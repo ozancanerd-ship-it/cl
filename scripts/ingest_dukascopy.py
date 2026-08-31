@@ -54,6 +54,10 @@ def main() -> int:
         default=0.0,
         help="Pause (s) vor jedem nicht gecachten Request — Rate-Limit-Schonung bei großen Fenstern.",
     )
+    ap.add_argument("--max-retries", type=int, default=3, help="Retries je Stunde (503-tolerant)")
+    ap.add_argument(
+        "--retry-backoff", type=float, default=1.0, help="Backoff-Basis (s), linear ×Versuch"
+    )
     args = ap.parse_args()
 
     start = parse_timestamp(args.start)
@@ -61,7 +65,12 @@ def main() -> int:
     repo = MarketDataRepository(args.repo)
     calendars = seed_calendars()
     inst_by_sym = {i.canonical_symbol: i for i in seed_instruments()}
-    provider = DukascopyProvider(cache_dir=Path(args.cache), request_delay_s=args.request_delay)
+    provider = DukascopyProvider(
+        cache_dir=Path(args.cache),
+        request_delay_s=args.request_delay,
+        max_retries=args.max_retries,
+        retry_backoff_s=args.retry_backoff,
+    )
 
     per_symbol: dict[str, dict[str, object]] = {}
     try:

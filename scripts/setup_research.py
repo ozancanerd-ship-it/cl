@@ -595,7 +595,7 @@ def _evaluate(
     split: datetime,
     start: datetime,
     end: datetime,
-    focus_symbol: str = "XAUUSDT",
+    focus_symbols: tuple[str, ...] = ("XAUUSDT",),
 ) -> dict[str, object]:
     is_pick: dict[float, float] = {}
     for rr, trs in trades_by_rr.items():
@@ -604,8 +604,13 @@ def _evaluate(
             is_pick[rr] = compute_metrics(is_t).expectancy_r
     best_rr = max(is_pick, key=lambda k: is_pick[k]) if is_pick else 2.0
     trades = trades_by_rr[best_rr]
-    is_t = [t for t in trades if t.entry_ts < split]
-    oos_t = [t for t in trades if t.entry_ts >= split]
+    # Purge/Embargo: Trades, deren Leben die IS/OOS-Grenze überspannt, fallen aus beiden Blöcken
+    # (max Haltedauer 60 H4-Bars = 10 Tage → 12-Tage-Puffer). Verhindert Leakage über die Grenze.
+    from datetime import timedelta as _td
+
+    embargo = _td(days=12)
+    is_t = [t for t in trades if t.exit_ts < split - embargo]
+    oos_t = [t for t in trades if t.entry_ts >= split + embargo]
     ss = symbol_stability(oos_t if oos_t else trades)
     ts = time_stability(trades, window_days=90, step_days=45)
     return {
@@ -615,7 +620,7 @@ def _evaluate(
         "IS": _m(is_t),
         "OOS": _m(oos_t),
         "dir_split_all": _dir_split(trades),
-        "focus_" + focus_symbol: _focus(trades, focus_symbol, split),
+        "focus": {s: _focus(trades, s, split) for s in focus_symbols},
         "walk_forward": _wf(trades, start, end),
         "monte_carlo_full": _mc(trades),
         "symbol_stability": {
@@ -657,6 +662,7 @@ def main() -> int:
     ap.add_argument("--end", default="2026-08-29")
     ap.add_argument("--cost-r", type=float, default=0.03)
     ap.add_argument("--manage", choices=["fixed", "scaled"], default="fixed")
+    ap.add_argument("--focus", nargs="+", default=["XAUUSDT", "XAUUSD-YF", "XAUUSD"])
     ap.add_argument("--out", default="data/repository_real/setup_research.json")
     args = ap.parse_args()
 
@@ -686,7 +692,9 @@ def main() -> int:
     for name, det in DETECTORS.items():
         by_rr = {rr: _run_detector(name, det, ctxs, rr=rr, cost_r=args.cost_r) for rr in _RRS}
         store[name] = by_rr
-        results[name] = _evaluate(by_rr, split=split, start=start, end=end)
+        results[name] = _evaluate(
+            by_rr, split=split, start=start, end=end, focus_symbols=tuple(args.focus)
+        )
         r = results[name]
         print(
             f"  {name}: {r['all'].get('n_trades', 0)} trades  RR={r['chosen_rr_on_is']}  "  # type: ignore[union-attr]
@@ -708,7 +716,9 @@ def main() -> int:
     combined = _combine(store["S0_sweep_reversal"][rr0], store[best_other][rrb])  # type: ignore[index]
     results["COMBINED_S0_plus_best"] = {
         "components": ["S0_sweep_reversal", best_other],
-        **_evaluate({2.0: combined}, split=split, start=start, end=end),
+        **_evaluate(
+            {2.0: combined}, split=split, start=start, end=end, focus_symbols=tuple(args.focus)
+        ),
     }
 
     report = {
