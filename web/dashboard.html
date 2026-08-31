@@ -129,7 +129,18 @@ const RENDERERS = {
     if(t.note) sec.appendChild($(`<div class="muted">${esc(t.note)}</div>`));
   },
   chart_analysis(sec,t){
-    sec.appendChild($(`<pre class="card">${esc(JSON.stringify(t.annotations||{},null,2))}</pre>`));
+    const a = t.annotations || {};
+    if(!a.candles || !a.candles.length){
+      sec.appendChild($(`<div class="empty">Keine Chart-Daten. build_dashboard.py --chart-symbol &lt;SYM&gt; (H4-Reihe im Repo nötig).</div>`));
+      return;
+    }
+    const head = $(`<div class="card"><h2>${esc(a.instrument||"Chart")} · H4 · ${a.candles.length} Bars</h2>
+      <div class="muted">Swings (HH/HL/LH/LL) · BOS/CHoCH · FVG · Entry/SL/TP wenn Signal</div></div>`);
+    const box = document.createElement("div");
+    box.style.cssText = "height:460px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px";
+    head.appendChild(box);
+    sec.appendChild(head);
+    drawChart(box, a);
   },
   signals(sec,t){
     const emitted = t.emitted||[], shadow = t.shadow||[], reentry = t.reentry||[];
@@ -305,6 +316,55 @@ function buildNav(){
     b.onclick = ()=>{ ACTIVE=k; render(); location.hash=k; };
     nav.appendChild(b);
   });
+}
+
+let _LWC = null;
+function loadLWC(){
+  if(_LWC) return Promise.resolve(_LWC);
+  return new Promise((res)=>{
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.js";
+    s.onload = ()=>{ _LWC = window.LightweightCharts; res(_LWC); };
+    s.onerror = ()=>res(null);
+    document.head.appendChild(s);
+  });
+}
+async function drawChart(box, a){
+  const LWC = await loadLWC();
+  if(!LWC){ box.innerHTML = `<div class="empty">Chart-Bibliothek nicht ladbar (offline?).</div>`; return; }
+  const dark = !matchMedia("(prefers-color-scheme: light)").matches;
+  const chart = LWC.createChart(box, {
+    layout:{background:{color:"transparent"},textColor:dark?"#8b949e":"#444"},
+    grid:{vertLines:{color:"rgba(120,120,120,0.08)"},horzLines:{color:"rgba(120,120,120,0.08)"}},
+    timeScale:{timeVisible:true,borderColor:"#2a313c"},
+    rightPriceScale:{borderColor:"#2a313c"},
+    autoSize:true,
+  });
+  const cs = chart.addCandlestickSeries({
+    upColor:"#3fb950",downColor:"#f85149",borderVisible:false,
+    wickUpColor:"#3fb950",wickDownColor:"#f85149",
+  });
+  cs.setData(a.candles.map(c=>({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close})));
+  const mk = (a.markers||[]).map(m=>({
+    time: Math.floor(new Date(m.time).getTime()/1000),
+    position: m.position==="aboveBar"?"aboveBar":"belowBar",
+    color: m.color||"#8b949e",
+    shape: m.shape==="arrowUp"?"arrowUp":m.shape==="arrowDown"?"arrowDown":"circle",
+    text: m.text||"",
+  })).filter(m=>!isNaN(m.time)).sort((x,y)=>x.time-y.time);
+  if(mk.length) cs.setMarkers(mk);
+  (a.price_lines||[]).forEach(p=>cs.createPriceLine({
+    price:p.price, color:p.color||"#2962FF",
+    lineStyle: p.line_style==="dashed"?2:p.line_style==="dotted"?1:0,
+    lineWidth:1, title:p.title||"",
+  }));
+  // FVG/OB-Zonen als horizontale Kanten (Füllung braucht LWC-Pro → nur obere/untere Linie)
+  (a.zones||[]).slice(0,10).forEach(z=>{
+    const col = String(z.title||"").indexOf("↓")>=0 ? "#f85149" : "#3fb950";
+    cs.createPriceLine({price:z.price_top,color:col,lineStyle:1,lineWidth:1,title:z.title||""});
+    cs.createPriceLine({price:z.price_bottom,color:col,lineStyle:1,lineWidth:1,title:""});
+  });
+  chart.timeScale().fitContent();
 }
 
 async function load(){

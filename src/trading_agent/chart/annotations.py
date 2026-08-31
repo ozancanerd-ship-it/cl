@@ -109,8 +109,14 @@ def build_chart_annotations(
 
     zones: list[Zone] = []
     per_tf = getattr(mtf, "per_tf", {}) or {}
-    entry = getattr(sr, "entry", None)
-    for ctx in per_tf.values():
+    # Bevorzugt den Setup-Timeframe (H4); fällt auf den ersten verfügbaren zurück.
+    ctxs = list(per_tf.values())
+    setup_ctx = next(
+        (c for c in ctxs if str(getattr(getattr(c, "timeframe", None), "value", "")) == "H4"),
+        ctxs[0] if ctxs else None,
+    )
+
+    for ctx in ctxs:
         for lv in getattr(ctx, "liquidity", ()) or ():
             price = getattr(lv, "price", None)
             if not isinstance(price, (int, float)):
@@ -126,15 +132,86 @@ def build_chart_annotations(
             )
         if len(zones) >= 6:
             break
-    _ = entry
+
+    if setup_ctx is not None:
+        _swing_markers(setup_ctx, markers)
+        _break_markers(setup_ctx, markers)
+        _imbalance_zones(setup_ctx, zones)
 
     return ChartAnnotations(
         instrument=instrument,
         as_of=as_of,
         price_lines=lines,
-        markers=markers,
-        zones=zones[:6],
+        markers=markers[:24],
+        zones=zones[:14],
     )
+
+
+_C_BULL_ZONE = "rgba(38,166,154,0.13)"
+_C_BEAR_ZONE = "rgba(239,83,80,0.13)"
+_C_OB_ZONE = "rgba(41,98,255,0.13)"
+
+
+def _iso(v: object) -> str:
+    return v.isoformat() if isinstance(v, datetime) else str(v)
+
+
+def _swing_markers(ctx: object, out: list[Marker]) -> None:
+    swings = list(getattr(ctx, "swings", ()) or [])[-10:]
+    for s in swings:
+        is_high = str(getattr(getattr(s, "type", None), "value", "")).endswith("high")
+        label = getattr(getattr(s, "label", None), "value", None) or ("H" if is_high else "L")
+        out.append(
+            Marker(
+                time=_iso(getattr(s, "timestamp", "")),
+                position="aboveBar" if is_high else "belowBar",
+                shape="circle",
+                color="#8b949e",
+                text=str(label).upper(),
+            )
+        )
+
+
+def _break_markers(ctx: object, out: list[Marker]) -> None:
+    for b in list(getattr(ctx, "structure_breaks", ()) or [])[-6:]:
+        kind = str(getattr(getattr(b, "kind", None), "value", "break")).upper()
+        bull = str(getattr(getattr(b, "direction", None), "value", "")) == "bullish"
+        out.append(
+            Marker(
+                time=_iso(getattr(b, "break_bar_timestamp", "")),
+                position="belowBar" if bull else "aboveBar",
+                shape="arrowUp" if bull else "arrowDown",
+                color=_C_TP if bull else _C_STOP,
+                text=kind,
+            )
+        )
+
+
+def _imbalance_zones(ctx: object, out: list[Zone]) -> None:
+    for fvg in list(getattr(ctx, "fvgs", ()) or []):
+        if str(getattr(getattr(fvg, "state", None), "value", "")) not in ("unmitigated", "partial"):
+            continue
+        bull = str(getattr(getattr(fvg, "direction", None), "value", "")) == "bullish"
+        out.append(
+            Zone(
+                price_top=float(getattr(fvg, "zone_high", 0.0)),
+                price_bottom=float(getattr(fvg, "zone_low", 0.0)),
+                color=_C_BULL_ZONE if bull else _C_BEAR_ZONE,
+                title=f"FVG {'↑' if bull else '↓'}",
+            )
+        )
+    for ob in list(getattr(ctx, "order_blocks", ()) or []):
+        if str(getattr(getattr(ob, "state", None), "value", "")) not in ("unmitigated", "partial"):
+            continue
+        bull = str(getattr(getattr(ob, "direction", None), "value", "")) == "bullish"
+        out.append(
+            Zone(
+                price_top=float(getattr(ob, "zone_high", 0.0)),
+                price_bottom=float(getattr(ob, "zone_low", 0.0)),
+                color=_C_OB_ZONE,
+                title=f"OB {'↑' if bull else '↓'}",
+            )
+        )
 
 
 __all__ = ["ChartAnnotations", "Marker", "PriceLine", "Zone", "build_chart_annotations"]

@@ -73,6 +73,56 @@ def _load_stocks(repo: MarketDataRepository, symbols: list[str], benchmark: str)
     return out
 
 
+def _load_chart(repo: MarketDataRepository, symbol: str, *, bars: int = 240) -> dict[str, object] | None:
+    """Candles (H4) + Swing-/BOS-Marker + FVG/OB-Zonen für den Chart-Tab.
+    Rein aus dem Repo + Primitiven — kein Live-Pipeline-Durchlauf nötig."""
+    from datetime import datetime as _dt
+
+    from trading_agent.chart.annotations import build_chart_annotations
+    from trading_agent.core.enums import Timeframe
+    from trading_agent.strategy.primitives.imbalance import find_fvgs
+    from trading_agent.strategy.primitives.structure import structure_breaks
+    from trading_agent.strategy.primitives.swings import detect_swings
+
+    lo, hi = _dt(2000, 1, 1, tzinfo=UTC), _dt(2100, 1, 1, tzinfo=UTC)
+    h4 = repo.read_ohlcv(symbol, Timeframe.H4, lo, hi)
+    if len(h4) < 60:
+        return None
+    window = h4[-bars:]
+    sw = detect_swings(h4, Timeframe.H4, left=2, right=2, min_leg_atr=0.5)
+    brk = structure_breaks(h4, sw, Timeframe.H4, min_swings=2)
+    tick = max(1e-6, round(abs(h4[-1].close) * 1e-5, 8))
+    try:
+        fvgs = find_fvgs(h4, Timeframe.H4, tick_size=tick)
+    except Exception:
+        fvgs = []
+    cutoff = window[-1].close_time
+    ctx = type(
+        "Ctx",
+        (),
+        {
+            "timeframe": Timeframe.H4,
+            "swings": tuple(s for s in sw if s.confirmed_at <= cutoff),
+            "structure_breaks": tuple(b for b in brk if b.break_bar_timestamp <= cutoff),
+            "fvgs": tuple(f for f in fvgs if f.created_bar <= cutoff)[-8:],
+            "order_blocks": (),
+            "liquidity": (),
+        },
+    )()
+    mtf = type("Mtf", (), {"per_tf": {Timeframe.H4: ctx}})()
+    sr = type("Sr", (), {"instrument": symbol, "information_cutoff": cutoff, "action": "", "direction": ""})()
+    ann = build_chart_annotations(sr, mtf=mtf).as_dict()
+    ann["candles"] = [
+        {
+            "time": int(b.open_time.timestamp()),
+            "open": b.open, "high": b.high, "low": b.low, "close": b.close,
+        }
+        for b in window
+    ]
+    ann["instrument"] = symbol
+    return ann
+
+
 def _load_reentry(pattern: str, shadow_signals: list[dict[str, object]]) -> list[dict[str, object]]:
     """reentry_watch-Zeilen aus den Journalen; 'setup', wenn ein frisches Shadow-Signal für
     dasselbe Instrument+Richtung existiert, sonst 'watch'."""
@@ -180,6 +230,12 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
     except Exception as exc:
         blockers.append(f"performance/reentry/stocks: {exc}")
 
+    chart: dict[str, object] | None = None
+    try:
+        chart = _load_chart(MarketDataRepository(args.repo), args.chart_symbol)
+    except Exception as exc:
+        blockers.append(f"chart: {exc}")
+
     dash = build_dashboard_state(
         DashboardInputs(
             as_of=datetime.now(UTC),
@@ -189,6 +245,7 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
             signals=signals,
             shadow_signals=shadow,
             reentry=reentry,
+            chart_annotations=chart,
             validation=[sv.as_dict() for sv in registry.all()],
             portfolio=portfolio,
             paper_performance=perf,
@@ -210,6 +267,7 @@ def main() -> int:
         "--stocks", nargs="*", default=["NVDA", "AAPL", "MSFT", "AMD", "GOOGL", "META"]
     )
     ap.add_argument("--benchmark", default="SPX-YF")
+    ap.add_argument("--chart-symbol", default="XAUUSD-YF")
     ap.add_argument("--validation-config", default="config/setup_validation.json")
     ap.add_argument("--out", default="web/dashboard.json")
     args = ap.parse_args()
