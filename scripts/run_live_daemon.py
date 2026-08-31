@@ -228,6 +228,8 @@ async def main() -> int:
                 top_opportunities=status["_top_opportunities"],
                 scanner_evaluations=scanner.evaluations,
                 signals=emitted_signals,
+                shadow_signals=shadow_signals,
+                validation=[sv.as_dict() for sv in validation.all()],
                 blockers=[],
             )
         )

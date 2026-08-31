@@ -45,7 +45,9 @@ class DashboardInputs:
     strategy_version: str = "0.1.1"
     top_opportunities: list[dict[str, Any]] = field(default_factory=list)
     scanner_evaluations: int = 0
-    signals: list[dict[str, Any]] = field(default_factory=list)
+    signals: list[dict[str, Any]] = field(default_factory=list)  # LIVE-eligible
+    shadow_signals: list[dict[str, Any]] = field(default_factory=list)  # nicht validiert
+    validation: list[dict[str, Any]] = field(default_factory=list)  # ValidationRegistry.all()
     chart_annotations: dict[str, Any] | None = None
     portfolio: dict[str, Any] | None = None
     paper_positions: list[dict[str, Any]] = field(default_factory=list)
@@ -112,10 +114,13 @@ def build_dashboard_state(inp: DashboardInputs) -> DashboardState:
         "signals": _section(
             True,
             emitted=signals,
+            shadow=inp.shadow_signals,
+            validation=inp.validation,
             note=(
                 "NO-TRADE-Zeitraum — lieber kein Trade als ein schlechter."
-                if not signals
-                else f"{len(signals)} strukturierte(s) BUY/SELL-Signal(e)."
+                if not signals and not inp.shadow_signals
+                else f"{len(signals)} LIVE · {len(inp.shadow_signals)} SHADOW "
+                "(Setup nicht validiert — nur Forward-Tracking)."
             ),
         ),
         "my_portfolios": _merge(inp.portfolio is not None, inp.portfolio),
