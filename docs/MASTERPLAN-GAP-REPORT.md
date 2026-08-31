@@ -1,15 +1,27 @@
 # Masterplan — Gap Report (2026-08-31)
 
-Vergleich des **tatsächlichen Codestands** (969 Tests grün, ruff/ruff-format/mypy-strict sauber)
-gegen den 71-Punkte-Masterplan. Marker: ✅ DONE · 🟡 PARTIAL · 🟠 PREPARED · 🔴 MISSING · ⛔ BLOCKED.
+Vergleich des **tatsächlichen Codestands** gegen den 71-Punkte-Masterplan.
+Marker: ✅ DONE · 🟡 PARTIAL · 🟠 PREPARED · 🔴 MISSING · ⛔ BLOCKED.
+
+> **Update 2026-08-31 (nach Stufen A–I + Governance):** 1040 Tests grün, mypy-strict clean.
+> Stufen A–I sind code-seitig abgearbeitet (`docs/STAGE-*-2026-08.md`). Zusätzlich:
+> - **Strategy-Edge-Investigation** (`docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md`): 6 Setup-
+>   Konstruktionen getestet, **keine mit robuster OOS-Edge** auf den verfügbaren Daten. Der
+>   Engpass ist die Strategie-Edge selbst, nicht das Regime-Gate.
+> - **Data-Roles / Live-Decision-Governance** (`docs/DATA-ROLES-LIVE-DECISION.md`): neues
+>   `governance/`-Paket — Historical=Validierung, Live=Entscheidung, Recent=Edge-Check.
+>   `ValidationRegistry` gated Live-Signale (Default: alles UNVALIDATED → SHADOW).
+> - **Gold/FX-Daten**: Dukascopy wieder erreichbar, XAUUSD-3-Jahres-Ingest läuft. FX folgt.
+> - **Weiterhin BLOCKED**: FRED-Key, Aktien-Datenquelle, News-Feed, Telegram-Token, FastAPI+
+>   Frontend, cTrader/OANDA-Demo. Echtgeld ausgeschlossen (kein OMS-Order-Lifecycle gebaut).
 
 ## Gesamtbild in einem Satz
 
-Die **Analyse- und Entscheidungshälfte** (Data Foundation → MarketContext → MTF → Struktur/
-Liquidity/SMC → Regime → Setup-FSM → Score/Confidence/Veto/No-Trade → dynamisches Signal →
-Paper-Position → Backtest) ist **gebaut und getestet**. Es fehlt fast die **gesamte Portfolio-/
-Ranking-/Scanner-/UI-Hälfte** sowie **News-/Macro-/Fundamentals-Live-Feeds**. Kein einziger
-Backtest hat je einen Trade erzeugt (Regime-Gate), daher ist die Strategie **noch nicht validiert**.
+Die **Analyse-, Signal-, Scanner-, Portfolio-Intelligence-, Ops- und UI-Daten-Schicht** ist
+gebaut und getestet. Die **Governance-Schicht** (welche Strategie darf live?) ist gebaut. Der
+verbleibende Kern-Blocker: **keine Strategie hat eine belegte OOS-Edge** — daher laufen alle
+Live-Signale als SHADOW. Fortschritt Richtung Echtgeld hängt an (A) mehr Daten + Re-Research,
+(B) Hypothese neu fassen, und an vier externen Zugängen/Entscheidungen.
 
 ---
 
