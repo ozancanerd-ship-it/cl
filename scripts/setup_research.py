@@ -91,6 +91,10 @@ class Ctx:
     _h4_brk_ts: list[datetime] = field(default_factory=list)
     _d1_state: list[RegimeDirectional] = field(default_factory=list)  # je H4-Bar
     _d1_bos: list[int] = field(default_factory=list)  # je H4-Bar: +1/-1/0
+    _dxy_sign: list[int] = field(default_factory=list)  # je H4-Bar: DXY-20-D1-Trend +1/-1/0
+
+    def dxy_sign(self, i: int) -> int:
+        return self._dxy_sign[i] if i < len(self._dxy_sign) else 0
 
     def swings_at(self, i: int) -> list[SwingPoint]:
         cut = self.h4[i].close_time
@@ -107,7 +111,27 @@ class Ctx:
         return self._d1_bos[i]
 
 
-def build_ctx(symbol: str, h4: list[OHLCV], d1: list[OHLCV]) -> Ctx:
+def _dxy_sign_series(h4: list[OHLCV], dxy_d1: list[OHLCV], lookback: int = 20) -> list[int]:
+    """Je H4-Bar: Vorzeichen des DXY-Trends über die letzten ``lookback`` D1-Bars (PIT).
+    +1 = DXY steigt, -1 = fällt, 0 = flach / keine Daten."""
+    if not dxy_d1:
+        return [0] * len(h4)
+    dxy_close = [b.close for b in dxy_d1]
+    dxy_ct = [b.close_time for b in dxy_d1]
+    out: list[int] = []
+    for bar in h4:
+        j = bisect_right(dxy_ct, bar.close_time) - 1  # letzte DXY-D1-Bar ≤ cutoff
+        if j < lookback:
+            out.append(0)
+            continue
+        chg = (dxy_close[j] - dxy_close[j - lookback]) / dxy_close[j - lookback]
+        out.append(1 if chg > 0.008 else -1 if chg < -0.008 else 0)
+    return out
+
+
+def build_ctx(
+    symbol: str, h4: list[OHLCV], d1: list[OHLCV], *, dxy_d1: list[OHLCV] | None = None
+) -> Ctx:
     atr = atr_series(h4, _ATR_P)
     h4_sw = detect_swings(h4, _H4, left=_SWING_L, right=_SWING_R, min_leg_atr=0.5)
     h4_sw.sort(key=lambda s: s.confirmed_at)
@@ -158,6 +182,7 @@ def build_ctx(symbol: str, h4: list[OHLCV], d1: list[OHLCV]) -> Ctx:
         _h4_brk_ts=[b.break_bar_timestamp for b in h4_brk],
         _d1_state=d1_state,
         _d1_bos=d1_bos,
+        _dxy_sign=_dxy_sign_series(h4, dxy_d1 or []),
     )
 
 
@@ -531,6 +556,19 @@ def detect_s15(ctx: Ctx, i: int) -> Signal | None:
     return sig if _d1_efficiency_ratio(ctx, i) >= 0.40 else None
 
 
+def detect_s16(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + **DXY-Gegenwind-Filter** (nur wo DXY-Daten vorliegen, sonst == S9): kein Gold-Long
+    gegen einen klar steigenden DXY, kein Gold-Short gegen einen klar fallenden DXY.
+    Gold ist invers zum USD — ein Breakout, der den Makro-Treiber bekämpft, ist fragil."""
+    sig = _s9_base(ctx, i)
+    if sig is None:
+        return None
+    dxy = ctx.dxy_sign(i)
+    if (sig.direction > 0 and dxy > 0) or (sig.direction < 0 and dxy < 0):
+        return None
+    return sig
+
+
 DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S0_sweep_reversal": detect_s0,
     "S1_breakout_retest": detect_s1,
@@ -548,6 +586,7 @@ DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S13_htf_conf_coil3": detect_s13,
     "S14_regime_gate_er30": detect_s14,
     "S15_regime_gate_er40": detect_s15,
+    "S16_dxy_headwind": detect_s16,
 }
 
 
@@ -840,6 +879,7 @@ def main() -> int:
     ap.add_argument("--cost-r", type=float, default=0.03)
     ap.add_argument("--manage", choices=["fixed", "scaled"], default="fixed")
     ap.add_argument("--focus", nargs="+", default=["XAUUSDT", "XAUUSD-YF", "XAUUSD"])
+    ap.add_argument("--dxy-symbol", default="DXY-YF", help="DXY-Reihe für den S16-Gegenwind-Filter")
     ap.add_argument("--out", default="data/repository_real/setup_research.json")
     args = ap.parse_args()
 
@@ -847,6 +887,10 @@ def main() -> int:
     _MANAGE = args.manage
     start, split, end = (parse_timestamp(x) for x in (args.start, args.split, args.end))
     repo = MarketDataRepository(args.repo)
+
+    dxy_d1 = repo.read_ohlcv(args.dxy_symbol, _D1, start, end)
+    if dxy_d1:
+        print(f"  DXY-Kontext: {len(dxy_d1)} D1-Bars ({args.dxy_symbol})")
 
     ctxs: list[Ctx] = []
     coverage: dict[str, object] = {}
@@ -856,7 +900,9 @@ def main() -> int:
         if len(h4) < 200 or len(d1) < 40:
             coverage[sym] = {"skip": True, "h4": len(h4), "d1": len(d1)}
             continue
-        ctxs.append(build_ctx(sym, h4, d1))
+        # DXY-Gegenwind-Filter (S16) nur für Gold-Instrumente
+        is_gold = "XAU" in sym.upper()
+        ctxs.append(build_ctx(sym, h4, d1, dxy_d1=dxy_d1 if is_gold else None))
         coverage[sym] = {
             "h4_bars": len(h4),
             "d1_bars": len(d1),

@@ -22,14 +22,24 @@ from trading_agent.data.providers.yahoo_finance import DEFAULT_SYMBOL_MAP, Yahoo
 from trading_agent.data.repository import MarketDataRepository
 from trading_agent.data.resample import resample_ohlcv
 
-_YAHOO = {"XAUUSD": "GC=F", **DEFAULT_SYMBOL_MAP}
+# Cross-Asset-Proxies (keylos): Broad-USD-Index, 10Y-/2Y-Rendite (×10), VIX, S&P 500.
+# Für den Makro-/Confluence-Layer (CrossAssetContext) — v. a. Gold ist real-yield-/DXY-getrieben.
+_INDEX_MAP = {
+    "DXY": "DX-Y.NYB",
+    "US10Y": "^TNX",
+    "US02Y": "^FVX",  # 5Y als 2Y-Proxy (Yahoo hat kein ^IRX-Äquivalent für 2Y stabil)
+    "VIX": "^VIX",
+    "SPX": "^GSPC",
+}
+_YAHOO = {"XAUUSD": "GC=F", **DEFAULT_SYMBOL_MAP, **_INDEX_MAP}
 
 
 async def _one(
     inst: str, start: datetime, end: datetime, repo: MarketDataRepository
 ) -> dict[str, object]:
     dest = f"{inst}-YF"
-    provider = YahooFinanceProvider(symbol_map={dest: _YAHOO.get(inst, f"{inst}=X")})
+    yahoo_sym = _YAHOO.get(inst) or (inst if inst.startswith("^") else f"{inst}=X")
+    provider = YahooFinanceProvider(symbol_map={dest: yahoo_sym})
     try:
         h1 = await provider.fetch_ohlcv(dest, Timeframe.H1, start, end)
     finally:

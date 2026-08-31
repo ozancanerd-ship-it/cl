@@ -57,14 +57,19 @@ Neue Detektoren, **strukturell** motiviert (nicht an die 6 Trades gefittet):
 hinaus (S11–S13) verschlechtert durchweg** → Stopp bei S9. Das ist die Grenze zwischen
 Verbesserung und Overfitting.
 
-### Regime-Gate (S14/S15) — geprüft, NICHT integriert
+### Weitere Varianten — alle geprüft, KEINE integriert
 
-Idee: nur handeln, wenn der Markt tatsächlich trendet (Kaufman Efficiency Ratio auf H4-Closes,
-120 Bars). Ergebnis: **zu streng** — S14 (ER ≥ 0.30) = 10 Trades im ganzen 12-Instrument-Panel
-über 3 Jahre, S15 (ER ≥ 0.40) = 1 Trade. Die überlebenden Zahlen sehen glänzend aus (S14 OOS
-+0.72 R, PF 3.8) — bei **n = 4 OOS** ist das die klassische Overfitting-Falle, kein Signal.
-Ein weicheres Regime-Maß oder mehr Daten nötig; die Detektoren bleiben zur Wieder-Prüfung im
-Research-Bench (`setup_research.py` S14/S15), werden aber **nicht** in die Strategie übernommen.
+| Variante | Idee | Ergebnis |
+|----------|------|----------|
+| S14/S15 | Regime-Gate: nur bei trendendem Markt (Kaufman Efficiency Ratio ≥ 0.30/0.40) | **zu streng** — 10 bzw. 1 Trade im ganzen Panel. Überlebende Zahlen glänzen (S14 OOS +0.72 R), aber n = 4 OOS = Overfitting-Falle. |
+| S16 | DXY-Gegenwind: kein Gold-Long gegen steigenden DXY, kein Short gegen fallenden DXY (DXY-YF 20-D1-Trend) | **hilft nicht** — entfernt 4 *gewinnende* XAUUSD-YF-Longs, OOS +0.414→+0.395, MC pp 0.79→0.76. Die Gold↔USD-Inverskorrelation hielt 2024–26 nicht (Gold + DXY stiegen zeitweise gemeinsam). |
+
+**Fazit: 8 strukturell motivierte Varianten getestet, genau eine (S9) überlebt OOS/WF/MC.**
+Das ist die disziplinierte Grenze — kein Threshold-Suchen bis „es passt". S14–S16 bleiben als
+Research-Detektoren im Bench (`setup_research.py`) für den Fall, dass mehr/echtere Daten kommen.
+
+Nebenprodukt: `DXY-YF` / `US10Y-YF` / `VIX-YF` (keylos, Yahoo) sind jetzt im Repo — nutzbar für
+den Makro-/Cross-Asset-Layer (`CrossAssetContext`), unabhängig von S16.
 
 ### S9-Logik
 
