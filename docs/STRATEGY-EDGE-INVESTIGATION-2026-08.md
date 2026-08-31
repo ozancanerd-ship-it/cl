@@ -170,6 +170,54 @@ Decision-Pfad.**
 
 ---
 
+## Teil 5 — Nachtrag (2026-08-31): Gold-Historie → Breakout+Retest **plausibel**
+
+Nach der Klarstellung des Nutzers (Historical = Validierung, Live = Entscheidung) wurde mehr
+Gold-Historie beschafft: **Yahoo `GC=F` H1, 2024-04 → 2026-08** (~28 Monate, indikativ) →
+`XAUUSD-YF` (H4 2 965 Bars, D1 734). Deckt die **2024er-Konsolidierung + 2025/26-Trend** ab —
+Regime-Vielfalt, die der Binance-XAUUSDT-Reihe (erst ab 2025-12) fehlt. Dukascopy-Spot-XAUUSD
+(2023–2026, echt) läuft parallel im Ingest (langsam, 503-Flakiness).
+
+**Neu-Lauf** (`setup_research.py`, scaled-Mgmt, 12-Tage-Purge/Embargo, 8 Symbole, 3 Splits
+2025-01/06/10, Kosten 0.06–0.08 R):
+
+| Setup | IS exp | OOS exp (3 Splits) | WF +/n | MC prob_positiv | XAUUSD-YF |
+|---|---:|---:|---:|---:|---|
+| **S4 Breakout+Retest, D1-Trend-Filter** | +0.18…+0.25 | **+0.40 / +0.44 / +0.47** | 5–6/6–7 | **0.59 / 0.65 / 0.78** | +7.7…+13.3 R / 16–18 Trades / PF 2.4–4.4 |
+| **S1 Breakout+Retest (roh)** | −0.01…+0.08 | +0.25 / +0.33 / +0.39 | **12/12** | 0.01 | **+23–24 R / 65 Trades / PF 2.2**, wächst über Zeit (1. Hälfte +6, 2. +18), long +19 / short +5 |
+| S3 HTF-Break+Confirm | +0.07…+0.10 | +0.10 / +0.13 / +0.16 | 7/9 | 0.12 | +6.6–7.0 R / 19 Trades / PF ~2.1 |
+| S5 D1-Trend+H4-Break | +0.08…+0.13 | +0.14 / +0.19 / +0.22 | 5/8 | 0.18 | +5.1–5.5 R / 19 Trades |
+| S0 / S2 | — | negativ / kippt | — | 0.0–0.02 | negativ |
+
+### Bewertung — ehrlich
+
+**Erstes belastbares Signal der gesamten Untersuchung.** Die **Breakout+Retest**-Familie (S1/S4)
+zeigt auf der Gold-Historie:
+- IS ≈ OOS (kein Overfit-Vorzeichen-Kippen) über **alle drei Splits**
+- **S1: 12/12 Walk-Forward-Fenster positiv** (die robusteste Kennzahl)
+- **S4: als einziges Setup Monte-Carlo-`prob_positive` > 0.5** unter 1.5×-Kosten-Stress
+- Gold-Performance **wächst** über die Zeit (nicht front-loaded), long **und** short auf Gold positiv (S1)
+- **Wenige, gute Trades** (S4 ≈ 7/Jahr auf Gold) — genau der geforderte Quality-over-Quantity-Charakter
+
+**Aber NICHT `VALIDATED`:**
+1. `XAUUSD-YF` ist **indikativ** (Yahoo-Futures-Close, kein Spot-Bid/Ask) — und **widerspricht** der
+   Binance-XAUUSDT-Reihe im 2026er-Overlap (S1: +24 R auf YF, **−0.7 R** auf XAUUSDT).
+2. Kleine OOS-Stichproben (S4: 10–26; S3/S5: 7–45).
+3. 2024–2026 war trotz Konsolidierungs-Phasen **überwiegend Gold-Hausse** (+120 %) — Long-Bias-Risiko bleibt.
+4. Auf dem Crypto-Panel ist S1 nur mittelmäßig (PF 1.17–1.24, MC pp 0.02) — evtl. ein **Gold-Setup**, kein universelles.
+
+### Entscheidung (datenbasiert)
+
+Der **zweite Setup-Typ = „Breakout + Retest mit HTF-Trend-Filter"** (`SETUP-BREAKOUT-RETEST-01`,
+S4-Logik). Status: **`IN_VALIDATION`** — historische OOS-Edge *plausibel*, noch nicht *bewiesen*.
+
+**Integriert** (damit die Forward-Validierung überhaupt laufen kann):
+Strategy-Engine (2. Setup-Typ) · Opportunity-Score · Signal-Engine · Paper-Trading · Versionierung.
+XAUUSDT-Signale erscheinen als **SHADOW** (IN_VALIDATION) und werden forward-getrackt. Übergang
+auf `VALIDATED` erst nach **(a)** Bestätigung auf echter Dukascopy-Gold-Historie **und (b)**
+≥ 100 Forward-/Paper-Trades, die die Baseline halten (`scripts/edge_health_check.py`).
+
 ## Änderungen an anderen Dokumenten
 
 - `docs/STAGE-B-STRATEGY-VALIDATION-2026-08.md` — Befund erweitert: die Setup-Ebene (nicht nur der Klassifikator) hat keine OOS-Edge. Dieses Dokument ist die tiefere Untersuchung dazu.
+- `docs/DATA-ROLES-LIVE-DECISION.md` — `SETUP-BREAKOUT-RETEST-01` in der `ValidationRegistry` als `IN_VALIDATION`.

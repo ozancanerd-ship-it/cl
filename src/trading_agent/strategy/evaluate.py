@@ -85,6 +85,12 @@ from trading_agent.strategy.setup_detection import (
     SetupScan,
     detect_setups,
 )
+from trading_agent.strategy.setups.breakout_retest import (
+    SETUP_BREAKOUT_RETEST,
+    BreakoutRetestParams,
+    BreakoutRetestReport,
+    detect_breakout_retest,
+)
 from trading_agent.strategy.veto import VetoParams, VetoReport, assess_vetoes
 
 _HIGHER = (Timeframe.M15, Timeframe.H4, Timeframe.D1)
@@ -107,6 +113,11 @@ class EvaluateParams:
     contradictions: ContradictionParams = dataclasses.field(default_factory=ContradictionParams)
     confidence: ConfidenceParams = dataclasses.field(default_factory=ConfidenceParams)
     scoring: ScoreParams = dataclasses.field(default_factory=ScoreParams)
+    # 2. Setup-Typ (SETUP-BREAKOUT-RETEST-01). Läuft parallel zur SMC-Kette; greift nur, wenn
+    # SMC NICHT actionable ist. Standardmäßig AN — die Governance (ValidationRegistry) hält es
+    # als SHADOW, solange nicht validiert.
+    breakout_enabled: bool = True
+    breakout: BreakoutRetestParams = dataclasses.field(default_factory=BreakoutRetestParams)
 
     def __post_init__(self) -> None:
         # 24/7-Märkte (Krypto + Altcoins): kein Wochenend-Block / Session-Kalender im No-Trade-Gate.
@@ -145,6 +156,7 @@ class EvaluationResult:
     contradictions: ContradictionReport | None = None
     confidence: ConfidenceReport | None = None
     score: ScoreReport | None = None
+    breakout: BreakoutRetestReport | None = None  # 2. Setup-Typ — Report (auch wenn nicht ARMED)
     live_gate: object = (
         None  # governance.LiveGateReport | None (spät gesetzt, Import-Zyklus vermeiden)
     )
@@ -208,8 +220,82 @@ def evaluate_from_mtf(
     account_risk: AccountRisk | None = None,
     params: EvaluateParams | None = None,
 ) -> EvaluationResult:
-    """Pipeline auf einem **bereits gebauten** ``MtfContext`` (``build_mtf_context`` übersprungen).
-    ``spread`` ergänzt / überschreibt ``mtf.market_context.spread`` für die Ausführungs-Gates."""
+    """Zentrale Pipeline auf einem bereits gebauten ``MtfContext``.
+
+    Fährt die **SMC-SWEEP-REV-01-Kette** (``_evaluate_smc``) und — wenn diese *nicht* actionable
+    ist und die globale No-Trade-Checkliste frei ist — parallel den **2. Setup-Typ**
+    ``SETUP-BREAKOUT-RETEST-01``. Ein ARMED Breakout-Retest mit gültiger Geometrie + RR ersetzt
+    dann die SMC-Entscheidung. Die SMC-Kette selbst bleibt unverändert.
+    """
+    p = params or EvaluateParams()
+    smc = _evaluate_smc(
+        mtf,
+        spread=spread,
+        portfolio_context=portfolio_context,
+        m1_bars=m1_bars,
+        session_specs=session_specs,
+        system=system,
+        instrument_history=instrument_history,
+        account_risk=account_risk,
+        params=p,
+    )
+    if not p.breakout_enabled or smc.decision.is_actionable or smc.no_trade.blocked:
+        return smc
+    bo = detect_breakout_retest(smc.mtf, params=p.breakout)
+    if not bo.is_armed:
+        return dataclasses.replace(smc, breakout=bo)
+    return _breakout_decision(smc, bo, p)
+
+
+def _breakout_decision(
+    smc: EvaluationResult, bo: BreakoutRetestReport, p: EvaluateParams
+) -> EvaluationResult:
+    """Baut aus einem ARMED ``BreakoutRetestReport`` eine ``Decision.trade`` — leichter Pfad
+    ohne die SMC-eigenen Location/Confluence-Gates (Breakout hat eigene Geometrie + RR-Prüfung)."""
+    assert bo.direction is not None and bo.entry is not None
+    from trading_agent.core.enums import RiskTier
+
+    dec = Decision.trade(
+        bo.instrument,
+        bo.information_cutoff,
+        bo.direction,
+        entry=float(bo.entry),
+        sl=float(bo.sl),  # type: ignore[arg-type]
+        tp1=float(bo.tp1),  # type: ignore[arg-type]
+        tp2=float(bo.tp2),  # type: ignore[arg-type]
+        tier=RiskTier.B,  # Breakout-Retest gibt (noch) kein A/A+-Tier — konservativ B
+        tp3_ref=bo.tp3_ref,
+        rr_to_tp2=bo.rr_to_tp2,
+        blended_rr=bo.blended_rr,
+        score=None,
+        confidence=bo.confidence,
+        chain_progress=bo.chain_progress,
+        setup_id=SETUP_BREAKOUT_RETEST,
+        context_ref={
+            "setup_type": SETUP_BREAKOUT_RETEST,
+            "d1_trend": bo.d1_trend.value,
+            "broken_level": bo.broken_level,
+            "breakout_bar": bo.breakout_bar.isoformat() if bo.breakout_bar else None,
+            "retest_bar": bo.retest_bar.isoformat() if bo.retest_bar else None,
+        },
+    )
+    return dataclasses.replace(smc, decision=dec, breakout=bo)
+
+
+def _evaluate_smc(
+    mtf: MtfContext,
+    *,
+    spread: float | None = None,
+    portfolio_context: PortfolioContext | None = None,
+    m1_bars: Sequence[object] = (),
+    session_specs: Sequence[SessionSpec] = (),
+    system: SystemState | None = None,
+    instrument_history: InstrumentHistory | None = None,
+    account_risk: AccountRisk | None = None,
+    params: EvaluateParams | None = None,
+) -> EvaluationResult:
+    """Die SMC-SWEEP-REV-01-Kette (unverändert). ``spread`` ergänzt/überschreibt
+    ``mtf.market_context.spread`` für die Ausführungs-Gates."""
     p = params or EvaluateParams()
     inst = mtf.instrument
     cutoff = mtf.information_cutoff

@@ -9,6 +9,21 @@
       "validated_window": null,
       "forward_trades_required": 100,
       "notes": "Baseline OOS-kalibriert + gesperrt, aber ohne nachgewiesene OOS-Edge (docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md: 6 Setup-Konstruktionen, keine mit robuster OOS-Edge). Live-Signale = SHADOW, bis eine belegte Edge + Forward-Bestaetigung vorliegt."
+    },
+    {
+      "setup_id": "SETUP-BREAKOUT-RETEST-01",
+      "strategy_version": "0.1.1",
+      "status": "in_validation",
+      "baseline": {
+        "expectancy_r": 0.40,
+        "profit_factor": 2.3,
+        "win_rate": 0.55,
+        "max_drawdown_r": 8.0,
+        "n_trades": 30
+      },
+      "validated_window": ["2024-04-09", "2026-08-28"],
+      "forward_trades_required": 100,
+      "notes": "S4 aus scripts/setup_research.py. Gold-Historie XAUUSD-YF (Yahoo, indikativ) ueber 3 IS/OOS-Splits: OOS-Expectancy +0.40..+0.47R, Walk-Forward 5-6/6-7 positiv, Monte-Carlo prob_positive 0.59-0.78 (einziger Setup, der den 1.5x-Kosten-Stress besteht). ABER: Yahoo-Daten indikativ + widersprechen der Binance-XAUUSDT-Reihe im 2026-Overlap; kleine OOS-Stichprobe (10-26); 2024-26 Gold-Hausse. IN_VALIDATION -> Live-Signale = SHADOW, forward-getrackt. VALIDATED erst nach (a) echter Dukascopy-Gold-Historie + (b) >=100 Forward-Trades (scripts/edge_health_check.py). Baseline hier = konservative Rundung der S4-OOS-Zahlen."
     }
   ]
 }

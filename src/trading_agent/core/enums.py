@@ -588,6 +588,11 @@ class NoTradeReason(StrEnum):
     MESSY_LIQUIDITY = "messy_liquidity"  # C2
     ENTRY_INTO_OPPOSING_HTF_ZONE = "entry_into_opposing_htf_zone"  # C9 (Überlappung > 50 %)
     COUNTER_SETUP_CONFLICT = "counter_setup_conflict"  # C12
+    # SETUP-BREAKOUT-RETEST-01 (2026-08, 2. Setup-Typ)
+    NO_CONSOLIDATION = "no_consolidation"
+    NO_BREAKOUT = "no_breakout"
+    NO_RETEST = "no_retest"
+    HTF_TREND_MISALIGNED = "htf_trend_misaligned"
 
 
 __all__ = [

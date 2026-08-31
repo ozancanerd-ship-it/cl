@@ -88,8 +88,8 @@ class SetupValidation:
         )
 
 
-# Konservativer eingebauter Default. Stand: `docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md` —
-# SMC-SWEEP-REV-01 hat auf den verfügbaren Daten KEINE belegte OOS-Edge → UNVALIDATED.
+# Konservativer eingebauter Default (überschreibbar via config/setup_validation.json).
+# Stand: `docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md`.
 _BUILTIN: dict[tuple[str, str], SetupValidation] = {
     ("SMC-SWEEP-REV-01", STRATEGY_VERSION): SetupValidation(
         setup_id="SMC-SWEEP-REV-01",
@@ -98,6 +98,22 @@ _BUILTIN: dict[tuple[str, str], SetupValidation] = {
         notes=(
             "Baseline OOS-kalibriert + gesperrt, aber ohne nachgewiesene OOS-Edge "
             "(Stufe B / Strategy-Edge-Investigation 2026-08). Live-Signale = SHADOW."
+        ),
+    ),
+    # 2. Setup-Typ: historische OOS-Edge auf Gold *plausibel* (S4-Forschung), aber auf
+    # indikativen Yahoo-Daten + kleiner OOS-Stichprobe → sammelt Forward-Trades.
+    ("SETUP-BREAKOUT-RETEST-01", STRATEGY_VERSION): SetupValidation(
+        setup_id="SETUP-BREAKOUT-RETEST-01",
+        strategy_version=STRATEGY_VERSION,
+        status=ValidationStatus.IN_VALIDATION,
+        baseline=BaselineMetrics(
+            expectancy_r=0.40, profit_factor=2.3, win_rate=0.55, max_drawdown_r=8.0, n_trades=30
+        ),
+        validated_window=("2024-04-09", "2026-08-28"),
+        notes=(
+            "S4 (Breakout+Retest, D1-Trend-Filter). Gold-OOS +0.40..+0.47R, WF 5-6/6-7, "
+            "MC prob_positive 0.59-0.78. Indikative Daten + kleine Stichprobe → IN_VALIDATION, "
+            "Signale = SHADOW bis echte Historie + >=100 Forward-Trades."
         ),
     ),
 }
