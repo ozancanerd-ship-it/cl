@@ -19,6 +19,9 @@ Alle Details: `docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md`.
 | 8 | **Re-Entry-Watches** ins Dashboard | `xau_shadow` emittiert Watches bei These-intaktem Exit |
 | 9 | **Aktien-Engine** (`investment/stock_analysis.py` + `scripts/stock_analysis.py`) | Einzelwerte only, ETF-Reject, 6 Faktoren |
 | 10 | **Cross-Asset keylos** (`ingest_yahoo.py` + `build_cross_asset_from_repo`) | DXY-YF/US10Y-YF/VIX-YF → Confluence |
+| 11 | **Economic Calendar** (`config/economic_calendar.csv` + `seed_economic_calendar.py`) | 80 FOMC+NFP-Termine 2023–26 (Fakten), im News-Store |
+| 12 | **Live-Chart** (`chart/annotations.py` + Candlestick im Dashboard) | Candles + Swings/BOS/FVG, lightweight-charts via cdnjs |
+| 13 | **Alert-Taxonomie vervollständigt** (`strategy/alerts.py`) | +PORTFOLIO_RISK / HIGH_IMPACT_NEWS / RE_ENTRY_SETUP / PARTIAL_TP (18 Typen) |
 
 ## IMPROVED
 
@@ -43,8 +46,8 @@ Alle Details: `docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md`.
 
 ## TESTS
 
-- **1063 grün** (vorher 1055). `+2` Governance/Konfluenz-Tests, `+1` cross_asset, `+5` stock_analysis,
-  `+4` breakout (bestehende an S9-Fixtures angepasst — kein Test „geschwächt").
+- **1067 grün** (vorher 1055). `+2` Governance/Konfluenz, `+1` cross_asset, `+5` stock_analysis,
+  `+3` economic_calendar, `+1` alerts, breakout an S9-Fixtures angepasst — **kein Test „geschwächt".**
 - `mypy --strict` sauber (204 Dateien). `ruff check` + `ruff format` sauber.
 - Live-Daemon-Kurzlauf (40 s, XAUUSDT): NO_TRADE, `orders_sent=0`, Audit-Hash-Kette intakt, 1 Snapshot.
 - **Bekannter Alt-Flake** (nicht von heute): `test_look_ahead_immunity` flackerte einmal im
@@ -144,12 +147,13 @@ die vollständige Dukascopy-Historie da ist.
 ## NEXT (autonom, sobald sinnvoll)
 
 1. **Breakout-Setup per Trending-vs-Ranging-Regime-Gate** absichern — die Diagnose zeigt, dass
-   es in Ranges systematisch verliert. Erste Versuche (Efficiency-Ratio) waren zu streng;
-   weicheres Maß oder mehr Daten nötig.
-2. **Live-Chart** (Candles + Swings/FVG/OB/BOS/S/R) im Dashboard — `chart/annotations.py` erweitern.
-3. **News-Kalender-CSV** mit historischen FOMC/CPI/NFP-Terminen 2023–26 seeden (reproduzierbare
-   Fakten) → News-Gate im Backtest aktiv.
+   es in Ranges systematisch verliert. Erste Versuche (Efficiency-Ratio, DXY) waren zu streng
+   bzw. wirkungslos; weicheres Maß (ADX / `htf_regime_gate`-Signal) oder mehr Daten nötig.
+2. **Alert-Emitter verdrahten** — `raise_context_alert` von PortfolioIntelligence (RED-Health),
+   News-Gate (High-Impact in Blackout), ReEntryEngine (readiness ≥ 0.9) aufrufen lassen.
+3. **CPI/PCE/ECB-Kalender** — braucht einen echten Feed (bewusst nicht approximiert).
 4. Forward-Paper-Trades sammeln (Ziel ≥ 100), dann `edge_health_check.py` + `validate_s4.py`.
+5. **Aktien-Fundamentals** — Yahoo `quoteSummary` (keylos, aber wackelig) oder Finnhub-Key.
 
 ---
 
