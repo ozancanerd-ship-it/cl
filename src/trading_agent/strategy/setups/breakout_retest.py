@@ -154,10 +154,14 @@ def detect_breakout_retest(
     if len(bars) < need:
         return base
 
-    atr = atr_series(bars, p.atr_period)
     i = len(bars) - 1
-    a = atr[i]
-    if not a or a <= 0:
+    # ATR am letzten Bar — bevorzugt der bereits im MtfContext berechnete Wert (kein O(n)-Rescan
+    # pro Tick); Fallback auf eine lokale Berechnung (Research-/Test-Kontext ohne .h4.atr).
+    a = float(getattr(h4c, "atr", 0.0) or 0.0)
+    if a <= 0:
+        series = atr_series(bars, p.atr_period)
+        a = series[i] or 0.0
+    if a <= 0:
         return base
 
     if p.require_d1_trend and trend not in (

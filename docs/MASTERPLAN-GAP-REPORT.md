@@ -69,9 +69,16 @@ Live-Signale als SHADOW. Fortschritt Richtung Echtgeld hängt an (A) mehr Daten 
 
 ## 5. Signal & Setup (§22–§32) — P2
 
+> **Update 2026-08-31:** **2. Setup-Typ `SETUP-BREAKOUT-RETEST-01`** gebaut + integriert
+> (`strategy/setups/breakout_retest.py`). H4-Konsolidierung → Ausbruch → haltender Retest →
+> Einstieg in D1-Trend-Richtung. Eigene FSM/Geometrie/Confidence. `evaluate_from_mtf` fährt
+> ihn parallel zur (unveränderten) SMC-Kette; greift nur, wenn SMC nicht actionable ist.
+> Status `IN_VALIDATION` → Signale = SHADOW. §24 „Warum/Invalidation/Risiken" ist mit
+> `strategy/signal_report.py` **erledigt** (Stufe D).
+
 | § | Punkt | Status | Anmerkung |
 |---|---|---|---|
-| 22 | Signal-Engine-Zustände (NO_TRADE/WATCH/SETUP_FORMING/BUY_SETUP/…/EXIT_REQUIRED) | ✅ | `strategy/signal.py`: 12-State-Lifecycle, append-only Revisionen, `SetupState`-FSM `SCANNING→…→ARMED` |
+| 22 | Signal-Engine-Zustände (NO_TRADE/WATCH/SETUP_FORMING/BUY_SETUP/…/EXIT_REQUIRED) | ✅ | `strategy/signal.py`: 12-State-Lifecycle, append-only Revisionen, `SetupState`-FSM `SCANNING→…→ARMED`. 2. Setup-Typ hat eigene FSM (`BreakoutState`). |
 | 23 | Tiers A+/A/B/C/NO_TRADE, A/A+ prominent | 🟡 | `strategy/scoring.py` → **A+/A/B/NO_TRADE** (aus `final_score × setup_confidence`). **Kein „C"-Tier.** „prominent anzeigen" = UI, fehlt. |
 | 24 | Konkretes strukturiertes BUY/SELL-Signal (Entry/SL/TP1-3/RR/Score/Conf/Risk/Setup/Warum/Invalidation/Risiken) | 🟡 | `Decision` trägt `direction/entry/sl/tp1/tp2/tp3_ref/rr_to_tp2/blended_rr/score/confidence/tier/reason_codes/setup_id/strategy_version`. **Es fehlt:** die Prosa-Felder „Warum / Invalidation / Risiken" als menschenlesbarer Text (Evidenz liegt als `ConfluenceReport`/`ContradictionReport` strukturiert vor, wird aber nicht zu Text gerendert). |
 | 25 | Entry (Market/Limit/Confirmation) | ✅ | `EntryMode`: LIMIT_AT_PROXIMAL_EDGE / LIMIT_AT_MID / CONFIRMATION_MARKET |
