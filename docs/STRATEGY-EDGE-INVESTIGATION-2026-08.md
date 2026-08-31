@@ -229,12 +229,34 @@ tragen bei. `total_r_without_best` (bestes Symbol entfernt) = **+15.8 R**.
 **nicht** trendeten. Kombiniert mit WF 8/9, MC `prob_positive` 0.65 und `fraction_positive` 1.0
 ist das die **stärkste Evidenz der gesamten Untersuchung**.
 
+### Teil 7 — Overfitting-Check + Port-Bug (2026-08-31, dieselbe Sitzung)
+
+**Port-Bug gefunden und behoben.** Der zunächst integrierte `detect_breakout_retest` armte auf
+**jedem** haltenden Retest eines Ausbruchs statt nur auf dem **ersten** (S4: `not earlier`).
+Spätere Retests = schlechtere Entries → verwässerte Edge: der integrierte Detektor feuerte ~2×
+so viele Signale mit OOS-Expectancy **−0.04 R** statt der Research-S4-**+0.48 R**. Nach dem Fix
+ist der integrierte Detektor **byte-äquivalent** zu Research-S4 (OOS n=35, exp +0.4829 R, PF 2.594).
+
+**Parameter-Sensitivität** (`scripts/setup_sensitivity.py`): die 6 Kernparameter
+(consolidation_bars, breakout_displacement_atr, retest_touch_atr, stop_buffer_atr,
+retest_window_bars, tp2_r) je ±30 % über Gold + FX, gleicher scaled-Sim, exakte Positions-Sperre:
+
+| | Ergebnis |
+|---|---|
+| **Alle 13 Störungen OOS-positiv** | ja (`all_perturbations_positive: true`) |
+| OOS-Expectancy-Bandbreite | **+0.24 … +0.67 R** |
+| OOS-PF-Bandbreite | 1.6 … 3.7 |
+
+Die Edge ist **nicht** an spezifische Parameterwerte gefittet. Das ist der vom Auftrag geforderte
+Overfitting-Test — und er hat einen echten Bug aufgedeckt.
+
 ### Entscheidung (datenbasiert)
 
 Der **zweite Setup-Typ = „Breakout + Retest mit HTF-Trend-Filter"** (`SETUP-BREAKOUT-RETEST-01`,
-S4-Logik). Status: **`IN_VALIDATION`** — historische OOS-Edge jetzt **belastbar**, aber noch
-nicht *final bewiesen*: die Daten sind indikativ (Yahoo) und die OOS-Stichprobe ist 46 Trades.
-Baseline (registry): OOS +0.35 R / PF 2.0 / n 46 (konservativ gerundet).
+S4-Logik). Status: **`IN_VALIDATION`** — historische OOS-Edge **belastbar** (WF 8/9, MC
+`prob_positive` 0.65, `fraction_positive` 1.0, alle Parameter-Störungen positiv), aber noch
+nicht *final bewiesen*: die Daten sind **indikativ** (Yahoo), OOS-Stichprobe **n=35**, keine
+Forward-Trades. Baseline (registry): OOS +0.35 R / PF 2.0 / n 46 (konservativ gerundet).
 
 **Integriert** (damit die Forward-Validierung überhaupt laufen kann):
 Strategy-Engine (2. Setup-Typ) · Opportunity-Score · Signal-Engine · Paper-Trading · Versionierung.
