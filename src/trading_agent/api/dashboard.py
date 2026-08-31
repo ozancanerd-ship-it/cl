@@ -45,6 +45,7 @@ class DashboardInputs:
     strategy_version: str = "0.1.1"
     top_opportunities: list[dict[str, Any]] = field(default_factory=list)
     scanner_evaluations: int = 0
+    stocks: list[dict[str, Any]] = field(default_factory=list)  # Einzelaktien-Analyse
     signals: list[dict[str, Any]] = field(default_factory=list)  # LIVE-eligible
     shadow_signals: list[dict[str, Any]] = field(default_factory=list)  # nicht validiert
     validation: list[dict[str, Any]] = field(default_factory=list)  # ValidationRegistry.all()
@@ -108,9 +109,10 @@ def build_dashboard_state(inp: DashboardInputs) -> DashboardState:
             blockers=inp.blockers,
         ),
         "market_scanner": _section(
-            bool(top),
+            bool(top) or bool(inp.stocks),
             evaluated=inp.scanner_evaluations,
             instruments=top,
+            stocks=inp.stocks,
         ),
         "top_opportunities": _section(
             bool(top),

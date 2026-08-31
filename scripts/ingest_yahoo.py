@@ -35,10 +35,13 @@ _YAHOO = {"XAUUSD": "GC=F", **DEFAULT_SYMBOL_MAP, **_INDEX_MAP}
 
 
 async def _one(
-    inst: str, start: datetime, end: datetime, repo: MarketDataRepository
+    inst: str, start: datetime, end: datetime, repo: MarketDataRepository, *, equity: bool = False
 ) -> dict[str, object]:
     dest = f"{inst}-YF"
-    yahoo_sym = _YAHOO.get(inst) or (inst if inst.startswith("^") else f"{inst}=X")
+    if equity:
+        yahoo_sym = inst  # Aktien: blanker Ticker (NVDA, AAPL, …)
+    else:
+        yahoo_sym = _YAHOO.get(inst) or (inst if inst.startswith("^") else f"{inst}=X")
     provider = YahooFinanceProvider(symbol_map={dest: yahoo_sym})
     try:
         h1 = await provider.fetch_ohlcv(dest, Timeframe.H1, start, end)
@@ -68,7 +71,7 @@ async def _run(args: argparse.Namespace) -> int:
     start = parse_timestamp(args.start)
     end = parse_timestamp(args.end)
     repo = MarketDataRepository(args.repo)
-    out = [await _one(inst, start, end, repo) for inst in args.instruments]
+    out = [await _one(inst, start, end, repo, equity=args.equity) for inst in args.instruments]
     print(json.dumps({"source": "Yahoo Finance (indicative, no key)", "results": out}, indent=2))
     return 0 if all("error" not in r for r in out) else 1
 
@@ -77,6 +80,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--instruments", nargs="+", default=["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"])
+    ap.add_argument(
+        "--equity", action="store_true", help="Symbole als blanke Aktien-Ticker behandeln (NVDA …)"
+    )
     ap.add_argument("--start", default="2023-01-01")
     ap.add_argument("--end", default=datetime.now(UTC).date().isoformat())
     return asyncio.run(_run(ap.parse_args()))

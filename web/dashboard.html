@@ -121,7 +121,8 @@ const RENDERERS = {
   },
   market_scanner(sec,t){
     sec.appendChild($(`<div class="card"><h2>Scanner</h2><div class="muted">${num(t.evaluated,0)} Bewertungen</div></div>`));
-    sec.appendChild(card("Instrumente", oppTable(t.instruments||[])));
+    sec.appendChild(card("Instrumente (SMC / Breakout)", oppTable(t.instruments||[])));
+    if(t.stocks && t.stocks.length) sec.appendChild(card("Einzelaktien (Trend/Momentum/rel. Stärke)", stockTable(t.stocks)));
   },
   top_opportunities(sec,t){
     sec.appendChild(card("Ranking nach Opportunity-Score", oppTable(t.ranking||[])));
@@ -268,6 +269,17 @@ function groupTable(grp){
       <td class="num">${esc(v.profit_factor)}</td><td class="num">${pct(v.win_rate)}</td>
       <td class="num ${v.total_r>0?'g':'r'}">${num(v.total_r,2)}</td>
       <td class="num">${num(v.avg_hold_h,1)}</td></tr>`).join("")}</tbody></table>`);
+}
+const _STK_CLS = {strong_buy:"g", buy:"g", hold:"y", avoid:"r", unknown:"muted"};
+function stockTable(rows){
+  return $(`<table>
+    <thead><tr><th>#</th><th>Ticker</th><th class="num">Score</th><th>Verdikt</th><th>Faktoren</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr>
+      <td>${i+1}</td><td>${esc(String(r.symbol).replace("-YF",""))}</td>
+      <td class="num">${num(r.score,1)}</td>
+      <td class="${_STK_CLS[r.verdict]||''}">${esc(String(r.verdict).replace("_"," ").toUpperCase())}</td>
+      <td class="muted" style="font-size:12px">${(r.factors||[]).map(f=>`${esc(f.name.slice(0,4))} ${num(f.value,2)}`).join(" · ")}</td>
+    </tr>`).join("")}</tbody></table>`);
 }
 function reentryCard(w){
   const isSetup = w.state==="setup";

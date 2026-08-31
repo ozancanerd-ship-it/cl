@@ -49,6 +49,30 @@ def _load_performance(repo: MarketDataRepository, pattern: str) -> dict[str, obj
     }
 
 
+def _load_stocks(repo: MarketDataRepository, symbols: list[str], benchmark: str) -> list[dict[str, object]]:
+    """Einzelaktien-Analyse für die im Repo vorliegenden ``<SYM>-YF``-D1-Reihen."""
+    if not symbols:
+        return []
+    from datetime import datetime as _dt
+
+    from trading_agent.core.enums import Timeframe
+    from trading_agent.investment.stock_analysis import StockAnalysisEngine
+
+    lo, hi = _dt(2000, 1, 1, tzinfo=UTC), _dt(2100, 1, 1, tzinfo=UTC)
+    bench = repo.read_ohlcv(benchmark, Timeframe.D1, lo, hi) or None
+    engine = StockAnalysisEngine()
+    now = datetime.now(UTC)
+    out: list[dict[str, object]] = []
+    for sym in symbols:
+        dest = sym if sym.endswith("-YF") else f"{sym}-YF"
+        d1 = repo.read_ohlcv(dest, Timeframe.D1, lo, hi)
+        if not d1:
+            continue
+        out.append(engine.analyze(dest, d1, as_of=now, benchmark_d1=bench).as_dict())
+    out.sort(key=lambda r: r["score"], reverse=True)  # type: ignore[arg-type,return-value]
+    return out
+
+
 def _load_reentry(pattern: str, shadow_signals: list[dict[str, object]]) -> list[dict[str, object]]:
     """reentry_watch-Zeilen aus den Journalen; 'setup', wenn ein frisches Shadow-Signal für
     dasselbe Instrument+Richtung existiert, sonst 'watch'."""
@@ -147,18 +171,21 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
 
     perf: dict[str, object] | None = None
     reentry: list[dict[str, object]] = []
+    stocks: list[dict[str, object]] = []
     try:
         repo = MarketDataRepository(args.repo)
         perf = _load_performance(repo, args.journals)
         reentry = _load_reentry(args.journals, shadow)
+        stocks = _load_stocks(repo, args.stocks, args.benchmark)
     except Exception as exc:
-        blockers.append(f"performance/reentry: {exc}")
+        blockers.append(f"performance/reentry/stocks: {exc}")
 
     dash = build_dashboard_state(
         DashboardInputs(
             as_of=datetime.now(UTC),
             top_opportunities=top,
             scanner_evaluations=len(top),
+            stocks=stocks,
             signals=signals,
             shadow_signals=shadow,
             reentry=reentry,
@@ -179,6 +206,10 @@ def main() -> int:
     ap.add_argument("--no-portfolio", action="store_true")
     ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--journals", default="data/repository_real/live/*.jsonl")
+    ap.add_argument(
+        "--stocks", nargs="*", default=["NVDA", "AAPL", "MSFT", "AMD", "GOOGL", "META"]
+    )
+    ap.add_argument("--benchmark", default="SPX-YF")
     ap.add_argument("--validation-config", default="config/setup_validation.json")
     ap.add_argument("--out", default="web/dashboard.json")
     args = ap.parse_args()
