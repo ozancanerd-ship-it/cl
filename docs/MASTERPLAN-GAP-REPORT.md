@@ -144,7 +144,7 @@ Live-Signale als SHADOW. Fortschritt Richtung Echtgeld hängt an (A) mehr Daten 
 | § | Punkt | Status |
 |---|---|---|
 | 50 | Live Chart (Candles + Swings/Liquidity/FVG/OB/BOS/CHoCH/S-R/Entry/SL/TP1-3, Echtzeit) | 🔴 (`chart/annotations.py` = 4-Zeilen-Stub) |
-| 51 | Alert-System (A+ Setup / Entry / TP / Move-SL / Invalidation / Exit / Re-Entry / Portfolio-Risk / News / Vol-Spike) | 🟡 (`strategy/alerts.py`: 15 Event-Typen, Dedup, Cooldown, Auto-Update — **gebaut + getestet**. **Zustellung** → Telegram = 🔴, `ops/notify.py` Stub) |
+| 51 | Alert-System (A+ Setup / Entry / TP / Move-SL / Invalidation / Exit / Re-Entry / Portfolio-Risk / News / Vol-Spike) | 🟡 (`strategy/alerts.py`: 18 Event-Typen (Portfolio-Risk / News / Re-Entry ergänzt 2026-08-31), Dedup, Cooldown, Auto-Update — **gebaut + getestet**. **Zustellung** → Telegram = 🔴, `ops/notify.py` Stub) |
 | 52 | Daily / Weekly Report | 🔴 |
 | 53 | System Health (APIs/WS/REST/Feed/Latency/StaleData/MissingCandles/DB/Strategy/PaperEngine/Portfolio; GREEN/YELLOW/RED) | 🟡 (`ops/health.py::SystemHealth`: Provider/Broker/Data-Block/Heartbeat/Kill-Switch, `ok()`/`snapshot()`. **Latency/Stale-Candle/DB/Paper-Engine-Checks fehlen**, GREEN/YELLOW/RED nur als `ok`-Bool + worst-provider) |
 | 58–62 | Finale App (10 Bereiche) + Overview + Detail-Views + Action Center | 🔴 (`api/` leer, **keine UI**) |

@@ -44,7 +44,11 @@ class AlertType(StrEnum):
     TP_REACHED = "tp_reached"
     SETUP_INVALIDATED = "setup_invalidated"
     EXIT_REQUIRED = "exit_required"
+    PARTIAL_TP = "partial_tp"
+    RE_ENTRY_SETUP = "re_entry_setup"
     RISK_LIMIT = "risk_limit"
+    PORTFOLIO_RISK = "portfolio_risk"
+    HIGH_IMPACT_NEWS = "high_impact_news"
     DATA_STALE = "data_stale"
     DATA_QUALITY_FAILURE = "data_quality_failure"
     BROKER_DISCONNECTED = "broker_disconnected"
@@ -82,7 +86,11 @@ _SEVERITY: dict[AlertType, AlertSeverity] = {
     AlertType.TP_REACHED: AlertSeverity.INFO,
     AlertType.SETUP_INVALIDATED: AlertSeverity.WARNING,
     AlertType.EXIT_REQUIRED: AlertSeverity.CRITICAL,
+    AlertType.PARTIAL_TP: AlertSeverity.INFO,
+    AlertType.RE_ENTRY_SETUP: AlertSeverity.INFO,
     AlertType.RISK_LIMIT: AlertSeverity.CRITICAL,
+    AlertType.PORTFOLIO_RISK: AlertSeverity.CRITICAL,
+    AlertType.HIGH_IMPACT_NEWS: AlertSeverity.WARNING,
     AlertType.DATA_STALE: AlertSeverity.WARNING,
     AlertType.DATA_QUALITY_FAILURE: AlertSeverity.WARNING,
     AlertType.BROKER_DISCONNECTED: AlertSeverity.CRITICAL,
@@ -167,6 +175,7 @@ class AlertParams:
             AlertType.BUY,
             AlertType.SELL,
             AlertType.RISK_LIMIT,
+            AlertType.PORTFOLIO_RISK,
             AlertType.BROKER_DISCONNECTED,
         }
     )
@@ -195,6 +204,23 @@ class AlertEngine:
 
     def active_for(self, signal_id: str) -> tuple[Alert, ...]:
         return tuple(a for a in self.active if a.signal_id == signal_id)
+
+    def raise_context_alert(
+        self,
+        atype: AlertType,
+        *,
+        key: str,
+        title: str,
+        body: str,
+        now: datetime,
+        evidence: _Evidence | None = None,
+    ) -> AlertEvent:
+        """Nicht-Signal-Alert (Portfolio-Risiko, High-Impact-News, Re-Entry-Setup, Ops).
+        Dedup + Cooldown wie bei Signal-Alerts; ``key`` ist der Dedup-Schlüssel
+        (z. B. ``"portfolio:concentration"`` / ``"news:FOMC_RATE:2026-01-28"``)."""
+        return self._raise(
+            atype, key, None, now, title=title, body=body, evidence=evidence or {}
+        )
 
     # ---- Haupteinstiege ------------------------------------------------------
     def on_engine_tick(self, tick: EngineTick) -> tuple[AlertEvent, ...]:

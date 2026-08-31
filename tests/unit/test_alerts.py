@@ -1,6 +1,6 @@
 """Phase 3 · Schritt 7 — Alert Engine (``strategy.alerts``).
 
-15 Event-Typen · Anti-Spam (Dedup je Signal+Typ) · Cooldown · Auto-Update / Auto-Dismiss wenn
+18 Event-Typen (inkl. Portfolio-Risk / High-Impact-News / Re-Entry-Setup / Partial-TP) · Anti-Spam (Dedup je Signal+Typ) · Cooldown · Auto-Update / Auto-Dismiss wenn
 sich das zugrunde liegende Signal ändert · Gegensatz-Ablösung (strengthen ↔ weaken) ·
 Pipeline-Alerts (DATA_STALE / DATA_QUALITY_FAILURE / RISK_LIMIT / BROKER_DISCONNECTED) ·
 deterministisch.
@@ -229,3 +229,27 @@ def test_cooldown_override_param() -> None:
     ev = eng.on_signal_update(t.ingest(sg._score(-20.0)), NOW + timedelta(seconds=1))
     weak = [e for e in ev if e.alert.type is AlertType.SIGNAL_WEAKENED]
     assert weak and weak[0].kind is AlertEventKind.UPDATED  # kein Cooldown → als Update gefaltet
+
+
+def test_context_alert_portfolio_and_news_dedup() -> None:
+    eng = AlertEngine()
+    e1 = eng.raise_context_alert(
+        AlertType.PORTFOLIO_RISK, key="portfolio:concentration",
+        title="Klumpenrisiko", body="FET 20 %", now=NOW,
+    )
+    assert e1.kind is AlertEventKind.RAISED
+    assert e1.alert.severity is AlertSeverity.CRITICAL
+    assert e1.alert.dedup_key == "portfolio:concentration:portfolio_risk"
+    # gleicher Schlüssel innerhalb Cooldown → als Update gefaltet, nicht neu
+    e2 = eng.raise_context_alert(
+        AlertType.PORTFOLIO_RISK, key="portfolio:concentration",
+        title="Klumpenrisiko", body="FET 22 %", now=NOW + timedelta(minutes=1),
+    )
+    assert e2.kind is AlertEventKind.UPDATED
+
+    news = eng.raise_context_alert(
+        AlertType.HIGH_IMPACT_NEWS, key="news:FOMC_RATE:2026-01-28",
+        title="FOMC in 2 h", body="Blackout", now=NOW,
+    )
+    assert news.kind is AlertEventKind.RAISED
+    assert news.alert.type is AlertType.HIGH_IMPACT_NEWS
