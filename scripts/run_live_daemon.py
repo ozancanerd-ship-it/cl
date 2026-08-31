@@ -59,6 +59,16 @@ async def main() -> int:
         default="data/repository_real/live/decision_ledger.sqlite",
         help="SQLite-Pfad für den Decision-Log (Masterplan §64). '' zum Deaktivieren.",
     )
+    ap.add_argument(
+        "--audit-log",
+        default="data/repository_real/live/audit.jsonl",
+        help="Hash-Chain-Audit-Log (Masterplan §51). '' zum Deaktivieren.",
+    )
+    ap.add_argument(
+        "--dashboard-json",
+        default=None,
+        help="Dashboard-State (10 Tabs) am Ende hierhin schreiben (Masterplan §63).",
+    )
     ap.add_argument("--max-seconds", type=float, default=None, help="Test-Deckel; sonst 24/7")
     ap.add_argument("--status-json", default=None, help="Endstand als JSON hierhin schreiben")
     args = ap.parse_args()
@@ -95,6 +105,16 @@ async def main() -> int:
 
     emitted_signals: list[dict] = []
 
+    # Hash-verkettetes Audit-Log (Masterplan §51) — sicherheitsrelevante Ereignisse
+    audit = None
+    if args.audit_log:
+        from trading_agent.safety.audit_log import AuditLog
+
+        audit = AuditLog(args.audit_log)
+        audit.record(
+            "daemon", "startup", {"exchange": args.exchange, "symbols": list(cfg.instruments)}
+        )
+
     async def _on_tradeable(ev: DecisionMade) -> None:
         if ev.decision_type not in ("buy", "sell"):
             return
@@ -106,8 +126,20 @@ async def main() -> int:
         if rep is not None:
             emitted_signals.append(rep.as_dict())
             _log.info("SIGNAL\n%s", rep.as_text())
+            if audit is not None:
+                audit.record(
+                    "strategy",
+                    "signal_emitted",
+                    {"instrument": rep.instrument, "action": rep.action, "tier": rep.tier},
+                )
 
     pipe.bus.subscribe(DecisionMade, _on_tradeable)
+
+    async def _on_alert(ev: AlertRaised) -> None:
+        if audit is not None:
+            audit.record("alert", "raised", {"instrument": ev.instrument, "type": ev.alert_type})
+
+    pipe.bus.subscribe(AlertRaised, _on_alert)
 
     counts = {"decision": 0, "alert": 0, "paper": 0, "quality": 0, "shutdown": 0}
     pipe.bus.subscribe(
@@ -157,6 +189,30 @@ async def main() -> int:
     ]
     status["_wall_runtime_s"] = round((datetime.now(UTC) - t0).total_seconds(), 1)
     assert sup.orders_sent == 0, "LIVE DAEMON hat eine Order gesendet — darf nie passieren"
+
+    if audit is not None:
+        audit.record(
+            "daemon",
+            "shutdown",
+            {"signals": len(emitted_signals), "orders_sent": sup.orders_sent},
+        )
+        status["_audit_log_entries"] = audit.count
+        status["_audit_log_ok"] = audit.verify().ok
+
+    if args.dashboard_json:
+        from trading_agent.api.dashboard import DashboardInputs, build_dashboard_state
+
+        dash = build_dashboard_state(
+            DashboardInputs(
+                as_of=datetime.now(UTC),
+                top_opportunities=status["_top_opportunities"],
+                scanner_evaluations=scanner.evaluations,
+                signals=emitted_signals,
+                blockers=[],
+            )
+        )
+        with open(args.dashboard_json, "w", encoding="utf-8") as fh:
+            json.dump(dash.as_dict(), fh, indent=2, default=str)
 
     out = json.dumps(status, indent=2, default=str)
     if args.status_json:
