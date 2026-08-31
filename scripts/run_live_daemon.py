@@ -50,6 +50,7 @@ async def main() -> int:
     ap.add_argument("--symbols", nargs="+", default=["BTCUSDT", "ETHUSDT"])
     ap.add_argument("--asset-class", default="crypto")
     ap.add_argument("--news-gate", choices=["on", "off"], default="off")
+    ap.add_argument("--risk-pct", type=float, default=1.0)
     ap.add_argument("--derivatives", action="store_true", help="Bybit Funding/OI (nur wenn valide)")
     ap.add_argument("--snapshot-dir", default="data/repository_real/live/state")
     ap.add_argument("--snapshot-interval", type=float, default=60.0)
@@ -89,6 +90,25 @@ async def main() -> int:
     )
     top_opps = scanner.attach(pipe.bus)
 
+    # konkretes strukturiertes BUY/SELL-Signal bei tradebarer Entscheidung (Masterplan §24)
+    from trading_agent.strategy.signal_report import build_signal_report
+
+    emitted_signals: list[dict] = []
+
+    async def _on_tradeable(ev: DecisionMade) -> None:
+        if ev.decision_type not in ("buy", "sell"):
+            return
+        rep = build_signal_report(
+            ev.result,
+            opportunity=scanner.score_for(ev.instrument),
+            risk_pct=args.risk_pct,
+        )
+        if rep is not None:
+            emitted_signals.append(rep.as_dict())
+            _log.info("SIGNAL\n%s", rep.as_text())
+
+    pipe.bus.subscribe(DecisionMade, _on_tradeable)
+
     counts = {"decision": 0, "alert": 0, "paper": 0, "quality": 0, "shutdown": 0}
     pipe.bus.subscribe(
         DecisionMade, lambda e: counts.__setitem__("decision", counts["decision"] + 1)
@@ -122,6 +142,7 @@ async def main() -> int:
     if recorder is not None:
         status["_decision_ledger_rows"] = recorder.rows_written
     status["_scanner_evaluations"] = scanner.evaluations
+    status["_signals_emitted"] = emitted_signals
     status["_top_opportunities"] = [
         {
             "rank": r.rank,
