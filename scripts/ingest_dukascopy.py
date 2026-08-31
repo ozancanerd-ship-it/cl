@@ -48,6 +48,12 @@ def main() -> int:
     ap.add_argument("--end", default="2025-01-01")
     ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--cache", default="data/cache/dukascopy")
+    ap.add_argument(
+        "--request-delay",
+        type=float,
+        default=0.0,
+        help="Pause (s) vor jedem nicht gecachten Request — Rate-Limit-Schonung bei großen Fenstern.",
+    )
     args = ap.parse_args()
 
     start = parse_timestamp(args.start)
@@ -55,7 +61,7 @@ def main() -> int:
     repo = MarketDataRepository(args.repo)
     calendars = seed_calendars()
     inst_by_sym = {i.canonical_symbol: i for i in seed_instruments()}
-    provider = DukascopyProvider(cache_dir=Path(args.cache))
+    provider = DukascopyProvider(cache_dir=Path(args.cache), request_delay_s=args.request_delay)
 
     per_symbol: dict[str, dict[str, object]] = {}
     try:

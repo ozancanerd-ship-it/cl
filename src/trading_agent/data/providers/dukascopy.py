@@ -203,6 +203,7 @@ class DukascopyProvider(HistoricalOHLCVProvider):
     timeout_s: float = 60.0
     max_retries: int = 3
     retry_backoff_s: float = 1.0
+    request_delay_s: float = 0.0  # Pause vor jedem NICHT gecachten Request (Rate-Limit-Schonung)
     _client: httpx.Client | None = None
     _last_error: str = ""
     _last_success: datetime | None = None
@@ -289,6 +290,8 @@ class DukascopyProvider(HistoricalOHLCVProvider):
         if cached.exists():
             return cached.read_bytes()
         url = f"{_BASE}/{rel}"
+        if self.request_delay_s > 0:
+            _time.sleep(self.request_delay_s)
         last: str = ""
         for attempt in range(1, self.max_retries + 1):
             try:
