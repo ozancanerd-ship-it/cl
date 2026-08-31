@@ -223,9 +223,11 @@ def evaluate_from_mtf(
     """Zentrale Pipeline auf einem bereits gebauten ``MtfContext``.
 
     Fährt die **SMC-SWEEP-REV-01-Kette** (``_evaluate_smc``) und — wenn diese *nicht* actionable
-    ist und die globale No-Trade-Checkliste frei ist — parallel den **2. Setup-Typ**
-    ``SETUP-BREAKOUT-RETEST-01``. Ein ARMED Breakout-Retest mit gültiger Geometrie + RR ersetzt
-    dann die SMC-Entscheidung. Die SMC-Kette selbst bleibt unverändert.
+    ist und **kein harter** No-Trade-Grund vorliegt — parallel den **2. Setup-Typ**
+    ``SETUP-BREAKOUT-RETEST-01``. „Hart" = alles außer den **Regime**-Gründen (der Breakout-Retest
+    ist regime-gate-**unabhängig**; Kill-Switch / Daten-Qualität / Weekend / News-Blackout blocken
+    ihn dagegen genauso). Ein ARMED Breakout mit gültiger Geometrie + RR ersetzt die SMC-
+    Entscheidung. Die SMC-Kette selbst bleibt unverändert.
     """
     p = params or EvaluateParams()
     smc = _evaluate_smc(
@@ -239,12 +241,19 @@ def evaluate_from_mtf(
         account_risk=account_risk,
         params=p,
     )
-    if not p.breakout_enabled or smc.decision.is_actionable or smc.no_trade.blocked:
+    if not p.breakout_enabled or smc.decision.is_actionable or _hard_no_trade(smc):
         return smc
     bo = detect_breakout_retest(smc.mtf, params=p.breakout)
     if not bo.is_armed:
         return dataclasses.replace(smc, breakout=bo)
     return _breakout_decision(smc, bo, p)
+
+
+def _hard_no_trade(smc: EvaluationResult) -> bool:
+    """Ein No-Trade-Grund, der **auch** den 2. Setup-Typ blockt — also alles außer Regime."""
+    from trading_agent.strategy.no_trade import NoTradeGroup
+
+    return any(r.group is not NoTradeGroup.REGIME for r in smc.no_trade.records)
 
 
 def _breakout_decision(
