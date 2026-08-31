@@ -99,3 +99,17 @@ nicht zeit-annualisiert; Sortino mit Downside-Deviation `sqrt(mean(min(r,0)²))`
 **Kernaussage:** Die Infrastruktur (Analyse, Backtest, Validierung) ist solide. Die **Strategie
 selbst hat auf den verfügbaren Daten noch keine bewiesene Edge.** Das ist ein valides,
 wichtiges Ergebnis — kein Grund, Regeln zu lockern.
+
+## 6. Nachtrag (2026-08-31) — P1 „2. Setup-Typ" abgearbeitet
+
+Siehe **`docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md`**. `scripts/setup_research.py` testet
+**6 strukturell verschiedene Swing-Setups** (Sweep+Reversal, Breakout+Retest, Trend-Pullback,
+HTF-Break+Confirm, trend-gefilterter Breakout, D1-Trend+H4-Break) auf H4/D1, look-ahead-frei,
+mit IS/OOS/Walk-Forward/Monte-Carlo über 7 Instrumente / 3+ Jahre, in 2 Management-Modellen.
+
+**Ergebnis: keine zeigt eine robuste, regime-unabhängige, kosten-überlebende OOS-Edge.** Jedes
+Setup fällt aus einem von drei Gründen durch: Vorzeichen kippt IS↔OOS (Overfit), „positive"
+Phase = Bull-Market-Long-Beta, oder Monte-Carlo-`prob_positive` ≈ 0 unter realistischen Kosten.
+Der **Befund dieses Dokuments erweitert sich**: nicht nur der Klassifikator, auch die **Setup-
+Ebene** hat auf diesen Daten keine Edge. Regime-Gate ist damit endgültig als *Symptom*, nicht
+Ursache, bestätigt (die neuen Setups umgehen das Gate und haben trotzdem keine Edge).
