@@ -245,3 +245,49 @@ def test_signal_strengthens_on_score_rise() -> None:
     t2 = eng.on_market_context(mc2)
     assert t2.signal is not None
     assert t2.signal.revision.change_kind is SignalChangeKind.STRENGTHENED
+
+
+# ------------------------------------------------------------- 2. Setup-Typ (Breakout-Retest)
+
+
+def _breakout_result(mc: MarketContext):
+    """EvaluationResult wie vom Breakout-Pfad: kein `candidate`, Decision trägt die setup_id."""
+    from trading_agent.strategy.setups.breakout_retest import SETUP_BREAKOUT_RETEST
+
+    dec = dataclasses.replace(
+        _BASE.decision,
+        information_cutoff=mc.information_cutoff,
+        setup_id=SETUP_BREAKOUT_RETEST,
+    )
+    return dataclasses.replace(_BASE, decision=dec, candidate=None)
+
+
+def test_breakout_decision_opens_paper_position_for_forward_validation() -> None:
+    from trading_agent.strategy.setups.breakout_retest import SETUP_BREAKOUT_RETEST
+
+    eng = ContinuousEvaluator(evaluate_fn=lambda mc, **_k: _breakout_result(mc))
+    # Bar über Entry → pending (kein Fill), dann Bar berührt Entry → Fill
+    t1 = eng.on_market_context(_mc([_bar(0, _ENTRY + 5, _ENTRY + 2)]))
+    assert t1.decision is DecisionType.BUY
+    assert t1.opened is not None and t1.opened.position_id == SETUP_BREAKOUT_RETEST
+    assert eng.position_for(SETUP_BREAKOUT_RETEST) is not None
+
+    # Folge-Tick: Breakout re-detektiert NICHT (NO_TRADE) — die offene Position muss trotzdem
+    # weiterlaufen (SETUP_BREAKOUT_RETEST-Fallback in engine._open).
+    nt_result = dataclasses.replace(
+        _BASE,
+        candidate=None,
+        decision=dataclasses.replace(
+            _BASE.decision,
+            decision=DecisionType.NO_TRADE,
+            setup_state=SetupState.SCANNING,
+            reason_codes=(NoTradeReason.NO_RETEST,),
+            tier=None,
+        ),
+    )
+    eng._evaluate = lambda mc, **_k: nt_result  # type: ignore[assignment, method-assign]
+    t2 = eng.on_market_context(
+        _mc([_bar(0, _ENTRY + 5, _ENTRY + 2), _bar(1, _ENTRY + 1, _ENTRY - 1)])
+    )
+    assert eng.position_for(SETUP_BREAKOUT_RETEST) is not None
+    assert t2.position is not None  # on_bar hat die Position fortgeschrieben (Fill)

@@ -43,6 +43,7 @@ from trading_agent.strategy.position import (
     signal_state_for,
 )
 from trading_agent.strategy.setup_detection import SetupCandidate
+from trading_agent.strategy.setups.breakout_retest import SETUP_BREAKOUT_RETEST
 from trading_agent.strategy.signal import SignalState, SignalTracker, SignalUpdate
 
 
@@ -182,7 +183,16 @@ class ContinuousEvaluator:
         now = mc.information_cutoff
         cand = result.candidate
         self._last_candidate = cand
+        # SMC-Kandidat ODER 2. Setup-Typ (Breakout-Retest): dessen setup_id trägt die Decision,
+        # es gibt keinen `candidate`. So bekommt auch der 2. Setup-Typ eine Paper-Position →
+        # Forward-Validierung (governance.assess_edge_health) läuft.
         setup_id = cand.setup_id if cand is not None else None
+        if setup_id is None and result.decision.decision in (DecisionType.BUY, DecisionType.SELL):
+            setup_id = result.decision.setup_id
+        # 2. Setup-Typ (Breakout-Retest) hat keinen persistenten `candidate` → eine bereits
+        # offene Breakout-Position muss weiterlaufen, auch wenn der aktuelle Tick NO_TRADE ist.
+        if setup_id is None and SETUP_BREAKOUT_RETEST in self._open:
+            setup_id = SETUP_BREAKOUT_RETEST
 
         pos_update: PositionUpdate | None = None
         opened: PaperPosition | None = None
