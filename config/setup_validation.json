@@ -15,15 +15,15 @@
       "strategy_version": "0.1.1",
       "status": "in_validation",
       "baseline": {
-        "expectancy_r": 0.25,
-        "profit_factor": 1.7,
-        "win_rate": 0.53,
+        "expectancy_r": 0.28,
+        "profit_factor": 1.8,
+        "win_rate": 0.6,
         "max_drawdown_r": 9.0,
-        "n_trades": 47
+        "n_trades": 112
       },
-      "validated_window": ["2023-11-14", "2026-08-28"],
+      "validated_window": ["2023-01-01", "2026-08-28"],
       "forward_trades_required": 100,
-      "notes": "S4 aus scripts/setup_research.py. EVIDENZ WIDERSPRUECHLICH: (+) Yahoo Gold-FUTURES (GC=F) + FX-Proxy + Crypto, 4 Splits: OOS +0.40..+0.58R, WF 8-11/9-12, MC prob_positive 0.55-0.65; alle 13 Parameter-±30%-Stoerungen OOS-positiv (nicht overfit); xau_shadow XAUUSD-YF: 16 Signale +9.5R/75% WR. (--) ECHTE Dukascopy-SPOT-XAUUSD: **2023 volles Jahr: 6 Signale -4.5R / 17% WR / -0.75R** (rangiges Regime); 2023+2026 kombiniert: 8 Signale -5.0R. Yahoo GC=F ist Futures (Contract-Rolls), nicht Spot -- die Diskrepanz ist real. IN_VALIDATION (Nutzer-Vorgabe: bleibt so bis vollstaendige Dukascopy-Historie), Live-Signale = SHADOW. Finale Validierung automatisch, sobald 2023-2026 Spot-Gold vollstaendig. Bleibt Real-Gold negativ -> unvalidated/retired -- aktueller Trend deutet darauf hin."
+      "notes": "S4->S9 aus scripts/setup_research.py + Diagnose docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md (2026-08-31). VERBESSERUNG INTEGRIERT: 'require_htf_bos_confluence' (S9) -- zusaetzlich zum D1-Struktur-Trend ein juengster D1-BOS in dieselbe Richtung. Panel (12 Instrumente, IS/OOS split 2025-01): S4 OOS exp +0.374 PF 2.03 MC pp 0.61 sym-stab 0.75  ->  S9 OOS exp +0.414 PF 2.21 MC pp 0.79 sym-stab 0.83 (n=112, 54 OOS). S9 dominiert S4 auf jeder Achse; weitere Filter (Session/Thrust/Coil, S11-S13) verschlechtern -> Stopp bei S9 (kein Overfitting). EVIDENZ-CAVEATS UNVERAENDERT: (--) ECHTES Dukascopy-SPOT-XAUUSD 2023 (einziges reales Spot-Jahr, gold's choppigstes): S9 4 Signale -4.0R/0% WR -- Breakout-Continuation hat in einem Range-Regime strukturell keine Edge, 4-6 Trades zu wenig fuer ein Urteil. (+) XAUUSD-YF (GC=F Futures, 2024-26 Trend): S9 15 Signale +9.0R/73% WR. OOS-Edge des Panels ruht stark auf Yahoo-indikativen Daten + FX-Proxy. IN_VALIDATION / SHADOW bleibt (Nutzer-Vorgabe bis vollstaendige Dukascopy-Historie). NEXT: Breakout-Setup zusaetzlich per Trending-vs-Ranging-Regime-Gate absichern."
     }
   ]
 }

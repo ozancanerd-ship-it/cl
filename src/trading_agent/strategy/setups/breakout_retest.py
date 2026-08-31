@@ -23,7 +23,13 @@ from datetime import datetime
 from enum import StrEnum
 
 from trading_agent.analysis.mtf import MtfContext
-from trading_agent.core.enums import Direction, NoTradeReason, RegimeDirectional
+from trading_agent.core.enums import (
+    Direction,
+    NoTradeReason,
+    Polarity,
+    RegimeDirectional,
+    StructureBreakKind,
+)
 from trading_agent.core.models import OHLCV
 from trading_agent.core.version import STRATEGY_VERSION
 from trading_agent.strategy.primitives.atr import atr_series
@@ -52,6 +58,12 @@ class BreakoutRetestParams:
     stop_buffer_atr: float = 0.3  # SL jenseits des Retest-Extrems
     min_stop_atr: float = 0.4  # SL-Distanz mind. — sonst zu eng
     require_d1_trend: bool = True  # S4: nur mit D1-Struktur-Trend
+    # S9-Diagnose (docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md): der 2-Swing-D1-Struktur-Trend
+    # allein flippt in Pullbacks zu leicht (5/6 Gold-Fehltrades waren Gegen-Trend-Shorts in
+    # einem Bullenjahr). Zusätzlich einen **jüngsten D1-BOS in dieselbe Richtung** verlangen.
+    # Panel-OOS: exp +0.374→+0.414 R, PF 2.03→2.21, MC prob_positive 0.61→0.79, sym-stab 0.75→0.83.
+    require_htf_bos_confluence: bool = True
+    d1_bos_lookback_bars: int = 20  # der BOS muss in den letzten N D1-Bars liegen
     tp1_r: float = 1.5
     tp2_r: float = 3.0
     tp3_assumed_r: float = 2.5  # für blended RR (Runner, kein fester Preis)
@@ -111,6 +123,24 @@ def _d1_trend(mtf: MtfContext) -> RegimeDirectional:
     if d1 is None:
         return RegimeDirectional.UNCLEAR
     return d1.structure.directional
+
+
+def _d1_bos_dir(mtf: MtfContext, lookback_bars: int) -> Direction | None:
+    """Richtung des jüngsten D1-**BOS**, falls seine Bruch-Bar in den letzten ``lookback_bars``
+    D1-Bars liegt. Sonst ``None``. Reine Lesefunktion über ``mtf.d1`` (look-ahead-frei)."""
+    d1 = mtf.d1
+    d1_bars = tuple(getattr(d1, "bars", ()) or ())
+    breaks = tuple(getattr(d1, "structure_breaks", ()) or ())
+    if d1 is None or not d1_bars:
+        return None
+    bos = [b for b in breaks if b.kind is StructureBreakKind.BOS]
+    if not bos:
+        return None
+    last = max(bos, key=lambda b: b.break_bar_timestamp)
+    recent = d1_bars[-lookback_bars:] if lookback_bars > 0 else d1_bars
+    if last.break_bar_timestamp < recent[0].open_time:
+        return None
+    return Direction.LONG if last.direction is Polarity.BULLISH else Direction.SHORT
 
 
 def _clip01(x: float) -> float:
@@ -177,6 +207,17 @@ def detect_breakout_retest(
             chain_progress="warte auf klaren D1-Struktur-Trend",
         )
 
+    bos_dir = _d1_bos_dir(mtf, p.d1_bos_lookback_bars) if p.require_htf_bos_confluence else None
+    if p.require_htf_bos_confluence and bos_dir is None:
+        return BreakoutRetestReport(
+            instrument=inst,
+            information_cutoff=cutoff,
+            state=BreakoutState.SCANNING,
+            d1_trend=trend,
+            reasons=(NoTradeReason.HTF_TREND_MISALIGNED,),
+            chain_progress="warte auf bestätigenden D1-BOS (HTF-Konfluenz)",
+        )
+
     look = p.consolidation_bars
     cur = bars[i]
     best: BreakoutRetestReport | None = None
@@ -204,6 +245,9 @@ def detect_breakout_retest(
             )
             if not aligned:
                 continue
+        # HTF-BOS-Konfluenz (S9): jüngster D1-BOS muss in dieselbe Richtung zeigen
+        if p.require_htf_bos_confluence and bos_dir is not d:
+            continue
         level = hi if up else lo
 
         # kein früherer Retest zwischen bo+1..i-1 (der erste Retest zählt)

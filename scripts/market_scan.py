@@ -30,7 +30,6 @@ from trading_agent.runtime.live_pipeline import (
     build_rest_provider,
 )
 from trading_agent.scanner.market_scanner import MarketScanner, ScannerConfig
-from trading_agent.scanner.opportunity import score_opportunity
 from trading_agent.strategy.evaluate import EvaluateParams, evaluate
 from trading_agent.strategy.signal_report import build_signal_report
 from trading_agent.utils.logging import configure_logging
@@ -43,8 +42,10 @@ async def _evaluate_all(
 ) -> list[dict[str, object]]:
     ac = AssetClass(asset_class)
     cfg = LivePipelineConfig(
-        exchange=exchange, instruments=tuple(s.upper() for s in symbols),
-        asset_class=ac, news_gate=False,
+        exchange=exchange,
+        instruments=tuple(s.upper() for s in symbols),
+        asset_class=ac,
+        news_gate=False,
     )
     rest = build_rest_provider(exchange)
     pipe = LivePipeline(cfg, rest_provider=rest)
@@ -68,9 +69,7 @@ async def _evaluate_all(
         no_trade=_dc.replace(ep.no_trade, require_news_feed=False),
         veto=_dc.replace(ep.veto, require_news_feed=False),
     )
-    scanner = MarketScanner(
-        ScannerConfig(asset_class=dict.fromkeys(contexts, asset_class))
-    )
+    scanner = MarketScanner(ScannerConfig(asset_class=dict.fromkeys(contexts, asset_class)))
 
     rows: list[dict[str, object]] = []
     for s, mc in contexts.items():
@@ -150,9 +149,13 @@ def _render_signal(r: dict[str, object]) -> None:
     head = "🔥" if elig == "LIVE" else "⚠️ SHADOW —"
     print(f"\n  {'-' * 60}")
     print(f"  {head}  {str(r['decision']).upper()} · {r['symbol']}")
-    print(f"  Entry {s['entry']}  ·  SL {s['stop_loss']}  ·  TP1 {s['tp1']}  TP2 {s['tp2']}  TP3 {s['tp3']}")
-    print(f"  R:R→TP2 {s['rr_to_tp2']}  ·  Blended {s['blended_rr']}  ·  "
-          f"Score {s['opportunity_score']}/100  ·  Conf {s['confidence_pct']}%")
+    print(
+        f"  Entry {s['entry']}  ·  SL {s['stop_loss']}  ·  TP1 {s['tp1']}  TP2 {s['tp2']}  TP3 {s['tp3']}"
+    )
+    print(
+        f"  R:R→TP2 {s['rr_to_tp2']}  ·  Blended {s['blended_rr']}  ·  "
+        f"Score {s['opportunity_score']}/100  ·  Conf {s['confidence_pct']}%"
+    )
     why = s.get("why") or []
     print(f"  Warum: {'; '.join(why) if why else '—'}")  # type: ignore[arg-type]
     print(f"  Invalidation: {s['invalidation']}")

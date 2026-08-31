@@ -97,7 +97,11 @@ async def _kraken(as_of: datetime, prices: dict[str, float]) -> AccountPortfolio
         cash_usdt = bal.pop("EUR", 0.0) * eurusd + bal.pop("USD", 0.0)
         bal["USDT"] = bal.get("USDT", 0.0) + cash_usdt
         return map_spot_account(
-            account="kraken", as_of=as_of, balances=bal, prices=prices, quote_ccy="USDT",
+            account="kraken",
+            as_of=as_of,
+            balances=bal,
+            prices=prices,
+            quote_ccy="USDT",
             read_only_verified=True,
         )
     finally:
@@ -115,8 +119,11 @@ async def _bybit(as_of: datetime) -> AccountPortfolio | None:
         w = await a.get_wallet_balance()
         pos = await a.get_positions(category="linear")
         return map_derivatives_account(
-            account="bybit", as_of=as_of, equity=w.equity,
-            positions=list(pos.get("positions") or []), read_only_verified=True,
+            account="bybit",
+            as_of=as_of,
+            equity=w.equity,
+            positions=list(pos.get("positions") or []),
+            read_only_verified=True,
         )
     finally:
         with contextlib.suppress(Exception):
@@ -134,8 +141,12 @@ async def _binance(as_of: datetime, prices: dict[str, float]) -> AccountPortfoli
         need = {f"{k}USDT" for k in s.nonzero_balances if k.upper() not in ("USDT", "USDC", "BUSD")}
         prices.update(await _prices(need))
         return map_spot_account(
-            account="binance", as_of=as_of, balances=s.nonzero_balances, prices=prices,
-            quote_ccy="USDT", read_only_verified=True,
+            account="binance",
+            as_of=as_of,
+            balances=s.nonzero_balances,
+            prices=prices,
+            quote_ccy="USDT",
+            read_only_verified=True,
         )
     finally:
         with contextlib.suppress(Exception):
@@ -151,7 +162,9 @@ async def main() -> int:
     prices: dict[str, float] = {}
 
     results = await asyncio.gather(
-        _kraken(as_of, prices), _bybit(as_of), _binance(as_of, prices),
+        _kraken(as_of, prices),
+        _bybit(as_of),
+        _binance(as_of, prices),
         return_exceptions=True,
     )
     accounts: list[AccountPortfolio] = []
@@ -160,7 +173,9 @@ async def main() -> int:
         if isinstance(r, AccountPortfolio):
             accounts.append(r)
         else:
-            skipped.append(f"{name}: {r if isinstance(r, Exception) else 'kein Key / kein Guthaben'}")
+            skipped.append(
+                f"{name}: {r if isinstance(r, Exception) else 'kein Key / kein Guthaben'}"
+            )
 
     if not accounts:
         print(json.dumps({"error": "kein Account lesbar", "skipped": skipped}, indent=2))
@@ -229,7 +244,9 @@ def _render(report: object, skipped: list[str]) -> None:
         )
     for p in report.exit_plans:  # type: ignore[attr-defined]
         if p.kind.value != "none":
-            print(f"    → {p.instrument}: {p.kind.value.upper()} {p.size_fraction:.0%}  ({p.trigger})")
+            print(
+                f"    → {p.instrument}: {p.kind.value.upper()} {p.size_fraction:.0%}  ({p.trigger})"
+            )
     rot = report.rotation  # type: ignore[attr-defined]
     if rot is not None:
         print(

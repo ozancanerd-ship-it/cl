@@ -364,6 +364,144 @@ def detect_s5(ctx: Ctx, i: int) -> Signal | None:
     return None
 
 
+def _brk_retest_core(
+    ctx: Ctx,
+    i: int,
+    *,
+    max_width_atr: float = 5.0,
+    min_thrust_atr: float = 0.3,
+    require_contraction: bool = False,
+) -> tuple[Signal, float] | None:
+    """Konfigurierbarer Breakout+Retest-Kern (Diagnose 2026-08-31: der S1/S4-Standard lässt
+    zu breite 'Konsolidierungen' und zu schwache Ausbrüche zu → False Breakouts auf Gold).
+    Rückgabe: (Signal, cons_width/ATR). Filter sind *struktureller* Natur, nicht an die
+    6 Gold-Trades gefittet."""
+    a = ctx.atr[i]
+    if not a or i < 40:
+        return None
+    h4 = ctx.h4
+    look, retest_window = 14, 12
+    for bo in range(i - 1, i - retest_window - 1, -1):
+        if bo - look < 0:
+            break
+        cons = h4[bo - look : bo]
+        hi = max(b.high for b in cons)
+        lo = min(b.low for b in cons)
+        width = hi - lo
+        if not (0.4 * a <= width <= max_width_atr * a):
+            continue
+        if require_contraction:
+            half = look // 2
+            r_early = max(b.high for b in cons[:half]) - min(b.low for b in cons[:half])
+            r_late = max(b.high for b in cons[half:]) - min(b.low for b in cons[half:])
+            if r_late >= 0.85 * r_early:  # zweite Hälfte nicht enger → kein echter Coil
+                continue
+        bob = h4[bo]
+        up = bob.close > hi + min_thrust_atr * a
+        dn = bob.close < lo - min_thrust_atr * a
+        if not (up or dn):
+            continue
+        level = hi if up else lo
+        d = 1 if up else -1
+        rb = h4[i]
+        touched = (rb.low <= level + 0.5 * a) if up else (rb.high >= level - 0.5 * a)
+        held = (rb.close > level) if up else (rb.close < level)
+        cd = _close_pos(rb) > 0.5 if up else _close_pos(rb) < 0.5
+        earlier = any(
+            ((h4[r].low <= level + 0.5 * a) if up else (h4[r].high >= level - 0.5 * a))
+            for r in range(bo + 1, i)
+        )
+        if touched and held and cd and not earlier:
+            stop = (min(rb.low, level) - 0.3 * a) if up else (max(rb.high, level) + 0.3 * a)
+            if abs(rb.close - stop) > 0.4 * a:
+                return Signal(i, d, stop, f"brk_retest w={width / a:.1f}ATR"), width / a
+    return None
+
+
+def _d1_trend_dir(ctx: Ctx, i: int) -> int:
+    st = ctx.d1_state(i)
+    return 1 if st is RegimeDirectional.TREND_UP else -1 if st is RegimeDirectional.TREND_DOWN else 0
+
+
+def detect_s6(ctx: Ctx, i: int) -> Signal | None:
+    """S4 + **enger Coil** (≤ 2.0·ATR) + **starker Ausbruch** (≥ 1.0·ATR Displacement).
+    Ziel: nur echte Continuation-Breakouts, keine Range-Fades."""
+    r = _brk_retest_core(ctx, i, max_width_atr=2.0, min_thrust_atr=1.0)
+    if r is None:
+        return None
+    sig, _ = r
+    return sig if _d1_trend_dir(ctx, i) == sig.direction else None
+
+
+def detect_s7(ctx: Ctx, i: int) -> Signal | None:
+    """S4 + **Range-Kontraktion** (2. Coil-Hälfte enger) + Ausbruch ≥ 0.8·ATR."""
+    r = _brk_retest_core(ctx, i, max_width_atr=3.0, min_thrust_atr=0.8, require_contraction=True)
+    if r is None:
+        return None
+    sig, _ = r
+    return sig if _d1_trend_dir(ctx, i) == sig.direction else None
+
+
+def detect_s8(ctx: Ctx, i: int) -> Signal | None:
+    """S4 + **Session-Filter**: kein Einstieg, wenn die Retest-Bar 20–04 UTC schließt
+    (illiquide; Diagnose: 4/6 Gold-Fehltrades in diesem Fenster)."""
+    r = _brk_retest_core(ctx, i, max_width_atr=5.0, min_thrust_atr=0.3)
+    if r is None:
+        return None
+    sig, _ = r
+    if _d1_trend_dir(ctx, i) != sig.direction:
+        return None
+    return sig if ctx.h4[i].close_time.hour not in (20, 21, 22, 23, 0, 1, 2, 3) else None
+
+
+def detect_s9(ctx: Ctx, i: int) -> Signal | None:
+    """S4 + **HTF-Konfluenz**: D1-Struktur-Trend UND jüngster D1-BOS zeigen in dieselbe Richtung
+    (Diagnose: der 2-Swing-D1-Trend allein flippt auf Gold in Pullbacks zu leicht auf trend_down)."""
+    r = _brk_retest_core(ctx, i, max_width_atr=5.0, min_thrust_atr=0.3)
+    if r is None:
+        return None
+    sig, _ = r
+    td = _d1_trend_dir(ctx, i)
+    return sig if td == sig.direction and ctx.d1_bos(i) == sig.direction else None
+
+
+def detect_s10(ctx: Ctx, i: int) -> Signal | None:
+    """S6 (enger Coil + starker Ausbruch) **und** S9 (HTF-Konfluenz) — die Qualitätsvariante."""
+    r = _brk_retest_core(ctx, i, max_width_atr=2.0, min_thrust_atr=1.0)
+    if r is None:
+        return None
+    sig, _ = r
+    td = _d1_trend_dir(ctx, i)
+    return sig if td == sig.direction and ctx.d1_bos(i) == sig.direction else None
+
+
+def _s9_base(ctx: Ctx, i: int, *, max_width_atr: float = 5.0, min_thrust_atr: float = 0.3) -> Signal | None:
+    r = _brk_retest_core(ctx, i, max_width_atr=max_width_atr, min_thrust_atr=min_thrust_atr)
+    if r is None:
+        return None
+    sig, _ = r
+    td = _d1_trend_dir(ctx, i)
+    return sig if td == sig.direction and ctx.d1_bos(i) == sig.direction else None
+
+
+def detect_s11(ctx: Ctx, i: int) -> Signal | None:
+    """S9 (HTF-Konfluenz) + Session-Filter (kein Einstieg 20–04 UTC)."""
+    sig = _s9_base(ctx, i)
+    if sig is None:
+        return None
+    return sig if ctx.h4[i].close_time.hour not in (20, 21, 22, 23, 0, 1, 2, 3) else None
+
+
+def detect_s12(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + moderater Ausbruch-Filter (Displacement ≥ 0.6·ATR — die schwächsten Breakouts raus)."""
+    return _s9_base(ctx, i, min_thrust_atr=0.6)
+
+
+def detect_s13(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + moderater Coil-Filter (Range ≤ 3.0·ATR — die breitesten 'Konsolidierungen' raus)."""
+    return _s9_base(ctx, i, max_width_atr=3.0)
+
+
 DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S0_sweep_reversal": detect_s0,
     "S1_breakout_retest": detect_s1,
@@ -371,6 +509,14 @@ DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S3_htf_break_confirm": detect_s3,
     "S4_breakout_retest_trendfilter": detect_s4,
     "S5_d1trend_h4break": detect_s5,
+    "S6_coil_strong_thrust": detect_s6,
+    "S7_range_contraction": detect_s7,
+    "S8_session_filter": detect_s8,
+    "S9_htf_confluence": detect_s9,
+    "S10_quality_combo": detect_s10,
+    "S11_htf_conf_session": detect_s11,
+    "S12_htf_conf_thrust06": detect_s12,
+    "S13_htf_conf_coil3": detect_s13,
 }
 
 

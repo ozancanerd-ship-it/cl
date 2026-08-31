@@ -27,7 +27,7 @@ from trading_agent.scanner.opportunity import OppFactor, OpportunityScore
 from trading_agent.strategy.decision import Decision
 from trading_agent.strategy.evaluate import EvaluationResult
 from trading_agent.strategy.primitives.atr import atr_series
-from trading_agent.strategy.primitives.structure import derive_structure_state
+from trading_agent.strategy.primitives.structure import derive_structure_state, structure_breaks
 from trading_agent.strategy.primitives.swings import detect_swings
 from trading_agent.strategy.setups.breakout_retest import BreakoutState, detect_breakout_retest
 from trading_agent.strategy.signal_report import build_signal_report
@@ -166,10 +166,25 @@ def main() -> int:
     sw.sort(key=lambda s: s.confirmed_at)
     conf = [s.confirmed_at for s in sw]
     atr = atr_series(h4, 14)
+    d1_brk = structure_breaks(d1, sw, _D1, min_swings=2)
+    d1_brk.sort(key=lambda b: b.break_bar_timestamp)
+    brk_ts = [b.break_bar_timestamp for b in d1_brk]
+    d1_open = [b.open_time for b in d1]
 
     def d1_trend(ts: datetime) -> object:
         v = sw[: bisect.bisect_right(conf, ts)]
         return derive_structure_state(v, _D1, min_swings=2).directional if len(v) >= 4 else None
+
+    def d1_ctx_at(ts: datetime) -> _NS:
+        """PIT-D1-Kontext: Bars + Struktur-Breaks ≤ ts (für die S9-HTF-BOS-Konfluenz)."""
+        nd = bisect.bisect_right(d1_open, ts)
+        nb = bisect.bisect_right(brk_ts, ts)
+        return _NS(
+            bars=tuple(d1[:nd]),
+            structure=_NS(directional=d1_trend(ts)),
+            structure_breaks=tuple(d1_brk[:nb]),
+            regime=_NS(directional_score=0.72),
+        )
 
     registry = ValidationRegistry.from_file(args.validation_config)
     from pathlib import Path
@@ -217,7 +232,7 @@ def main() -> int:
             instrument=args.symbol,
             information_cutoff=ts,
             h4=_NS(bars=tuple(h4[: i + 1]), atr=atr[i] or 0.0),
-            d1=_NS(structure=_NS(directional=trend), regime=_NS(directional_score=0.72)),
+            d1=d1_ctx_at(ts),
         )
         rep = detect_breakout_retest(mtf)  # type: ignore[arg-type]
         if rep.state is not BreakoutState.ARMED or rep.direction is None or rep.sl is None:

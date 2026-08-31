@@ -107,15 +107,17 @@ _BUILTIN: dict[tuple[str, str], SetupValidation] = {
         strategy_version=STRATEGY_VERSION,
         status=ValidationStatus.IN_VALIDATION,
         baseline=BaselineMetrics(
-            expectancy_r=0.25, profit_factor=1.7, win_rate=0.53, max_drawdown_r=9.0, n_trades=47
+            expectancy_r=0.28, profit_factor=1.8, win_rate=0.60, max_drawdown_r=9.0, n_trades=112
         ),
-        validated_window=("2023-11-14", "2026-08-28"),
+        validated_window=("2023-01-01", "2026-08-28"),
         notes=(
-            "S4 (Breakout+Retest, D1-Trend-Filter). EVIDENZ GEMISCHT: (+) Yahoo Gold-Futures + "
-            "FX-Proxy + Crypto: OOS +0.40..+0.58R, WF 8-11/9-12, MC pp 0.55-0.65, alle 13 "
-            "Parameter-Störungen OOS-positiv. (-) echte Dukascopy-Spot-XAUUSD (n=7, Lücke): "
-            "-2.17R gesamt. Yahoo GC=F = Futures, nicht Spot. IN_VALIDATION → SHADOW. VALIDATED "
-            "nur nach vollständiger Dukascopy-Historie mit + OOS UND ≥100 Forward-Trades."
+            "S4→S9 (Breakout+Retest, D1-Trend + jüngster-D1-BOS-Konfluenz). Diagnose "
+            "docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md: S9 dominiert S4 im Panel (12 Instrumente) "
+            "auf jeder Achse — OOS exp +0.37→+0.41, PF 2.03→2.21, MC pp 0.61→0.79, sym-stab "
+            "0.75→0.83. Weitere Filter (S11-S13) verschlechtern → Stopp (kein Overfitting). "
+            "CAVEATS: echtes Spot-XAUUSD 2023 (Range-Jahr) bleibt negativ (n=4-6, zu klein); "
+            "Panel-OOS ruht stark auf Yahoo-indikativen + FX-Proxy-Daten. IN_VALIDATION → "
+            "SHADOW. VALIDATED nur nach vollständiger Dukascopy-Historie UND ≥100 Forward-Trades."
         ),
     ),
 }

@@ -25,8 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from trading_agent.api.dashboard import DashboardInputs, build_dashboard_state  # noqa: E402
-from trading_agent.governance import ValidationRegistry  # noqa: E402
+from trading_agent.api.dashboard import DashboardInputs, build_dashboard_state
+from trading_agent.governance import ValidationRegistry
 
 
 async def _run(args: argparse.Namespace) -> dict[str, object]:
@@ -47,7 +47,7 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
     for asset_class, syms in groups:
         try:
             rows = await market_scan._evaluate_all(syms, args.exchange, asset_class, registry)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             blockers.append(f"scan {asset_class}: {exc}")
             continue
         for r in rows:
@@ -77,6 +77,7 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
     if not args.no_portfolio:
         try:
             import portfolio_hub  # scripts/portfolio_hub.py
+
             from trading_agent.portfolio_intel import (
                 AccountPortfolio,
                 PortfolioIntelligenceEngine,
@@ -97,7 +98,7 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
                 portfolio = rep.as_dict()
             else:
                 blockers.append("portfolio: kein Account lesbar (kein Key)")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             blockers.append(f"portfolio: {exc}")
             portfolio = None
 

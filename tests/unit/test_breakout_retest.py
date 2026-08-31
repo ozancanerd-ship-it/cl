@@ -7,9 +7,18 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from trading_agent.core.enums import Direction, NoTradeReason, RegimeDirectional, Timeframe
+from trading_agent.core.enums import (
+    Direction,
+    NoTradeReason,
+    Polarity,
+    RegimeDirectional,
+    StructureBreakKind,
+    StructureOrigin,
+    Timeframe,
+)
 from trading_agent.core.models import OHLCV
 from trading_agent.core.time import bar_close_time
+from trading_agent.strategy.primitives.models import StructureBreak
 from trading_agent.strategy.setups.breakout_retest import (
     BreakoutState,
     detect_breakout_retest,
@@ -38,12 +47,53 @@ def _bar(t: datetime, o: float, h: float, low: float, c: float) -> OHLCV:
     )
 
 
-def _mtf(bars: list[OHLCV], d1_dir: RegimeDirectional) -> _E:
+def _d1_ctx(bars: list[OHLCV], d1_dir: RegimeDirectional, bos: Direction | None) -> _E:
+    """Minimaler D1-Kontext: ~30 Tagesbars bis kurz vor dem letzten H4-Close + optional ein
+    jüngster D1-BOS (für die S9-HTF-Konfluenz)."""
+    end = bars[-1].open_time.replace(hour=0, minute=0, second=0, microsecond=0)
+    d1_bars = [
+        OHLCV(
+            instrument="XAUUSD", timeframe=Timeframe.D1,
+            open_time=end - timedelta(days=k), close_time=end - timedelta(days=k - 1),
+            open=100.0, high=101.0, low=99.0, close=100.0, volume=1.0, source="test",
+        )
+        for k in range(30, 0, -1)
+    ]
+    breaks: tuple[StructureBreak, ...] = ()
+    if bos is not None:
+        breaks = (
+            StructureBreak(
+                kind=StructureBreakKind.BOS,
+                direction=Polarity.BULLISH if bos is Direction.LONG else Polarity.BEARISH,
+                timeframe=Timeframe.D1,
+                broken_level_price=100.0,
+                break_bar_timestamp=d1_bars[-8].open_time,
+                break_close=100.0,
+                origin=StructureOrigin.TREND,
+            ),
+        )
+    return _E(structure=_E(directional=d1_dir), bars=tuple(d1_bars), structure_breaks=breaks)
+
+
+def _mtf(
+    bars: list[OHLCV],
+    d1_dir: RegimeDirectional,
+    *,
+    bos: Direction | None = "auto",  # type: ignore[assignment]
+) -> _E:
+    # Standard: BOS bestätigt den Trend (realer ARMED-Breakout-Retest hat i. d. R. einen jüngsten
+    # D1-BOS in Trendrichtung). Tests, die die Konfluenz gezielt prüfen, setzen bos= explizit.
+    if bos == "auto":
+        bos = (
+            Direction.LONG if d1_dir is RegimeDirectional.TREND_UP
+            else Direction.SHORT if d1_dir is RegimeDirectional.TREND_DOWN
+            else None
+        )
     return _E(
         instrument="XAUUSD",
         information_cutoff=bars[-1].close_time,
         h4=_E(bars=tuple(bars)),
-        d1=_E(structure=_E(directional=d1_dir)),
+        d1=_d1_ctx(bars, d1_dir, bos),  # type: ignore[arg-type]
     )
 
 
@@ -85,6 +135,23 @@ def test_no_arm_without_d1_trend() -> None:
     rep = detect_breakout_retest(_mtf(bars, RegimeDirectional.UNCLEAR))  # type: ignore[arg-type]
     assert rep.state is BreakoutState.SCANNING
     assert NoTradeReason.HTF_TREND_MISALIGNED in rep.reasons
+
+
+def test_no_arm_without_htf_bos_confluence() -> None:
+    """S9: D1-Trend up, aber kein bestätigender D1-BOS → SCANNING (kein ARMED)."""
+    bars = _long_breakout_retest_series()
+    rep = detect_breakout_retest(_mtf(bars, RegimeDirectional.TREND_UP, bos=None))  # type: ignore[arg-type]
+    assert rep.state is BreakoutState.SCANNING
+    assert not rep.is_armed
+
+
+def test_no_arm_when_bos_opposes_breakout() -> None:
+    """D1-Trend up + Long-Breakout, aber jüngster D1-BOS ist bearish → keine Konfluenz."""
+    bars = _long_breakout_retest_series()
+    rep = detect_breakout_retest(
+        _mtf(bars, RegimeDirectional.TREND_UP, bos=Direction.SHORT)  # type: ignore[arg-type]
+    )
+    assert not rep.is_armed
 
 
 def test_no_arm_when_breakout_direction_opposes_trend() -> None:
