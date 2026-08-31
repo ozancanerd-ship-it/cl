@@ -74,6 +74,11 @@ async def main() -> int:
         default="config/setup_validation.json",
         help="Setup-Freigabe-Registry (Masterplan-Regel 3). Fehlt sie → alles SHADOW.",
     )
+    ap.add_argument(
+        "--signal-journal",
+        default="data/repository_real/live/signal_journal.jsonl",
+        help="JSONL — jedes Signal + jede Revision + jeder Shadow-Trade-Schritt (Masterplan §24/§30). '' zum Deaktivieren.",
+    )
     ap.add_argument("--max-seconds", type=float, default=None, help="Test-Deckel; sonst 24/7")
     ap.add_argument("--status-json", default=None, help="Endstand als JSON hierhin schreiben")
     args = ap.parse_args()
@@ -114,6 +119,20 @@ async def main() -> int:
     validation = ValidationRegistry.from_file(args.validation_config)
     emitted_signals: list[dict] = []
     shadow_signals: list[dict] = []
+
+    # JSONL-Journal: jedes Signal, jede Revision, jeder Shadow-Trade-Schritt — sofort persistiert
+    journal = None
+    if args.signal_journal:
+        from trading_agent.runtime.signal_journal import SignalJournal
+
+        journal = SignalJournal(args.signal_journal, build_report=build_signal_report)
+        journal.configure(
+            opportunity_for=scanner.score_for,
+            risk_pct=args.risk_pct,
+            apply_live_gate=apply_live_gate,
+            registry=validation,
+        )
+        journal.attach(pipe.bus)
 
     # Hash-verkettetes Audit-Log (Masterplan §51) — sicherheitsrelevante Ereignisse
     audit = None
@@ -195,6 +214,8 @@ async def main() -> int:
     status["_signals_emitted"] = emitted_signals
     status["_shadow_signals"] = shadow_signals
     status["_validation"] = [sv.as_dict() for sv in validation.all()]
+    if journal is not None:
+        status["_journal"] = {"path": str(journal.path), "counts": journal.counts}
     status["_top_opportunities"] = [
         {
             "rank": r.rank,
