@@ -23,7 +23,15 @@ from trading_agent.core.enums import AssetClass, Timeframe
 from trading_agent.core.time import parse_timestamp
 from trading_agent.data.repository import MarketDataRepository
 from trading_agent.engine.backtest import Backtest, BacktestConfig
-from trading_agent.research.validation import chronological_split
+from trading_agent.research.metrics import compute_metrics
+from trading_agent.research.robustness import monte_carlo
+from trading_agent.research.validation import (
+    chronological_split,
+    fraction_positive_windows,
+    symbol_stability,
+    time_stability,
+    walk_forward_folds,
+)
 from trading_agent.strategy.cost_profiles import estimate_profile
 from trading_agent.strategy.costs import CostConfig
 from trading_agent.strategy.engine import EngineParams
@@ -40,6 +48,60 @@ def _seg_row(s: object) -> dict:
         "median_r": round(s.median_r, 4),  # type: ignore[attr-defined]
         "total_r": round(s.total_r, 4),  # type: ignore[attr-defined]
         "profit_factor": round(s.profit_factor, 3) if s.profit_factor != float("inf") else "inf",  # type: ignore[attr-defined]
+    }
+
+
+def _validation_block(trades: list, cfg: BacktestConfig) -> dict:
+    """OOS-Split · Walk-Forward · Monte-Carlo · Zeit-/Symbol-Stabilität — nur wenn Trades da."""
+    if not trades:
+        return {"note": "keine Trades — Validierung nicht möglich (Bottleneck ist upstream)"}
+    split = chronological_split(trades, train=0.5, validation=0.25)
+    folds = walk_forward_folds(cfg.start, cfg.end, train_days=180, test_days=60, step_days=60)
+    wf = []
+    for f in folds:
+        tr = f.test_trades(trades)
+        if tr:
+            mm = compute_metrics(tr)
+            wf.append(
+                {
+                    "fold": f.index,
+                    "test_window": [f.test_start.date().isoformat(), f.test_end.date().isoformat()],
+                    "n": mm.n_trades,
+                    "expectancy_r": round(mm.expectancy_r, 4),
+                    "profit_factor": round(mm.profit_factor, 3)
+                    if mm.profit_factor != float("inf")
+                    else "inf",
+                    "total_r": round(mm.total_r, 4),
+                }
+            )
+    mc = monte_carlo(trades, runs=2000)
+    ts = time_stability(trades, window_days=90, step_days=30)
+    ss = symbol_stability(trades)
+    return {
+        "chronological_split": {
+            "train": len(split.train),
+            "validation": len(split.validation),
+            "test": len(split.test),
+        },
+        "walk_forward": wf,
+        "monte_carlo": {
+            "runs": mc.runs,
+            "final_equity_r_p05": round(mc.final_equity_r_p05, 3),
+            "final_equity_r_p50": round(mc.final_equity_r_p50, 3),
+            "final_equity_r_p95": round(mc.final_equity_r_p95, 3),
+            "max_dd_r_p95": round(mc.max_dd_r_p95, 3),
+            "prob_positive": round(mc.prob_positive, 4),
+            "ruin_probability": round(mc.ruin_probability, 4),
+        },
+        "time_stability": {
+            "windows": len(ts),
+            "fraction_positive": round(fraction_positive_windows(ts), 4),
+        },
+        "symbol_stability": {
+            "per_symbol_total_r": ss.per_symbol_total_r,
+            "fraction_positive": ss.fraction_positive,
+            "total_r_without_best_symbol": ss.total_r_without_best,
+        },
     }
 
 
@@ -142,7 +204,6 @@ def main() -> int:
     m = res.metrics
     rep = res.strategy_report
     tel = res.telemetry
-    split = chronological_split(res.trades, train=0.5, validation=0.25) if res.trades else None
 
     gross_total = round(sum(t.gross_r for t in res.trades), 4)
     net_total = round(sum(t.realized_r for t in res.trades), 4)
@@ -176,6 +237,9 @@ def main() -> int:
             "median_r": round(m.median_r, 4),
             "stdev_r": round(m.stdev_r, 4),
             "max_drawdown_r": round(m.max_drawdown_r, 4),
+            "sharpe_r": m.sharpe_r,
+            "sortino_r": m.sortino_r,
+            "calmar_r": m.calmar_r,
             "longest_loss_streak": m.longest_loss_streak,
             "avg_mfe_r": round(m.avg_mfe_r, 4),
             "avg_mae_r": round(m.avg_mae_r, 4),
@@ -227,17 +291,7 @@ def main() -> int:
             "exit_required_events": tel.exit_required_events,
             "alerts_raised": tel.alerts_raised,
         },
-        "validation_prep": {
-            "chronological_split": (
-                {
-                    "train": len(split.train),
-                    "validation": len(split.validation),
-                    "test": len(split.test),
-                }
-                if split
-                else None
-            ),
-        },
+        "validation": _validation_block(res.trades, cfg),
     }
     print(json.dumps(out, indent=2, default=str))
     print(f"\n# generated {datetime.now(UTC).isoformat()}  ·  run_id={res.run_id}")

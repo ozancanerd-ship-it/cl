@@ -84,6 +84,18 @@ class TestMetrics:
         t = t.model_copy(update={"gross_r": 1.2, "realized_r": 1.0})
         assert abs(compute_metrics([t]).cost_drag_r - 0.2) < 1e-9
 
+    def test_risk_adjusted_ratios(self) -> None:
+        # 3× +2R, 2× -1R: mean=+0.8, stdev>0, max_dd (2 aufeinander) = 2R, total=4R
+        trades = [_trade(1, 2.0), _trade(2, 2.0), _trade(3, -1.0), _trade(4, -1.0), _trade(5, 2.0)]
+        m = compute_metrics(trades)
+        assert m.sharpe_r > 0 and m.sortino_r > 0
+        assert m.sortino_r > m.sharpe_r  # Downside-Vol < Gesamt-Vol ⇒ Sortino höher
+        assert abs(m.calmar_r - m.total_r / m.max_drawdown_r) < 1e-6
+
+    def test_ratios_zero_when_no_variation(self) -> None:
+        m = compute_metrics([_trade(1, 1.0)])
+        assert m.sharpe_r == 0.0 and m.sortino_r == 0.0 and m.calmar_r == 0.0
+
 
 class TestValidation:
     def test_chronological_split(self) -> None:

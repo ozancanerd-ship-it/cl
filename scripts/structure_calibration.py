@@ -28,12 +28,12 @@ import statistics
 from collections.abc import Sequence
 from datetime import datetime
 
-from trading_agent.core.enums import RegimeDirectional, Timeframe
+from trading_agent.core.enums import Polarity, RegimeDirectional, StructureBreakKind, Timeframe
 from trading_agent.core.models import OHLCV
 from trading_agent.core.time import parse_timestamp
 from trading_agent.data.repository import MarketDataRepository
-from trading_agent.strategy.primitives.structure import derive_structure_state
-from trading_agent.strategy.primitives.swings import detect_swings
+from trading_agent.strategy.primitives.structure import derive_structure_state, structure_breaks
+from trading_agent.strategy.primitives.swings import SwingType, detect_swings
 
 # --------------------------------------------------------------------------------------------
 # Klassifikator-Varianten (nur die Struktur-Ebene — kein Slope, kein Vol, kein Gate)
@@ -48,6 +48,7 @@ class StructVariant:
     min_leg_atr: float
     min_swings: int
     note: str
+    method: str = "strict"  # strict | hl_only | one_violation | bos_anchor
 
 
 VARIANTS: tuple[StructVariant, ...] = (
@@ -58,13 +59,100 @@ VARIANTS: tuple[StructVariant, ...] = (
     StructVariant("V4_fractal_3_ms_3", 3, 3, 0.5, 3, "signifikantere Swings + strenger"),
     StructVariant("V5_leg_1atr", 2, 2, 1.0, 2, "größere Mindest-Leg (1·ATR)"),
     StructVariant("V6_fractal_3_leg_1atr", 3, 3, 1.0, 2, "beides: signifikantere + größere Legs"),
+    # --- strukturell andere Definitionen (nicht nur Param-Sweep) ---
+    StructVariant(
+        "V7_hl_only", 2, 2, 0.5, 2, "Uptrend = nur Higher-Lows; Down = nur Lower-Highs", "hl_only"
+    ),
+    StructVariant(
+        "V8_one_violation",
+        2,
+        2,
+        0.5,
+        3,
+        "1 Verstoß je Serie erlaubt (interne Struktur)",
+        "one_violation",
+    ),
+    StructVariant(
+        "V9_bos_anchor",
+        2,
+        2,
+        0.5,
+        2,
+        "Trend = letzter gerichteter BOS in den letzten N Bars",
+        "bos_anchor",
+    ),
 )
+
+_BOS_LOOKBACK = 20
+
+
+def _classify_hl_only(sw: Sequence[object], min_swings: int) -> RegimeDirectional:
+    highs = [s for s in sw if s.type is SwingType.SWING_HIGH]  # type: ignore[attr-defined]
+    lows = [s for s in sw if s.type is SwingType.SWING_LOW]  # type: ignore[attr-defined]
+    if len(lows) <= min_swings or len(highs) <= min_swings:
+        return RegimeDirectional.UNCLEAR
+    rl = lows[-min_swings - 1 :]
+    rh = highs[-min_swings - 1 :]
+    if all(rl[i].price > rl[i - 1].price for i in range(1, len(rl))):
+        return RegimeDirectional.TREND_UP
+    if all(rh[i].price < rh[i - 1].price for i in range(1, len(rh))):
+        return RegimeDirectional.TREND_DOWN
+    return RegimeDirectional.UNCLEAR
+
+
+def _monotone_with_tolerance(prices: list[float], *, up: bool, max_viol: int = 1) -> bool:
+    if up:
+        viol = sum(1 for i in range(1, len(prices)) if prices[i] <= prices[i - 1])
+    else:
+        viol = sum(1 for i in range(1, len(prices)) if prices[i] >= prices[i - 1])
+    return viol <= max_viol and prices[-1] != prices[0]
+
+
+def _classify_one_violation(sw: Sequence[object], min_swings: int) -> RegimeDirectional:
+    highs = [s.price for s in sw if s.type is SwingType.SWING_HIGH]  # type: ignore[attr-defined]
+    lows = [s.price for s in sw if s.type is SwingType.SWING_LOW]  # type: ignore[attr-defined]
+    n = min_swings + 1
+    if len(highs) < n or len(lows) < n:
+        return RegimeDirectional.UNCLEAR
+    h, low = highs[-n:], lows[-n:]
+    if _monotone_with_tolerance(h, up=True) and _monotone_with_tolerance(low, up=True):
+        return RegimeDirectional.TREND_UP
+    if _monotone_with_tolerance(h, up=False) and _monotone_with_tolerance(low, up=False):
+        return RegimeDirectional.TREND_DOWN
+    return RegimeDirectional.UNCLEAR
+
+
+def _classify_bos_anchor(
+    bars: Sequence[OHLCV], sw: Sequence[object], tf: Timeframe
+) -> RegimeDirectional:
+    breaks = structure_breaks(bars, sw, tf)  # type: ignore[arg-type]
+    idx = {b.open_time: i for i, b in enumerate(bars)}
+    cutoff = len(bars) - _BOS_LOOKBACK
+    directional = [
+        b
+        for b in breaks
+        if b.kind is StructureBreakKind.BOS and idx.get(b.break_bar_timestamp, len(bars)) >= cutoff
+    ]
+    if not directional:
+        return RegimeDirectional.UNCLEAR
+    last = directional[-1]
+    return (
+        RegimeDirectional.TREND_UP
+        if last.direction is Polarity.BULLISH
+        else RegimeDirectional.TREND_DOWN
+    )
 
 
 def classify(bars: Sequence[OHLCV], tf: Timeframe, v: StructVariant) -> RegimeDirectional:
     if len(bars) < 4 * (v.min_swings + 2):
         return RegimeDirectional.UNCLEAR
     sw = detect_swings(bars, tf, left=v.left, right=v.right, min_leg_atr=v.min_leg_atr)
+    if v.method == "hl_only":
+        return _classify_hl_only(sw, v.min_swings)
+    if v.method == "one_violation":
+        return _classify_one_violation(sw, v.min_swings)
+    if v.method == "bos_anchor":
+        return _classify_bos_anchor(bars, sw, tf)
     return derive_structure_state(sw, tf, min_swings=v.min_swings).directional
 
 

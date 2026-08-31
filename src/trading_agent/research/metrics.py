@@ -31,6 +31,14 @@ class Metrics:
     avg_mae_r: float
     total_r: float
     total_pnl_ccy: float
+    # Risiko-adjustierte Kennzahlen auf der **R-Sequenz je Trade** (nicht zeit-annualisiert —
+    # ein Trade-Sequenz-Backtest hat keine feste Kalenderfrequenz):
+    #   sharpe_r  = mean(R) / stdev(R)          — Rendite je Einheit Gesamtvolatilität
+    #   sortino_r = mean(R) / downside_stdev(R) — Rendite je Einheit *Verlust*volatilität
+    #   calmar_r  = total_R / max_drawdown_R    — Gesamtertrag je Einheit maximalem Rückschlag
+    sharpe_r: float = 0.0
+    sortino_r: float = 0.0
+    calmar_r: float = 0.0
 
     def as_dict(self) -> dict[str, float | int]:
         return {f.name: getattr(self, f.name) for f in fields(self)}
@@ -68,6 +76,24 @@ def _drawdown_r(rs: list[float]) -> float:
     return max_dd
 
 
+def _ratios(rs: list[float], max_dd: float) -> tuple[float, float, float]:
+    """(sharpe_r, sortino_r, calmar_r) auf der R-Sequenz. ``0.0`` wenn nicht bestimmbar.
+
+    Sortino nutzt die **Downside-Deviation** ``sqrt(mean(min(r,0)²))`` (Abweichung unter dem
+    Ziel 0), nicht die Streuung der Verlust-Teilmenge — sonst wäre die Kennzahl 0, wenn alle
+    Verluste gleich groß sind.
+    """
+    if len(rs) < 2:
+        return 0.0, 0.0, 0.0
+    mean = statistics.fmean(rs)
+    sd = statistics.pstdev(rs)
+    sharpe = mean / sd if sd > 0 else 0.0
+    dd_dev = math.sqrt(statistics.fmean([min(r, 0.0) ** 2 for r in rs]))
+    sortino = mean / dd_dev if dd_dev > 0 else 0.0
+    calmar = sum(rs) / max_dd if max_dd > 0 else 0.0
+    return round(sharpe, 4), round(sortino, 4), round(calmar, 4)
+
+
 def compute_metrics(trades: list[TradeRecord]) -> Metrics:
     if not trades:
         return Metrics.empty()
@@ -87,6 +113,9 @@ def compute_metrics(trades: list[TradeRecord]) -> Metrics:
         streak = streak + 1 if r < 0 else 0
         worst = max(worst, streak)
 
+    max_dd = _drawdown_r(rs)
+    sharpe_r, sortino_r, calmar_r = _ratios(rs, max_dd)
+
     return Metrics(
         n_trades=len(trades),
         win_rate=len(wins) / len(trades),
@@ -102,12 +131,15 @@ def compute_metrics(trades: list[TradeRecord]) -> Metrics:
         avg_r=statistics.fmean(rs),
         median_r=statistics.median(rs),
         stdev_r=statistics.pstdev(rs) if len(rs) > 1 else 0.0,
-        max_drawdown_r=_drawdown_r(rs),
+        max_drawdown_r=max_dd,
         longest_loss_streak=worst,
         avg_mfe_r=statistics.fmean([t.mfe_r for t in trades]),
         avg_mae_r=statistics.fmean([t.mae_r for t in trades]),
         total_r=sum(rs),
         total_pnl_ccy=sum(t.pnl_ccy for t in trades),
+        sharpe_r=sharpe_r,
+        sortino_r=sortino_r,
+        calmar_r=calmar_r,
     )
 
 
