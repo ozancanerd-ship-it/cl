@@ -44,13 +44,20 @@ _log = get_logger("run_live_daemon")
 
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--exchange", choices=["kraken", "bybit"], default="bybit")
+    ap.add_argument(
+        "--exchange", choices=["kraken", "bybit", "binance", "binance_spot"], default="bybit"
+    )
     ap.add_argument("--symbols", nargs="+", default=["BTCUSDT", "ETHUSDT"])
     ap.add_argument("--asset-class", default="crypto")
     ap.add_argument("--news-gate", choices=["on", "off"], default="off")
     ap.add_argument("--derivatives", action="store_true", help="Bybit Funding/OI (nur wenn valide)")
     ap.add_argument("--snapshot-dir", default="data/repository_real/live/state")
     ap.add_argument("--snapshot-interval", type=float, default=60.0)
+    ap.add_argument(
+        "--decision-ledger",
+        default="data/repository_real/live/decision_ledger.sqlite",
+        help="SQLite-Pfad für den Decision-Log (Masterplan §64). '' zum Deaktivieren.",
+    )
     ap.add_argument("--max-seconds", type=float, default=None, help="Test-Deckel; sonst 24/7")
     ap.add_argument("--status-json", default=None, help="Endstand als JSON hierhin schreiben")
     args = ap.parse_args()
@@ -65,6 +72,14 @@ async def main() -> int:
     )
     rest = build_rest_provider(args.exchange)
     pipe = LivePipeline(cfg, rest_provider=rest)
+
+    recorder = None
+    if args.decision_ledger:
+        from trading_agent.journal.decision_ledger import DecisionLedgerRecorder
+        from trading_agent.journal.ledger import Ledger
+
+        recorder = DecisionLedgerRecorder(Ledger(args.decision_ledger))
+        recorder.attach(pipe.bus)
 
     counts = {"decision": 0, "alert": 0, "paper": 0, "quality": 0, "shutdown": 0}
     pipe.bus.subscribe(
@@ -96,6 +111,8 @@ async def main() -> int:
 
     status = sup.status()
     status["_event_counts"] = counts
+    if recorder is not None:
+        status["_decision_ledger_rows"] = recorder.rows_written
     status["_wall_runtime_s"] = round((datetime.now(UTC) - t0).total_seconds(), 1)
     assert sup.orders_sent == 0, "LIVE DAEMON hat eine Order gesendet — darf nie passieren"
 
