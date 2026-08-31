@@ -149,7 +149,7 @@ def build_cross_asset_from_repo(
             return None
         try:
             bars = [b for b in reader(sym, timeframe, start, as_of) if b.close_time <= as_of]
-        except Exception:  # noqa: BLE001 — fehlende Reihe ist kein Fehler
+        except Exception:  # fehlende Reihe ist kein Fehler
             return None
         return bars or None
 
