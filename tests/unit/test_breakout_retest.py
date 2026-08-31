@@ -53,9 +53,16 @@ def _d1_ctx(bars: list[OHLCV], d1_dir: RegimeDirectional, bos: Direction | None)
     end = bars[-1].open_time.replace(hour=0, minute=0, second=0, microsecond=0)
     d1_bars = [
         OHLCV(
-            instrument="XAUUSD", timeframe=Timeframe.D1,
-            open_time=end - timedelta(days=k), close_time=end - timedelta(days=k - 1),
-            open=100.0, high=101.0, low=99.0, close=100.0, volume=1.0, source="test",
+            instrument="XAUUSD",
+            timeframe=Timeframe.D1,
+            open_time=end - timedelta(days=k),
+            close_time=end - timedelta(days=k - 1),
+            open=100.0,
+            high=101.0,
+            low=99.0,
+            close=100.0,
+            volume=1.0,
+            source="test",
         )
         for k in range(30, 0, -1)
     ]
@@ -85,8 +92,10 @@ def _mtf(
     # D1-BOS in Trendrichtung). Tests, die die Konfluenz gezielt prüfen, setzen bos= explizit.
     if bos == "auto":
         bos = (
-            Direction.LONG if d1_dir is RegimeDirectional.TREND_UP
-            else Direction.SHORT if d1_dir is RegimeDirectional.TREND_DOWN
+            Direction.LONG
+            if d1_dir is RegimeDirectional.TREND_UP
+            else Direction.SHORT
+            if d1_dir is RegimeDirectional.TREND_DOWN
             else None
         )
     return _E(

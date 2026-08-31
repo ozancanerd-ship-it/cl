@@ -51,11 +51,15 @@ def main() -> int:
     print(f"\n{'=' * 68}\n  EINZELAKTIEN-ANALYSE  ·  {as_of.date()}  ·  Benchmark {args.benchmark}")
     print(f"{'=' * 68}")
     for i, r in enumerate(rows, 1):
-        print(f"\n  #{i}  {str(r['symbol']).replace('-YF', ''):<8} {r['score']:>5.1f}/100  "
-              f"{str(r['verdict']).upper()}")
+        print(
+            f"\n  #{i}  {str(r['symbol']).replace('-YF', ''):<8} {r['score']:>5.1f}/100  "
+            f"{str(r['verdict']).upper()}"
+        )
         for f in r["factors"]:  # type: ignore[union-attr]
             bar = "█" * round(f["value"] * 10)
-            print(f"      {f['name']:<18} {f['value']:.2f} {bar:<10} (w{f['weight']:.2f})  {f['detail']}")
+            print(
+                f"      {f['name']:<18} {f['value']:.2f} {bar:<10} (w{f['weight']:.2f})  {f['detail']}"
+            )
         if r["excluded"]:
             print(f"      ausgeschlossen: {', '.join(r['excluded'])}")  # type: ignore[arg-type]
         for n in r["notes"]:  # type: ignore[union-attr]

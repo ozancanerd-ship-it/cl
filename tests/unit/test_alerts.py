@@ -234,22 +234,31 @@ def test_cooldown_override_param() -> None:
 def test_context_alert_portfolio_and_news_dedup() -> None:
     eng = AlertEngine()
     e1 = eng.raise_context_alert(
-        AlertType.PORTFOLIO_RISK, key="portfolio:concentration",
-        title="Klumpenrisiko", body="FET 20 %", now=NOW,
+        AlertType.PORTFOLIO_RISK,
+        key="portfolio:concentration",
+        title="Klumpenrisiko",
+        body="FET 20 %",
+        now=NOW,
     )
     assert e1.kind is AlertEventKind.RAISED
     assert e1.alert.severity is AlertSeverity.CRITICAL
     assert e1.alert.dedup_key == "portfolio:concentration:portfolio_risk"
     # gleicher Schlüssel innerhalb Cooldown → als Update gefaltet, nicht neu
     e2 = eng.raise_context_alert(
-        AlertType.PORTFOLIO_RISK, key="portfolio:concentration",
-        title="Klumpenrisiko", body="FET 22 %", now=NOW + timedelta(minutes=1),
+        AlertType.PORTFOLIO_RISK,
+        key="portfolio:concentration",
+        title="Klumpenrisiko",
+        body="FET 22 %",
+        now=NOW + timedelta(minutes=1),
     )
     assert e2.kind is AlertEventKind.UPDATED
 
     news = eng.raise_context_alert(
-        AlertType.HIGH_IMPACT_NEWS, key="news:FOMC_RATE:2026-01-28",
-        title="FOMC in 2 h", body="Blackout", now=NOW,
+        AlertType.HIGH_IMPACT_NEWS,
+        key="news:FOMC_RATE:2026-01-28",
+        title="FOMC in 2 h",
+        body="Blackout",
+        now=NOW,
     )
     assert news.kind is AlertEventKind.RAISED
     assert news.alert.type is AlertType.HIGH_IMPACT_NEWS

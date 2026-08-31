@@ -34,8 +34,31 @@ from trading_agent.strategy.primitives.swings import detect_swings
 
 # Bekannte ETF-/Fonds-Ticker — die Engine handelt sie **nicht** (Masterplan: nur Einzelwerte).
 _ETF_TICKERS = frozenset(
-    {"SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "IVV", "ARKK", "XLK", "XLF", "XLE", "GLD", "SLV",
-     "TLT", "HYG", "EEM", "EFA", "VEA", "VWO", "SPX", "NDX", "SMH", "SOXX"}
+    {
+        "SPY",
+        "QQQ",
+        "IWM",
+        "DIA",
+        "VOO",
+        "VTI",
+        "IVV",
+        "ARKK",
+        "XLK",
+        "XLF",
+        "XLE",
+        "GLD",
+        "SLV",
+        "TLT",
+        "HYG",
+        "EEM",
+        "EFA",
+        "VEA",
+        "VWO",
+        "SPX",
+        "NDX",
+        "SMH",
+        "SOXX",
+    }
 )
 
 
@@ -182,7 +205,10 @@ def _rel_strength_factor(d1: list[OHLCV], bench: list[OHLCV] | None) -> StockFac
     rising = rs_line[-1] > rs_line[0] if len(rs_line) >= 2 else False
     val = _clip01(0.5 + 2.0 * diff + (0.15 if rising else -0.15))
     return StockFactor(
-        "relative_strength", val, 0.18, f"vs Benchmark {diff:+.1%} / RS-Linie {'↑' if rising else '↓'}"
+        "relative_strength",
+        val,
+        0.18,
+        f"vs Benchmark {diff:+.1%} / RS-Linie {'↑' if rising else '↓'}",
     )
 
 
@@ -245,8 +271,12 @@ class StockAnalysisEngine:
         base = symbol.upper().split("-")[0]
         if base in _ETF_TICKERS:
             return StockAssessment(
-                symbol=symbol, as_of=as_of, score=0.0, verdict=StockVerdict.UNKNOWN,
-                factors=(), notes=(f"{base} ist ein ETF/Index — die Engine handelt nur Einzelwerte.",),
+                symbol=symbol,
+                as_of=as_of,
+                score=0.0,
+                verdict=StockVerdict.UNKNOWN,
+                factors=(),
+                notes=(f"{base} ist ein ETF/Index — die Engine handelt nur Einzelwerte.",),
             )
 
         d1 = [b for b in d1_bars if ensure_utc(b.close_time) <= as_of]
@@ -255,8 +285,12 @@ class StockAnalysisEngine:
         )
         if len(d1) < 80:
             return StockAssessment(
-                symbol=symbol, as_of=as_of, score=0.0, verdict=StockVerdict.UNKNOWN,
-                factors=(), notes=(f"zu wenig Historie ({len(d1)} D1-Bars, ≥80 nötig)",),
+                symbol=symbol,
+                as_of=as_of,
+                score=0.0,
+                verdict=StockVerdict.UNKNOWN,
+                factors=(),
+                notes=(f"zu wenig Historie ({len(d1)} D1-Bars, ≥80 nötig)",),
             )
 
         candidates: list[StockFactor | None] = [
@@ -273,8 +307,16 @@ class StockAnalysisEngine:
         excluded = [
             n
             for n, f in zip(
-                ("trend", "structure", "momentum", "relative_strength", "volume", "volatility",
-                 "fundamentals", "earnings"),
+                (
+                    "trend",
+                    "structure",
+                    "momentum",
+                    "relative_strength",
+                    "volume",
+                    "volatility",
+                    "fundamentals",
+                    "earnings",
+                ),
                 candidates,
                 strict=True,
             )

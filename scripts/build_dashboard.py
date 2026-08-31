@@ -49,7 +49,9 @@ def _load_performance(repo: MarketDataRepository, pattern: str) -> dict[str, obj
     }
 
 
-def _load_stocks(repo: MarketDataRepository, symbols: list[str], benchmark: str) -> list[dict[str, object]]:
+def _load_stocks(
+    repo: MarketDataRepository, symbols: list[str], benchmark: str
+) -> list[dict[str, object]]:
     """Einzelaktien-Analyse für die im Repo vorliegenden ``<SYM>-YF``-D1-Reihen."""
     if not symbols:
         return []
@@ -73,7 +75,9 @@ def _load_stocks(repo: MarketDataRepository, symbols: list[str], benchmark: str)
     return out
 
 
-def _load_chart(repo: MarketDataRepository, symbol: str, *, bars: int = 240) -> dict[str, object] | None:
+def _load_chart(
+    repo: MarketDataRepository, symbol: str, *, bars: int = 240
+) -> dict[str, object] | None:
     """Candles (H4) + Swing-/BOS-Marker + FVG/OB-Zonen für den Chart-Tab.
     Rein aus dem Repo + Primitiven — kein Live-Pipeline-Durchlauf nötig."""
     from datetime import datetime as _dt
@@ -110,12 +114,19 @@ def _load_chart(repo: MarketDataRepository, symbol: str, *, bars: int = 240) -> 
         },
     )()
     mtf = type("Mtf", (), {"per_tf": {Timeframe.H4: ctx}})()
-    sr = type("Sr", (), {"instrument": symbol, "information_cutoff": cutoff, "action": "", "direction": ""})()
+    sr = type(
+        "Sr",
+        (),
+        {"instrument": symbol, "information_cutoff": cutoff, "action": "", "direction": ""},
+    )()
     ann = build_chart_annotations(sr, mtf=mtf).as_dict()
     ann["candles"] = [
         {
             "time": int(b.open_time.timestamp()),
-            "open": b.open, "high": b.high, "low": b.low, "close": b.close,
+            "open": b.open,
+            "high": b.high,
+            "low": b.low,
+            "close": b.close,
         }
         for b in window
     ]
@@ -136,8 +147,7 @@ def _load_reentry(pattern: str, shadow_signals: list[dict[str, object]]) -> list
                 continue
             watches[(str(r["instrument"]), str(r["direction"]))] = r
     fresh = {
-        (str(s.get("instrument")), str(s.get("direction", "")).upper())
-        for s in shadow_signals
+        (str(s.get("instrument")), str(s.get("direction", "")).upper()) for s in shadow_signals
     }
     out: list[dict[str, object]] = []
     for (inst, direction), w in sorted(watches.items()):
@@ -263,9 +273,7 @@ def main() -> int:
     ap.add_argument("--no-portfolio", action="store_true")
     ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--journals", default="data/repository_real/live/*.jsonl")
-    ap.add_argument(
-        "--stocks", nargs="*", default=["NVDA", "AAPL", "MSFT", "AMD", "GOOGL", "META"]
-    )
+    ap.add_argument("--stocks", nargs="*", default=["NVDA", "AAPL", "MSFT", "AMD", "GOOGL", "META"])
     ap.add_argument("--benchmark", default="SPX-YF")
     ap.add_argument("--chart-symbol", default="XAUUSD-YF")
     ap.add_argument("--validation-config", default="config/setup_validation.json")

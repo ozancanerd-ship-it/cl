@@ -445,7 +445,9 @@ def _brk_retest_core(
 
 def _d1_trend_dir(ctx: Ctx, i: int) -> int:
     st = ctx.d1_state(i)
-    return 1 if st is RegimeDirectional.TREND_UP else -1 if st is RegimeDirectional.TREND_DOWN else 0
+    return (
+        1 if st is RegimeDirectional.TREND_UP else -1 if st is RegimeDirectional.TREND_DOWN else 0
+    )
 
 
 def detect_s6(ctx: Ctx, i: int) -> Signal | None:
@@ -500,7 +502,9 @@ def detect_s10(ctx: Ctx, i: int) -> Signal | None:
     return sig if td == sig.direction and ctx.d1_bos(i) == sig.direction else None
 
 
-def _s9_base(ctx: Ctx, i: int, *, max_width_atr: float = 5.0, min_thrust_atr: float = 0.3) -> Signal | None:
+def _s9_base(
+    ctx: Ctx, i: int, *, max_width_atr: float = 5.0, min_thrust_atr: float = 0.3
+) -> Signal | None:
     r = _brk_retest_core(ctx, i, max_width_atr=max_width_atr, min_thrust_atr=min_thrust_atr)
     if r is None:
         return None

@@ -218,9 +218,7 @@ class AlertEngine:
         """Nicht-Signal-Alert (Portfolio-Risiko, High-Impact-News, Re-Entry-Setup, Ops).
         Dedup + Cooldown wie bei Signal-Alerts; ``key`` ist der Dedup-Schlüssel
         (z. B. ``"portfolio:concentration"`` / ``"news:FOMC_RATE:2026-01-28"``)."""
-        return self._raise(
-            atype, key, None, now, title=title, body=body, evidence=evidence or {}
-        )
+        return self._raise(atype, key, None, now, title=title, body=body, evidence=evidence or {})
 
     # ---- Haupteinstiege ------------------------------------------------------
     def on_engine_tick(self, tick: EngineTick) -> tuple[AlertEvent, ...]:

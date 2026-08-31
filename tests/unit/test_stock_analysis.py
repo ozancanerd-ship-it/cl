@@ -12,16 +12,25 @@ from trading_agent.investment.stock_analysis import StockAnalysisEngine, StockVe
 _AS_OF = datetime(2026, 1, 2, tzinfo=UTC)
 
 
-def _d1(prices: list[float], *, vol: list[float] | None = None, sym: str = "TEST-YF") -> list[OHLCV]:
+def _d1(
+    prices: list[float], *, vol: list[float] | None = None, sym: str = "TEST-YF"
+) -> list[OHLCV]:
     start = _AS_OF - timedelta(days=len(prices))
     out: list[OHLCV] = []
     for i, px in enumerate(prices):
         t = start + timedelta(days=i)
         out.append(
             OHLCV(
-                instrument=sym, timeframe=Timeframe.D1, open_time=t, close_time=t + timedelta(days=1),
-                open=px * 0.995, high=px * 1.01, low=px * 0.99, close=px,
-                volume=(vol[i] if vol else 1_000_000.0), source="test",
+                instrument=sym,
+                timeframe=Timeframe.D1,
+                open_time=t,
+                close_time=t + timedelta(days=1),
+                open=px * 0.995,
+                high=px * 1.01,
+                low=px * 0.99,
+                close=px,
+                volume=(vol[i] if vol else 1_000_000.0),
+                source="test",
             )
         )
     return out
