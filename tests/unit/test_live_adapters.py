@@ -131,6 +131,28 @@ def test_cross_asset_only_real_fields() -> None:
     assert ctx.real_yield_10y is None  # nicht übergeben → None (kein Fake)
 
 
+def test_cross_asset_from_repo_reads_series_and_missing_is_none() -> None:
+    from trading_agent.core.enums import Timeframe
+    from trading_agent.data.providers.cross_asset import build_cross_asset_from_repo
+
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    dxy = [
+        b.model_copy(update={"instrument": "DXY-YF", "timeframe": Timeframe.D1})
+        for b in _series([100 + i * 0.4 for i in range(40)], start, tf_min=1440)
+    ]
+
+    class _Repo:
+        def read_ohlcv(self, sym: str, tf: object, s: object, e: object) -> list[object]:
+            if sym == "DXY-YF":
+                return dxy
+            raise FileNotFoundError(sym)  # VIX-YF / US10Y-YF fehlen → Feld bleibt None
+
+    ctx = build_cross_asset_from_repo(_Repo(), as_of=datetime(2025, 2, 5, tzinfo=UTC))
+    assert ctx.dxy_trend is RegimeDirectional.TREND_UP
+    assert ctx.vix is None and ctx.real_yield_10y is None  # kein Fake für fehlende Reihen
+    assert ctx.as_of is not None
+
+
 def test_cross_asset_pit_filter() -> None:
     start = datetime(2025, 1, 1, tzinfo=UTC)
     vix = _series([15.0] * 10 + [50.0] * 10, start)  # Spike liegt NACH as_of

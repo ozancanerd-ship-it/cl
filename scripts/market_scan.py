@@ -69,6 +69,19 @@ async def _evaluate_all(
         no_trade=_dc.replace(ep.no_trade, require_news_feed=False),
         veto=_dc.replace(ep.veto, require_news_feed=False),
     )
+
+    # Cross-Asset-Kontext (DXY / US10Y / VIX) aus dem Repo — keylos (ingest_yahoo.py).
+    from trading_agent.data.providers.cross_asset import build_cross_asset_from_repo
+    from trading_agent.data.repository import MarketDataRepository
+
+    _repo = MarketDataRepository("data/repository_real")
+    for s, mc in list(contexts.items()):
+        cut = getattr(mc, "information_cutoff", None)
+        if cut is None:
+            continue
+        ca = build_cross_asset_from_repo(_repo, as_of=cut)
+        if ca.as_of is not None:
+            contexts[s] = _dc.replace(mc, cross_asset=ca)
     scanner = MarketScanner(ScannerConfig(asset_class=dict.fromkeys(contexts, asset_class)))
 
     rows: list[dict[str, object]] = []

@@ -43,6 +43,7 @@ async def main() -> int:
     ap.add_argument("--exchange", default="binance")
     ap.add_argument("--asset-class", default="gold")
     ap.add_argument("--validation-config", default="config/setup_validation.json")
+    ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--risk-pct", type=float, default=1.0)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
@@ -65,6 +66,15 @@ async def main() -> int:
             await rest.aclose()
 
     import dataclasses as _dc
+
+    # Cross-Asset-Kontext (DXY / US10Y / VIX) aus dem Repo — keylos via ingest_yahoo.py.
+    # Speist die Confluence-/Makro-Bewertung; fehlt eine Reihe, bleibt ihr Feld None.
+    from trading_agent.data.providers.cross_asset import build_cross_asset_from_repo
+    from trading_agent.data.repository import MarketDataRepository
+
+    ca = build_cross_asset_from_repo(MarketDataRepository(args.repo), as_of=cut)
+    if ca.as_of is not None:
+        mc = _dc.replace(mc, cross_asset=ca)
 
     from trading_agent.strategy.evaluate import EvaluateParams, evaluate
 

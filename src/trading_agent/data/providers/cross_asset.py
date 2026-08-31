@@ -14,7 +14,7 @@ import statistics
 from collections.abc import Sequence
 from datetime import datetime
 
-from trading_agent.core.enums import RegimeDirectional
+from trading_agent.core.enums import RegimeDirectional, Timeframe
 from trading_agent.core.models import OHLCV, MacroEvent
 from trading_agent.core.time import ensure_utc
 from trading_agent.core.types import CrossAssetContext
@@ -125,6 +125,42 @@ def build_cross_asset_context(
     )
 
 
+def build_cross_asset_from_repo(
+    repo: object,
+    *,
+    as_of: datetime,
+    timeframe: Timeframe = Timeframe.D1,
+    dxy_symbol: str = "DXY-YF",
+    us10y_symbol: str = "US10Y-YF",
+    vix_symbol: str = "VIX-YF",
+    lookback_days: int = 400,
+) -> CrossAssetContext:
+    """``CrossAssetContext`` aus im Repo liegenden Cross-Asset-Reihen (z. B. keylos via
+    ``scripts/ingest_yahoo.py`` als ``DXY-YF`` / ``US10Y-YF`` / ``VIX-YF``). Fehlt eine Reihe,
+    bleibt ihr Feld ``None`` — kein Fake. PIT: nur Bars mit ``close_time <= as_of``."""
+    from datetime import timedelta
+
+    as_of = ensure_utc(as_of)
+    start = as_of - timedelta(days=lookback_days)
+
+    def _read(sym: str) -> list[OHLCV] | None:
+        reader = getattr(repo, "read_ohlcv", None)
+        if reader is None:
+            return None
+        try:
+            bars = [b for b in reader(sym, timeframe, start, as_of) if b.close_time <= as_of]
+        except Exception:  # noqa: BLE001 — fehlende Reihe ist kein Fehler
+            return None
+        return bars or None
+
+    return build_cross_asset_context(
+        as_of=as_of,
+        dxy=_read(dxy_symbol),
+        us10y_yield=_read(us10y_symbol),
+        vix=_read(vix_symbol),
+    )
+
+
 def build_cross_asset_from_macro(
     *,
     as_of: datetime,
@@ -143,4 +179,8 @@ def build_cross_asset_from_macro(
     )
 
 
-__all__ = ["build_cross_asset_context", "build_cross_asset_from_macro"]
+__all__ = [
+    "build_cross_asset_context",
+    "build_cross_asset_from_macro",
+    "build_cross_asset_from_repo",
+]
