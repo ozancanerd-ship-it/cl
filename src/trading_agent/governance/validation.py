@@ -107,14 +107,15 @@ _BUILTIN: dict[tuple[str, str], SetupValidation] = {
         strategy_version=STRATEGY_VERSION,
         status=ValidationStatus.IN_VALIDATION,
         baseline=BaselineMetrics(
-            expectancy_r=0.35, profit_factor=2.0, win_rate=0.55, max_drawdown_r=8.0, n_trades=46
+            expectancy_r=0.25, profit_factor=1.7, win_rate=0.53, max_drawdown_r=9.0, n_trades=47
         ),
         validated_window=("2023-11-14", "2026-08-28"),
         notes=(
-            "S4 (Breakout+Retest, D1-Trend-Filter). Gold+FX+Crypto, 4 Splits: OOS +0.40..+0.57R, "
-            "WF 8/9, MC prob_positive 0.65, symbol_stability fraction_positive 1.0 (jedes "
-            "Instrument positiv, auch nicht-trendende FX). Indikative Yahoo-Daten + OOS n=46 → "
-            "IN_VALIDATION, Signale = SHADOW bis echte Historie + >=100 Forward-Trades."
+            "S4 (Breakout+Retest, D1-Trend-Filter). EVIDENZ GEMISCHT: (+) Yahoo Gold-Futures + "
+            "FX-Proxy + Crypto: OOS +0.40..+0.58R, WF 8-11/9-12, MC pp 0.55-0.65, alle 13 "
+            "Parameter-Störungen OOS-positiv. (-) echte Dukascopy-Spot-XAUUSD (n=7, Lücke): "
+            "-2.17R gesamt. Yahoo GC=F = Futures, nicht Spot. IN_VALIDATION → SHADOW. VALIDATED "
+            "nur nach vollständiger Dukascopy-Historie mit + OOS UND ≥100 Forward-Trades."
         ),
     ),
 }

@@ -15,15 +15,15 @@
       "strategy_version": "0.1.1",
       "status": "in_validation",
       "baseline": {
-        "expectancy_r": 0.35,
-        "profit_factor": 2.0,
-        "win_rate": 0.55,
-        "max_drawdown_r": 8.0,
-        "n_trades": 46
+        "expectancy_r": 0.25,
+        "profit_factor": 1.7,
+        "win_rate": 0.53,
+        "max_drawdown_r": 9.0,
+        "n_trades": 47
       },
       "validated_window": ["2023-11-14", "2026-08-28"],
       "forward_trades_required": 100,
-      "notes": "S4 aus scripts/setup_research.py. Gold+FX+Crypto (Yahoo XAUUSD-YF/EURUSD-YF/GBPUSD-YF/USDJPY-YF + 6 Crypto), 4 IS/OOS-Splits, scaled mgmt, 12-Tage-Purge: OOS-Expectancy +0.40..+0.57R, Walk-Forward 8/9 positiv, Monte-Carlo prob_positive 0.65 (besteht 1.5x-Kosten-Stress), **symbol_stability fraction_positive = 1.0** (jedes Instrument positiv, auch nicht-trendende FX: GBPUSD +1.7R). Bricht das 'nur Gold-Hausse-Beta'-Argument. ABER: Yahoo-Daten indikativ, OOS n=46, noch keine Forward-Trades. IN_VALIDATION -> Live-Signale = SHADOW. VALIDATED erst nach (a) Bestaetigung auf echter Dukascopy-Historie + (b) >=100 Forward-Trades (scripts/edge_health_check.py). Baseline = konservativ gerundet."
+      "notes": "S4 aus scripts/setup_research.py. EVIDENZ GEMISCHT: (+) Yahoo Gold-Futures (GC=F) + FX-Proxy + Crypto, 4 Splits: OOS +0.40..+0.58R, WF 8-11/9-12, MC prob_positive 0.55-0.65, symbol_stability fraction_positive 1.0 (auch nicht-trendende FX). (+) Parameter-Sensitivitaet: alle 13 +-30%-Stoerungen OOS-positiv (+0.24..+0.67R) -> nicht knife-edge-gefittet. (-) ECHTE Dukascopy-Spot-XAUUSD (2023 Jan-Sep + 2026 Mai-Aug, Luecke, n=7): total -2.17R (IS-Anteil negativ, OOS-Sliver +1.19R) -- Stichprobe zu klein fuer Widerlegung ODER Bestaetigung. Yahoo GC=F ist FUTURES (Contract-Rolls), nicht Spot. IN_VALIDATION -> Live-Signale = SHADOW, forward-getrackt. VALIDATED NUR nach (a) vollstaendiger Dukascopy-Spot-Gold-Historie mit positivem OOS UND (b) >=100 Forward-Trades die die Baseline halten. Bei negativem Real-Gold-Check -> unvalidated/retired."
     }
   ]
 }

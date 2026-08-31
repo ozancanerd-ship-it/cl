@@ -250,13 +250,38 @@ retest_window_bars, tp2_r) je ±30 % über Gold + FX, gleicher scaled-Sim, exakt
 Die Edge ist **nicht** an spezifische Parameterwerte gefittet. Das ist der vom Auftrag geforderte
 Overfitting-Test — und er hat einen echten Bug aufgedeckt.
 
-### Entscheidung (datenbasiert)
+### Teil 8 — Echt-Gold-Cross-Check (2026-08-31): **Evidenz gemischt**
 
-Der **zweite Setup-Typ = „Breakout + Retest mit HTF-Trend-Filter"** (`SETUP-BREAKOUT-RETEST-01`,
-S4-Logik). Status: **`IN_VALIDATION`** — historische OOS-Edge **belastbar** (WF 8/9, MC
-`prob_positive` 0.65, `fraction_positive` 1.0, alle Parameter-Störungen positiv), aber noch
-nicht *final bewiesen*: die Daten sind **indikativ** (Yahoo), OOS-Stichprobe **n=35**, keine
-Forward-Trades. Baseline (registry): OOS +0.35 R / PF 2.0 / n 46 (konservativ gerundet).
+Dukascopy-Spot-XAUUSD monatsweise ingestiert (die einzige Methode, die die Umgebung nicht
+killt): bisher **2023 Jan–Sep + 2026 Mai–Aug** (Lücke dazwischen, D1 = 335 Bars). Research-Lauf
+mit `XAUUSD` (echt) **neben** `XAUUSD-YF` (Yahoo):
+
+| S4 auf … | Trades | Total R | Exp | PF |
+|---|---:|---:|---:|---:|
+| **XAUUSD-YF** (Yahoo GC=F Futures) | 18 | **+13.7 R** | +0.76 | 5.3 |
+| **XAUUSD** (echt, Dukascopy Spot) | **7** | **−2.17 R** | −0.31 | 0.49 |
+
+Die beiden Gold-Reihen **widersprechen sich**. Gründe: Yahoo `GC=F` = **Futures** (Contract-Rolls,
+Session-Lücken, andere Microstructure); Dukascopy `XAUUSD` = **Spot**. Die echte Stichprobe (n=7,
+davon der IS-Anteil negativ, der OOS-Sliver +1.19 R) ist **zu klein für Widerlegung ODER
+Bestätigung**. Panel-weit bleibt S4 OOS-positiv (+0.58 R, `fraction_positive` 1.0), aber die
+einzige echte Spot-Gold-Reihe trägt das nicht.
+
+### Entscheidung (datenbasiert, ehrlich)
+
+Der **zweite Setup-Typ = „Breakout + Retest mit HTF-Trend-Filter"** (`SETUP-BREAKOUT-RETEST-01`).
+Status: **`IN_VALIDATION`** — die Evidenz ist **gemischt**:
+
+- **Pro:** OOS-positiv über 4 Splits auf Yahoo-Gold-Futures + FX-Proxy + Crypto (WF 8–11/9–12,
+  MC `prob_positive` 0.55–0.65), **alle 13 Parameter-Störungen positiv** (nicht overfit).
+- **Contra:** die einzige **echte** Spot-Gold-Reihe (klein) ist negativ; die positiven Zahlen
+  stammen von **indikativen** Feeds.
+
+Baseline (registry) **abgesenkt**: OOS +0.25 R / PF 1.7 / n 47. Live-Signale = **SHADOW**.
+**VALIDATED nur** nach (a) vollständiger Dukascopy-Spot-Gold-Historie **mit positivem OOS** und
+(b) ≥ 100 Forward-Trades, die die Baseline halten. Zeigt der Real-Gold-Check bei mehr Daten
+weiter negativ → `unvalidated` / `retired`. **Der Setup-Code bleibt gebaut + integriert** und
+läuft wie SMC im Beobachtungs-Modus; die Forward-Paper-Trades sind der eigentliche Schiedsrichter.
 
 **Integriert** (damit die Forward-Validierung überhaupt laufen kann):
 Strategy-Engine (2. Setup-Typ) · Opportunity-Score · Signal-Engine · Paper-Trading · Versionierung.
