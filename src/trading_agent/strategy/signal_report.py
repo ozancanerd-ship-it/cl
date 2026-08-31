@@ -13,12 +13,18 @@ Kein neuer Analyse-Schritt — nur Aufbereitung vorhandener Reports (`decision`,
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from trading_agent.core.enums import DecisionType, Direction
 
 _TIER_ICON = {"A+": "🔥", "A": "🎯", "B": "•"}
+# Freigabe-Zustand (governance.LiveEligibility) → Kopfzeile
+_LIVE_HEAD = {
+    "live": None,  # normale Tier-Kopfzeile (🔥/🎯/•)
+    "shadow": "⚠️ SHADOW-SIGNAL · Setup nicht validiert · nur Forward-Tracking",
+    "blocked": "🚨 BLOCKED · Edge aktuell nicht intakt · kein Signal",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,11 +51,22 @@ class SignalReport:
     invalidation: str
     risks: list[str]
     trading_horizon: str = "swing"
+    live_eligibility: str = "live"  # "live" | "shadow" | "blocked" (governance.LiveEligibility)
+    live_gate_reasons: list[str] = field(default_factory=list)
+
+    @property
+    def is_live(self) -> bool:
+        return self.live_eligibility == "live"
 
     def as_text(self) -> str:
         icon = _TIER_ICON.get(self.tier or "", "•")
+        head_override = _LIVE_HEAD.get(self.live_eligibility)
+        tier_line = (
+            f"{icon} {self.tier or ''} {self.action} · {self.instrument} · {self.direction}".strip()
+        )
         lines = [
-            f"{icon} {self.tier or ''} {self.action} · {self.instrument} · {self.direction}".strip(),
+            head_override or tier_line,
+            *([f"   ({tier_line})"] if head_override else []),
             "",
             f"Entry:        {self.entry:g}",
             f"Stop Loss:    {self.stop_loss:g}",
@@ -96,6 +113,8 @@ class SignalReport:
             "invalidation": self.invalidation,
             "risks": self.risks,
             "trading_horizon": self.trading_horizon,
+            "live_eligibility": self.live_eligibility,
+            "live_gate_reasons": self.live_gate_reasons,
         }
 
 
@@ -184,6 +203,15 @@ def build_signal_report(
     opp_score = getattr(opportunity, "score", None)
     conf_pct = (d.confidence * 100.0) if d.confidence is not None else None
 
+    # Freigabe-Zustand (governance) — ohne live_gate: konservativ SHADOW (nicht bewiesen validiert)
+    lg = getattr(result, "live_gate", None)
+    live_elig = str(getattr(getattr(lg, "eligibility", None), "value", "shadow"))
+    lg_reasons = list(getattr(lg, "reasons", ()) or ())
+    if lg is None:
+        lg_reasons = ["kein Live-Gate ausgewertet — konservativ als SHADOW behandelt"]
+    if live_elig != "live":
+        risks.insert(0, f"Freigabe: {live_elig.upper()} — " + ("; ".join(lg_reasons[:2]) or "—"))
+
     return SignalReport(
         instrument=d.instrument,
         information_cutoff=d.information_cutoff,
@@ -207,6 +235,8 @@ def build_signal_report(
         invalidation=invalidation,
         risks=risks,
         trading_horizon=trading_horizon,
+        live_eligibility=live_elig,
+        live_gate_reasons=lg_reasons,
     )
 
 

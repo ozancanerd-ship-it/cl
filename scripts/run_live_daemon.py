@@ -69,6 +69,11 @@ async def main() -> int:
         default=None,
         help="Dashboard-State (10 Tabs) am Ende hierhin schreiben (Masterplan §63).",
     )
+    ap.add_argument(
+        "--validation-config",
+        default="config/setup_validation.json",
+        help="Setup-Freigabe-Registry (Masterplan-Regel 3). Fehlt sie → alles SHADOW.",
+    )
     ap.add_argument("--max-seconds", type=float, default=None, help="Test-Deckel; sonst 24/7")
     ap.add_argument("--status-json", default=None, help="Endstand als JSON hierhin schreiben")
     args = ap.parse_args()
@@ -101,9 +106,14 @@ async def main() -> int:
     top_opps = scanner.attach(pipe.bus)
 
     # konkretes strukturiertes BUY/SELL-Signal bei tradebarer Entscheidung (Masterplan §24)
+    from trading_agent.governance import ValidationRegistry, apply_live_gate
     from trading_agent.strategy.signal_report import build_signal_report
 
+    # Freigabe-Autorität (Masterplan-Regel 3: "die Strategie dafür validiert ist").
+    # Ohne config/setup_validation.json: konservativer Default — alles UNVALIDATED → SHADOW.
+    validation = ValidationRegistry.from_file(args.validation_config)
     emitted_signals: list[dict] = []
+    shadow_signals: list[dict] = []
 
     # Hash-verkettetes Audit-Log (Masterplan §51) — sicherheitsrelevante Ereignisse
     audit = None
@@ -118,20 +128,28 @@ async def main() -> int:
     async def _on_tradeable(ev: DecisionMade) -> None:
         if ev.decision_type not in ("buy", "sell"):
             return
+        gated = apply_live_gate(ev.result, registry=validation)
         rep = build_signal_report(
-            ev.result,
+            gated,
             opportunity=scanner.score_for(ev.instrument),
             risk_pct=args.risk_pct,
         )
-        if rep is not None:
-            emitted_signals.append(rep.as_dict())
-            _log.info("SIGNAL\n%s", rep.as_text())
-            if audit is not None:
-                audit.record(
-                    "strategy",
-                    "signal_emitted",
-                    {"instrument": rep.instrument, "action": rep.action, "tier": rep.tier},
-                )
+        if rep is None:
+            return
+        row = rep.as_dict()
+        (emitted_signals if rep.is_live else shadow_signals).append(row)
+        _log.info("SIGNAL [%s]\n%s", rep.live_eligibility.upper(), rep.as_text())
+        if audit is not None:
+            audit.record(
+                "strategy",
+                "signal_emitted" if rep.is_live else "shadow_signal",
+                {
+                    "instrument": rep.instrument,
+                    "action": rep.action,
+                    "tier": rep.tier,
+                    "live_eligibility": rep.live_eligibility,
+                },
+            )
 
     pipe.bus.subscribe(DecisionMade, _on_tradeable)
 
@@ -175,6 +193,8 @@ async def main() -> int:
         status["_decision_ledger_rows"] = recorder.rows_written
     status["_scanner_evaluations"] = scanner.evaluations
     status["_signals_emitted"] = emitted_signals
+    status["_shadow_signals"] = shadow_signals
+    status["_validation"] = [sv.as_dict() for sv in validation.all()]
     status["_top_opportunities"] = [
         {
             "rank": r.rank,

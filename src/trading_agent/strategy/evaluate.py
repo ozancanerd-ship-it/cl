@@ -126,7 +126,12 @@ class EvaluateParams:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class EvaluationResult:
-    """Die ``Decision`` + **alle** Zwischen-Reports (Explainability-Container)."""
+    """Die ``Decision`` + **alle** Zwischen-Reports (Explainability-Container).
+
+    ``live_gate`` (optional): die **Freigabe**-Entscheidung, getrennt von der Strategie-
+    Entscheidung — gesetzt von ``governance.apply_live_gate``. Ohne sie ist das Ergebnis eine
+    reine Analyse (Backtest/Research); ein *actionable Live-Signal* verlangt ``live_gate.is_live``.
+    """
 
     decision: Decision
     mtf: MtfContext
@@ -140,11 +145,20 @@ class EvaluationResult:
     contradictions: ContradictionReport | None = None
     confidence: ConfidenceReport | None = None
     score: ScoreReport | None = None
+    live_gate: object = (
+        None  # governance.LiveGateReport | None (spät gesetzt, Import-Zyklus vermeiden)
+    )
     strategy_version: str = STRATEGY_VERSION
 
     @property
     def is_actionable(self) -> bool:
+        """Strategie-Verdikt: der Live-Markt zeigt JETZT ein gültiges ARMED-Setup."""
         return self.decision.is_actionable
+
+    @property
+    def is_actionable_live(self) -> bool:
+        """Freigabe-Verdikt: actionable **und** das Setup ist für Live-Signale validiert."""
+        return self.decision.is_actionable and bool(getattr(self.live_gate, "is_live", False))
 
 
 # --------------------------------------------------------------------------------- öffentlich

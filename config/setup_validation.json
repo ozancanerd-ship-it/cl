@@ -1,0 +1,14 @@
+{
+  "_comment": "Setup-Freigabe-Registry (Masterplan-Regel 3: 'die Strategie dafuer validiert ist'). Nur hier gelistete + auf 'validated' gesetzte Setups duerfen ein actionable Live-BUY/SELL erzeugen. Alles andere -> SHADOW (volle Analyse + Forward-Tracking, kein Live-Signal). Ein Setup wird 'validated', wenn (a) historische OOS-Edge belegt ist (Backtest/OOS/Walk-Forward/Monte-Carlo) UND (b) >= forward_trades_required Paper-/Forward-Trades die Baseline bestaetigen. Bricht die Edge auf Recent-Daten (assess_edge_health BROKEN) -> Status auf 'edge_degraded'.",
+  "setups": [
+    {
+      "setup_id": "SMC-SWEEP-REV-01",
+      "strategy_version": "0.1.1",
+      "status": "unvalidated",
+      "baseline": null,
+      "validated_window": null,
+      "forward_trades_required": 100,
+      "notes": "Baseline OOS-kalibriert + gesperrt, aber ohne nachgewiesene OOS-Edge (docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md: 6 Setup-Konstruktionen, keine mit robuster OOS-Edge). Live-Signale = SHADOW, bis eine belegte Edge + Forward-Bestaetigung vorliegt."
+    }
+  ]
+}
