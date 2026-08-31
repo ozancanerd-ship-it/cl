@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Trading Agent — Dashboard</title>
+<style>
+  :root {
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2129; --line:#2a313c;
+    --fg:#e6edf3; --dim:#8b949e; --accent:#58a6ff;
+    --green:#3fb950; --yellow:#d29922; --red:#f85149;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  header { padding:16px 20px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  header .as-of { color:var(--dim); font-size:12px; }
+  header .stale { color:var(--yellow); }
+  nav { display:flex; gap:2px; padding:0 12px; border-bottom:1px solid var(--line);
+    overflow-x:auto; }
+  nav button { background:none; border:none; color:var(--dim); padding:10px 12px;
+    cursor:pointer; font-size:13px; white-space:nowrap; border-bottom:2px solid transparent; }
+  nav button:hover { color:var(--fg); }
+  nav button.active { color:var(--fg); border-bottom-color:var(--accent); }
+  nav button .dot { display:inline-block; width:6px; height:6px; border-radius:50%;
+    background:var(--dim); margin-left:6px; vertical-align:middle; }
+  nav button.has-data .dot { background:var(--green); }
+  main { padding:20px; max-width:1100px; margin:0 auto; }
+  section { display:none; }
+  section.active { display:block; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--dim); margin:0 0 12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
+  .kpi { background:var(--panel2); border-radius:6px; padding:12px; }
+  .kpi .v { font-size:20px; font-weight:600; }
+  .kpi .l { color:var(--dim); font-size:12px; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:500; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px;
+    border:1px solid var(--line); }
+  .pill.buy { color:var(--green); border-color:var(--green); }
+  .pill.sell { color:var(--red); border-color:var(--red); }
+  .pill.wait { color:var(--yellow); border-color:var(--yellow); }
+  .pill.shadow { color:var(--yellow); border-color:var(--yellow); }
+  .pill.live { color:var(--green); border-color:var(--green); }
+  .pill.armed { color:var(--accent); border-color:var(--accent); }
+  .g { color:var(--green);} .y { color:var(--yellow);} .r { color:var(--red);}
+  .muted { color:var(--dim); }
+  .sig { background:var(--panel2); border-left:3px solid var(--yellow); border-radius:6px;
+    padding:12px 14px; margin-bottom:10px; }
+  .sig.live { border-left-color:var(--green); }
+  .sig .row { display:flex; flex-wrap:wrap; gap:16px; margin-top:6px; font-size:13px; }
+  .sig .row span b { color:var(--dim); font-weight:500; margin-right:4px; }
+  .empty { color:var(--dim); padding:24px; text-align:center; }
+  code { background:var(--panel2); padding:1px 5px; border-radius:4px; font-size:12px; }
+  .err { color:var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Trading Agent</h1>
+  <span class="as-of" id="asof">lade…</span>
+  <span class="as-of" style="margin-left:auto">SHADOW / Paper — keine Echtgeldorders</span>
+</header>
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<script>
+"use strict";
+const TABS = [
+  ["overview","Übersicht"],["market_scanner","Scanner"],["top_opportunities","Chancen"],
+  ["chart_analysis","Chart"],["signals","Signale"],["my_portfolios","Portfolios"],
+  ["paper_trading","Paper"],["performance","Performance"],["news_macro","News/Makro"],
+  ["system_health","System"],
+];
+const $ = (h) => { const d=document.createElement("div"); d.innerHTML=h.trim(); return d.firstChild; };
+const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = (v,d=2) => (v==null||isNaN(v))?"—":Number(v).toLocaleString("de-DE",{maximumFractionDigits:d});
+const pct = (v) => v==null?"—":(Number(v)*100).toFixed(1)+"%";
+
+let STATE = null, ACTIVE = "overview";
+
+function gradeClass(g){ g=String(g||"").toUpperCase();
+  return g==="GREEN"?"g":g==="YELLOW"?"y":g==="RED"?"r":"muted"; }
+
+function render(){
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  const tab = (STATE && STATE.tabs && STATE.tabs[ACTIVE]) || {available:false};
+  const fn = RENDERERS[ACTIVE] || (()=>{});
+  const sec = $(`<section class="active"></section>`);
+  if(tab.available===false && ACTIVE!=="signals" && ACTIVE!=="paper_trading"){
+    sec.appendChild($(`<div class="empty">Kein Datenbaustein für diesen Tab — ${esc(ACTIVE)} (available:false, NO BLIND AI).</div>`));
+  } else {
+    fn(sec, tab);
+  }
+  main.appendChild(sec);
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.k===ACTIVE));
+}
+
+const RENDERERS = {
+  overview(sec,t){
+    sec.appendChild($(`<div class="card"><h2>Lage</h2><div class="big">${esc(t.headline||"")}</div></div>`));
+    const g = $(`<div class="grid"></div>`);
+    const best = t.best_opportunity;
+    g.appendChild(kpi(t.open_signals ?? 0, "offene Signale"));
+    g.appendChild(kpi(t.actionable_setups ?? 0, "scharfe Setups"));
+    g.appendChild(kpi(best?`#${esc(best.instrument)}`:"—", best?`Top-Score ${num(best.score,1)}`:"beste Chance"));
+    const ph = t.portfolio_health;
+    g.appendChild(kpi(ph?`<span class="${gradeClass(ph.grade)}">${esc(ph.grade)}</span>`:"—", ph?`Portfolio ${num(ph.score,0)}/100`:"Portfolio-Health"));
+    g.appendChild(kpi(esc(t.breadth_regime||"—"), "Marktbreite"));
+    sec.appendChild(card("Kennzahlen", g));
+    if(t.blockers && t.blockers.length)
+      sec.appendChild(card("Blocker", $(`<ul>${t.blockers.map(b=>`<li class="err">${esc(b)}</li>`).join("")}</ul>`)));
+  },
+  market_scanner(sec,t){
+    sec.appendChild($(`<div class="card"><h2>Scanner</h2><div class="muted">${num(t.evaluated,0)} Bewertungen</div></div>`));
+    sec.appendChild(card("Instrumente", oppTable(t.instruments||[])));
+  },
+  top_opportunities(sec,t){
+    sec.appendChild(card("Ranking nach Opportunity-Score", oppTable(t.ranking||[])));
+    if(t.note) sec.appendChild($(`<div class="muted">${esc(t.note)}</div>`));
+  },
+  chart_analysis(sec,t){
+    sec.appendChild($(`<pre class="card">${esc(JSON.stringify(t.annotations||{},null,2))}</pre>`));
+  },
+  signals(sec,t){
+    const emitted = t.emitted||[], shadow = t.shadow||[];
+    sec.appendChild($(`<div class="muted" style="margin-bottom:12px">${esc(t.note||"")}</div>`));
+    if(!emitted.length && !shadow.length)
+      sec.appendChild($(`<div class="empty">NO TRADE — kein gültiges Setup. Lieber kein Trade als ein schlechter.</div>`));
+    emitted.forEach(s=>sec.appendChild(sigCard(s,true)));
+    shadow.forEach(s=>sec.appendChild(sigCard(s,false)));
+    if(t.validation && t.validation.length)
+      sec.appendChild(card("Setup-Freigabe", valTable(t.validation)));
+  },
+  my_portfolios(sec,t){
+    const g = $(`<div class="grid"></div>`);
+    g.appendChild(kpi(num(t.equity,2), "Equity gesamt"));
+    g.appendChild(kpi(pct(t.cash_pct), "Cash-Anteil"));
+    const h = t.health||{};
+    g.appendChild(kpi(`<span class="${gradeClass(h.grade)}">${esc(h.grade||"—")}</span>`, `Health ${num(h.score,0)}/100`));
+    sec.appendChild(card("Konsolidiert", g));
+    if(t.allocation) sec.appendChild(card("Allokation",
+      $(`<table><tbody>${Object.entries(t.allocation).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${pct(v)}</td></tr>`).join("")}</tbody></table>`)));
+    if(t.ranking && t.ranking.length) sec.appendChild(card("Positionen", $(`<table>
+      <thead><tr><th>#</th><th>Instrument</th><th class="num">Score</th><th>Verdikt</th><th class="num">Gewicht</th></tr></thead>
+      <tbody>${t.ranking.map(r=>`<tr><td>${r.rank}</td><td>${esc(r.instrument)}</td>
+        <td class="num">${num(r.score,1)}</td><td><span class="pill">${esc(r.verdict)}</span></td>
+        <td class="num">${num(r.weight_pct,1)}%</td></tr>`).join("")}</tbody></table>`)));
+    if(t.exit_plans && t.exit_plans.length) sec.appendChild(card("Exit-Pläne",
+      $(`<ul>${t.exit_plans.map(p=>`<li>${esc(p.instrument)}: <b>${esc(p.kind)}</b> ${num(p.size_fraction*100,0)}% — ${esc(p.trigger)}</li>`).join("")}</ul>`)));
+    if(t.health && t.health.flags && t.health.flags.length) sec.appendChild(card("Hinweise",
+      $(`<ul>${t.health.flags.map(f=>`<li class="y">${esc(f)}</li>`).join("")}</ul>`)));
+  },
+  paper_trading(sec,t){
+    const pos = t.open_positions||[];
+    if(!pos.length) sec.appendChild($(`<div class="empty">Keine offenen Paper-Positionen.</div>`));
+    else sec.appendChild(card("Offene Paper-Positionen", $(`<pre>${esc(JSON.stringify(pos,null,2))}</pre>`)));
+    if(t.performance) sec.appendChild(card("Paper-Performance", perfTable(t.performance)));
+    sec.appendChild($(`<div class="muted">Validiert nach ≥100 Forward-Trades: <b>${t.validated?"ja":"nein"}</b></div>`));
+  },
+  performance(sec,t){ sec.appendChild(card("Performance", perfTable(t))); },
+  news_macro(sec,t){
+    ["macro","news","breadth"].forEach(k=>{
+      if(t[k]) sec.appendChild(card(k, $(`<pre>${esc(JSON.stringify(t[k],null,2))}</pre>`)));
+    });
+    if(!t.macro && !t.news && !t.breadth)
+      sec.appendChild($(`<div class="empty">Kein News-/Makro-Feed verbunden (API-Key fehlt). Kontrakte stehen.</div>`));
+  },
+  system_health(sec,t){
+    const g = $(`<div class="grid"></div>`);
+    g.appendChild(kpi(`<span class="${gradeClass(t.grade)}">${esc(t.grade||"—")}</span>`, "System-Grade"));
+    g.appendChild(kpi(esc(t.strategy_version||"—"), "Strategie-Version"));
+    sec.appendChild(card("System", g));
+    sec.appendChild($(`<pre class="card">${esc(JSON.stringify(t,null,2))}</pre>`));
+  },
+};
+
+function kpi(v,l){ return $(`<div class="kpi"><div class="v">${v}</div><div class="l">${esc(l)}</div></div>`); }
+function card(title,node){ const c=$(`<div class="card"><h2>${esc(title)}</h2></div>`); c.appendChild(node); return c; }
+
+function decPill(d){ d=String(d||"").toLowerCase();
+  const cls = d==="buy"?"buy":d==="sell"?"sell":d.includes("wait")?"wait":"";
+  const lbl = d==="buy"?"BUY":d==="sell"?"SELL":d.includes("wait")?"WAIT":"NO TRADE";
+  return `<span class="pill ${cls}">${lbl}</span>`; }
+
+function oppTable(rows){
+  if(!rows.length) return $(`<div class="empty">Noch keine Bewertungen.</div>`);
+  return $(`<table>
+    <thead><tr><th>#</th><th>Instrument</th><th class="num">Score</th><th>Entscheidung</th><th>Setup</th><th>Headline</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${r.rank||""}</td><td>${esc(r.instrument)}</td>
+      <td class="num">${num(r.score,1)}</td>
+      <td>${decPill(r.decision)}</td>
+      <td><span class="pill ${r.setup_state==="armed"?"armed":""}">${esc(r.setup_state)}</span></td>
+      <td class="muted">${esc(r.headline||"")}</td></tr>`).join("")}</tbody></table>`);
+}
+
+function sigCard(s,isLive){
+  const c = $(`<div class="sig ${isLive?"live":""}"></div>`);
+  c.innerHTML = `<div><b>${isLive?"🔥":"⚠️ SHADOW —"} ${esc((s.direction||s.side||"").toUpperCase())} · ${esc(s.instrument||"")}</b>
+    <span class="pill ${isLive?"live":"shadow"}">${isLive?"LIVE":"SHADOW"}</span></div>
+    <div class="row">
+      <span><b>Entry</b>${num(s.entry,2)}</span><span><b>SL</b>${num(s.stop_loss,2)}</span>
+      <span><b>TP1</b>${num(s.tp1,2)}</span><span><b>TP2</b>${num(s.tp2,2)}</span><span><b>TP3</b>${esc(s.tp3||"—")}</span>
+      <span><b>R:R→TP2</b>${num(s.rr_to_tp2,2)}</span><span><b>Blended</b>${num(s.blended_rr,2)}</span>
+      <span><b>Score</b>${num(s.opportunity_score,1)}</span><span><b>Conf</b>${num(s.confidence_pct,0)}%</span>
+      <span><b>Setup</b>${esc(s.setup_id||"")}</span>
+    </div>
+    <div class="row"><span><b>Warum</b>${esc((s.why||[]).join("; ")||"—")}</span></div>
+    <div class="row"><span><b>Invalidation</b>${esc(s.invalidation||"—")}</span></div>
+    ${(s.risks&&s.risks.length)?`<div class="row"><span class="muted"><b>Risiken</b>${esc(s.risks.join("; "))}</span></div>`:""}`;
+  return c;
+}
+
+function valTable(rows){
+  return $(`<table>
+    <thead><tr><th>Setup</th><th>Version</th><th>Status</th><th class="num">Forward benötigt</th><th>Notiz</th></tr></thead>
+    <tbody>${rows.map(v=>`<tr>
+      <td>${esc(v.setup_id)}</td><td>${esc(v.strategy_version)}</td>
+      <td><span class="pill ${v.status==="validated"?"live":"shadow"}">${esc(v.status)}</span></td>
+      <td class="num">${esc(v.forward_trades_required??"")}</td>
+      <td class="muted" style="max-width:420px">${esc(v.notes||"")}</td></tr>`).join("")}</tbody></table>`);
+}
+
+function perfTable(p){
+  if(!p) return $(`<div class="empty">Noch keine Performance-Daten.</div>`);
+  const keys = Object.keys(p);
+  return $(`<table><tbody>${keys.map(k=>`<tr><td>${esc(k)}</td><td class="num">${
+    typeof p[k]==="object"?esc(JSON.stringify(p[k])):num(p[k],3)}</td></tr>`).join("")}</tbody></table>`);
+}
+
+function buildNav(){
+  const nav = document.getElementById("nav");
+  nav.innerHTML = "";
+  TABS.forEach(([k,label])=>{
+    const t = (STATE && STATE.tabs && STATE.tabs[k]) || {};
+    const b = $(`<button data-k="${k}">${esc(label)}<span class="dot"></span></button>`);
+    if(t.available) b.classList.add("has-data");
+    b.onclick = ()=>{ ACTIVE=k; render(); location.hash=k; };
+    nav.appendChild(b);
+  });
+}
+
+async function load(){
+  try {
+    const r = await fetch("dashboard.json?"+Date.now());
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    STATE = await r.json();
+  } catch(e){
+    document.getElementById("main").innerHTML =
+      `<div class="empty err">dashboard.json nicht ladbar (${esc(e.message)}).<br>
+       Erzeuge sie mit <code>uv run python scripts/build_dashboard.py</code>
+       und öffne diese Seite über einen lokalen Server
+       (<code>python -m http.server -d web</code>).</div>`;
+    return;
+  }
+  const asof = document.getElementById("asof");
+  const ts = STATE.as_of ? new Date(STATE.as_of) : null;
+  if(ts){
+    const ageMin = (Date.now()-ts.getTime())/60000;
+    asof.textContent = "Stand: "+ts.toLocaleString("de-DE")+(ageMin>90?"  (veraltet)":"");
+    asof.classList.toggle("stale", ageMin>90);
+  }
+  if(location.hash){ const h=location.hash.slice(1); if(TABS.some(t=>t[0]===h)) ACTIVE=h; }
+  buildNav();
+  render();
+}
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
