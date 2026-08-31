@@ -107,13 +107,14 @@ _BUILTIN: dict[tuple[str, str], SetupValidation] = {
         strategy_version=STRATEGY_VERSION,
         status=ValidationStatus.IN_VALIDATION,
         baseline=BaselineMetrics(
-            expectancy_r=0.40, profit_factor=2.3, win_rate=0.55, max_drawdown_r=8.0, n_trades=30
+            expectancy_r=0.35, profit_factor=2.0, win_rate=0.55, max_drawdown_r=8.0, n_trades=46
         ),
-        validated_window=("2024-04-09", "2026-08-28"),
+        validated_window=("2023-11-14", "2026-08-28"),
         notes=(
-            "S4 (Breakout+Retest, D1-Trend-Filter). Gold-OOS +0.40..+0.47R, WF 5-6/6-7, "
-            "MC prob_positive 0.59-0.78. Indikative Daten + kleine Stichprobe → IN_VALIDATION, "
-            "Signale = SHADOW bis echte Historie + >=100 Forward-Trades."
+            "S4 (Breakout+Retest, D1-Trend-Filter). Gold+FX+Crypto, 4 Splits: OOS +0.40..+0.57R, "
+            "WF 8/9, MC prob_positive 0.65, symbol_stability fraction_positive 1.0 (jedes "
+            "Instrument positiv, auch nicht-trendende FX). Indikative Yahoo-Daten + OOS n=46 → "
+            "IN_VALIDATION, Signale = SHADOW bis echte Historie + >=100 Forward-Trades."
         ),
     ),
 }

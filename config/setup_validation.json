@@ -15,15 +15,15 @@
       "strategy_version": "0.1.1",
       "status": "in_validation",
       "baseline": {
-        "expectancy_r": 0.40,
-        "profit_factor": 2.3,
+        "expectancy_r": 0.35,
+        "profit_factor": 2.0,
         "win_rate": 0.55,
         "max_drawdown_r": 8.0,
-        "n_trades": 30
+        "n_trades": 46
       },
-      "validated_window": ["2024-04-09", "2026-08-28"],
+      "validated_window": ["2023-11-14", "2026-08-28"],
       "forward_trades_required": 100,
-      "notes": "S4 aus scripts/setup_research.py. Gold-Historie XAUUSD-YF (Yahoo, indikativ) ueber 3 IS/OOS-Splits: OOS-Expectancy +0.40..+0.47R, Walk-Forward 5-6/6-7 positiv, Monte-Carlo prob_positive 0.59-0.78 (einziger Setup, der den 1.5x-Kosten-Stress besteht). ABER: Yahoo-Daten indikativ + widersprechen der Binance-XAUUSDT-Reihe im 2026-Overlap; kleine OOS-Stichprobe (10-26); 2024-26 Gold-Hausse. IN_VALIDATION -> Live-Signale = SHADOW, forward-getrackt. VALIDATED erst nach (a) echter Dukascopy-Gold-Historie + (b) >=100 Forward-Trades (scripts/edge_health_check.py). Baseline hier = konservative Rundung der S4-OOS-Zahlen."
+      "notes": "S4 aus scripts/setup_research.py. Gold+FX+Crypto (Yahoo XAUUSD-YF/EURUSD-YF/GBPUSD-YF/USDJPY-YF + 6 Crypto), 4 IS/OOS-Splits, scaled mgmt, 12-Tage-Purge: OOS-Expectancy +0.40..+0.57R, Walk-Forward 8/9 positiv, Monte-Carlo prob_positive 0.65 (besteht 1.5x-Kosten-Stress), **symbol_stability fraction_positive = 1.0** (jedes Instrument positiv, auch nicht-trendende FX: GBPUSD +1.7R). Bricht das 'nur Gold-Hausse-Beta'-Argument. ABER: Yahoo-Daten indikativ, OOS n=46, noch keine Forward-Trades. IN_VALIDATION -> Live-Signale = SHADOW. VALIDATED erst nach (a) Bestaetigung auf echter Dukascopy-Historie + (b) >=100 Forward-Trades (scripts/edge_health_check.py). Baseline = konservativ gerundet."
     }
   ]
 }

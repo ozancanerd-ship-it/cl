@@ -206,10 +206,35 @@ zeigt auf der Gold-Historie:
 3. 2024–2026 war trotz Konsolidierungs-Phasen **überwiegend Gold-Hausse** (+120 %) — Long-Bias-Risiko bleibt.
 4. Auf dem Crypto-Panel ist S1 nur mittelmäßig (PF 1.17–1.24, MC pp 0.02) — evtl. ein **Gold-Setup**, kein universelles.
 
+### Teil 6 — FX-Gegenprobe (2026-08-31, dieselbe Sitzung)
+
+`scripts/ingest_yahoo.py` erweitert um **EURUSD-YF / GBPUSD-YF / USDJPY-YF** (Yahoo H1,
+2023-11 → 2026-08, ~4 187 H4-Bars je Symbol). FX ist **kein Bull-only-Markt** — genau der Test,
+ob die Breakout+Retest-Edge über die 2024–26-Gold-Hausse hinaus trägt.
+
+**Neu-Lauf** (Gold + 3× FX + 6× Crypto, Split 2025-04, scaled-Mgmt, Kosten 0.06 R):
+
+| Setup | ALL exp | IS exp | OOS exp (n) | WF +/n | MC prob_positiv | symbol_stability |
+|---|---:|---:|---:|---:|---:|---|
+| **S4 Breakout+Retest, D1-Trend-Filter** | **+0.26** | +0.08 | **+0.57 (46)** | **8/9** | **0.65** | **fraction_positive 1.0** — jedes Instrument positiv |
+| S1 Breakout+Retest (roh) | +0.09 | +0.04 | +0.18 (222) | 12/12 | 0.0005 | 7/10, GBPUSD −4 R |
+| S3 / S5 | +0.05 / +0.06 | +0.10 / +0.09 | **−0.09 / −0.00** | 6/11 / 5/11 | 0.02 / 0.04 | negativ auf FX |
+| S0 | −0.03 | — | −0.01 | 4/12 | 0.0 | GBPUSD −40 R |
+
+**S4 je Instrument (alle positiv):** XAUUSD-YF +13.7 R (PF 5.3), EURUSD-YF +1.4 R, GBPUSD-YF
++1.7 R (PF 1.3 — **auf einem seitwärts laufenden Markt**), USDJPY-YF +1.0 R. Long **und** Short
+tragen bei. `total_r_without_best` (bestes Symbol entfernt) = **+15.8 R**.
+
+**Das bricht das „nur Gold-Hausse-Beta"-Argument.** S4 trägt auf FX-Märkten, die 2024–26
+**nicht** trendeten. Kombiniert mit WF 8/9, MC `prob_positive` 0.65 und `fraction_positive` 1.0
+ist das die **stärkste Evidenz der gesamten Untersuchung**.
+
 ### Entscheidung (datenbasiert)
 
 Der **zweite Setup-Typ = „Breakout + Retest mit HTF-Trend-Filter"** (`SETUP-BREAKOUT-RETEST-01`,
-S4-Logik). Status: **`IN_VALIDATION`** — historische OOS-Edge *plausibel*, noch nicht *bewiesen*.
+S4-Logik). Status: **`IN_VALIDATION`** — historische OOS-Edge jetzt **belastbar**, aber noch
+nicht *final bewiesen*: die Daten sind indikativ (Yahoo) und die OOS-Stichprobe ist 46 Trades.
+Baseline (registry): OOS +0.35 R / PF 2.0 / n 46 (konservativ gerundet).
 
 **Integriert** (damit die Forward-Validierung überhaupt laufen kann):
 Strategy-Engine (2. Setup-Typ) · Opportunity-Score · Signal-Engine · Paper-Trading · Versionierung.
