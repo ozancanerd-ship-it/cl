@@ -81,6 +81,14 @@ async def main() -> int:
         recorder = DecisionLedgerRecorder(Ledger(args.decision_ledger))
         recorder.attach(pipe.bus)
 
+    # 24/7 Opportunity-Ranking über die vorhandene Pipeline (Masterplan §4/§5)
+    from trading_agent.scanner.market_scanner import MarketScanner, ScannerConfig
+
+    scanner = MarketScanner(
+        ScannerConfig(asset_class=dict.fromkeys(cfg.instruments, args.asset_class))
+    )
+    top_opps = scanner.attach(pipe.bus)
+
     counts = {"decision": 0, "alert": 0, "paper": 0, "quality": 0, "shutdown": 0}
     pipe.bus.subscribe(
         DecisionMade, lambda e: counts.__setitem__("decision", counts["decision"] + 1)
@@ -113,6 +121,19 @@ async def main() -> int:
     status["_event_counts"] = counts
     if recorder is not None:
         status["_decision_ledger_rows"] = recorder.rows_written
+    status["_scanner_evaluations"] = scanner.evaluations
+    status["_top_opportunities"] = [
+        {
+            "rank": r.rank,
+            "instrument": r.instrument,
+            "score": r.score,
+            "tier": r.tier,
+            "setup_state": r.setup_state,
+            "direction": r.direction,
+            "headline": r.headline,
+        }
+        for r in top_opps.top(10)
+    ]
     status["_wall_runtime_s"] = round((datetime.now(UTC) - t0).total_seconds(), 1)
     assert sup.orders_sent == 0, "LIVE DAEMON hat eine Order gesendet — darf nie passieren"
 

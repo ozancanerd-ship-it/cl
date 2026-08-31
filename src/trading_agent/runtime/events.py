@@ -150,6 +150,26 @@ class MarketObserved(Event):
     note: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class OpportunityScored(Event):
+    """Scanner hat ein Instrument neu bewertet (`Masterplan §5/§6`)."""
+
+    instrument: str = ""
+    score: float = 0.0
+    setup_state: str = ""
+    tier: str | None = None
+    opportunity: object = None  # scanner.opportunity.OpportunityScore
+
+
+@dataclass(frozen=True, slots=True)
+class RankingUpdated(Event):
+    """Das Top-Opportunities-Ranking hat sich geändert (neuer #1 oder Reihenfolge)."""
+
+    top_instrument: str = ""
+    previous_top: str | None = None
+    ranking: tuple[tuple[str, float], ...] = ()  # (instrument, score), absteigend
+
+
 __all__ = [
     "AlertRaised",
     "BarClosed",
@@ -161,8 +181,10 @@ __all__ = [
     "MarketObserved",
     "NewsReceived",
     "OpenInterestUpdate",
+    "OpportunityScored",
     "PaperPositionChanged",
     "QuoteUpdate",
+    "RankingUpdated",
     "ShutdownRequested",
     "SignalRevised",
     "TradeTick",
