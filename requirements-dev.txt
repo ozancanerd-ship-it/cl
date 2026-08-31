@@ -1,0 +1,8 @@
+# Dev-/Test-Abhängigkeiten stehen in pyproject.toml ([project.optional-dependencies].dev),
+# exakt gepinnt in uv.lock.
+#
+# Einrichtung:  make install
+#
+#   pytest, pytest-cov   Tests + Coverage
+#   ruff                 Lint + Format
+#   mypy                 statische Typprüfung (strict)

@@ -1,0 +1,57 @@
+# Beispiel-Scoring-Konfiguration. Lokale Kopie: config/scoring.yaml (nicht versioniert).
+# Rubriken & Formeln: docs/strategy/scoring-rubric.md
+#
+# Score = 100 * sum(w_i * f_i) / sum(w_i) - sum(penalties)     ;  f_i in [0,1]
+# NUR erreichbar, wenn no-trade.md + regime-gate + chain-gates + Vetos ALLE bestanden sind.
+#
+# NUTZER-FESTLEGUNG 2026-08-28 (strategy_version 0.1.1):
+#   - Start GLEICHGEWICHTET (jeder WEIGHTED-Faktor = 10)
+#   - alle Penalties = 0
+#   - Optimierung von Gewichten/Penalties ERST nach OOS-Nachweis eines Edges,
+#     und dann nur <= anti_overfitting.max_free_params gleichzeitig.
+
+schema_version: 1
+
+setup: SMC-SWEEP-REV-01
+
+weights:                        # Start: alle gleich
+  htf_bias_strength:        10
+  liquidity_quality:        10
+  sweep_clarity:            10
+  displacement_strength:    10
+  structure_shift_quality:  10
+  risk_reward:              10
+  entry_location_depth:     10
+  fvg_quality:              10
+  reclaim_quality:          10
+  regime_alignment:         10
+  session_context:          10
+  data_confidence_bonus:    10
+
+penalties:                      # Start: alle 0 (Definitionen in contradictions.md §5)
+  messy_sweep:                0
+  proximity_opposing_htf_zone: 0
+  stale_structure:           0
+  weak_displacement:         0
+  mtf_partial_disagreement:  0
+  wide_sl:                   0
+  late_session:              0
+
+# Risikostufen-Bänder (Score UND setup_confidence müssen erfüllt sein).
+# PROPOSED DEFAULT — gültig erst, wenn OOS-Monotonie (A+ > A > B in realisierter Expectancy) belegt ist.
+tiers:
+  A_plus: { min_score: 85, min_confidence: 0.80 }
+  A:      { min_score: 75, min_confidence: 0.70 }
+  B:      { min_score: 65, min_confidence: 0.60 }
+  # sonst: NO_TRADE
+
+# Harte Vorbedingungen (GATE, nicht gewichtet). Fehlt eine -> NO_TRADE, kein Score.
+required_gates:
+  - regime_allowed
+  - htf_bias_present
+  - chain_complete
+  - entry_location_ok
+  - rr_ok
+  - sl_definable
+  - session_ok
+  - confidence_ok

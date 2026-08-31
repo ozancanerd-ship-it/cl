@@ -1,0 +1,1 @@
+"""Investment Engine (Langfrist). INVEST/WAIT/HOLD/REDUCE je Instrument/Bucket. Monatsbudget ~200-400 EUR. Beruecksichtigt bestehende Positionen. Erzeugt NIE Trade-Signale. Strikt getrennt von der Trading Engine."""

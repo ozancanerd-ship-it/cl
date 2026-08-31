@@ -1,0 +1,53 @@
+# Beispiel-News-/Event-Konfiguration. Lokale Kopie: config/news.yaml
+# Verbindliche Regeln: docs/strategy/news-rules.md
+# ALLE Werte PROPOSED DEFAULT (strategy_version 0.1.1).
+# Datenquelle im MVP: statische Fixture / CSV (Point-in-Time, kein externer Call).
+
+schema_version: 1
+
+source:
+  type: fixture                    # fixture | csv   (externe Feeds erst später)
+  path: data/raw/news_calendar.csv
+  max_age_h: 12
+  failure_action: block_new_entries   # fail-safe
+
+impact_map:
+  high:   [FOMC_RATE, FOMC_STATEMENT, FED_CHAIR_SPEECH, CPI, CORE_CPI, NFP, PCE, CORE_PCE,
+           GDP_ADVANCE, ECB_RATE, BOE_RATE, BOJ_RATE,
+           CRYPTO_EXCHANGE_HALT, CRYPTO_REGULATION, SPOT_ETF_DECISION, TOKEN_UNLOCK_LARGE]
+  medium: [PPI, RETAIL_SALES, ISM_PMI, JOBLESS_CLAIMS, JOLTS, CONSUMER_CONFIDENCE,
+           FOMC_MINUTES, FOMC_MEMBER_SPEECH, GDP_REVISION, ADP,
+           CRYPTO_NETWORK_UPGRADE, FUNDING_EXTREME, MAJOR_LISTING_DELISTING]
+  low:    [SECONDARY_REVISION, REGIONAL_FED_INDEX, MINOR_DATA]
+
+crypto:
+  unlock_pct: 1.0                  # % zirkulierende Menge in <= 48h -> HIGH
+  funding_extreme: 0.05            # % (8h-Rate) -> MEDIUM
+
+routing:
+  usd_macro_to_crypto: true        # FOMC/CPI/NFP/PCE/GDP betreffen auch BTCUSDT/ETHUSDT
+  eur_to_crypto: false             # Nutzer-Bestätigung: EUR-Events beeinflussen BTC/ETH kaum
+
+blackout:
+  high:   { pre_min: 30, post_min: 30, prepos_ban_min: 120 }
+  high_fomc_override: { pre_min: 30, post_min: 60, prepos_ban_min: 180 }
+  medium: { pre_min: 15, post_min: 15, prepos_ban_min: 0 }
+  low:    { pre_min: 0,  post_min: 0,  prepos_ban_min: 0 }
+
+open_position:
+  be_trigger_r: 0.5
+  reduce_pct: 50
+  pre_event_min: 15
+  flatten_high_impact: true        # Nutzer-Festlegung: Crypto-Trades vor HIGH-Events komplett flat
+
+reentry:
+  min_min: 30
+  max_vol_pct: 90
+
+shock:                             # ungeplantes / Headline-Risiko
+  auto_risk_off: true
+  move_atr: 4.0
+  window_bars: 3
+  risk_off_clear_bars: 12
+
+session_open_buffer_min: 15

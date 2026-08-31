@@ -1,0 +1,63 @@
+# Example: BrokerRouter configuration. Local copy: config/brokers.yaml
+# Authoritative: ARCHITECTURE.md §3a "Broker Router"
+#
+# The Strategy Engine NEVER talks to a broker directly. Only path:
+#   Strategy -> Risk -> BrokerRouter -> BrokerAdapter -> Broker/Platform
+#
+# NO secrets here. Credentials come from security/secrets (env / OS keychain),
+# separate namespaces for demo vs live. No withdrawal permission is ever required.
+
+schema_version: 1
+
+# Global execution mode. In phase 2B: paper_live only (real data, NO real-money orders).
+mode: paper_live                   # backtest | paper | paper_live | demo   (live not allowed yet)
+
+adapters:
+
+  kraken:
+    broker: kraken
+    asset_classes: [crypto, altcoin]
+    account_currency: EUR
+    margin_mode: isolated
+    position_mode: one_way
+    max_leverage_source: refdata   # real exchange limit, not a strategy parameter
+    credentials_ref: kraken        # security/secrets namespace (demo/live separated there)
+    enabled_for: [paper_live]      # real trading adapter comes phase 9 (demo first)
+
+  bybit:
+    broker: bybit
+    asset_classes: [crypto, altcoin]
+    account_currency: USDT
+    margin_mode: isolated
+    position_mode: one_way
+    max_leverage_source: refdata
+    credentials_ref: bybit
+    enabled_for: [paper_live]
+
+  pepperstone_mt5:
+    broker: pepperstone
+    platform: mt5                  # official MetaTrader5 Python integration
+    platform_only: windows        # adapter disabled on non-Windows
+    asset_classes: [gold, forex]
+    account_currency: EUR
+    credentials_ref: pepperstone_mt5
+    enabled_for: []               # activate on Windows with MT5 + Pepperstone demo account
+    note: "MQL5 must never contain strategy/risk/AI logic. Python is the brain."
+
+  trade_republic:
+    broker: trade_republic
+    asset_classes: [equity, etf]
+    purpose: investment            # long-term portfolio, NOT the trading path
+    integration: manual_import     # official/permitted only; NO unofficial API
+    credentials_ref: null
+    enabled_for: []
+
+# Instrument -> route. BrokerRouter picks the adapter, checks BrokerHealth, does fallback.
+routes:
+  XAUUSD:        { primary: pepperstone_mt5, fallback: [] }
+  "crypto:*":    { primary: kraken,          fallback: [bybit] }   # BTC, ETH, liquid alts, perps
+  "investment:*": { primary: trade_republic, fallback: [] }
+
+health:
+  broker_health_veto: true        # DEGRADED/UNAVAILABLE broker -> NO_TRADE for its instruments
+  reconcile_interval_s: 30        # demo/live only

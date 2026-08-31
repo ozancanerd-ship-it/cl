@@ -1,0 +1,99 @@
+# Beispiel-Hauptkonfiguration. Lokale Kopie: config/config.yaml (nicht versioniert).
+# KEINE Secrets hier ablegen.
+
+schema_version: 1
+mode: development            # development | research | backtest | paper | paper_live | demo   (live NOT allowed yet)
+
+strategy_version: "0.1.1"    # muss zur eingefrorenen Spezifikation in docs/strategy/ passen (DECISIONS-0.1.1.md)
+active_setups:
+  - SMC-SWEEP-REV-01
+
+timeframes:
+  # Der Agent nutzt Multi-Timeframe-Kontext (nie isoliert auf einem TF).
+  htf: [D1, H4]             # Regime-Konsens (Nutzer-Festlegung: nur D1 + H4)
+  context: [M15]            # nur Kontext, kein Veto-Recht
+  entry: [M5]
+  execution_detail: [M1]    # nur für Intrabar-Reihenfolge / Excursion-Messung
+
+instruments:
+  - symbol: BTCUSDT
+    asset_class: crypto
+    quote_currency: USDT
+    settle_currency: USDT
+    enabled: true            # MVP
+  - symbol: ETHUSDT
+    asset_class: crypto
+    quote_currency: USDT
+    settle_currency: USDT
+    enabled: true            # MVP
+  - symbol: XAUUSD
+    asset_class: gold
+    quote_currency: USD
+    enabled: false           # später
+  - symbol: EURUSD
+    asset_class: forex
+    quote_currency: USD
+    enabled: false
+  - symbol: AAPL
+    asset_class: equity
+    quote_currency: USD
+    enabled: false
+  - symbol: SPY
+    asset_class: etf
+    quote_currency: USD
+    enabled: false
+
+data:
+  provider: mock             # mock | csv   (echte Provider erst ab Phase 8/9)
+  csv_dir: data/raw
+  repository_dir: data/repository
+  timezone: UTC              # intern IMMER UTC
+  reject_on_gaps: true
+  max_bar_age_factor: 1.5    # DATA_STALE, wenn letzte Bar älter als 1.5 * Δ(tf)
+  gap_lookback_bars: 50
+
+sessions:
+  # Sessions in BÖRSENLOKALZEIT definiert; zur Laufzeit DST-korrekt nach UTC aufgelöst.
+  # Für 24/7-Crypto sind dies Liquiditäts-Approximationen.
+  asia:
+    tz: Asia/Tokyo
+    start: "09:00"
+    end:   "15:00"
+  london:
+    tz: Europe/London
+    start: "08:00"
+    end:   "16:30"
+  newyork:
+    tz: America/New_York
+    start: "09:30"
+    end:   "16:00"
+  london_ny_overlap:
+    derived_from: [london, newyork]   # Schnittmenge
+
+engines:
+  market_structure: true
+  liquidity: true
+  smc: true
+  support_resistance: true
+  sessions: true
+  regime: true
+  mtf: true
+  news: true
+  macro: true
+  ai_reasoning: false        # LLM-Layer: Contract vorhanden, Nutzung im MVP DEAKTIVIERT
+
+scanner:
+  enabled: true
+  report_no_trade_if_chain_reached: STRUCTURE_SHIFTED   # NO_TRADE nur melden, wenn Kette so weit kam
+  min_tier_to_alert: B
+
+paths:
+  decision_ledger: data/journal/decision_ledger.jsonl   # Export; primär SQLite
+  trade_journal:   data/journal/trades.jsonl
+  state_db:        data/state/state.sqlite
+  research_runs:   data/research/runs
+
+logging:
+  level: INFO
+  format: json
+  redact_secrets: true

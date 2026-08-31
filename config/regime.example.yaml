@@ -1,0 +1,67 @@
+# Beispiel-Regime-Konfiguration. Lokale Kopie: config/regime.yaml
+# Verbindliche Definitionen: docs/strategy/regime.md
+# ALLE Werte PROPOSED DEFAULT (strategy_version 0.1.1), empirisch zu validieren.
+
+schema_version: 1
+
+# Nutzer-Festlegung 2026-08-28:
+#  - Konsens-Timeframes = D1 + H4 (M15 nur Kontext)
+#  - D1 ODER H4 = UNCLEAR  -> NO_TRADE
+#  - LOW-Vol fuer SMC-SWEEP-REV-01 im MVP verboten
+mtf:
+  consensus_timeframes: [D1, H4]
+  context_timeframes: [M15]
+  allow_unclear_htf: false        # streng
+  conflict_max_disagreement: 0.0
+
+trend:
+  min_swings: 2
+  slope_window: 50
+  min_slope: 0.05                 # TO-VALIDATE #8
+  slope_saturation: 0.20
+
+range:
+  window: 40
+  max_height_atr: 8
+  max_slope: 0.03
+  min_touches: 2
+  touch_eps_atr: 0.15
+  min_touch_separation_bars: 3
+
+vol:
+  atr_period: 14
+  lookback: 100
+  low_pct: 20
+  high_pct: 80
+  extreme_pct: 97
+  extreme_atr_ratio:              # grobe Schätzwerte — VOR erstem Backtest je Instrument neu setzen
+    crypto: 0.08
+    gold:   0.04
+    forex:  0.02
+    equity: 0.06
+    etf:    0.05
+
+phase:
+  window: 10
+  expansion_atr_ratio: 1.30
+  compression_atr_ratio: 0.80
+  bandwidth_period: 20
+  bandwidth_pct: 25
+  min_compression_bars: 5
+  narrow_bar_atr: 0.7
+  coiled_bars: 10
+
+hysteresis:
+  min_bars: 3
+  vol_exit_pct: 70
+  trend_exit_slope: 0.03
+
+cooldown_bars: 3                  # nach directional-Wechsel: NO_TRADE fuer n Bars
+
+# Regime -> Setup-Freigabe (siehe regime.md §8)
+setup_allow:
+  SMC-SWEEP-REV-01:
+    directional: [TREND_UP, TREND_DOWN, RANGE]
+    volatility:  [NORMAL, HIGH]
+    phase:       [NEUTRAL, EXPANSION]
+    forbid:      [UNCLEAR, CONFLICTING, EXTREME, LOW_VOL, COMPRESSION_COILED]

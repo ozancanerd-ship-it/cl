@@ -1,0 +1,160 @@
+# Example: data provider registry + router policy. Local copy: config/providers.yaml
+# Authoritative: docs/FINAL_ARCHITECTURE_AUDIT.md §4/§5, ARCHITECTURE.md §3a
+# NO secrets here. API keys come from security/secrets (env / OS keychain).
+
+schema_version: 1
+
+cost_budget_eur_per_month: 0       # router rejects providers exceeding this
+
+# --------------------------------------------------------------------------------------------
+# Provider registry: capabilities, cost, license, rate limits
+# --------------------------------------------------------------------------------------------
+providers:
+
+  kraken:
+    kind: exchange
+    role: primary                  # crypto primary (data + execution)
+    asset_classes: [crypto, altcoin]
+    data_kinds: [ohlcv, quote, trade, orderbook, funding, open_interest]
+    modes: [historical, live]
+    auth: none                     # public market data needs no key
+    rest_base: "https://api.kraken.com"
+    ws_base: "wss://ws.kraken.com/v2"
+    historical_depth_days: 720     # Kraken OHLC endpoint returns limited recent history
+    typical_latency_ms: 200
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: true
+
+  binance_vision:
+    kind: file_import               # official public bulk dumps (data.binance.vision)
+    role: secondary                 # crypto deep historical M1/M5 backtest data
+    asset_classes: [crypto, altcoin]
+    data_kinds: [ohlcv]
+    modes: [historical]
+    auth: none
+    rest_base: "https://data.binance.vision/data/spot"
+    historical_depth_days: 2500     # monthly kline zips back to listing
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: true                   # BTC/ETH M5 ingested (docs/DATASET-BTC-ETH-M5.md)
+
+  bybit_public:
+    kind: exchange
+    role: secondary                # additional data / alternative execution / fallback
+    asset_classes: [crypto, altcoin]
+    data_kinds: [ohlcv, quote, trade, orderbook, funding, open_interest]
+    modes: [historical, live]
+    auth: none
+    rest_base: "https://api.bybit.com"
+    ws_base: "wss://stream.bybit.com/v5/public/linear"
+    historical_depth_days: 1000
+    typical_latency_ms: 150
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: true
+
+  pepperstone_mt5:
+    kind: broker_feed
+    role: primary                  # gold / XAUUSD (data + execution)
+    asset_classes: [gold, forex]
+    data_kinds: [ohlcv, quote]
+    modes: [historical, live]
+    auth: mt5_terminal             # MetaTrader5 Python integration; Windows + terminal + Pepperstone account
+    platform_only: windows
+    historical_depth_days: 3000
+    typical_latency_ms: 250
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: false                 # activate on Windows with MT5 set up
+
+  dukascopy_import:
+    kind: file_import
+    asset_classes: [gold, forex]
+    data_kinds: [ohlcv, trade]
+    modes: [historical]
+    auth: none
+    historical_depth_days: 7000
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: false                 # deep backtest history, one-off import
+
+  polygon_io:
+    kind: data_vendor
+    asset_classes: [equity, etf, forex]
+    data_kinds: [ohlcv, quote, trade, news, corporate_actions]
+    modes: [historical, live]
+    auth: api_key
+    historical_depth_days: 5500
+    typical_latency_ms: 250
+    cost_tier: paid
+    redistribution_allowed: false
+    enabled: false                 # from phase 7 (equities active)
+
+  fred_alfred:
+    kind: macro
+    asset_classes: [macro]
+    data_kinds: [macro]
+    modes: [historical, live]
+    auth: api_key                  # FRED key is free
+    point_in_time: true            # ALFRED delivers first-release values
+    cost_tier: free
+    redistribution_allowed: true
+    enabled: false                 # from phase 3
+
+  finnhub:
+    kind: news_calendar
+    asset_classes: [equity, macro, crypto]
+    data_kinds: [news, economic_calendar, earnings_calendar]
+    modes: [historical, live]
+    auth: api_key                  # free tier
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: false                 # from phase 3
+
+  csv_economic_calendar:
+    kind: news_calendar            # data/providers/news_calendar.py::CsvEconomicCalendar
+    asset_classes: [crypto, forex, equity, gold, macro]
+    data_kinds: [economic_calendar, news]
+    modes: [historical]
+    auth: none                     # local, manually curated CSV
+    point_in_time: true            # every row carries available_time
+    cost_tier: free
+    redistribution_allowed: false
+    enabled: false                 # enable by pointing at a real curated calendar CSV
+
+# --------------------------------------------------------------------------------------------
+# Router policy: best source per (asset class, data kind, mode) + fallback chain
+# --------------------------------------------------------------------------------------------
+router:
+  policy:
+    prefer: [quality, latency, cost]
+    historical_prefer: [depth, quality, cost]
+  health:
+    avoid_below: healthy           # healthy | degraded
+    circuit_breaker_cooldown_s: 60
+
+  routes:
+    crypto:
+      live:       { primary: kraken,       fallback: [bybit_public] }
+      historical: { primary: kraken,       fallback: [bybit_public] }
+      funding:    { primary: bybit_public, fallback: [kraken] }        # Bybit funding history is richer
+      open_interest: { primary: bybit_public, fallback: [] }
+    gold:
+      live:       { primary: pepperstone_mt5, fallback: [] }
+      historical: { primary: dukascopy_import, fallback: [pepperstone_mt5] }
+      macro:      { primary: fred_alfred,   fallback: [] }
+    forex:
+      live:       { primary: pepperstone_mt5, fallback: [] }
+      historical: { primary: dukascopy_import, fallback: [pepperstone_mt5] }
+    equity:
+      live:       { primary: polygon_io,   fallback: [] }
+      historical: { primary: polygon_io,   fallback: [] }
+      corporate_actions: { primary: polygon_io, fallback: [] }
+      news:       { primary: finnhub,      fallback: [polygon_io] }
+    etf:
+      live:       { primary: polygon_io,   fallback: [] }
+      historical: { primary: polygon_io,   fallback: [] }
+    macro:
+      historical: { primary: fred_alfred,  fallback: [] }
+      calendar:   { primary: finnhub,      fallback: [] }

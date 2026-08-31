@@ -1,0 +1,1 @@
+"""FastAPI-Backend fuer das Dashboard (Phase 12): REST + WebSocket. Scanner/Signale/Portfolio/Risk/Positionen/Performance/Journal/News/AI-Reasoning/Alerts/Health/Execution + Chart-Datafeed + Approval-Endpoint."""

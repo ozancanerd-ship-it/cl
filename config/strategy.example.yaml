@@ -1,0 +1,126 @@
+# Beispiel-Setup-/Strategie-Konfiguration. Lokale Kopie: config/strategy.yaml
+# Verbindliche Spezifikation: docs/strategy/setups/SMC-SWEEP-REV-01.md, confidence.md, contradictions.md,
+#   DECISIONS-0.1.1.md, SPEC-ADDENDUM-0.1.1.md
+# ALLE Werte PROPOSED DEFAULT (strategy_version 0.1.1), empirisch zu validieren.
+
+schema_version: 1
+strategy_version: "0.1.1"
+
+setups:
+  SMC-SWEEP-REV-01:
+    timeframes:
+      htf: [D1, H4]
+      sweep_tf: M15
+      displacement_tf: M15
+      structure_tf: M5
+      entry_tf: M5
+      confirmation_tf: M1
+
+    bias:
+      min_strength: 0.35
+
+    liquidity:
+      allowed_types: [equal_lows, equal_highs, session_low, session_high,
+                      pdl, pdh, pwl, pwh, swing_low, swing_high]
+      min_strength: 0.40
+      freshness_bars: 50          # H1
+      max_distance_atr: 5.0       # ATR(H1)
+
+    sweep:
+      max_penetration_atr: 1.00   # TO-VALIDATE #1  (überschreibt primitives fürs Setup)
+      max_reclaim_bars: 3         # TO-VALIDATE #2
+      min_wick_ratio: 1.5
+      require_wick: true
+      max_pools_in_window: 2      # 3+ -> Veto MESSY_LIQUIDITY
+
+    reclaim:
+      min_close_beyond_atr: 0.10
+      min_body_ratio: 0.50
+      require_opposite_color: true
+
+    displacement:
+      min_atr: 1.5                # TO-VALIDATE #3
+      max_bars_after_reclaim: 3
+
+    structure:
+      max_break_distance_atr: 4.0
+      max_bars_after_displacement: 3
+      confirmation: close
+
+    entry:
+      mode: limit_at_proximal_edge   # limit_at_proximal_edge | limit_at_mid | confirmation_market
+      allow_ob_fallback: true
+      max_pd_position: 0.50          # TO-VALIDATE #5  (Nutzer-Festlegung: 0.50; numerischer Gate maßgeblich, 0.1.1 C4)
+      min_zone_height_atr: 0.15
+      confirmation_tf: M1
+      # nur bei mode=confirmation_market — SPEC-ADDENDUM-0.1.1.md §2 (PROPOSED / TO-VALIDATE)
+      confirmation:
+        engulf: { tol_atr: 0.05, min_body_atr: 0.6, min_body_ratio: 1.0 }
+        pin:    { min_wick_ratio: 2.0, min_wick_range_frac: 0.6, max_opp_wick_frac: 0.2,
+                  pierce_tol_atr: 0.15, min_range_atr: 0.5 }
+        choch:  { swing_left: 1, swing_right: 1, min_swings: 1, buffer_atr: 0.0, zone_pad_atr: 0.5 }
+
+    sl:
+      buffer_atr: 0.50               # TO-VALIDATE #6
+      max_distance_atr: 3.0
+      min_distance_atr: 0.40
+      min_spread_multiple: 5
+
+    tp1: { r_multiple: 1.5, min_r: 1.0, size_pct: 50 }
+    tp2: { r_multiple: 3.0, min_r: 2.0, size_pct: 25 }
+    tp3: { size_pct: 25 }
+    be:  { buffer_atr: 0.10 }
+    trail: { timeframe: M15, buffer_atr: 0.30, activate_after: TP2 }
+
+    rr:
+      min_to_tp2: 2.0               # TO-VALIDATE #7
+      min_blended: 1.3
+      tp3_assumed_r: 2.5
+      min_target_room_r: 1.5
+
+    expiry:
+      armed_bars: 12                # M5
+      expire_at_session_end: true
+      max_holding_bars: 96          # M5
+      dead_trade_bars: 48
+      dead_trade_r: 0.3
+      dead_trade_mfe_r: 0.5
+
+    session:
+      allowed: [london, newyork, london_ny_overlap]
+      avoid_first_min: 15
+      avoid_weekend: true           # Nutzer-Festlegung
+      avoid_pre_weekend_min: 60
+
+    cooldown_bars: 12               # M15, nach Stop-Out auf demselben Instrument
+    min_confidence: 0.60
+
+invalidation:
+  zone_fail_confirm: true           # Nutzer-Festlegung
+  htf_flip_hysteresis_bars: 2
+  structure_tf: M5
+
+confidence:
+  data_floor: 0.50                  # Veto V6
+  soft_floor: 0.60
+  weights: { data: 0.40, analysis: 0.60 }
+  analysis_weights:
+    swing_confirmation: 0.20
+    structure_clarity: 0.20
+    sweep_unambiguity: 0.20
+    regime_clarity: 0.15
+    htf_mtf_agreement: 0.15
+    fvg_integrity: 0.10
+  regime_margin_pct: 10
+  single_source_value: 0.80
+  source_disagree_atr: 0.30
+
+contradictions:
+  opposing_zone_buffer_atr: 0.5
+  opposing_zone_overlap_veto: 0.50
+  late_session_min: 30
+
+# Decision-Output der Strategy Engine (SPEC-ADDENDUM-0.1.1.md §1, 0.1.1 C6)
+decision:
+  emit_wait: true                 # false -> FSM-Zwischenzustände liefern NO_TRADE statt WAIT
+  wait_min_state: BIAS_SET        # ab diesem FSM-Zustand wird WAIT zurückgegeben

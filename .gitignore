@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+
+# Test / Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Lokale Konfiguration (nur *.example.* wird versioniert)
+config/*.yaml
+!config/*.example.yaml
+config/*.yml
+!config/*.example.yml
+
+# Secrets / Umgebung (NIE committen)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Lokale Daten (Marktdaten, Repository, State, Journal) – nie versioniert
+data/raw/*
+data/processed/*
+data/journal/*
+data/repository/*
+data/repository_real/*
+data/cache/*
+data/state/*
+data/research/*
+!data/**/.gitkeep
+
+# uv.lock WIRD versioniert (reproduzierbare Umgebung) – NICHT ignorieren.
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Generierte Diagnose-Artefakte (Script bleibt versioniert, Output nicht)
+diagnostics/

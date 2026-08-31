@@ -1,0 +1,88 @@
+# Beispiel-Konfiguration der Primitive-Detektoren. Lokale Kopie: config/primitives.yaml
+# Verbindliche Definitionen: docs/strategy/primitives.md
+# ALLE Werte sind PROPOSED DEFAULT (strategy_version 0.1.1) und empirisch zu validieren.
+# Überschreibbar pro Instrument: instruments.<symbol>.primitives.<name>.<param>
+
+schema_version: 1
+
+atr:
+  period: 14                       # THEORY-FIXED
+
+swing:
+  method: fractal                  # fractal | zigzag
+  left: 2
+  right: 2
+  zigzag_reversal_atr: 1.0         # nur bei method=zigzag
+  min_leg_atr: 0.5
+  equal_eps_atr: 0.05
+
+structure:
+  min_swings: 2
+
+bos:
+  confirmation: close              # close | wick   (THEORY-FIXED: close)
+  buffer_atr: 0.0
+
+choch:
+  confirmation: close
+  buffer_atr: 0.0
+
+liquidity:
+  enabled_types: [swing_high, swing_low, equal_highs, equal_lows,
+                  pdh, pdl, pwh, pwl, session_high, session_low, range_high, range_low]
+  swing_tfs: [H1, H4, D1]
+  touch_eps_atr: 0.10
+  touch_saturation: 4
+  age_saturation: 50
+  weights: { touch: 0.30, age: 0.15, equal: 0.25, session: 0.20, htf: 0.10 }
+
+equal:
+  tol_atr: 0.10
+  tol_pct: 0.05                     # %
+  tol_ticks: 2
+  min_separation_bars: 3
+  min_intervening_depth_atr: 0.5
+
+sweep:
+  min_penetration_atr: 0.05        # TO-VALIDATE (via setup)
+  max_penetration_atr: 1.00        # TO-VALIDATE #1
+  max_reclaim_bars: 3              # TO-VALIDATE #2
+  min_reclaim_atr: 0.10
+  require_wick: true
+  min_wick_ratio: 1.5
+
+displacement:
+  max_bars: 3
+  min_atr: 1.5                     # TO-VALIDATE #3
+  min_body_ratio: 0.60
+  max_counter_bars: 0
+
+fvg:
+  min_size_atr: 0.20               # TO-VALIDATE #4
+  min_size_pct: 0.05               # %
+  min_size_ticks: 4
+  require_displacement: true
+  max_age_bars: 50
+
+ifvg:
+  min_close_through_atr: 0.0
+  max_age_bars: 50
+
+ob:
+  zone: full_range                 # full_range | body | open_to_extreme
+  max_bars_to_break: 5
+
+breaker:
+  buffer_atr: 0.0
+  max_age_bars: 50
+
+mitigation:
+  touch_threshold: 0.0
+  consumed_threshold: 0.5
+  full_threshold: 1.0
+
+pd:                                # Premium / Discount
+  discount_max: 0.45
+  premium_min: 0.55
+  reference: swept_leg             # Nutzer-Festlegung: swept_leg primär (dealing_range später vergleichen)
+  reference_tf: H4

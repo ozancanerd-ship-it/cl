@@ -1,0 +1,74 @@
+# Beispiel-Konfiguration fuer das Anti-Overfitting-Protokoll. Lokale Kopie: config/anti_overfitting.yaml
+# Verbindliche Regeln: docs/strategy/anti-overfitting.md, docs/strategy/backtest-labeling.md
+
+schema_version: 1
+
+max_free_params: 8                 # im MVP duerfen nur 8 Parameter variiert werden
+
+# Die 8 TO-VALIDATE-Parameter (Nutzer-bestaetigt). Rest bleibt fix auf PROPOSED DEFAULT.
+to_validate:
+  - { key: "primitives.sweep.max_penetration_atr",          default: 1.00, range: [0.5, 2.0] }
+  - { key: "primitives.sweep.max_reclaim_bars",             default: 3,    range: [2, 6] }
+  - { key: "primitives.displacement.min_atr",               default: 1.5,  range: [1.0, 2.5] }
+  - { key: "primitives.fvg.min_size_atr",                   default: 0.20, range: [0.1, 0.5] }
+  - { key: "setups.SMC-SWEEP-REV-01.entry.max_pd_position", default: 0.50, range: [0.30, 0.55] }
+  - { key: "setups.SMC-SWEEP-REV-01.sl.buffer_atr",         default: 0.50, range: [0.25, 1.0] }
+  - { key: "setups.SMC-SWEEP-REV-01.rr.min_to_tp2",         default: 2.0,  range: [1.5, 3.0] }
+  - { key: "regime.trend.min_slope",                        default: 0.05, range: [0.02, 0.12] }
+
+split:
+  train_pct: 50
+  validation_pct: 25
+  test_pct: 25                     # UNBERUEHRT - genau einmal am Ende
+
+walk_forward:
+  train_months: 6
+  test_months: 2
+  step_months: 2
+  min_folds: 4
+
+embargo_bars: 96                   # = max_holding_bars des Setups (M5)
+
+sensitivity:
+  steps: 7
+  plateau_frac: 0.6
+  max_degradation: 40              # %
+
+monte_carlo:
+  runs: 1000
+  dropout_pct: 10
+  cost_mult: 1.5
+  start_jitter_days: 30
+  skipped_signal_prob: 0.1
+  max_ruin_prob: 5                 # %
+
+multiple_testing:
+  base_hurdle_r: 0.05
+  per_log_config: 0.01
+
+min_samples: 30                    # keine Bucket-Aussage unter n Trades
+min_live_samples: 100             # kein Uebergang Paper->Demo unter n Paper-Trades
+
+stability:                         # Regime- / Time- / Symbol-Stabilitaet (anti-overfitting.md 4a)
+  max_bucket_share: 0.6            # kein Regime-Bucket traegt mehr als 60% des P&L
+  min_positive_windows: 0.6       # Anteil profitabler rollierender 3M-Fenster
+  min_positive_symbols: 0.6       # Anteil Instrumente mit positivem Edge
+  min_expectancy_without_best_r: 0.0  # Expectancy ohne bestes Instrument >= 0
+
+complexity:
+  min_improvement_r: 0.05          # neue Regel muss OOS-Expectancy um >= das verbessern
+
+kill:
+  window: 50
+  min_expectancy_r: 0.0
+  max_is_oos_gap_r: 0.30
+  max_live_gap_r: 0.40
+
+backtest:
+  excursion_tf: M1
+  scratch_r: 0.1
+  partial_fills: false
+  slippage_atr: 0.05
+  slippage_spread_mult: 0.5
+  fees: { taker_pct: 0.055, maker_pct: 0.02 }   # an reale Bybit-Gebuehren + Instrument anpassen
+  sl_before_tp_same_bar: true                    # konservativ

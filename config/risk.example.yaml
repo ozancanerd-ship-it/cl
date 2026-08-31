@@ -1,0 +1,124 @@
+# Beispiel-Risikokonfiguration. Lokale Kopie: config/risk.yaml (nicht versioniert).
+# Die Risk Engine setzt diese Grenzen HART durch und hat Vetorecht gegenüber der Strategie.
+# Details & Herleitung: docs/strategy/sizing.md, docs/strategy/no-trade.md, docs/strategy/contradictions.md
+#
+# ALLE Werte sind PROPOSED DEFAULT (Nutzer-Festlegung 2026-08-28, strategy_version 0.1.1).
+# Sie MÜSSEN durch Backtest / OOS / Walk-Forward / Drawdown-Analyse validiert werden.
+
+schema_version: 1
+
+account:
+  currency: USD
+  starting_equity: 1000        # nur für Paper/Backtest (simuliert)
+
+# ── Risikostufen: KONTROLLIERT AGGRESSIV (Nutzer-Entscheidung 2026-08-28) ───
+# Basis-Risiko pro Trade als % der Equity. Stufe aus Score UND setup_confidence.
+# Finale Baender werden durch Backtest / OOS / Walk-Forward / Monte-Carlo validiert
+# (Kriterium: Ruin-Wahrscheinlichkeit < 5%, Max-DD im MC-95%-Band).
+risk_tiers:                     # strategy_version 0.1.1 C1 (ersetzt 0.50/0.35/0.25 aus 0.1.0)
+  A_plus: 1.00                  # %  (Score >= 85 und confidence >= 0.80)
+  A:      0.65                  # %  (Score >= 75 und confidence >= 0.70)
+  B:      0.40                  # %  (Score >= 65 und confidence >= 0.60)
+  # sonst: NO_TRADE (0 %)
+
+hard_max_risk_pct: 2.0          # absolute Obergrenze pro Trade, egal was die Faktoren sagen
+
+# Dynamischer Groessen-Multiplikator: effective = base_risk_pct[tier] * product(factors)
+# product(factors) wird auf [multiplier.min, multiplier.max] geklemmt, dann hard_max_risk_pct.
+size_multiplier:
+  min: 0.25
+  max: 1.00                     # > 1.0 erst nach positiver MC/WF-Validierung freischalten
+  drawdown_taper_to: 0.30       # bei Naehe zu drawdown.max_total_pct
+  high_vol_factor: 0.70
+  exposure_taper_at_pct: 70     # ab 70% des Portfolio-Heat-Limits reduzieren
+  correlation_taper_at_pct: 70  # ab 70% des Cluster-Caps reduzieren
+
+per_trade:
+  min_risk_reward_to_tp2: 2.0
+  min_blended_rr: 1.3
+  min_target_room_r: 1.5
+  require_stop_loss: true       # OrderIntent ohne gültigen SL -> Reject (Veto V10)
+
+# ── Position Sizing / Hebel ────────────────────────────────────────────────
+# KEINE starren pauschalen Hebel-Caps. Hebel wird DYNAMISCH pro Trade berechnet:
+# Account Equity -> Risk Budget -> Stop Distance -> Position Notional -> Margin -> noetiger Hebel.
+# Einzige Hebel-Obergrenze = reale Broker-Grenze (aus refdata).
+sizing:
+  small_account_eur: 200        # unterhalb: Mindest-Notional-Check haeufig -> NO_TRADE(SIZE_BELOW_MIN)
+  min_fraction: 0.5            # risikobasierte Zielgröße < 50% erreichbar -> NO_TRADE (keine Kompromissgröße)
+  vol:
+    max_position_vol_pct: 1.5  # max. Beitrag einer Position zur Tages-Portfolio-Volatilität (% Equity)
+  exec:
+    spread_in_risk_mult: 0.5   # Anteil des Spreads in die effektive SL-Distanz
+  margin:
+    max_utilization: 0.5       # max. Anteil des verfügbaren Margin-Budgets je Position
+  liq:
+    min_buffer_atr: 2.0        # Mindestabstand Liquidation <-> (SL + Exec-Puffer), in ATR(entry_tf)
+  liquidity:
+    max_adv_pct: 1.0           # max. % des durchschnittlichen Bar-Volumens
+    max_depth_pct: 10.0        # max. % der sichtbaren Order-Book-Tiefe (falls verfügbar)
+  funding:
+    max_share_of_risk: 0.25    # erwartete Funding-Kosten <= 25% des Trade-Risikos
+  round:
+    tolerance: 1.05            # erlaubte Risiko-Überschreitung durch Lot-Rundung
+
+# ── Konto-Limits ──────────────────────────────────────────────────────────
+daily:
+  max_loss_pct: 2.0            # -> blockiert NEUE Entries bis Tageswechsel (UTC); KEIN Auto-Flatten
+  max_trades: 5
+weekly:
+  max_loss_pct: 5.0            # -> blockiert neue Entries bis Wochenwechsel
+drawdown:
+  max_total_pct: 10.0          # -> globaler Kill-Switch (stop + Alert) + MANUELLE Freigabe nötig
+loss_streak:
+  review_after: 4              # n Verluste in Folge -> Pause + Alert + MANUELLE Entscheidung
+                               #   (keine Auto-Risikoreduktion, keine Auto-Erhöhung, kein Auto-Resume)
+
+# ── Portfolio-Limits ─────────────────────────────────────────────────────
+portfolio:
+  max_open_positions: 4
+  max_total_exposure_pct: 60           # Notional
+  max_open_risk_pct: 3.0               # Portfolio-Heat: Summe offener 1R-Risiken (% Equity)
+  max_correlated_exposure_pct: 1.0     # Cluster-Cap als RISIKO (Summe 1R), NICHT Notional
+  correlation:
+    threshold: 0.70
+    window_days: 30
+    return_tf: H1
+    static:                            # bekannte Beziehungen; ρ_measured überschreibt bei genug Daten
+      BTCUSDT__ETHUSDT: 0.80
+      XAUUSD__DXY: -0.70
+      EURUSD__DXY: -0.90
+
+# ── Ausführungs-Schutz (Filter, Veto V7) ────────────────────────────────
+protection:
+  max_spread_atr: 0.10         # Spread <= 0.10 * ATR(entry_tf)
+  max_spread_pct: 0.05         # UND <= 0.05 %
+  max_slippage_r: 0.10         # geschätzte Slippage <= 0.10 R
+  max_data_age_s: 5            # Live-Datenalter (Demo/Live)
+  max_clock_drift_s: 2         # (Demo/Live)
+  block_on_incomplete_data: true
+
+# ── Verbote (im Code erzwungen, mit Tests) ──────────────────────────────
+forbidden:
+  martingale: true
+  averaging_down_losers: true
+  increase_risk_after_losses: true
+  size_from_desired_profit: true        # Größe NIE rückwärts aus Gewinn
+  leverage_overrides_risk: true         # Hebel erhöht NIE das erlaubte Verlustrisiko
+  leverage_overrides_veto: true         # Hebel/Größe löst NIE ein Risk-Engine-Veto
+
+# ── Kill-Switch-Hierarchie ─────────────────────────────────────────────
+kill_switch:
+  levels: [global, broker, asset, strategy, data]
+  persist: true
+  fail_safe_on_start: true              # Start = gestoppt, bis Recovery + Reconciliation ok
+  emergency_flatten_enabled: false      # erst ab Demo; im MVP nur Entry-Block
+
+# ── LLM/AI Guardrails (verbindlich) ───────────────────────────────────
+ai_guardrails:
+  may_bypass_risk_engine: false
+  may_bypass_veto: false
+  may_increase_position_limits: false
+  may_force_leverage: false
+  may_override_no_trade: false
+  max_score_modulation_points: 5        # LLM darf den Score nur in diesem Rahmen bewegen

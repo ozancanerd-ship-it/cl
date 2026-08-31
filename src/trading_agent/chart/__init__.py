@@ -1,0 +1,1 @@
+"""Chart-Annotation-Payloads (Daten, kein Rendering). Marker/PriceLine/Zone/TrendLine/Point/SessionBand/Label fuer die Frontend-Chart-Komponente (Lightweight Charts zuerst, TradingView Charting Library spaeter)."""

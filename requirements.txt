@@ -1,0 +1,10 @@
+# Die maßgebliche Abhängigkeits-Definition steht in pyproject.toml ([project.dependencies]),
+# exakt gepinnt in uv.lock (versioniert).
+#
+# Einrichtung:  make install    (bzw. `uv venv --python 3.12 && uv pip install -e ".[dev]"`)
+#
+# Laufzeit-Abhängigkeiten Phase 1:
+#   pydantic>=2.7     validierte, unveränderliche Datenmodelle
+#   pyarrow>=16       Parquet-Speicher für historische Marktdaten
+#   pyyaml>=6         Config-Laden
+#   tzdata>=2024.1    IANA-Zeitzonen (DST) unabhängig vom Betriebssystem
