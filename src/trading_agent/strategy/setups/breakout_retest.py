@@ -221,9 +221,9 @@ def detect_breakout_retest(
         held = (cur.close > level) if up else (cur.close < level)
         closes_dir = _close_pos(cur) > 0.5 if up else _close_pos(cur) < 0.5
 
-        holds_now = touched_now and held and closes_dir
-        if earlier and not holds_now:
-            # Retest ist schon passiert (an einer Vorbar) → ARMED nur, wenn er JETZT hält
+        # **Nur der ERSTE Retest zählt** (wie in der validierten S4-Forschung). Ist der Retest
+        # schon an einer Vorbar passiert → dieser Ausbruch ist verbraucht, kein ARMED mehr.
+        if earlier:
             if best is None:
                 best = BreakoutRetestReport(
                     instrument=inst,
@@ -236,7 +236,7 @@ def detect_breakout_retest(
                     breakout_bar=bob.open_time,
                     d1_trend=trend,
                     reasons=(NoTradeReason.NO_RETEST,),
-                    chain_progress="Retest-Fenster ohne haltenden Retest",
+                    chain_progress="Ausbruch bereits zurückgetestet — kein frischer Einstieg",
                 )
             continue
 
