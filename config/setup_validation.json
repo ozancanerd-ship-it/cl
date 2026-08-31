@@ -23,7 +23,7 @@
       },
       "validated_window": ["2023-11-14", "2026-08-28"],
       "forward_trades_required": 100,
-      "notes": "S4 aus scripts/setup_research.py. EVIDENZ GEMISCHT: (+) Yahoo Gold-Futures (GC=F) + FX-Proxy + Crypto, 4 Splits: OOS +0.40..+0.58R, WF 8-11/9-12, MC prob_positive 0.55-0.65, symbol_stability fraction_positive 1.0 (auch nicht-trendende FX). (+) Parameter-Sensitivitaet: alle 13 +-30%-Stoerungen OOS-positiv (+0.24..+0.67R) -> nicht knife-edge-gefittet. (-) ECHTE Dukascopy-Spot-XAUUSD (2023 Jan-Sep + 2026 Mai-Aug, Luecke, n=7): total -2.17R (IS-Anteil negativ, OOS-Sliver +1.19R) -- Stichprobe zu klein fuer Widerlegung ODER Bestaetigung. Yahoo GC=F ist FUTURES (Contract-Rolls), nicht Spot. IN_VALIDATION -> Live-Signale = SHADOW, forward-getrackt. VALIDATED NUR nach (a) vollstaendiger Dukascopy-Spot-Gold-Historie mit positivem OOS UND (b) >=100 Forward-Trades die die Baseline halten. Bei negativem Real-Gold-Check -> unvalidated/retired."
+      "notes": "S4 aus scripts/setup_research.py. EVIDENZ WIDERSPRUECHLICH: (+) Yahoo Gold-FUTURES (GC=F) + FX-Proxy + Crypto, 4 Splits: OOS +0.40..+0.58R, WF 8-11/9-12, MC prob_positive 0.55-0.65; alle 13 Parameter-±30%-Stoerungen OOS-positiv (nicht overfit); xau_shadow XAUUSD-YF: 16 Signale +9.5R/75% WR. (--) ECHTE Dukascopy-SPOT-XAUUSD: **2023 volles Jahr: 6 Signale -4.5R / 17% WR / -0.75R** (rangiges Regime); 2023+2026 kombiniert: 8 Signale -5.0R. Yahoo GC=F ist Futures (Contract-Rolls), nicht Spot -- die Diskrepanz ist real. IN_VALIDATION (Nutzer-Vorgabe: bleibt so bis vollstaendige Dukascopy-Historie), Live-Signale = SHADOW. Finale Validierung automatisch, sobald 2023-2026 Spot-Gold vollstaendig. Bleibt Real-Gold negativ -> unvalidated/retired -- aktueller Trend deutet darauf hin."
     }
   ]
 }
