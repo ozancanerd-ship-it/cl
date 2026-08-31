@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import glob
 import json
 import os
 import sys
@@ -26,7 +27,49 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from trading_agent.api.dashboard import DashboardInputs, build_dashboard_state
+from trading_agent.data.repository import MarketDataRepository
 from trading_agent.governance import ValidationRegistry
+
+
+def _load_performance(repo: MarketDataRepository, pattern: str) -> dict[str, object] | None:
+    """Shadow-/Paper-Journale → Performance-Kennzahlen (performance_report._load_trades)."""
+    import performance_report as pr
+
+    paths = sorted(glob.glob(pattern))
+    trades = pr._load_trades(paths, repo)
+    if not trades:
+        return None
+    return {
+        "trades": pr._block(trades),
+        "by_asset": pr._grouped(trades, lambda t: t.instrument),
+        "by_setup": pr._grouped(trades, lambda t: t.setup_id),
+        "by_direction": pr._grouped(trades, lambda t: t.direction.value),
+        "by_score_bucket": pr._grouped(trades, pr._score_bucket),
+        "by_eligibility": pr._grouped(trades, lambda t: pr._meta(t).get("elig") or "n/a"),
+    }
+
+
+def _load_reentry(pattern: str, shadow_signals: list[dict[str, object]]) -> list[dict[str, object]]:
+    """reentry_watch-Zeilen aus den Journalen; 'setup', wenn ein frisches Shadow-Signal für
+    dasselbe Instrument+Richtung existiert, sonst 'watch'."""
+    watches: dict[tuple[str, str], dict[str, object]] = {}
+    for p in sorted(glob.glob(pattern)):
+        for line in Path(p).read_text().splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if r.get("kind") != "reentry_watch":
+                continue
+            watches[(str(r["instrument"]), str(r["direction"]))] = r
+    fresh = {
+        (str(s.get("instrument")), str(s.get("direction", "")).upper())
+        for s in shadow_signals
+    }
+    out: list[dict[str, object]] = []
+    for (inst, direction), w in sorted(watches.items()):
+        w = {**w, "state": "setup" if (inst, direction.upper()) in fresh else "watch"}
+        out.append(w)
+    return out
 
 
 async def _run(args: argparse.Namespace) -> dict[str, object]:
@@ -102,6 +145,15 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
             blockers.append(f"portfolio: {exc}")
             portfolio = None
 
+    perf: dict[str, object] | None = None
+    reentry: list[dict[str, object]] = []
+    try:
+        repo = MarketDataRepository(args.repo)
+        perf = _load_performance(repo, args.journals)
+        reentry = _load_reentry(args.journals, shadow)
+    except Exception as exc:
+        blockers.append(f"performance/reentry: {exc}")
+
     dash = build_dashboard_state(
         DashboardInputs(
             as_of=datetime.now(UTC),
@@ -109,8 +161,10 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
             scanner_evaluations=len(top),
             signals=signals,
             shadow_signals=shadow,
+            reentry=reentry,
             validation=[sv.as_dict() for sv in registry.all()],
             portfolio=portfolio,
+            paper_performance=perf,
             blockers=blockers,
         )
     )
@@ -123,6 +177,8 @@ def main() -> int:
     ap.add_argument("--gold", nargs="*", default=["XAUUSDT"])
     ap.add_argument("--exchange", default="binance")
     ap.add_argument("--no-portfolio", action="store_true")
+    ap.add_argument("--repo", default="data/repository_real")
+    ap.add_argument("--journals", default="data/repository_real/live/*.jsonl")
     ap.add_argument("--validation-config", default="config/setup_validation.json")
     ap.add_argument("--out", default="web/dashboard.json")
     args = ap.parse_args()

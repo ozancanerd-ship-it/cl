@@ -131,12 +131,13 @@ const RENDERERS = {
     sec.appendChild($(`<pre class="card">${esc(JSON.stringify(t.annotations||{},null,2))}</pre>`));
   },
   signals(sec,t){
-    const emitted = t.emitted||[], shadow = t.shadow||[];
+    const emitted = t.emitted||[], shadow = t.shadow||[], reentry = t.reentry||[];
     sec.appendChild($(`<div class="muted" style="margin-bottom:12px">${esc(t.note||"")}</div>`));
-    if(!emitted.length && !shadow.length)
+    if(!emitted.length && !shadow.length && !reentry.length)
       sec.appendChild($(`<div class="empty">NO TRADE — kein gültiges Setup. Lieber kein Trade als ein schlechter.</div>`));
     emitted.forEach(s=>sec.appendChild(sigCard(s,true)));
     shadow.forEach(s=>sec.appendChild(sigCard(s,false)));
+    reentry.forEach(w=>sec.appendChild(reentryCard(w)));
     if(t.validation && t.validation.length)
       sec.appendChild(card("Setup-Freigabe", valTable(t.validation)));
   },
@@ -161,12 +162,20 @@ const RENDERERS = {
   },
   paper_trading(sec,t){
     const pos = t.open_positions||[];
-    if(!pos.length) sec.appendChild($(`<div class="empty">Keine offenen Paper-Positionen.</div>`));
+    if(!pos.length) sec.appendChild($(`<div class="empty">Keine offenen Paper-Positionen (Snapshot). Der Live-Daemon füllt dies laufend.</div>`));
     else sec.appendChild(card("Offene Paper-Positionen", $(`<pre>${esc(JSON.stringify(pos,null,2))}</pre>`)));
-    if(t.performance) sec.appendChild(card("Paper-Performance", perfTable(t.performance)));
+    if(t.performance && t.performance.trades) sec.appendChild(card("Shadow-/Paper-Performance", perfBlock(t.performance.trades)));
     sec.appendChild($(`<div class="muted">Validiert nach ≥100 Forward-Trades: <b>${t.validated?"ja":"nein"}</b></div>`));
   },
-  performance(sec,t){ sec.appendChild(card("Performance", perfTable(t))); },
+  performance(sec,t){
+    if(!t.trades){ sec.appendChild($(`<div class="empty">Noch keine abgeschlossenen Shadow-/Paper-Trades.</div>`)); return; }
+    sec.appendChild(card("Gesamt", perfBlock(t.trades)));
+    [["by_asset","nach Asset"],["by_setup","nach Setup"],["by_direction","nach Richtung"],
+     ["by_score_bucket","nach Opportunity-Score"],["by_eligibility","nach Freigabe"]].forEach(([k,label])=>{
+      const grp = t[k]; if(!grp || !Object.keys(grp).length) return;
+      sec.appendChild(card(label, groupTable(grp)));
+    });
+  },
   news_macro(sec,t){
     ["macro","news","breadth"].forEach(k=>{
       if(t[k]) sec.appendChild(card(k, $(`<pre>${esc(JSON.stringify(t[k],null,2))}</pre>`)));
@@ -235,6 +244,43 @@ function perfTable(p){
   const keys = Object.keys(p);
   return $(`<table><tbody>${keys.map(k=>`<tr><td>${esc(k)}</td><td class="num">${
     typeof p[k]==="object"?esc(JSON.stringify(p[k])):num(p[k],3)}</td></tr>`).join("")}</tbody></table>`);
+}
+
+const _PERF_ROWS = [
+  ["n_trades","Trades",0],["win_rate","Win Rate",null],["profit_factor","Profit Factor",2],
+  ["expectancy_r","Expectancy (R)",3],["avg_r","Ø R",3],["total_r","Σ R",2],
+  ["max_drawdown_r","Max Drawdown (R)",2],["avg_mfe_r","Ø MFE (R)",2],["avg_mae_r","Ø MAE (R)",2],
+  ["sharpe_r","Sharpe (R)",2],["sortino_r","Sortino (R)",2],["longest_loss_streak","längste Verlustserie",0],
+  ["avg_hold_h","Ø Haltedauer (h)",1],["median_hold_h","Median Haltedauer (h)",1],
+];
+function perfBlock(b){
+  return $(`<table><tbody>${_PERF_ROWS.filter(([k])=>b[k]!=null).map(([k,label,dp])=>
+    `<tr><td>${esc(label)}</td><td class="num">${k==="win_rate"?pct(b[k]):num(b[k],dp==null?3:dp)}</td></tr>`
+  ).join("")}</tbody></table>`);
+}
+function groupTable(grp){
+  return $(`<table>
+    <thead><tr><th>Gruppe</th><th class="num">n</th><th class="num">Exp R</th><th class="num">PF</th>
+      <th class="num">WR</th><th class="num">Σ R</th><th class="num">Ø Hold h</th></tr></thead>
+    <tbody>${Object.entries(grp).map(([k,v])=>`<tr>
+      <td>${esc(k)}</td><td class="num">${v.n_trades}</td>
+      <td class="num ${v.expectancy_r>0?'g':'r'}">${num(v.expectancy_r,3)}</td>
+      <td class="num">${esc(v.profit_factor)}</td><td class="num">${pct(v.win_rate)}</td>
+      <td class="num ${v.total_r>0?'g':'r'}">${num(v.total_r,2)}</td>
+      <td class="num">${num(v.avg_hold_h,1)}</td></tr>`).join("")}</tbody></table>`);
+}
+function reentryCard(w){
+  const isSetup = w.state==="setup";
+  const c = $(`<div class="sig ${isSetup?"live":""}"></div>`);
+  c.innerHTML = `<div><b>🔁 RE-ENTRY ${isSetup?"SETUP":"WATCH"} · ${esc(w.direction||"")} · ${esc(w.instrument||"")}</b>
+    <span class="pill ${isSetup?"live":"wait"}">${isSetup?"frisches Setup":"beobachten"}</span></div>
+    <div class="row">
+      <span><b>Exit</b>${esc(w.exit_reason||"")} (${num(w.exit_realized_r,2)}R)</span>
+      <span><b>Level</b>${num(w.level_to_reclaim,2)}</span>
+      <span><b>seit</b>${esc(String(w.ts||"").slice(0,10))}</span>
+    </div>
+    <div class="row"><span class="muted">${esc(w.note||"")}</span></div>`;
+  return c;
 }
 
 function buildNav(){

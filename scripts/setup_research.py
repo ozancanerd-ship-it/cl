@@ -502,6 +502,35 @@ def detect_s13(ctx: Ctx, i: int) -> Signal | None:
     return _s9_base(ctx, i, max_width_atr=3.0)
 
 
+def _d1_efficiency_ratio(ctx: Ctx, i: int, window_h4_bars: int = 120) -> float:
+    """Kaufman Efficiency Ratio auf den H4-Closes der letzten ~window Bars (Proxy für
+    D1-Regime: ~1 = klarer Trend, ~0 = Chop). Rein preisbasiert, nicht überfittbar."""
+    lo = max(0, i - window_h4_bars)
+    seg = [b.close for b in ctx.h4[lo : i + 1]]
+    if len(seg) < 10:
+        return 0.0
+    net = abs(seg[-1] - seg[0])
+    path = sum(abs(seg[k] - seg[k - 1]) for k in range(1, len(seg)))
+    return net / path if path > 0 else 0.0
+
+
+def detect_s14(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + **Regime-Gate**: nur wenn der Markt tatsächlich trendet (Efficiency Ratio ≥ 0.30).
+    Die Diagnose zeigt: Breakout-Continuation verliert systematisch in Ranges."""
+    sig = _s9_base(ctx, i)
+    if sig is None:
+        return None
+    return sig if _d1_efficiency_ratio(ctx, i) >= 0.30 else None
+
+
+def detect_s15(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + strengeres Regime-Gate (Efficiency Ratio ≥ 0.40)."""
+    sig = _s9_base(ctx, i)
+    if sig is None:
+        return None
+    return sig if _d1_efficiency_ratio(ctx, i) >= 0.40 else None
+
+
 DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S0_sweep_reversal": detect_s0,
     "S1_breakout_retest": detect_s1,
@@ -517,6 +546,8 @@ DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S11_htf_conf_session": detect_s11,
     "S12_htf_conf_thrust06": detect_s12,
     "S13_htf_conf_coil3": detect_s13,
+    "S14_regime_gate_er30": detect_s14,
+    "S15_regime_gate_er40": detect_s15,
 }
 
 

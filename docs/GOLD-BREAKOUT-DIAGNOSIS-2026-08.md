@@ -57,6 +57,15 @@ Neue Detektoren, **strukturell** motiviert (nicht an die 6 Trades gefittet):
 hinaus (S11–S13) verschlechtert durchweg** → Stopp bei S9. Das ist die Grenze zwischen
 Verbesserung und Overfitting.
 
+### Regime-Gate (S14/S15) — geprüft, NICHT integriert
+
+Idee: nur handeln, wenn der Markt tatsächlich trendet (Kaufman Efficiency Ratio auf H4-Closes,
+120 Bars). Ergebnis: **zu streng** — S14 (ER ≥ 0.30) = 10 Trades im ganzen 12-Instrument-Panel
+über 3 Jahre, S15 (ER ≥ 0.40) = 1 Trade. Die überlebenden Zahlen sehen glänzend aus (S14 OOS
++0.72 R, PF 3.8) — bei **n = 4 OOS** ist das die klassische Overfitting-Falle, kein Signal.
+Ein weicheres Regime-Maß oder mehr Daten nötig; die Detektoren bleiben zur Wieder-Prüfung im
+Research-Bench (`setup_research.py` S14/S15), werden aber **nicht** in die Strategie übernommen.
+
 ### S9-Logik
 
 Zusätzlich zum D1-Struktur-Trend muss der **jüngste D1-BOS** (`structure_breaks`, kind=BOS,

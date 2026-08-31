@@ -222,6 +222,27 @@ def main() -> int:
                     )
                 for e in open_trade.events:
                     emit({"instrument": args.symbol, **e})
+                # RE-ENTRY WATCH: Exit mit intakter These (Teilgewinn / BE-Scratch, kein voller
+                # Stop) und D1-Trend weiter in Trade-Richtung → beobachten, ob ein frisches Setup
+                # in dieselbe Richtung kommt (Masterplan §38).
+                last_change = open_trade.events[-1]["change"] if open_trade.events else ""
+                td = d1_trend(ts)
+                td_dir = 1 if getattr(td, "value", "") == "trend_up" else (
+                    -1 if getattr(td, "value", "") == "trend_down" else 0
+                )
+                if last_change in ("TP2", "BE_EXIT", "MAX_HOLD_EXIT") and (
+                    open_trade.realized_r > -0.5 and td_dir == open_trade.direction
+                ):
+                    emit({
+                        "kind": "reentry_watch",
+                        "instrument": args.symbol,
+                        "ts": ts.isoformat(),
+                        "direction": "LONG" if open_trade.direction > 0 else "SHORT",
+                        "exit_reason": last_change,
+                        "exit_realized_r": round(open_trade.realized_r, 3),
+                        "level_to_reclaim": round(open_trade.entry, 4),
+                        "note": "These intakt (Teilgewinn/BE), D1-Trend hält — auf frisches Setup warten",
+                    })
                 open_trade.events.clear()
                 open_trade = None
         if open_trade is not None:

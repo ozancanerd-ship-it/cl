@@ -50,6 +50,7 @@ class DashboardInputs:
     validation: list[dict[str, Any]] = field(default_factory=list)  # ValidationRegistry.all()
     chart_annotations: dict[str, Any] | None = None
     portfolio: dict[str, Any] | None = None
+    reentry: list[dict[str, Any]] = field(default_factory=list)  # RE-ENTRY WATCH / SETUP
     paper_positions: list[dict[str, Any]] = field(default_factory=list)
     paper_performance: dict[str, Any] | None = None
     breadth: dict[str, Any] | None = None
@@ -76,6 +77,16 @@ def build_dashboard_state(inp: DashboardInputs) -> DashboardState:
     signals = inp.signals
     health = inp.system_health or {}
     grade = str(health.get("grade", "UNKNOWN")) if health else "UNKNOWN"
+
+    # paper_performance kann flach ({"trades": int, …}) oder verschachtelt
+    # ({"trades": {"n_trades": int, …}, "by_asset": …}) ankommen.
+    _pp = inp.paper_performance or {}
+    _pp_trades = _pp.get("trades")
+    _n_paper = (
+        _pp_trades.get("n_trades", 0)
+        if isinstance(_pp_trades, dict)
+        else (_pp_trades if isinstance(_pp_trades, int) else 0)
+    )
 
     actionable = [
         o
@@ -115,11 +126,13 @@ def build_dashboard_state(inp: DashboardInputs) -> DashboardState:
             True,
             emitted=signals,
             shadow=inp.shadow_signals,
+            reentry=inp.reentry,
             validation=inp.validation,
             note=(
                 "NO-TRADE-Zeitraum — lieber kein Trade als ein schlechter."
-                if not signals and not inp.shadow_signals
-                else f"{len(signals)} LIVE · {len(inp.shadow_signals)} SHADOW "
+                if not signals and not inp.shadow_signals and not inp.reentry
+                else f"{len(signals)} LIVE · {len(inp.shadow_signals)} SHADOW · "
+                f"{len(inp.reentry)} RE-ENTRY "
                 "(Setup nicht validiert — nur Forward-Tracking)."
             ),
         ),
@@ -128,7 +141,7 @@ def build_dashboard_state(inp: DashboardInputs) -> DashboardState:
             True,
             open_positions=inp.paper_positions,
             performance=inp.paper_performance,
-            validated=bool(inp.paper_performance and inp.paper_performance.get("trades", 0) >= 100),
+            validated=_n_paper >= 100,
         ),
         "performance": _merge(inp.paper_performance is not None, inp.paper_performance),
         "news_macro": _section(
