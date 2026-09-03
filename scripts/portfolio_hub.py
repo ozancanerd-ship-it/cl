@@ -156,6 +156,11 @@ async def _binance(as_of: datetime, prices: dict[str, float]) -> AccountPortfoli
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--alerts-journal",
+        default="data/repository_real/live/context_alerts.jsonl",
+        help="Kontext-Alerts (Portfolio-Risk / Re-Entry) hier anhängen. '' zum Deaktivieren.",
+    )
     args = ap.parse_args()
     _load_env_file()
     as_of = datetime.now(UTC)
@@ -208,10 +213,40 @@ async def main() -> int:
     d = report.as_dict()
     d["skipped_accounts"] = skipped
 
+    # Kontext-Alerts: Portfolio-Health YELLOW/RED, harte EXIT/REDUCE-Verdikte, Re-Entry-Watches.
+    # Dedup/Cooldown + Fingerprint-Änderungserkennung → kein Spam bei wiederholten Läufen.
+    from trading_agent.strategy.alerts import AlertEngine
+    from trading_agent.strategy.context_alerts import ContextAlertEmitter
+
+    emitter = ContextAlertEmitter(AlertEngine())
+    alert_events = emitter.on_portfolio_report(report, as_of)
+    alerts_out = [
+        {
+            "ts": as_of.isoformat(),
+            "type": ae.alert.type.value,
+            "severity": ae.alert.severity.value,
+            "kind": ae.kind.value,
+            "title": ae.alert.title,
+            "body": ae.alert.body,
+            "evidence": dict(ae.alert.evidence),
+        }
+        for ae in alert_events
+        if ae.delivered
+    ]
+    d["context_alerts"] = alerts_out
+    if args.alerts_journal and alerts_out:
+        jp = Path(args.alerts_journal)
+        jp.parent.mkdir(parents=True, exist_ok=True)
+        with jp.open("a") as fh:
+            for row in alerts_out:
+                fh.write(json.dumps(row, default=str) + "\n")
+
     if args.json:
         print(json.dumps(d, indent=2, default=str))
         return 0
     _render(report, skipped)
+    for row in alerts_out:
+        print(f"  🔔 [{row['severity'].upper()}] {row['title']} — {row['body']}")
     return 0
 
 

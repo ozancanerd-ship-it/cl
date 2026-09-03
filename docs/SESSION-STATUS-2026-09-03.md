@@ -55,13 +55,21 @@
 FX-Proxy. Auf echtem Spot-Gold ist die Stichprobe zu klein und im einzigen Range-Jahr negativ.
 **Kein Live-Freigabe-Signal. Kein Echtgeld. XAUUSDT bleibt SHADOW/PAPER.**
 
+### 2b. Portfolio-Risk-Alerts im One-Shot-Pfad
+- **`scripts/portfolio_hub.py`** — `--alerts-journal` (Default
+  `data/repository_real/live/context_alerts.jsonl`). Nach `PortfolioIntelligenceEngine.assess`
+  läuft `ContextAlertEmitter.on_portfolio_report` → gelieferte Alerts in `--json`-Ausgabe,
+  Textausgabe (`🔔`) und JSONL-Journal.
+  - **Verifiziert gegen die echten read-only Konten:** ein `PORTFOLIO_RISK`-Alert
+    (Health YELLOW 69/100, „viel unallokiertes Cash 73 % · Aktien-Anteil 0 %"), kein Spam.
+
 ## PARTIAL
 
-- **Alert-Emitter Portfolio-Risk / Re-Entry im Live-Daemon** — der `ContextAlertEmitter` kann
-  beides (Methoden + Tests vorhanden), aber der Daemon ruft nur `on_news` auf. `on_portfolio_report`
-  braucht die read-only Konto-Adapter (laufen bisher nur im One-Shot `portfolio_hub.py` /
-  `build_dashboard.py`), `on_reentry` eine Live-Re-Entry-Registry (die `ReEntryEngine` wird bei
-  Position-Close noch nicht bestückt). NEXT: in `build_dashboard.py` + eine Daemon-Watch-Registrierung.
+- **Alert-Emitter Portfolio-Risk / Re-Entry im Live-Daemon** — `on_portfolio_report` läuft jetzt
+  im One-Shot (`portfolio_hub.py`). Im 24/7-Daemon fehlt noch: `on_reentry` braucht eine
+  Live-Re-Entry-Registry (die `ReEntryEngine` wird bei Position-Close noch nicht bestückt), und
+  die read-only Konto-Adapter im Daemon-Loop. NEXT: Daemon-Watch-Registrierung bei
+  `PaperPositionChanged CLOSED`.
 - **Forward-Paper-Trades (Ziel ≥ 100)** — die Aufzeichnungs-Kette ist geschlossen (Daemon →
   `signal_journal.jsonl` → `edge_health_check.py`), aber es sind **0 echte Forward-Trades**
   gesammelt: das braucht den Daemon 24/7 über Wochen, und XAUUSDT armt selten (Regime-Gate).
