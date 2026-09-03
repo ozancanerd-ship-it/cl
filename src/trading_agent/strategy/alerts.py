@@ -220,6 +220,23 @@ class AlertEngine:
         (z. B. ``"portfolio:concentration"`` / ``"news:FOMC_RATE:2026-01-28"``)."""
         return self._raise(atype, key, None, now, title=title, body=body, evidence=evidence or {})
 
+    def dismiss_context_alert(self, key: str, now: datetime) -> AlertEvent | None:
+        """Verwirft den aktiven Kontext-Alert mit diesem ``key`` — der zugrunde liegende
+        Zustand ist wieder unkritisch (Health ``GREEN``, Blackout vorbei, Verdikt ``HOLD``).
+        Genau **ein** Übergang; ``None`` wenn kein offener Alert existiert."""
+        for full_key, alert in list(self._active.items()):
+            if alert.signal_id == key and alert.is_open:
+                dismissed = dataclasses.replace(
+                    alert,
+                    state=AlertState.DISMISSED,
+                    updated_at=now,
+                    revision=alert.revision + 1,
+                )
+                self._active[full_key] = dismissed
+                self._log.append(dismissed)
+                return AlertEvent(dismissed, AlertEventKind.DISMISSED)
+        return None
+
     # ---- Haupteinstiege ------------------------------------------------------
     def on_engine_tick(self, tick: EngineTick) -> tuple[AlertEvent, ...]:
         events: list[AlertEvent] = []

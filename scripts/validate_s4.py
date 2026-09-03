@@ -32,17 +32,26 @@ _SPLIT = "2025-01-01"
 
 
 def _coverage(repo: MarketDataRepository, sym: str) -> tuple[int, float, list[str]]:
-    m5 = repo.read_ohlcv(
-        sym, Timeframe.M5, datetime(2000, 1, 1, tzinfo=UTC), datetime(2100, 1, 1, tzinfo=UTC)
-    )
-    if not m5:
+    # M5 bevorzugt; ist die M5-Parquet unlesbar (bekannter XAUUSD-Thrift-Defekt) oder leer,
+    # auf H4 zurückfallen — der xau_shadow-Runner selbst arbeitet ohnehin auf H4/D1.
+    bars: list[object] = []
+    for tf in (Timeframe.M5, Timeframe.H4):
+        try:
+            bars = repo.read_ohlcv(
+                sym, tf, datetime(2000, 1, 1, tzinfo=UTC), datetime(2100, 1, 1, tzinfo=UTC)
+            )
+        except Exception:  # korrupte Parquet → nächster TF
+            bars = []
+        if bars:
+            break
+    if not bars:
         return 0, 999.0, []
-    months = sorted({(b.open_time.year, b.open_time.month) for b in m5})
-    # größte Lücke zwischen aufeinanderfolgenden M5-Bars (Handelstage)
+    months = sorted({(b.open_time.year, b.open_time.month) for b in bars})
+    # größte Lücke zwischen aufeinanderfolgenden Bars (Handelstage)
     gap = 0.0
     from itertools import pairwise
 
-    for a, b in pairwise(m5):
+    for a, b in pairwise(bars):
         dt = (b.open_time - a.open_time).total_seconds() / 86400.0
         if dt > gap:
             gap = dt

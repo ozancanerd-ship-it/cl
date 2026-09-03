@@ -560,6 +560,25 @@ def detect_s15(ctx: Ctx, i: int) -> Signal | None:
     return sig if _d1_efficiency_ratio(ctx, i) >= 0.40 else None
 
 
+def detect_s17(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + **sanftes** Regime-Gate (Efficiency Ratio ≥ 0.20). S14/S15 (ER ≥ 0.30/0.40) haben
+    die Stichprobe zerstört (112 → 10 → 1 Trade). 0.20 liegt zwischen 'kein Gate' (S9) und
+    'zu streng' (S14): die dokumentierte Ranging-Schwäche (echtes Spot-Gold 2023, S9 −4 R/n4)
+    soll gefiltert werden, ohne die Continuation-Trades in klaren Trends wegzuschneiden."""
+    sig = _s9_base(ctx, i)
+    if sig is None:
+        return None
+    return sig if _d1_efficiency_ratio(ctx, i) >= 0.20 else None
+
+
+def detect_s18(ctx: Ctx, i: int) -> Signal | None:
+    """S9 + sanftes Regime-Gate (Efficiency Ratio ≥ 0.25)."""
+    sig = _s9_base(ctx, i)
+    if sig is None:
+        return None
+    return sig if _d1_efficiency_ratio(ctx, i) >= 0.25 else None
+
+
 def detect_s16(ctx: Ctx, i: int) -> Signal | None:
     """S9 + **DXY-Gegenwind-Filter** (nur wo DXY-Daten vorliegen, sonst == S9): kein Gold-Long
     gegen einen klar steigenden DXY, kein Gold-Short gegen einen klar fallenden DXY.
@@ -591,6 +610,8 @@ DETECTORS: dict[str, Callable[[Ctx, int], Signal | None]] = {
     "S14_regime_gate_er30": detect_s14,
     "S15_regime_gate_er40": detect_s15,
     "S16_dxy_headwind": detect_s16,
+    "S17_regime_gate_er20": detect_s17,
+    "S18_regime_gate_er25": detect_s18,
 }
 
 

@@ -79,6 +79,11 @@ async def main() -> int:
         default="data/repository_real/live/signal_journal.jsonl",
         help="JSONL — jedes Signal + jede Revision + jeder Shadow-Trade-Schritt (Masterplan §24/§30). '' zum Deaktivieren.",
     )
+    ap.add_argument(
+        "--economic-calendar",
+        default="config/economic_calendar.csv",
+        help="Lokaler CSV-Kalender → HIGH_IMPACT_NEWS-Kontext-Alerts. '' zum Deaktivieren.",
+    )
     ap.add_argument("--max-seconds", type=float, default=None, help="Test-Deckel; sonst 24/7")
     ap.add_argument("--status-json", default=None, help="Endstand als JSON hierhin schreiben")
     args = ap.parse_args()
@@ -177,6 +182,69 @@ async def main() -> int:
             audit.record("alert", "raised", {"instrument": ev.instrument, "type": ev.alert_type})
 
     pipe.bus.subscribe(AlertRaised, _on_alert)
+
+    # --- Kontext-Alert-Emitter: HIGH_IMPACT_NEWS aus dem lokalen Wirtschaftskalender ---
+    # (Portfolio-Risk / Re-Entry laufen im One-Shot-Pfad build_dashboard/portfolio_hub —
+    #  brauchen die read-only Konto-Adapter bzw. eine Live-Re-Entry-Registry.)
+    ctx_emitters: dict[str, object] = {}
+    calendar_events: list[object] = []
+    if args.economic_calendar:
+        from trading_agent.analysis.news import assess_news
+        from trading_agent.data.providers.news_calendar import CsvEconomicCalendar
+        from trading_agent.strategy.alerts import AlertEngine
+        from trading_agent.strategy.context_alerts import ContextAlertEmitter
+
+        try:
+            cal = CsvEconomicCalendar(args.economic_calendar)
+            calendar_events = list(
+                cal.get_calendar(datetime(2023, 1, 1, tzinfo=UTC), datetime(2030, 1, 1, tzinfo=UTC))
+            )
+            _log.info("economic calendar loaded", extra={"events": len(calendar_events)})
+        except Exception:
+            _log.warning("economic calendar unavailable — no news context alerts", exc_info=True)
+
+        if calendar_events:
+            ctx_engine = AlertEngine()
+            for sym in cfg.instruments:
+                ctx_emitters[sym] = ContextAlertEmitter(ctx_engine)
+
+            async def _on_decision_news(ev: DecisionMade) -> None:
+                emitter = ctx_emitters.get(ev.instrument)
+                if emitter is None:
+                    return
+                assessment = assess_news(
+                    calendar_events,
+                    cutoff=ev.ts,
+                    asset_class=cfg.asset_class,
+                    instrument=ev.instrument,
+                )
+                for ae in emitter.on_news(assessment, ev.ts):  # type: ignore[attr-defined]
+                    if not ae.delivered:
+                        continue
+                    _log.info(
+                        "CONTEXT-ALERT [%s] %s — %s",
+                        ae.alert.type.value,
+                        ae.alert.title,
+                        ae.alert.body,
+                    )
+                    if audit is not None:
+                        audit.record(
+                            "alert",
+                            "context_raised",
+                            {"instrument": ev.instrument, "type": ae.alert.type.value},
+                        )
+                    await pipe.bus.publish(
+                        AlertRaised(
+                            ts=ev.ts,
+                            instrument=ev.instrument,
+                            alert_type=ae.alert.type.value,
+                            message=ae.alert.title,
+                            delivered=True,
+                            alert=ae,
+                        )
+                    )
+
+            pipe.bus.subscribe(DecisionMade, _on_decision_news)
 
     counts = {"decision": 0, "alert": 0, "paper": 0, "quality": 0, "shutdown": 0}
     pipe.bus.subscribe(
