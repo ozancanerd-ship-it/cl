@@ -183,68 +183,25 @@ async def main() -> int:
 
     pipe.bus.subscribe(AlertRaised, _on_alert)
 
-    # --- Kontext-Alert-Emitter: HIGH_IMPACT_NEWS aus dem lokalen Wirtschaftskalender ---
-    # (Portfolio-Risk / Re-Entry laufen im One-Shot-Pfad build_dashboard/portfolio_hub —
-    #  brauchen die read-only Konto-Adapter bzw. eine Live-Re-Entry-Registry.)
-    ctx_emitters: dict[str, object] = {}
-    calendar_events: list[object] = []
-    if args.economic_calendar:
-        from trading_agent.analysis.news import assess_news
-        from trading_agent.data.providers.news_calendar import CsvEconomicCalendar
-        from trading_agent.strategy.alerts import AlertEngine
-        from trading_agent.strategy.context_alerts import ContextAlertEmitter
+    # --- Kontext-Alerts: HIGH_IMPACT_NEWS (Wirtschaftskalender) + RE_ENTRY_SETUP (§38/§51) ---
+    # (Portfolio-Risk läuft im One-Shot-Pfad portfolio_hub.py — braucht die Konto-Adapter.)
+    from trading_agent.runtime.context_alert_bridge import ContextAlertBridge
 
+    calendar_events: list = []
+    if args.economic_calendar:
         try:
-            cal = CsvEconomicCalendar(args.economic_calendar)
-            calendar_events = list(
-                cal.get_calendar(datetime(2023, 1, 1, tzinfo=UTC), datetime(2030, 1, 1, tzinfo=UTC))
-            )
+            calendar_events = ContextAlertBridge.load_calendar(args.economic_calendar)
             _log.info("economic calendar loaded", extra={"events": len(calendar_events)})
         except Exception:
             _log.warning("economic calendar unavailable — no news context alerts", exc_info=True)
 
-        if calendar_events:
-            ctx_engine = AlertEngine()
-            for sym in cfg.instruments:
-                ctx_emitters[sym] = ContextAlertEmitter(ctx_engine)
-
-            async def _on_decision_news(ev: DecisionMade) -> None:
-                emitter = ctx_emitters.get(ev.instrument)
-                if emitter is None:
-                    return
-                assessment = assess_news(
-                    calendar_events,
-                    cutoff=ev.ts,
-                    asset_class=cfg.asset_class,
-                    instrument=ev.instrument,
-                )
-                for ae in emitter.on_news(assessment, ev.ts):  # type: ignore[attr-defined]
-                    if not ae.delivered:
-                        continue
-                    _log.info(
-                        "CONTEXT-ALERT [%s] %s — %s",
-                        ae.alert.type.value,
-                        ae.alert.title,
-                        ae.alert.body,
-                    )
-                    if audit is not None:
-                        audit.record(
-                            "alert",
-                            "context_raised",
-                            {"instrument": ev.instrument, "type": ae.alert.type.value},
-                        )
-                    await pipe.bus.publish(
-                        AlertRaised(
-                            ts=ev.ts,
-                            instrument=ev.instrument,
-                            alert_type=ae.alert.type.value,
-                            message=ae.alert.title,
-                            delivered=True,
-                            alert=ae,
-                        )
-                    )
-
-            pipe.bus.subscribe(DecisionMade, _on_decision_news)
+    ctx_bridge = ContextAlertBridge(
+        cfg.instruments,
+        cfg.asset_class,
+        calendar_events=calendar_events,
+        audit=(audit.record if audit is not None else None),
+    )
+    ctx_bridge.attach(pipe.bus)
 
     counts = {"decision": 0, "alert": 0, "paper": 0, "quality": 0, "shutdown": 0}
     pipe.bus.subscribe(
@@ -276,6 +233,7 @@ async def main() -> int:
 
     status = sup.status()
     status["_event_counts"] = counts
+    status["_context_alerts"] = {**ctx_bridge.counts, "active_watches": ctx_bridge.active_watches}
     if recorder is not None:
         status["_decision_ledger_rows"] = recorder.rows_written
     status["_scanner_evaluations"] = scanner.evaluations

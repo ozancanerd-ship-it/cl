@@ -63,13 +63,25 @@ FX-Proxy. Auf echtem Spot-Gold ist die Stichprobe zu klein und im einzigen Range
   - **Verifiziert gegen die echten read-only Konten:** ein `PORTFOLIO_RISK`-Alert
     (Health YELLOW 69/100, „viel unallokiertes Cash 73 % · Aktien-Anteil 0 %"), kein Spam.
 
+### 2c. Re-Entry im 24/7-Daemon verdrahtet
+- **`src/trading_agent/runtime/context_alert_bridge.py`** — `ContextAlertBridge`, EventBus-
+  Subscriber nach dem `SignalJournal`/`MarketScanner`-Muster (`attach(bus)`):
+  - `PaperPositionChanged` (CLOSED) → `ReEntryEngine.register_exit` (These intakt bei
+    trail_stop/tp/BE/shakeout, verworfen bei `structure_invalidation`).
+  - `DecisionMade` → aktive Watch gegen die frische `EvaluationResult` neu bewerten →
+    `RE_ENTRY_SETUP`-Alert; zusätzlich News-Lage (`assess_news`) → `HIGH_IMPACT_NEWS`.
+  - Gelieferte Alerts als `AlertRaised` zurück auf den Bus (Audit + Zähler + Journal).
+- **`run_live_daemon.py`** — der ~90-Zeilen-Inline-Block ist durch `ctx_bridge = ContextAlertBridge(...)`
+  + `ctx_bridge.attach(pipe.bus)` ersetzt; `_context_alerts`-Zähler im Status-JSON.
+- **`tests/unit/test_context_alert_bridge.py`** (4): Watch registriert + Alert bei Trend-Rückkehr;
+  gebrochene These → keine Watch; kein Alert solange Trend nicht zurück; News-Alert aus Kalender.
+- Daemon-Smoke (binance XAUUSDT, 35 s): Bridge attached, Kalender geladen, kein Crash, `orders_sent=0`.
+
 ## PARTIAL
 
-- **Alert-Emitter Portfolio-Risk / Re-Entry im Live-Daemon** — `on_portfolio_report` läuft jetzt
-  im One-Shot (`portfolio_hub.py`). Im 24/7-Daemon fehlt noch: `on_reentry` braucht eine
-  Live-Re-Entry-Registry (die `ReEntryEngine` wird bei Position-Close noch nicht bestückt), und
-  die read-only Konto-Adapter im Daemon-Loop. NEXT: Daemon-Watch-Registrierung bei
-  `PaperPositionChanged CLOSED`.
+- **Portfolio-Risk-Alerts im 24/7-Daemon** — `on_portfolio_report` läuft im One-Shot
+  (`portfolio_hub.py`). Im Daemon-Loop fehlen die read-only Konto-Adapter (periodischer
+  Hub-Assess). Re-Entry + News laufen jetzt im Daemon.
 - **Forward-Paper-Trades (Ziel ≥ 100)** — die Aufzeichnungs-Kette ist geschlossen (Daemon →
   `signal_journal.jsonl` → `edge_health_check.py`), aber es sind **0 echte Forward-Trades**
   gesammelt: das braucht den Daemon 24/7 über Wochen, und XAUUSDT armt selten (Regime-Gate).
