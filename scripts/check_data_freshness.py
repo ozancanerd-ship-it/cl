@@ -18,12 +18,18 @@ from trading_agent.data.freshness import format_report, scan_repository
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--profile",
+        choices=("research", "live"),
+        default="research",
+        help="live: strengere Schwellen fuer den taeglichen Lauf (Krypto max. 3 Tage alt)",
+    )
     ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--timeframe", default="H4")
     ap.add_argument("--strict", action="store_true", help="Exit 1, wenn etwas veraltet ist")
     args = ap.parse_args()
 
-    ages = scan_repository(args.repo, timeframe=args.timeframe)
+    ages = scan_repository(args.repo, profile=args.profile, timeframe=args.timeframe)
     if not ages:
         print(f"keine Reihen unter {args.repo} (timeframe={args.timeframe})")
         return 1

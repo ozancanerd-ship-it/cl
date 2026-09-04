@@ -91,6 +91,26 @@ INSTRUMENT_VENUE: dict[str, str | None] = {
     "GBPUSD-YFD": None,
     "USDJPY-YFD": None,
 }
+# Anlageklasse je Instrument. Das ist nicht Kosmetik: der gesamte Nutzen der Regel kommt
+# aus der Mischung. Krypto allein ergab OOS Sharpe -0.21, ueber vier Klassen gemischt 1.08
+# (docs/TSMOM-MULTIASSET-ERGEBNIS-2026-09-04.md). Ein Auswahlverfahren, das bei 400 EUR
+# zufaellig vier Krypto-Positionen uebrig laesst, baut genau die schlechtere Variante nach.
+ASSET_CLASS: dict[str, str] = {
+    "BTCUSDT": "krypto",
+    "ETHUSDT": "krypto",
+    "BNBUSDT": "krypto",
+    "XAUUSD-YFD": "gold",
+    "NVDA-YFD": "aktien",
+    "AAPL-YFD": "aktien",
+    "MSFT-YFD": "aktien",
+    "AMD-YFD": "aktien",
+    "GOOGL-YFD": "aktien",
+    "META-YFD": "aktien",
+    "EURUSD-YFD": "fx",
+    "GBPUSD-YFD": "fx",
+    "USDJPY-YFD": "fx",
+}
+
 BLOCKED_HINT = {
     "EURUSD-YFD": "FX-Broker",
     "GBPUSD-YFD": "FX-Broker",
@@ -179,6 +199,32 @@ def _journal(path: str) -> list[dict]:
     return rows
 
 
+def _round_robin_klassen(kandidaten: list[dict]) -> list[dict]:
+    """Reihum die jeweils staerkste Klasse, damit die Mischung erhalten bleibt.
+
+    Aus [Aktie 0.9, Aktie 0.85, Aktie 0.8, Krypto 0.7, Gold 0.6] wird
+    [Aktie 0.9, Krypto 0.7, Gold 0.6, Aktie 0.85, Aktie 0.8] — die ersten drei Plaetze
+    decken drei Klassen ab statt einer. Wenn das Geld nur fuer drei Positionen reicht,
+    ist das der Unterschied zwischen der Strategie und einem Krypto-Klumpen.
+    """
+    nach_klasse: dict[str, list[dict]] = {}
+    for i in kandidaten:
+        nach_klasse.setdefault(ASSET_CLASS.get(i["instrument"], "?"), []).append(i)
+    for v in nach_klasse.values():
+        v.sort(key=lambda x: -x["target_weight"])
+    # Klassen selbst nach ihrem staerksten Kandidaten ordnen — sonst entschiede die Reihenfolge
+    # des Dictionaries, welche Klasse zuerst drankommt.
+    klassen = sorted(nach_klasse, key=lambda k: -nach_klasse[k][0]["target_weight"])
+    out: list[dict] = []
+    runde = 0
+    while len(out) < len(kandidaten):
+        for k in klassen:
+            if runde < len(nach_klasse[k]):
+                out.append(nach_klasse[k][runde])
+        runde += 1
+    return out
+
+
 def build_plan(entry: dict, risk: dict) -> dict:
     """Journalzeile -> handelbarer Euro-Plan, unter den Grenzen aus risk.yaml.
 
@@ -204,33 +250,43 @@ def build_plan(entry: dict, risk: dict) -> dict:
     handelbar = [i for i in longs if venue_of(i["instrument"])]
     ohne_konto = [i for i in longs if not venue_of(i["instrument"])]
 
-    kandidaten = handelbar[:max_pos]
-    zu_klein: list[dict] = []
+    # Reihenfolge: reihum die jeweils staerkste Klasse, nicht stur nach Gewicht. Sonst
+    # verdraengt eine Klasse mit vielen Kandidaten (sechs Aktien) alle anderen.
+    reihenfolge = _round_robin_klassen(handelbar)
 
-    # Iterativ: raus, was unter der Gebuehrengrenze liegt, Rest neu skalieren, nochmal pruefen.
-    while kandidaten:
-        raw = sum(i["target_weight"] for i in kandidaten)
-        eur = {
-            i["instrument"]: (i["target_weight"] / raw * budget * equity) if raw > 0 else 0.0
-            for i in kandidaten
-        }
-        schwaechster = min(
-            kandidaten,
-            key=lambda i: eur[i["instrument"]] - venue_of(i["instrument"])["min_order_eur"],  # type: ignore[index]
-        )
-        v = venue_of(schwaechster["instrument"])
-        assert v is not None
-        if eur[schwaechster["instrument"]] >= v["min_order_eur"]:
+    # Wie viele Positionen das Geld hergibt, entscheidet nicht max_positions allein,
+    # sondern die Gebuehrenuntergrenze: lieber vier Positionen, die gross genug sind,
+    # als acht, von denen jede ein Zehntel an Gebuehren verliert.
+    kandidaten: list[dict] = []
+    zu_klein = []
+    for n in range(min(max_pos, len(reihenfolge)), 0, -1):
+        versuch = reihenfolge[:n]
+        raw_n = sum(i["target_weight"] for i in versuch)
+        if raw_n <= 0:
+            continue
+        eur_n = {i["instrument"]: i["target_weight"] / raw_n * budget * equity for i in versuch}
+        if all(
+            eur_n[i["instrument"]] >= venue_of(i["instrument"])["min_order_eur"]  # type: ignore[index]
+            for i in versuch
+        ):
+            kandidaten = versuch
             break
+    # Was nicht reinpasst, wird nicht als "zu klein" abgetan: der bindende Grund ist,
+    # dass das Geld nur fuer N ordentliche Positionen reicht. Das ist eine Aussage ueber
+    # das Konto, nicht ueber das Instrument — und sie aendert sich, sobald mehr da ist.
+    for i in reihenfolge:
+        if i in kandidaten:
+            continue
+        v = venue_of(i["instrument"])
+        assert v is not None
         zu_klein.append(
             {
-                "instrument": schwaechster["instrument"],
-                "eur": eur[schwaechster["instrument"]],
+                "instrument": i["instrument"],
                 "min_order_eur": v["min_order_eur"],
                 "venue": v["name"],
+                "klasse": ASSET_CLASS.get(i["instrument"], "?"),
             }
         )
-        kandidaten = [i for i in kandidaten if i is not schwaechster]
 
     raw = sum(i["target_weight"] for i in kandidaten)
     positions = []
@@ -266,6 +322,8 @@ def build_plan(entry: dict, risk: dict) -> dict:
         "n_total": entry.get("n_instruments"),
         "positions": positions,
         "zu_klein": zu_klein,
+        "investierbar_eur": budget * equity,
+        "klassen": sorted({ASSET_CLASS.get(x["instrument"], "?") for x in positions}),
         "ohne_konto": [
             {
                 "instrument": i["instrument"],
@@ -355,15 +413,18 @@ def render(plan: dict, d: dict) -> str:
     L.append(
         f"  {'Cash':<12} {plan['cash_eur']:>5.0f} EUR  {plan['cash_eur'] / plan['equity']:>5.1%}"
     )
+    if plan["klassen"]:
+        L.append(f"  verteilt auf: {', '.join(plan['klassen'])}")
 
     if plan["zu_klein"]:
         L.append("")
-        L.append("NICHT VORGESCHLAGEN - Position waere zu klein fuer die Gebuehr:")
+        L.append(
+            f"WARTEN - {plan['investierbar_eur']:.0f} EUR reichen fuer"
+            f" {len(plan['positions'])} ordentliche Positionen, mehr nicht:"
+        )
         for x in plan["zu_klein"]:
-            L.append(
-                f"  {x['instrument']:<12} {x['eur']:>5.0f} EUR"
-                f"  (mind. {x['min_order_eur']:.0f} EUR bei {x['venue']})"
-            )
+            L.append(f"  {x['instrument']:<12} ({x['klasse']}, mind. {x['min_order_eur']:.0f} EUR)")
+        L.append("  Mehr Kapital heisst hier mehr Streuung, nicht groessere Wetten.")
 
     if plan["ohne_konto"]:
         L.append("")

@@ -46,6 +46,13 @@ data/processed/*
 data/journal/*
 data/repository/*
 data/repository_real/*
+# Ausnahme: das Forward-Journal ist die einzige unkontaminierte Datenspur, die das
+# Projekt noch erzeugt (docs/TSMOM-MULTIASSET-ERGEBNIS-2026-09-04.md). Es ist klein,
+# es waechst um eine Zeile am Tag, und es darf nicht nur auf einem Rechner liegen.
+!data/repository_real/live/
+data/repository_real/live/*
+!data/repository_real/live/tsmom_forward.jsonl
+!data/repository_real/live/tsmom_forward_corrections.jsonl
 data/cache/*
 data/state/*
 data/research/*

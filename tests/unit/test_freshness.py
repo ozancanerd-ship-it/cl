@@ -97,3 +97,33 @@ def test_stale_series_and_report_render(repo) -> None:
 
 def test_empty_repository_is_not_an_error(tmp_path) -> None:
     assert scan_repository(tmp_path, now=NOW) == []
+
+
+def test_live_profile_is_stricter_than_research() -> None:
+    """Der Fall, der am 2026-09-04 durchrutschte: Krypto 34 Tage alt, Schwelle 45.
+
+    Fuer einen Backtest ueber sieben Jahre ist der letzte Monat egal. Fuer eine taegliche
+    Allokationsregel nicht: aus 34 Tagen Bewegung wurde eine Tageskerze von +29 %, die
+    realisierte Volatilitaet sprang von ~50 % auf 79.6 %.
+    """
+    from trading_agent.data.freshness import _tolerance_for
+
+    assert _tolerance_for("BTCUSDT", "research") == 45
+    assert _tolerance_for("BTCUSDT", "live") == 3
+    assert _tolerance_for("NVDA-YF", "live") < _tolerance_for("NVDA-YF", "research")
+    # unbekanntes Profil faellt auf research zurueck, statt zu krachen
+    assert _tolerance_for("BTCUSDT", "quatsch") == 45
+
+
+def test_live_profile_flags_a_month_old_series() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from trading_agent.data.freshness import SeriesAge, _tolerance_for
+
+    last = datetime.now(UTC) - timedelta(days=34)
+    fuer_forschung = SeriesAge(
+        "BTCUSDT", "D1", 1000, last, last, 34, _tolerance_for("BTCUSDT", "research")
+    )
+    fuer_live = SeriesAge("BTCUSDT", "D1", 1000, last, last, 34, _tolerance_for("BTCUSDT", "live"))
+    assert not fuer_forschung.stale
+    assert fuer_live.stale

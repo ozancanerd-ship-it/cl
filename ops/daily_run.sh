@@ -20,7 +20,7 @@ export PYTHONPATH="$REPO/src"
 echo "=== $(date '+%Y-%m-%d %H:%M:%S %Z') ==="
 
 echo "--- 1/2 Forward-Aufzeichnung ---"
-"$PY" scripts/tsmom_forward.py || echo "! Aufzeichnung fehlgeschlagen — Report laeuft trotzdem"
+"$PY" scripts/tsmom_forward.py --source api || echo "! Aufzeichnung fehlgeschlagen — Report laeuft trotzdem"
 
 echo "--- 2/2 Tagesplan ---"
 "$PY" scripts/daily_report.py --send

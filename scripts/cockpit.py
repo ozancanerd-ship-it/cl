@@ -33,7 +33,7 @@ from trading_agent.strategy.setups.tsmom import (
 )
 
 sys.path.insert(0, str(Path(__file__).parent))
-from tsmom_forward import UNIVERSE, _latest_close, _repo_closes
+from tsmom_forward import UNIVERSE, _merged_history
 
 CLASS_OF = {
     "BTCUSDT": "Krypto",
@@ -145,13 +145,12 @@ def main() -> int:
     # ── Signale ──────────────────────────────────────────────────────────────
     signals = []
     for canon, (source, sym) in UNIVERSE.items():
-        hist = _repo_closes(args.repo, canon)
+        # Dieselbe Zusammenfuehrung wie im Forward-Lauf: sonst rechnet das Cockpit mit
+        # veralteten Reihen und zeigt andere Gewichte als der Report, den Ozan bekommt.
+        hist, _quelle = _merged_history(args.repo, canon, source, sym, mode="auto")
         if len(hist) < params.warmup_bars():
             continue
         closes = [c for _, c in hist]
-        live = _latest_close(source, sym)
-        if live and live[0] > hist[-1][0]:
-            closes.append(live[1])
         rep = evaluate_tsmom(closes, params=params)
         signals.append(
             {

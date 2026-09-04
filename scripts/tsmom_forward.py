@@ -111,6 +111,91 @@ def _latest_close(source: str, symbol: str) -> tuple[datetime, float] | None:
         return None
 
 
+def _api_history(source: str, symbol: str, bars: int = 400) -> list[tuple[datetime, float]]:
+    """Tages-Historie direkt bei der Quelle holen — ohne lokales Parquet-Repo.
+
+    Warum: der 24/7-Lauf soll auf einem fremden Rechner (GitHub Actions) funktionieren,
+    auf dem die 271 MB Marktdaten nicht liegen. Die Regel braucht nur Tagesschlusskurse,
+    und die geben beide Quellen in einem Aufruf her.
+
+    Wichtig: es sind DIESELBEN Quellen wie beim Ingest (Binance-Klines, Yahoo-Chart),
+    also dieselben Zahlen. Die laufende Tageskerze wird verworfen — nur abgeschlossene
+    Tage zaehlen, sonst entstuende ein Blick in die Zukunft.
+    """
+    import httpx
+
+    if source == "binance":
+        r = httpx.get(
+            "https://api.binance.com/api/v3/klines",
+            params={"symbol": symbol, "interval": "1d", "limit": min(bars, 1000)},
+            timeout=30,
+        ).json()
+        if not isinstance(r, list):
+            return []
+        return [
+            (datetime.fromtimestamp(row[0] / 1000, tz=UTC), float(row[4]))
+            for row in r[:-1]  # letzte Kerze laeuft noch
+        ]
+
+    rng = "2y" if bars <= 500 else "5y"
+    r = httpx.get(
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+        params={"interval": "1d", "range": rng},
+        headers={"User-Agent": "Mozilla/5.0 (compatible; trading-agent/0.1; research)"},
+        timeout=30,
+    ).json()
+    res = (r.get("chart", {}).get("result") or [{}])[0]
+    stamps = res.get("timestamp") or []
+    closes = (res.get("indicators", {}).get("quote") or [{}])[0].get("close") or []
+    out: list[tuple[datetime, float]] = []
+    for ts, c in zip(stamps, closes, strict=False):
+        if c is None:
+            continue
+        d = datetime.fromtimestamp(int(ts), tz=UTC).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        out.append((d, float(c)))
+    # Yahoo liefert den laufenden Tag mit; er ist noch nicht abgeschlossen.
+    heute = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return [(d, c) for d, c in out if d < heute]
+
+
+def _merged_history(
+    repo: str, canon: str, source: str, symbol: str, *, mode: str
+) -> tuple[list[tuple[datetime, float]], str]:
+    """Tiefe aus dem Repo, Aktualitaet aus der API — zusammengefuehrt ueber das Datum.
+
+    Das ist kein Komfort, sondern eine Fehlerkorrektur. Am 2026-09-04 endeten die
+    Krypto-Reihen im Repo am 2026-07-31 (34 Tage alt, Binance Vision liefert Monatsarchive
+    mit Verzug). ``_latest_close`` haengte genau EINEN aktuellen Tag an — aus 34 Tagen
+    Kursbewegung wurde eine einzige Tageskerze von +29 %. Die realisierte Volatilitaet
+    sprang dadurch von ~50 % auf 79.6 %, das Zielgewicht halbierte sich. Die Regel war
+    nicht falsch; sie bekam eine Luecke als Kurssprung serviert.
+
+    Deshalb: die API liefert 400 Tage rueckwaerts, das schliesst jede realistische Luecke.
+    Wo sich beide Quellen ueberlappen, gewinnt die API (sie ist die juengere Wahrheit) —
+    und die Ueberlappung ist zugleich die Probe, dass beide dieselben Zahlen meinen.
+    """
+    hist: list[tuple[datetime, float]] = []
+    if mode in ("auto", "repo"):
+        hist = _repo_closes(repo, canon)
+    if mode == "repo":
+        return hist, "repo"
+
+    api = _api_history(source, symbol)
+    if not api:
+        return hist, "repo (API stumm)"
+    if not hist:
+        return api, "api"
+
+    luecke = (api[-1][0] - hist[-1][0]).days
+    merged = dict(hist)
+    merged.update(dict(api))  # API gewinnt in der Ueberlappung
+    out = sorted(merged.items())
+    note = "repo" if luecke <= 1 else f"repo + {luecke}d aus API"
+    return out, note
+
+
 def _load_journal(path: str) -> list[dict]:
     p = Path(path)
     if not p.exists():
@@ -134,6 +219,16 @@ def main() -> int:
     ap.add_argument("--repo", default="data/repository_real")
     ap.add_argument("--journal", default=JOURNAL)
     ap.add_argument("--report", action="store_true", help="nur anzeigen, nichts schreiben")
+    ap.add_argument(
+        "--source",
+        choices=("api", "auto", "repo"),
+        default="api",
+        help=(
+            "api (Standard): Historie direkt bei der Quelle — dasselbe Ergebnis auf dem Mac "
+            "und in der CI. auto/repo nutzen das lokale Parquet-Repo und liefern wegen "
+            "anderer Historientiefe leicht andere Gewichte; nur fuer Offline-Arbeit."
+        ),
+    )
     args = ap.parse_args()
 
     params = TsmomParams()
@@ -147,21 +242,20 @@ def main() -> int:
 
     rows: list[dict] = []
     for canon, (source, sym) in UNIVERSE.items():
-        hist = _repo_closes(args.repo, canon)
+        hist, quelle = _merged_history(args.repo, canon, source, sym, mode=args.source)
         if len(hist) < params.warmup_bars():
             print(f"  {canon:<12} zu wenig Historie ({len(hist)} Bars) — uebersprungen")
             continue
-        live = _latest_close(source, sym)
+        if "API" in quelle or "api" in quelle:
+            print(f"  {canon:<12} Historie: {quelle}")
         closes = [c for _, c in hist]
         as_of = hist[-1][0]
-        if live and live[0] > hist[-1][0]:
-            closes.append(live[1])
-            as_of = live[0]
         rep = evaluate_tsmom(closes, params=params)
         rows.append(
             {
                 "instrument": canon,
                 "as_of": as_of.date().isoformat(),
+                "history_source": quelle,
                 "close": closes[-1],
                 "target_weight": rep.target_weight,
                 "agreement": rep.agreement,

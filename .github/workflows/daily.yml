@@ -1,0 +1,75 @@
+# Der 24/7-Lauf — kostenlos, ohne Server, ohne dass der Mac an sein muss.
+#
+# Warum GitHub Actions und nicht Oracle Cloud: Oracle verlangt eine Kreditkarten-
+# Verifizierung und lehnt viele Anmeldungen ohne Begruendung ab. Actions braucht nur ein
+# GitHub-Konto. Fuer oeffentliche Repos ist es unbegrenzt gratis, fuer private 2000 Minuten
+# im Monat — dieser Job braucht etwa 2 Minuten am Tag, also rund 60.
+#
+# Was hier laeuft, ist genau dasselbe wie lokal:
+#   1. tsmom_forward.py --source api   holt die Historie direkt bei Binance/Yahoo
+#      (das Repo mit den 271 MB Marktdaten liegt NICHT auf GitHub und wird nicht gebraucht)
+#   2. daily_report.py --send          baut den Euro-Plan und schickt ihn per Telegram
+#   3. der Commit sichert die Journalzeile — das ist die Forward-Datenspur, das
+#      wertvollste Ergebnis des ganzen Projekts. Sie darf nicht nur auf einem Mac liegen.
+#
+# Einrichten: im Repo unter Settings -> Secrets and variables -> Actions zwei Secrets
+# anlegen: TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID. Ohne sie laeuft der Job trotzdem,
+# schreibt die Journalzeile und meldet nur, dass er nicht senden konnte.
+
+name: Taeglicher Tagesplan
+
+on:
+  schedule:
+    # 23:10 UTC — nach US-Boersenschluss (22:00 UTC), vor dem Tageswechsel.
+    # GitHub-Cron laeuft in UTC und kann sich bei Last um einige Minuten verspaeten;
+    # das ist hier egal, die Regel arbeitet auf Tagesschlusskursen.
+    - cron: "10 23 * * *"
+  workflow_dispatch: {}   # Knopf zum Selbststarten, fuer Tests
+
+concurrency:
+  group: taeglicher-tagesplan
+  cancel-in-progress: false   # ein laufender Schreibvorgang wird nicht abgebrochen
+
+permissions:
+  contents: write   # noetig, um die Journalzeile zurueckzuschreiben
+
+jobs:
+  tagesplan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhaengigkeiten
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Forward-Zeile aufzeichnen
+        env:
+          PYTHONPATH: src
+        run: python scripts/tsmom_forward.py --source api
+
+      - name: Tagesplan bauen und schicken
+        env:
+          PYTHONPATH: src
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/daily_report.py --send
+
+      - name: Journal sichern
+        run: |
+          git config user.name  "trading-agent[bot]"
+          git config user.email "trading-agent@users.noreply.github.com"
+          git add -f data/repository_real/live/tsmom_forward.jsonl \
+                     data/repository_real/live/tsmom_forward_corrections.jsonl 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "keine neue Zeile — nichts zu sichern"
+          else
+            git commit -m "forward: Journalzeile $(date -u +%Y-%m-%d)"
+            git push
+          fi

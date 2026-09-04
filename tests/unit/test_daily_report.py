@@ -67,7 +67,34 @@ def test_max_positions_truncates() -> None:
     risk = {**RISK, "max_positions": 3}
     plan = dr.build_plan(_entry(weights, portfolio_weight=0.6), risk)
     assert len(plan["positions"]) <= 3
-    assert set(plan["dropped"])  # der Rest wird als abgeschnitten ausgewiesen
+
+
+def test_selection_spreads_across_asset_classes() -> None:
+    """Der eigentliche Punkt: sechs Aktien duerfen Krypto und Gold nicht verdraengen.
+
+    Krypto allein war OOS Sharpe -0.21, gemischt 1.08. Ein Auswahlverfahren, das bei
+    knappem Geld in einer Klasse landet, baut die schlechtere Variante nach.
+    """
+    # Aktien haben die hoechsten Gewichte — nach reiner Gewichtssortierung waeren die
+    # ersten vier Plaetze alle Aktien.
+    weights = {s: 0.9 - i * 0.01 for i, s in enumerate(AKTIEN)}
+    weights |= {"BTCUSDT": 0.5, "XAUUSD-YFD": 0.45}
+    plan = dr.build_plan(_entry(weights, portfolio_weight=0.6), RISK)
+    klassen = {dr.ASSET_CLASS[x["instrument"]] for x in plan["positions"]}
+    assert len(klassen) >= 3, f"nur {klassen} — die Mischung ist verloren"
+
+
+def test_round_robin_alternates_classes() -> None:
+    kand = [
+        {"instrument": "NVDA-YFD", "target_weight": 0.9},
+        {"instrument": "AAPL-YFD", "target_weight": 0.85},
+        {"instrument": "MSFT-YFD", "target_weight": 0.8},
+        {"instrument": "BTCUSDT", "target_weight": 0.7},
+        {"instrument": "XAUUSD-YFD", "target_weight": 0.6},
+    ]
+    order = [x["instrument"] for x in dr._round_robin_klassen(kand)]
+    assert order[:3] == ["NVDA-YFD", "BTCUSDT", "XAUUSD-YFD"]
+    assert set(order) == {x["instrument"] for x in kand}  # nichts geht verloren
 
 
 def test_budget_follows_conviction_not_just_the_cap() -> None:
@@ -92,15 +119,24 @@ def test_instruments_without_account_get_no_budget() -> None:
     assert plan["ohne_konto"][0]["blocked_by"] == "FX-Broker"
 
 
-def test_position_below_fee_threshold_is_dropped_and_budget_redistributed() -> None:
-    """Eine 20-EUR-Aktienposition kostet 10 % Gebuehr. Die darf nicht im Plan stehen."""
-    weights = dict.fromkeys(AKTIEN, 1.0)  # 6 Aktien, 240 EUR Budget -> je 40 EUR
+def test_fee_floor_limits_the_number_of_positions() -> None:
+    """Eine 20-EUR-Aktienposition kostet 10 % Gebuehr rein und raus. Lieber vier grosse."""
+    weights = dict.fromkeys(AKTIEN, 1.0)  # 6 Aktien, 240 EUR Budget -> je 40 EUR waere zu wenig
     plan = dr.build_plan(_entry(weights, portfolio_weight=0.6), RISK)
-    assert plan["zu_klein"], "zu kleine Aktienpositionen muessen ausgewiesen werden"
+    assert plan["zu_klein"], "was nicht reinpasst, muss benannt werden"
     for x in plan["positions"]:
-        assert x["eur"] >= 60.0 - 1e-6  # was uebrig bleibt, ist gross genug
-    # das Budget geht nicht verloren, es wird auf die Ueberlebenden verteilt
+        assert x["eur"] >= 60.0 - 1e-6
+    assert len(plan["positions"]) == 4  # 240 / 60
+    # das Budget geht nicht verloren, es verteilt sich auf die Ueberlebenden
     assert plan["invested_eur"] == 0.6 * RISK["equity"]
+
+
+def test_tiny_account_proposes_nothing_rather_than_a_fee_trap() -> None:
+    """Bei 50 EUR Equity ist keine Aktienposition sinnvoll — dann eben keine."""
+    risk = {**RISK, "equity": 50.0}
+    plan = dr.build_plan(_entry(dict.fromkeys(AKTIEN, 1.0), portfolio_weight=0.6), risk)
+    assert plan["positions"] == []
+    assert plan["cash_eur"] == 50.0
 
 
 def test_crypto_has_no_minimum_problem() -> None:
@@ -113,6 +149,7 @@ def test_crypto_has_no_minimum_problem() -> None:
 def test_cost_pct_reflects_the_venue() -> None:
     plan = dr.build_plan(_entry({"BTCUSDT": 1.0, "NVDA-YFD": 1.0}, portfolio_weight=0.6), RISK)
     cost = {x["instrument"]: x["cost_pct"] for x in plan["positions"]}
+    assert len(cost) == 2
     assert cost["BTCUSDT"] < 1.0  # 0.2 % rein + raus
     assert cost["NVDA-YFD"] > cost["BTCUSDT"]  # 1 EUR pauschal wiegt bei 120 EUR schwerer
 
@@ -152,6 +189,7 @@ def test_render_is_plain_text_and_mentions_the_decision() -> None:
     assert "TAGESPLAN" in text
     assert "KAUFEN" in text
     assert "FX-Broker" in text  # die gesperrte Zeile wird benannt, nicht verschwiegen
+    assert "verteilt auf" in text
     assert "Kill-Switch" in text
     assert len(text) < 4096  # Telegram-Limit fuer eine Nachricht
 
