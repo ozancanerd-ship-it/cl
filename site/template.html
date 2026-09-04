@@ -296,6 +296,20 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 
 /* Kopf */
 const P = D.plan;
+
+/* Ein Datenausfall darf nicht als normaler Plan durchgehen. Er steht ganz oben,
+   vor allem anderen, und sagt was fehlt. */
+if (D.incomplete) {
+  document.querySelector('.wrap').insertAdjacentHTML('afterbegin',
+    `<div class="note bad" style="margin:20px 0 0">
+      <span class="nt">Datenausfall — kein gültiger Plan</span>
+      <p>Für ${D.missing.length} Instrument(e) kamen keine Kurse:
+        <strong>${D.missing.map(esc).join(', ')}</strong>.</p>
+      <p>Was unten steht, ist auf weniger Instrumenten gerechnet als die Regel vorsieht.
+        <strong>Nicht danach handeln.</strong> Bestand halten, bis der nächste Lauf
+        vollständig durchgeht.</p>
+    </div>`);
+}
 document.getElementById('stamp').textContent = 'Stand ' + P.date;
 document.getElementById('sub').textContent = D.subtitle;
 document.getElementById('mode').textContent = P.eligibility === 'live' ? 'Live' : 'Paper';

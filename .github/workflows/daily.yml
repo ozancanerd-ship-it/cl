@@ -61,12 +61,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      # continue-on-error, weil ein Datenausfall die FOLGENDEN Schritte nicht verhindern
+      # darf: die Warnung soll trotzdem aufs Handy und auf die Seite. Der Lauf wird am
+      # Ende gezielt rot gemacht, damit der Ausfall sichtbar bleibt.
       - name: Forward-Zeile aufzeichnen
+        id: forward
+        continue-on-error: true
         env:
           PYTHONPATH: src
         run: python scripts/tsmom_forward.py --source api
 
       - name: Tagesplan schicken
+        id: report
+        continue-on-error: true
         env:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -103,6 +110,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+
+      # Jetzt erst scheitern. Bis hierher sind Warnung und Seite draussen.
+      - name: Ausfall melden
+        if: steps.forward.outcome == 'failure' || steps.report.outcome == 'failure'
+        run: |
+          echo "::error::Der Lauf war unvollstaendig — siehe die Schritte oben."
+          exit 1
 
   veroeffentlichen:
     needs: tagesplan

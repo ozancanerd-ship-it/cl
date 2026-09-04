@@ -63,6 +63,20 @@ UNIVERSE: dict[str, tuple[str, str]] = {
 
 JOURNAL = "data/repository_real/live/tsmom_forward.jsonl"
 
+# Binance sperrt Anfragen aus Rechenzentren — der erste CI-Lauf am 2026-09-04 bekam fuer
+# BTC/ETH/BNB null Bars, uebersprang sie stillschweigend und schrieb eine Journalzeile mit
+# 10 statt 13 Instrumenten. Der Lauf war gruen, und die gesamte Anlageklasse Krypto war weg.
+#
+# Deshalb eine Kette. Alle Adressen liefern DIESELBEN Binance-Daten — eine andere Boerse
+# waere hier falsch: unterschiedliche Kurse an unterschiedlichen Tagen erzeugen Spruenge in
+# der Reihe, die die Regel als Bewegung liest.
+BINANCE_HOSTS = (
+    "https://api.binance.com",
+    "https://data-api.binance.vision",  # oeffentlicher Daten-Spiegel, meist ohne Geosperre
+    "https://api-gcp.binance.com",
+    "https://api1.binance.com",
+)
+
 
 def _repo_closes(repo: str, symbol: str) -> list[tuple[datetime, float]]:
     import pyarrow.parquet as pq
@@ -125,17 +139,24 @@ def _api_history(source: str, symbol: str, bars: int = 400) -> list[tuple[dateti
     import httpx
 
     if source == "binance":
-        r = httpx.get(
-            "https://api.binance.com/api/v3/klines",
-            params={"symbol": symbol, "interval": "1d", "limit": min(bars, 1000)},
-            timeout=30,
-        ).json()
-        if not isinstance(r, list):
-            return []
-        return [
-            (datetime.fromtimestamp(row[0] / 1000, tz=UTC), float(row[4]))
-            for row in r[:-1]  # letzte Kerze laeuft noch
-        ]
+        for host in BINANCE_HOSTS:
+            try:
+                r = httpx.get(
+                    f"{host}/api/v3/klines",
+                    params={"symbol": symbol, "interval": "1d", "limit": min(bars, 1000)},
+                    timeout=30,
+                ).json()
+            except Exception:
+                continue
+            if isinstance(r, list) and r:
+                return [
+                    (datetime.fromtimestamp(row[0] / 1000, tz=UTC), float(row[4]))
+                    for row in r[:-1]  # letzte Kerze laeuft noch
+                ]
+            # Kein Absturz, sondern eine Antwort wie {"code":0,"msg":"..."} — z.B. Geosperre.
+            if isinstance(r, dict):
+                print(f"    {host}: {str(r.get('msg') or r)[:80]}")
+        return []
 
     rng = "2y" if bars <= 500 else "5y"
     r = httpx.get(
@@ -241,10 +262,12 @@ def main() -> int:
     print()
 
     rows: list[dict] = []
+    fehlend: list[str] = []
     for canon, (source, sym) in UNIVERSE.items():
         hist, quelle = _merged_history(args.repo, canon, source, sym, mode=args.source)
         if len(hist) < params.warmup_bars():
-            print(f"  {canon:<12} zu wenig Historie ({len(hist)} Bars) — uebersprungen")
+            print(f"  {canon:<12} zu wenig Historie ({len(hist)} Bars) — FEHLT")
+            fehlend.append(canon)
             continue
         if "API" in quelle or "api" in quelle:
             print(f"  {canon:<12} Historie: {quelle}")
@@ -287,8 +310,22 @@ def main() -> int:
     print("-" * 58)
     print(f"{'PORTFOLIO':<13}{'':<12}{'':<12}{invested:>7}/{len(rows)} long{pw:>9.2f}")
 
+    # Das praeregistrierte Universum hat 13 Instrumente. Fehlt eines, ist die Zeile keine
+    # gueltige Beobachtung DIESER Regel: die Gewichte verteilen sich auf weniger Titel, das
+    # Portfoliogewicht verschiebt sich, und der Vergleich mit gestern misst den Datenausfall
+    # statt den Markt. Die Zeile wird trotzdem geschrieben — aber markiert, und der Lauf
+    # endet rot, damit es jemand merkt.
+    vollstaendig = not fehlend
+    if fehlend:
+        print()
+        print(f"!! UNVOLLSTAENDIG: {len(fehlend)} von {len(UNIVERSE)} Instrumenten fehlen")
+        print(f"   {', '.join(fehlend)}")
+        print("   Die Zeile wird als unvollstaendig markiert und zaehlt nicht als Forward-Tag.")
+
     entry = {
         "ts": datetime.now(UTC).isoformat(),
+        "complete": vollstaendig,
+        "missing": fehlend,
         "date": max(r["as_of"] for r in rows),
         "setup_id": SETUP_TSMOM_ENSEMBLE,
         "strategy_version": STRATEGY_VERSION,
@@ -323,6 +360,9 @@ def main() -> int:
         print(f"  Zeitraum {first} bis {last}")
     print("\nErinnerung: Waehrend der Sammelphase wird an der Regel nichts geaendert.")
     print("Jede Aenderung setzt den Zaehler zurueck.")
+    if not vollstaendig:
+        print(f"::error::Forward-Lauf unvollstaendig — es fehlen: {', '.join(fehlend)}")
+        return 2
     return 0
 
 

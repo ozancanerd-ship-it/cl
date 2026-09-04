@@ -455,6 +455,34 @@ def render(plan: dict, d: dict) -> str:
     return "\n".join(L)
 
 
+def _send(body: str, *, title: str, severity_high: bool = False) -> bool:
+    """Ueber den vorhandenen Notifier verschicken. False, wenn Telegram nicht steht."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    from trading_agent.ops.notify import (
+        FileSink,
+        Notification,
+        Notifier,
+        Severity,
+        TelegramSink,
+    )
+
+    tg = TelegramSink(min_severity=Severity.INFO)
+    if not tg.available():
+        print("::warning::Telegram nicht konfiguriert — TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
+        print("\n! Telegram nicht konfiguriert. Der Text steht oben, verschickt wurde nichts.")
+        return False
+    n = Notifier([tg, FileSink("data/repository_real/live/alerts.jsonl")], max_per_window=20)
+    return n.notify(
+        Notification(
+            severity=Severity.CRITICAL if severity_high else Severity.WARNING,
+            title=title,
+            body=body,
+            dedup_key=f"{title}",
+            ts=datetime.now(UTC),
+        )
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--journal", default=JOURNAL)
@@ -472,8 +500,27 @@ def main() -> int:
 
     risk = _risk_config(args.risk)
     latest = rows[-1]
+
+    # Eine unvollstaendige Zeile (fehlende Kursquelle) ist keine Marktaussage. Wuerde man
+    # sie mit gestern vergleichen, meldete der Bericht "VERKAUFEN: Bitcoin" — obwohl nur
+    # die Datenquelle stumm war. Deshalb: melden, was fehlt, und keinen Plan bauen.
+    if latest.get("complete") is False and not args.json:
+        fehlt = latest.get("missing") or []
+        text = (
+            f"DATENAUSFALL {latest.get('date')}\n\n"
+            f"Fuer {len(fehlt)} von {latest.get('n_instruments', 0) + len(fehlt)} Instrumenten "
+            "kamen keine Kurse:\n  " + ", ".join(fehlt) + "\n\n"
+            "Es gibt heute keinen Plan. Bestand unveraendert halten.\n"
+            "Ein Vergleich mit gestern wuerde den Ausfall messen, nicht den Markt."
+        )
+        print(text)
+        if args.send:
+            _send(text, title=f"Datenausfall {latest.get('date')}", severity_high=True)
+        return 3
+
+    vollstaendig = [r for r in rows if r.get("complete") is not False]
     prev_row = None
-    for r in reversed(rows[:-1]):
+    for r in reversed(vollstaendig[:-1]):
         if r.get("date") != latest.get("date"):
             prev_row = r
             break
@@ -490,7 +537,11 @@ def main() -> int:
                     "diff": {k: v for k, v in d.items() if k != "first_run"},
                     "first_run": d["first_run"],
                     "expect": EXPECT,
-                    "journal_days": len({r.get("date") for r in rows}),
+                    "journal_days": len(
+                        {r.get("date") for r in rows if r.get("complete") is not False}
+                    ),
+                    "incomplete": latest.get("complete") is False,
+                    "missing": latest.get("missing") or [],
                     "signals": latest.get("instruments", []),
                 },
                 ensure_ascii=False,
@@ -510,35 +561,10 @@ def main() -> int:
         print("\n(nichts geaendert — kein Telegram, kein Spam)")
         return 0
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-    from trading_agent.ops.notify import (
-        FileSink,
-        Notification,
-        Notifier,
-        Severity,
-        TelegramSink,
-    )
-
-    tg = TelegramSink(min_severity=Severity.INFO)
-    if not tg.available():
-        # Bewusst KEIN Fehler-Exit: der Plan ist fertig und richtig, nur der Kanal fehlt.
-        # In GitHub Actions wuerde ein Exit != 0 hier den ganzen Lauf abbrechen — die Seite
-        # wuerde nicht gebaut und nicht veroeffentlicht, wegen eines fehlenden Secrets.
-        # ::warning:: macht es in der Actions-Oberflaeche trotzdem sichtbar.
-        print("::warning::Telegram nicht konfiguriert — TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
-        print("\n! Telegram nicht konfiguriert. Der Plan steht oben, verschickt wurde nichts.")
-        return 0
-
-    n = Notifier([tg, FileSink("data/repository_real/live/alerts.jsonl")], max_per_window=20)
-    sev = Severity.WARNING if (d["buy"] or d["sell"]) else Severity.INFO
-    ok = n.notify(
-        Notification(
-            severity=sev,
-            title=f"Tagesplan {plan['date']}",
-            body=render(plan, d),
-            dedup_key=f"daily-{plan['date']}",
-            ts=datetime.now(UTC),
-        )
+    ok = _send(
+        render(plan, d),
+        title=f"Tagesplan {plan['date']}",
+        severity_high=bool(d["buy"] or d["sell"]),
     )
     print(f"\nTelegram: {'gesendet' if ok else 'unterdrueckt (dedup/rate-limit)'}")
     return 0
