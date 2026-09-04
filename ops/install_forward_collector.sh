@@ -8,6 +8,14 @@
 # Der Job ruft ops/daily_run.sh: erst aufzeichnen, dann den Tagesplan per Telegram schicken.
 # Er schreibt auf und benachrichtigt. Er handelt nicht und legt keine Order.
 #
+# ACHTUNG — NICHT ZUSAETZLICH ZU GITHUB ACTIONS LAUFEN LASSEN.
+# .github/workflows/daily.yml macht dasselbe in der Cloud. Beides gleichzeitig heisst:
+# zwei Telegram-Nachrichten am Tag und zwei Schreiber auf derselben Journaldatei, die sich
+# beim naechsten Pull gegenseitig ueberschreiben. Das ist eine Entweder-oder-Entscheidung.
+#
+#   GitHub Actions  -> laeuft auch, wenn der Mac aus ist. Der Normalfall.
+#   Dieser launchd-Job -> nur, wenn kein GitHub gewuenscht ist (dann Actions abschalten).
+#
 #   bash ops/install_forward_collector.sh          # einrichten
 #   bash ops/install_forward_collector.sh --status # Stand ansehen
 #   bash ops/install_forward_collector.sh --remove # wieder entfernen
