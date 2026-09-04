@@ -30,6 +30,11 @@ on:
   workflow_dispatch: {}   # Knopf zum Selbststarten, fuer Tests
   push:
     branches: [main]      # nach einer Aenderung sofort neu bauen, statt bis 23:10 zu warten
+    paths-ignore:
+      # Der Job committet die Journalzeile selbst. Commits mit dem GITHUB_TOKEN loesen zwar
+      # ohnehin keinen neuen Lauf aus (GitHub verhindert genau diese Schleife), aber hier
+      # steht es nochmal ausdruecklich — eine Endlosschleife waere teuer und peinlich.
+      - "data/repository_real/live/**"
 
 concurrency:
   group: taeglicher-tagesplan
@@ -71,7 +76,7 @@ jobs:
       - name: Web-App bauen
         env:
           PYTHONPATH: src
-        run: python scripts/build_site.py --out site
+        run: python scripts/build_site.py --out _site
 
       - name: Journal sichern
         run: |
@@ -88,7 +93,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
 
   veroeffentlichen:
     needs: tagesplan

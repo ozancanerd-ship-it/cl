@@ -5,12 +5,16 @@ Warum es das gibt: der Telegram-Text ist gut zum Handeln, aber schlecht zum Nach
 Diese Seite ist das Nachschlagewerk — Plan, Signale, Erwartung, Grenzen — und sie wird von
 ``.github/workflows/daily.yml`` jeden Tag neu erzeugt und auf GitHub Pages veroeffentlicht.
 
+Die Vorlage liegt in ``site/``, das Ergebnis in ``_site/``. Getrennt, weil GitHub Pages
+den ganzen Ausgabeordner ausliefert — die Vorlage mit ihrem ``__DATA__``-Platzhalter
+hat dort nichts zu suchen.
+
 Wichtig: sie zieht sich ihre Zahlen NICHT selbst. Sie ist statisch und traegt ihr Baudatum
 sichtbar im Fuss. Steht dort ein altes Datum, ist der taegliche Job nicht gelaufen — das
 ist die Anzeige dafuer, dass etwas kaputt ist, und genau so soll es sein. Eine Seite, die
 sich selbst live nachlaedt, wuerde einen Ausfall verbergen.
 
-    python3 scripts/build_site.py --out site
+    python3 scripts/build_site.py --out _site
 """
 
 from __future__ import annotations
@@ -137,7 +141,7 @@ def _icon_png() -> bytes:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default="site")
+    ap.add_argument("--out", default="_site")
     args = ap.parse_args()
 
     repo = Path(__file__).resolve().parents[1]

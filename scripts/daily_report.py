@@ -521,8 +521,13 @@ def main() -> int:
 
     tg = TelegramSink(min_severity=Severity.INFO)
     if not tg.available():
-        print("\n! Telegram nicht konfiguriert (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID fehlt).")
-        return 2
+        # Bewusst KEIN Fehler-Exit: der Plan ist fertig und richtig, nur der Kanal fehlt.
+        # In GitHub Actions wuerde ein Exit != 0 hier den ganzen Lauf abbrechen — die Seite
+        # wuerde nicht gebaut und nicht veroeffentlicht, wegen eines fehlenden Secrets.
+        # ::warning:: macht es in der Actions-Oberflaeche trotzdem sichtbar.
+        print("::warning::Telegram nicht konfiguriert — TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
+        print("\n! Telegram nicht konfiguriert. Der Plan steht oben, verschickt wurde nichts.")
+        return 0
 
     n = Notifier([tg, FileSink("data/repository_real/live/alerts.jsonl")], max_per_window=20)
     sev = Severity.WARNING if (d["buy"] or d["sell"]) else Severity.INFO
