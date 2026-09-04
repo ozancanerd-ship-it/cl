@@ -71,6 +71,33 @@ BUCKETS: dict[str, dict[str, float]] = {
 }
 
 
+def _series(repo: Path, bars: int = 200) -> dict[str, list[float]]:
+    """Kursverlauf je Instrument fuer die Charts — gekuerzt auf das, was gezeigt wird.
+
+    Die Regel schaut 180 Tage zurueck; mehr braucht die Zeichnung nicht. Gerundet wird
+    auf sechs signifikante Stellen, sonst blaeht JSON die Seite mit Nachkommastellen auf,
+    die auf 320 Pixel Breite ohnehin niemand sieht.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("tf", repo / "scripts" / "tsmom_forward.py")
+    assert spec and spec.loader
+    tf = importlib.util.module_from_spec(spec)
+    sys.modules["tf"] = tf
+    spec.loader.exec_module(tf)
+
+    out: dict[str, list[float]] = {}
+    for canon, (source, sym) in tf.UNIVERSE.items():
+        try:
+            hist = tf._api_history(source, sym, bars=max(bars + 20, 400))
+        except Exception as exc:  # eine stumme Quelle darf die Seite nicht verhindern
+            print(f"  ! {canon}: Kursverlauf nicht geladen ({type(exc).__name__})")
+            continue
+        if hist:
+            out[canon] = [float(f"{c:.6g}") for _, c in hist[-bars:]]
+    return out
+
+
 def _plan_json(repo: Path) -> dict:
     """daily_report.py als Unterprozess — eine Quelle fuer die Zahlen, nicht zwei."""
     out = subprocess.run(
@@ -150,6 +177,7 @@ def main() -> int:
 
     d = _plan_json(repo)
     plan = d["plan"]
+    series = _series(repo)
     payload = {
         "plan": plan,
         "diff": d["diff"],
@@ -157,6 +185,7 @@ def main() -> int:
         "signals": d["signals"],
         "expect": d["expect"],
         "buckets": BUCKETS,
+        "series": series,
         "rules": _rules(repo),
         "names": NAMES,
         "klasse": KLASSE,

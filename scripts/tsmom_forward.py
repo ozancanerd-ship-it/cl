@@ -263,6 +263,10 @@ def main() -> int:
                 "realized_vol": rep.realized_vol,
                 "vol_scalar": rep.vol_scalar,
                 "per_lookback": {str(k): v for k, v in rep.per_lookback.items()},
+                # Rendite je Rueckblickfenster. Daraus laesst sich der Vergleichskurs
+                # zurueckrechnen (close / (1+r)) — genau die Linie, die die Regel prueft.
+                # Ohne sie kann die App nur das Ergebnis zeigen, nicht die Begruendung.
+                "lookback_returns": {str(k): v for k, v in rep.lookback_returns.items()},
                 "reasons": rep.reasons,
             }
         )

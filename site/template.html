@@ -155,6 +155,37 @@ tr.key td{background:var(--long-bg)}
 .bk-bar i{display:block; height:100%; background:var(--accent)}
 .bk-sum{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600;
   margin-top:5px; text-align:right; font-variant-numeric:tabular-nums}
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+  margin-bottom:14px; overflow:hidden}
+.card-h{display:flex; align-items:center; gap:10px; padding:13px 15px 10px}
+.card-h .nm{font-weight:600; font-size:16px}
+.card-h .cl{font-size:12px; color:var(--ink-3)}
+.card-h .w{margin-left:auto; text-align:right}
+.card-h .w b{font-family:"IBM Plex Mono",monospace; font-size:18px; font-weight:600;
+  font-variant-numeric:tabular-nums; display:block; line-height:1}
+.card-h .w s{font-size:10px; color:var(--ink-3); text-decoration:none;
+  font-family:"IBM Plex Mono",monospace; letter-spacing:.06em; text-transform:uppercase}
+.chart{display:block; width:100%; height:auto; background:var(--surface)}
+.card-b{padding:2px 15px 14px}
+.rowx{display:flex; gap:10px; font-size:13.5px; padding:5px 0;
+  border-top:1px solid var(--rule)}
+.rowx:first-child{border-top:0}
+.rowx .lab{color:var(--ink-2); flex:1; min-width:0}
+.rowx .val{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.win{display:flex; gap:5px; padding:9px 15px; background:var(--surface-2);
+  border-top:1px solid var(--rule); flex-wrap:wrap}
+.wchip{font-family:"IBM Plex Mono",monospace; font-size:10.5px; padding:2px 7px;
+  border-radius:3px; background:var(--flat-bg); color:var(--ink-3)}
+.wchip.on{background:var(--long-bg); color:var(--long)}
+.wchip.off{background:var(--bad-bg); color:var(--bad)}
+.alarm{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
+  border-radius:4px; padding:14px 16px; margin-bottom:9px}
+.alarm.hot{border-left-color:var(--long); background:var(--long-bg)}
+.alarm .ah{font-weight:600; font-size:15.5px; display:flex; gap:10px; align-items:baseline}
+.alarm .ah .d{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px;
+  color:var(--ink-3)}
+.alarm p{margin:5px 0 0; font-size:13.5px}
 .foot{margin-top:36px; padding-top:16px; border-top:1px solid var(--rule);
   font-size:12.5px; color:var(--ink-3)}
 .foot p{font-size:12.5px; color:var(--ink-3)}
@@ -188,9 +219,10 @@ tr.key td{background:var(--long-bg)}
     </div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" aria-selected="true"  aria-controls="p1" id="t1">Heute</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2">Signale</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Erwartung</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Regeln</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2">Analyse</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Alarme</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Erwartung</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Regeln</button>
     </div>
   </div>
 </header>
@@ -204,23 +236,29 @@ tr.key td{background:var(--long-bg)}
 </section>
 
 <section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
-  <p class="lead">Das Gewicht sagt, wie <em>groß</em> die Position sein soll — nicht, wie sicher
-    das Signal ist. Volle Zustimmung bei kleinem Gewicht heißt: der Trend ist da, aber das
-    Instrument schwankt zu stark für mehr.</p>
-  <div id="sigs"></div>
+  <p class="lead">Die Regel vergleicht den heutigen Kurs mit dem von vor 28, 56, 90, 120 und
+    180 Tagen. Jede gestrichelte Linie im Chart ist einer dieser Vergleichskurse. Liegt der
+    Kurs darüber, ist das Fenster grün.</p>
   <div class="note">
-    <span class="nt">Die fünf Balken</span>
-    <p>Jeder steht für einen Zeitraum: 28, 56, 90, 120 und 180 Tage. Grün heißt, der Kurs
-      liegt über dem von damals. Fünf grüne Balken sind ein Trend, den alle Zeiträume sehen.</p>
+    <span class="nt">Das ist keine Prognose</span>
+    <p>Niemand hier sagt, wohin der Kurs geht — auch ich nicht. Der Chart zeigt, was die
+      Regel <em>sieht</em>, und die Zahlen darunter sagen, <strong>ab welchem Kurs sie ihre
+      Meinung ändert.</strong> Das ist überprüfbar; eine Prognose wäre es nicht.</p>
   </div>
+  <div id="analyse"></div>
 </section>
 
 <section class="panel" id="p3" role="tabpanel" aria-labelledby="t3" hidden>
+  <p class="lead">Nur ein Alarm, und nur dann, wenn er etwas wert ist.</p>
+  <div id="alarme"></div>
+</section>
+
+<section class="panel" id="p4" role="tabpanel" aria-labelledby="t4" hidden>
   <p class="lead">Aus 398 vergangenen Positionen. Es ist eine Beschreibung, keine Zusage.</p>
   <div id="expect"></div>
 </section>
 
-<section class="panel" id="p4" role="tabpanel" aria-labelledby="t4" hidden>
+<section class="panel" id="p5" role="tabpanel" aria-labelledby="t5" hidden>
   <div id="rules"></div>
 </section>
 
@@ -351,30 +389,194 @@ if ((P.ohne_konto||[]).length) {
     </table></div>`;
 }
 
-/* Signale */
-document.getElementById('sigs').innerHTML = D.signals.slice()
+/* ---------- Analyse: Chart + Begruendung je Instrument ---------- */
+const num = (v, d) => Number(v).toLocaleString('de-DE',
+  {minimumFractionDigits:d, maximumFractionDigits:d});
+const digits = v => v >= 1000 ? 0 : v >= 10 ? 2 : 4;
+
+/* Vergleichskurs je Fenster: heutiger Kurs zurueckgerechnet ueber die Fensterrendite.
+   Genau diese Linie prueft die Regel — deshalb wird sie gezeichnet, nicht beschrieben. */
+function levels(s){
+  const out = [];
+  for (const [lb, r] of Object.entries(s.lookback_returns || {})) {
+    const lvl = s.close / (1 + r);
+    if (isFinite(lvl) && lvl > 0) out.push({lb:+lb, level:lvl, ret:r, up:r > 0});
+  }
+  return out.sort((a,b)=>a.lb-b.lb);
+}
+
+function chart(s, L){
+  const px = D.series[s.instrument];
+  if (!px || px.length < 10) return '<div class="card-b"><p>kein Kursverlauf verfügbar</p></div>';
+  const W=320, H=132, padL=3, padR=44, padT=9, padB=15;
+  const vals = px.concat(L.map(l=>l.level));
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = (hi-lo) || Math.abs(hi) || 1;
+  lo -= span*0.06; hi += span*0.06;
+  const X = i => padL + i*(W-padL-padR)/(px.length-1);
+  const Y = v => padT + (hi-v)*(H-padT-padB)/(hi-lo);
+
+  const line = px.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  const area = `${line} L${X(px.length-1).toFixed(1)} ${H-padB} L${padL} ${H-padB} Z`;
+
+  // Liegen zwei Vergleichskurse dicht beieinander, ueberlagern sich ihre Beschriftungen
+  // und beide werden unlesbar. Die Linien bleiben, wo sie hingehoeren; nur die Texte
+  // werden auseinandergeschoben.
+  const marked = L.map(l=>({...l, y: Y(l.level), ty: Y(l.level)})).sort((a,b)=>a.y-b.y);
+  const GAP = 9.5;
+  for (let i=1;i<marked.length;i++)
+    if (marked[i].ty - marked[i-1].ty < GAP) marked[i].ty = marked[i-1].ty + GAP;
+  const over = marked.length ? marked[marked.length-1].ty - (H-padB) : 0;
+  if (over > 0) marked.forEach(m => m.ty -= over);   // nach oben zurueckschieben
+
+  const marks = marked.map(l=>{
+    const y = l.y.toFixed(1), ty = l.ty.toFixed(1);
+    const col = l.up ? 'var(--long)' : 'var(--bad)';
+    const leader = Math.abs(l.ty - l.y) > 1.5
+      ? `<line x1="${W-padR}" y1="${y}" x2="${W-padR+3}" y2="${ty}" stroke="${col}"
+          stroke-width=".7" opacity=".6"/>` : '';
+    return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="${col}"
+      stroke-width="1" stroke-dasharray="3 3" opacity=".75"/>${leader}
+      <text x="${W-padR+5}" y="${+ty+3.2}" fill="${col}" font-size="9"
+        font-family="IBM Plex Mono, monospace">${l.lb}d</text>`;
+  }).join('');
+
+  const cy = Y(px[px.length-1]).toFixed(1), cx = X(px.length-1).toFixed(1);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="Kursverlauf ${esc(D.names[s.instrument]||s.instrument)} mit den fünf Vergleichskursen">
+    <path d="${area}" fill="var(--accent)" opacity=".07"/>
+    ${marks}
+    <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.4"
+      stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="2.8" fill="var(--accent)"/>
+    <text x="${padL}" y="${H-4}" fill="var(--ink-3)" font-size="8.5"
+      font-family="IBM Plex Mono, monospace">vor ${px.length} Tagen</text>
+    <text x="${W-padR}" y="${H-4}" text-anchor="end" fill="var(--ink-3)" font-size="8.5"
+      font-family="IBM Plex Mono, monospace">heute</text>
+  </svg>`;
+}
+
+/* Was muesste passieren, damit die Regel ihre Meinung aendert?
+   Das naechste gruene Fenster unter dem Kurs ist die Schwelle nach unten,
+   das naechste rote darueber die Schwelle nach oben. */
+function schwellen(s, L){
+  const d = digits(s.close);
+  const gruen = L.filter(l=>l.up).sort((a,b)=>b.level-a.level);
+  const rot   = L.filter(l=>!l.up).sort((a,b)=>a.level-b.level);
+  const out = [];
+  if (gruen.length) {
+    const n = gruen[0];
+    const abst = (s.close/n.level - 1) * 100;
+    out.push(['Fällt unter', `${num(n.level,d)} (${n.lb}d)`,
+      `${abst.toFixed(1).replace('.',',')} % Puffer — dann kippt dieses Fenster auf rot`]);
+  }
+  if (rot.length) {
+    const n = rot[0];
+    const abst = (n.level/s.close - 1) * 100;
+    out.push(['Steigt über', `${num(n.level,d)} (${n.lb}d)`,
+      `${abst.toFixed(1).replace('.',',')} % entfernt — dann wird dieses Fenster grün`]);
+  }
+  return out;
+}
+
+document.getElementById('analyse').innerHTML = D.signals.slice()
   .sort((a,b)=>b.target_weight-a.target_weight).map(s=>{
-  const long = s.target_weight > 0;
-  const lb = Object.values(s.per_lookback||{});
-  return `<div class="sig ${long?'long':'flat'}">
-    <div class="sig-top">
-      <div class="sig-name">
-        <span class="nm">${esc(D.names[s.instrument]||s.instrument)}</span>
-        <span class="cl">${esc(D.klasse[s.instrument]||'')}</span>
-      </div>
-      <div class="sig-w">
-        <div class="num">${s.target_weight.toFixed(2).replace('.',',')}</div>
-        <div class="lab">Gewicht</div>
-      </div>
+  const L = levels(s);
+  const d = digits(s.close);
+  const inPlan = P.positions.find(p=>p.instrument===s.instrument);
+  const chips = L.map(l=>`<span class="wchip ${l.up?'on':'off'}">${l.lb}d ${
+    l.ret>0?'+':''}${(l.ret*100).toFixed(0)} %</span>`).join('');
+  const rows = [];
+  rows.push(['Kurs', num(s.close,d)]);
+  rows.push(['Schwankung im Jahr', `${(s.realized_vol*100).toFixed(0)} %`]);
+  rows.push(['Zielgröße daraus',
+    `${s.vol_scalar.toFixed(2).replace('.',',')} × ${Math.round(s.agreement*100)} % = ${
+    s.target_weight.toFixed(2).replace('.',',')}`]);
+  if (inPlan) rows.push(['Im Plan', `${Math.round(inPlan.eur)} € · ${inPlan.venue}`]);
+  else rows.push(['Im Plan', 'nein']);
+
+  const sw = schwellen(s, L).map(([a,b,c])=>
+    `<div class="rowx"><span class="lab">${a} <strong>${b}</strong><br>
+      <span style="color:var(--ink-3);font-size:12.5px">${c}</span></span></div>`).join('');
+
+  const urteil = s.target_weight === 0
+    ? 'Kein Trend, den die Regel akzeptiert — kein Gewicht.'
+    : s.agreement >= 1
+      ? 'Alle fünf Zeiträume zeigen nach oben. Stärkstes Signal, das die Regel kennt.'
+      : `${Math.round(s.agreement*5)} von 5 Zeiträumen positiv.` +
+        (s.vol_scalar < 0.99
+          ? ' Die Größe begrenzt hier die Schwankung, nicht das Signal.'
+          : ' Die Schwankung ist niedrig genug für volle Größe.');
+
+  return `<div class="card">
+    <div class="card-h">
+      <div><span class="nm">${esc(D.names[s.instrument]||s.instrument)}</span>
+        <span class="cl">${esc(D.klasse[s.instrument]||'')}</span></div>
+      <div class="w"><b style="color:${s.target_weight>0?'var(--long)':'var(--flat)'}">${
+        s.target_weight.toFixed(2).replace('.',',')}</b><s>Gewicht</s></div>
     </div>
-    <div class="bar"><i style="width:${Math.min(100,s.target_weight*100)}%"></i></div>
-    <div class="sig-foot">
-      <div class="dots">${lb.map(v=>`<span class="dot ${v?'on':''}"></span>`).join('')}</div>
-      <span class="dots-lab">${Math.round(s.agreement*100)} %</span>
-      <span class="px">${Number(s.close).toLocaleString('de-DE',{maximumFractionDigits:2})}</span>
+    ${chart(s, L)}
+    <div class="win">${chips}</div>
+    <div class="card-b">
+      <p style="margin:10px 0 6px">${urteil}</p>
+      ${rows.map(([a,b])=>`<div class="rowx"><span class="lab">${a}</span>
+        <span class="val">${b}</span></div>`).join('')}
+      ${sw}
     </div>
   </div>`;
 }).join('');
+
+/* ---------- Alarme ---------- */
+/* Bewusst streng: TSMOM ist eine Allokationsregel, keine Einstiegs-Timing-Regel.
+   Den "perfekten Moment" kennt sie nicht. Das Naechste daran: ein Instrument springt
+   auf 5 von 5 gruenen Fenstern. Alles darunter ist Rauschen und wird nicht gemeldet. */
+(function(){
+  const stark = D.signals.filter(s=>s.agreement>=1 && s.target_weight>0)
+    .sort((a,b)=>b.target_weight-a.target_weight);
+  const knapp = D.signals.filter(s=>s.agreement>=0.8 && s.agreement<1)
+    .sort((a,b)=>b.agreement-a.agreement);
+  let h = '';
+  if (stark.length) {
+    h += '<h2>Voller Rückenwind — 5 von 5</h2>';
+    h += stark.map(s=>{
+      const p = P.positions.find(x=>x.instrument===s.instrument);
+      return `<div class="alarm hot">
+        <div class="ah"><span>${esc(D.names[s.instrument]||s.instrument)}</span>
+          <span class="d">${p ? Math.round(p.eur)+' €' : 'nicht im Plan'}</span></div>
+        <p>Alle fünf Zeiträume positiv, Schwankung ${(s.realized_vol*100).toFixed(0)} % im Jahr.
+          ${p ? 'Steht im heutigen Plan.'
+              : 'Steht nicht im Plan — entweder kein Konto dafür oder das Geld reicht nicht für eine ordentliche Position.'}</p>
+      </div>`;
+    }).join('');
+  } else {
+    h += `<div class="alarm"><div class="ah"><span>Kein starkes Signal</span></div>
+      <p>Zurzeit hat kein Instrument alle fünf Zeiträume grün. Das ist kein Fehler,
+        sondern ein Ergebnis: nicht eingreifen.</p></div>`;
+  }
+  if (knapp.length) {
+    h += '<h2>Kurz davor — 4 von 5</h2>';
+    h += knapp.map(s=>{
+      const L = levels(s), rot = L.filter(l=>!l.up).sort((a,b)=>a.level-b.level)[0];
+      const d = digits(s.close);
+      return `<div class="alarm">
+        <div class="ah"><span>${esc(D.names[s.instrument]||s.instrument)}</span>
+          <span class="d">${Math.round(s.agreement*100)} %</span></div>
+        <p>${rot ? `Über <strong>${num(rot.level,d)}</strong> wäre auch das ${rot.lb}-Tage-Fenster
+          grün — das sind ${((rot.level/s.close-1)*100).toFixed(1).replace('.',',')} % von hier.`
+          : 'Ein Fenster fehlt noch.'}</p>
+      </div>`;
+    }).join('');
+  }
+  h += `<div class="note warn" style="margin-top:26px">
+    <span class="nt">Warum so wenige Alarme</span>
+    <p>Diese Regel sucht keine Einstiegsmomente, sie verteilt Kapital nach Trendstärke.
+      Ein Alarm bei jeder kleinen Bewegung wäre erfunden. Gemeldet wird nur, was die
+      Regel selbst als stärkstes Signal kennt: <strong>alle fünf Zeiträume grün.</strong></p>
+    <p>Per Telegram bekommst du ohnehin nur etwas, wenn sich der Plan ändert —
+      also wenn wirklich gekauft, verkauft oder umgeschichtet wird.</p>
+  </div>`;
+  document.getElementById('alarme').innerHTML = h;
+})();
 
 /* Erwartung */
 const E = D.expect, B = D.buckets || {};
