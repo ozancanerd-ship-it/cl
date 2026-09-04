@@ -3,11 +3,23 @@
 Tests:
 * **trade-order bootstrap** — resample R-multiples with replacement,
 * **trade dropout** — randomly drop a fraction of trades,
-* **cost stress** — inflate the loss side,
+* **cost stress** — an additive cost per trade (F10: frueher wurden nur Verluste
+      multipliziert, Gewinne blieben unberuehrt — reale Kosten verkleinern beides),
 * **start jitter** — drop the first N trades.
 
 Reports 5th-percentile final equity, max-drawdown distribution and **ruin probability**
 (P(peak-to-trough drawdown in R >= threshold)).
+
+WARNUNG (Befund F2, ``docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md``):
+``bootstrap_fraction_positive`` ist **kein Signifikanztest**. Der Bootstrap zieht aus den
+*beobachteten* Trades und ist damit per Konstruktion um deren Mittelwert zentriert. Der
+Wert misst nur, wie oft eine Neuziehung derselben Stichprobe positiv ausfaellt — er sagt
+nichts darueber, ob der Mittelwert selbst von Null verschieden ist.
+
+Als grobe Umrechnung: ``bootstrap_fraction_positive = 0.93`` entspricht einem einseitigen
+Bootstrap-p-Wert von rund 0.07 — nicht signifikant auf 5 %, und voellig unkorrigiert fuer
+die Zahl der getesteten Konfigurationen. Fuer die belastbare Aussage:
+``scripts/audit_multiple_testing.py``.
 """
 
 from __future__ import annotations
@@ -39,7 +51,10 @@ class MonteCarloReport:
     max_dd_r_p95: float
     ruin_probability: float
     ruin_threshold_r: float
-    prob_positive: float
+    bootstrap_fraction_positive: float
+    """Anteil positiver Bootstrap-Ziehungen. KEIN Signifikanztest — siehe Modul-Docstring."""
+
+    extra_cost_r: float
 
 
 def monte_carlo(
@@ -49,9 +64,10 @@ def monte_carlo(
     seed: int = 0,
     ruin_threshold_r: float = 10.0,
     dropout_pct: float = 0.10,
-    cost_stress: float = 1.5,
+    extra_cost_r: float = 0.10,
     start_jitter: int = 0,
 ) -> MonteCarloReport:
+    """``extra_cost_r`` wird von **jedem** Trade abgezogen, Gewinn wie Verlust (F10)."""
     base = [t.realized_r for t in trades]
     if start_jitter:
         base = base[start_jitter:]
@@ -65,7 +81,8 @@ def monte_carlo(
             max_dd_r_p95=0.0,
             ruin_probability=0.0,
             ruin_threshold_r=ruin_threshold_r,
-            prob_positive=0.0,
+            bootstrap_fraction_positive=0.0,
+            extra_cost_r=extra_cost_r,
         )
 
     rng = random.Random(seed)
@@ -78,8 +95,10 @@ def monte_carlo(
         if dropout_pct > 0:
             keep = max(1, int(n * (1.0 - dropout_pct)))
             sample = rng.sample(sample, keep)
-        if cost_stress != 1.0:
-            sample = [r * cost_stress if r < 0 else r for r in sample]
+        if extra_cost_r:
+            # F10: additiver Abzug auf beiden Seiten. Reale Kosten verkleinern auch Gewinne;
+            # die fruehere Multiplikation der Verlustseite war auf der Gewinnseite zu milde.
+            sample = [r - extra_cost_r for r in sample]
         rng.shuffle(sample)
         finals.append(sum(sample))
         dd = _max_dd_r(sample)
@@ -103,7 +122,8 @@ def monte_carlo(
         max_dd_r_p95=pct(dds, 0.95),
         ruin_probability=round(ruined / runs, 4),
         ruin_threshold_r=ruin_threshold_r,
-        prob_positive=round(sum(1 for f in finals if f > 0) / runs, 4),
+        bootstrap_fraction_positive=round(sum(1 for f in finals if f > 0) / runs, 4),
+        extra_cost_r=extra_cost_r,
     )
 
 

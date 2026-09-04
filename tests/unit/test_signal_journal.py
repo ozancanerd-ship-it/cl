@@ -125,7 +125,10 @@ async def test_journal_applies_live_gate_and_renders_report(tmp_path) -> None:
     rows = j.read()
     assert len(rows) == 1
     r = rows[0]
-    assert r["eligibility"] == "shadow"  # IN_VALIDATION → SHADOW
+    # SETUP-BREAKOUT-RETEST-01 ist seit 2026-09-04 REFUTED → BLOCKED (vorher SHADOW).
+    # Das Journal zeichnet den Vorgang weiterhin vollstaendig auf — nur die Einstufung
+    # aendert sich. Genau so soll es sein: nachvollziehbar bleibt es, handelbar nicht.
+    assert r["eligibility"] == "blocked"
     assert r["report"]["entry"] == 4480.0 and r["report"]["tp2"] == 4560.0
     assert r["report"]["setup_id"] == "SETUP-BREAKOUT-RETEST-01"
-    assert r["live_gate"]["eligibility"] == "shadow"
+    assert r["live_gate"]["eligibility"] == "blocked"

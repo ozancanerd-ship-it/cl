@@ -1,0 +1,78 @@
+# Aktive Risikokonfiguration (Ozan, 2026-09-04).
+#
+# ENTSCHEIDUNG DES NUTZERS: Es wird ohne statistischen Beweis gehandelt. Der Grund steht in
+# docs/TSMOM-MULTIASSET-ERGEBNIS-2026-09-04.md — ein Sharpe um 1 braucht ueber ein Jahrzehnt
+# OOS-Daten fuer Signifikanz, der Beweis kommt also nie.
+#
+# Damit verschiebt sich die gesamte Sicherheit von "vorher pruefen" auf DIESE DATEI.
+# Sie ist keine Empfehlung. Die Risk Engine setzt sie hart durch und hat Vetorecht.
+#
+# Die Zahlen sind bewusst klein. Bei ~400 EUR Equity geht es nicht darum, wie viel man
+# verdienen kann, sondern darum, dass ein Irrtum 5 % kostet und nicht 100 %.
+
+schema_version: 1
+
+account:
+  currency: EUR
+  starting_equity: 400
+
+# ── Risiko je Position ───────────────────────────────────────────────────────
+# TSMOM ist eine Allokationsregel, keine Setup-Strategie: das Gewicht kommt aus der
+# Volatilitaets-Zielsteuerung, nicht aus einem Tier. Diese Werte begrenzen, was das
+# Gewicht maximal bedeuten darf.
+risk_tiers:
+  A_plus: 0.50                  # % der Equity Risiko je Position
+  A:      0.35
+  B:      0.25
+
+hard_max_risk_pct: 0.75         # absolute Obergrenze je Position, egal was die Regel sagt
+
+size_multiplier:
+  min: 0.25
+  max: 1.00                     # kein Hebel ueber die Regel hinaus
+
+# ── Portfolio-Grenzen ────────────────────────────────────────────────────────
+portfolio:
+  max_total_exposure_pct: 60    # nie mehr als 60 % der Equity gleichzeitig investiert
+  max_positions: 8              # bei 400 EUR sind mehr Positionen nur Gebuehren
+  max_per_asset_class_pct: 35   # keine Klasse dominiert — das war der Fehler im Altbestand
+  max_correlated_exposure_pct: 30
+  correlation_threshold: 0.60   # ab hier gelten Positionen als dieselbe Wette
+  min_cash_pct: 40              # Puffer, den die Regel nicht anfassen darf
+
+# ── Verlustgrenzen: die eigentliche Notbremse ────────────────────────────────
+# Ohne Beweis vorher ist DAS die Sicherheit. Diese Werte sind nicht verhandelbar,
+# solange kein Forward-Ergebnis vorliegt.
+loss_limits:
+  daily_loss_pct: 2.0           # -2 % an einem Tag  -> keine neuen Positionen bis morgen
+  weekly_loss_pct: 5.0          # -5 % in einer Woche -> Pause bis Wochenwechsel
+  max_drawdown_pct: 10.0        # -10 % vom Hoechststand -> KILL SWITCH, alles aus
+
+# ── Kill-Switch ──────────────────────────────────────────────────────────────
+kill_switch:
+  enabled: true
+  levels:
+    soft: 5.0                   # % Drawdown -> nur noch Positionen verkleinern
+    hard: 10.0                  # % Drawdown -> keine neuen Orders, Bestand halten
+    full: 15.0                  # % Drawdown -> alles schliessen, manuelle Freigabe noetig
+  auto_reset: false             # ein ausgeloester Kill-Switch wird VON HAND zurueckgesetzt
+
+# ── Degradations-Ueberwachung ────────────────────────────────────────────────
+# Ersetzt die einmalige Freigabe. Wenn die Regel live schlechter laeuft als im Backtest,
+# faellt sie automatisch aus, statt dass jemand es irgendwann merkt.
+edge_health:
+  min_forward_trades: 20        # ab so vielen Trades wird ueberhaupt bewertet
+  rolling_window: 60
+  # Backtest-Referenz aus docs/TSMOM-MULTIASSET-ERGEBNIS-2026-09-04.md
+  reference_sharpe: 1.08
+  reference_max_dd_pct: 8.4
+  # Abbruchschwellen, vorab festgelegt:
+  degraded_if_sharpe_below: 0.0     # live negativ ueber das Fenster -> edge_degraded
+  broken_if_dd_exceeds_pct: 16.8    # doppelter Referenz-Drawdown -> BROKEN, Setup gesperrt
+
+# ── Live-Freigabe ────────────────────────────────────────────────────────────
+execution:
+  mode: paper                   # 'paper' | 'live'. Wechsel auf 'live' ist eine bewusste Handlung.
+  max_live_equity_eur: 100      # Obergrenze fuer echtes Geld im ersten Schritt
+  require_manual_confirmation: true   # jede Order wird einzeln bestaetigt
+  # Erst wenn 30 Tage Live ohne Kill-Switch-Ausloesung laufen, darf max_live_equity_eur steigen.

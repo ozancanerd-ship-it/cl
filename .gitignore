@@ -25,6 +25,13 @@ config/*.yaml
 config/*.yml
 !config/*.example.yml
 
+# Ausnahmen: enthalten KEINE Secrets, sind aber tragende Konfiguration und muessen
+# eine Historie haben. risk.yaml ist seit dem Verzicht auf den statistischen Beweis
+# das gesamte Sicherheitsnetz (siehe Kopf der Datei) — eine Aenderung daran ohne
+# nachvollziehbaren Commit waere genau die Art Drift, die man spaeter nicht mehr findet.
+!config/risk.yaml
+!config/costs.yaml
+
 # Secrets / Umgebung (NIE committen)
 .env
 .env.*

@@ -54,12 +54,29 @@ def _trades(rs: list[float]) -> list[TradeRecord]:
 # --------------------------------------------------------------------------- registry
 
 
-def test_builtin_default_is_unvalidated_and_not_live() -> None:
+def test_unknown_setup_defaults_to_unvalidated_and_not_live() -> None:
     reg = ValidationRegistry.default()
-    assert reg.status_of("SMC-SWEEP-REV-01", "0.1.1") is ValidationStatus.UNVALIDATED
-    assert not reg.live_allowed("SMC-SWEEP-REV-01", "0.1.1")
-    # unbekanntes Setup → konservativ UNVALIDATED
+    # unbekanntes Setup → konservativ UNVALIDATED, nie live
     assert reg.status_of("BREAKOUT-RETEST-01", "0.1.1") is ValidationStatus.UNVALIDATED
+    assert not reg.live_allowed("BREAKOUT-RETEST-01", "0.1.1")
+
+
+def test_refuted_setups_are_refuted_in_the_builtin_defaults() -> None:
+    """Die Defaults greifen, wenn die Config fehlt — sie duerfen nicht milder sein.
+
+    Beide SMC-Setups sind seit 2026-09-04 widerlegt (958 OOS-Trades, t = -3.71).
+    Ein Default, der sie als UNVALIDATED fuehrt, laesst sie harmloser aussehen als sie sind.
+    """
+    reg = ValidationRegistry.default()
+    for setup_id in ("SMC-SWEEP-REV-01", "SETUP-BREAKOUT-RETEST-01"):
+        assert reg.status_of(setup_id, "0.1.1") is ValidationStatus.REFUTED
+        assert not reg.live_allowed(setup_id, "0.1.1")
+
+
+def test_tsmom_is_in_validation_in_the_builtin_defaults() -> None:
+    reg = ValidationRegistry.default()
+    assert reg.status_of("SETUP-TSMOM-ENSEMBLE-01", "0.1.1") is ValidationStatus.IN_VALIDATION
+    assert not reg.live_allowed("SETUP-TSMOM-ENSEMBLE-01", "0.1.1")
 
 
 def test_registry_from_file_roundtrip(tmp_path) -> None:
@@ -92,7 +109,7 @@ def test_registry_from_file_roundtrip(tmp_path) -> None:
     assert sv.baseline is not None and sv.baseline.expectancy_r == 0.3
     assert sv.forward_trades_required == 80
     # builtin bleibt erhalten
-    assert reg.status_of("SMC-SWEEP-REV-01", "0.1.1") is ValidationStatus.UNVALIDATED
+    assert reg.status_of("SMC-SWEEP-REV-01", "0.1.1") is ValidationStatus.REFUTED
 
 
 # --------------------------------------------------------------------------- edge health
@@ -129,8 +146,16 @@ def test_edge_health_insufficient_data() -> None:
 
 def test_live_gate_unvalidated_is_shadow() -> None:
     reg = ValidationRegistry.default()
-    g = evaluate_live_gate("SMC-SWEEP-REV-01", "0.1.1", registry=reg)
+    g = evaluate_live_gate("EIN-UNBEKANNTES-SETUP", "0.1.1", registry=reg)
     assert g.eligibility is LiveEligibility.SHADOW and not g.is_live
+
+
+def test_live_gate_refuted_is_blocked_not_shadow() -> None:
+    """SHADOW heisst 'beobachten'. Ein widerlegtes Setup soll gar nicht erst mitlaufen."""
+    reg = ValidationRegistry.default()
+    g = evaluate_live_gate("SMC-SWEEP-REV-01", "0.1.1", registry=reg)
+    assert g.eligibility is LiveEligibility.BLOCKED and not g.is_live
+    assert any("refuted" in r for r in g.reasons)
 
 
 def test_live_gate_validated_is_live() -> None:
@@ -177,7 +202,7 @@ def test_apply_live_gate_flags_signal_report_as_shadow() -> None:
         instrument="XAUUSDT",
         information_cutoff=_T0,
         setup_state=_E(value="armed"),
-        setup_id="SMC-SWEEP-REV-01",
+        setup_id="SETUP-TSMOM-ENSEMBLE-01",  # in_validation -> SHADOW
         strategy_version="0.1.1",
         direction=Direction.LONG,
         chain_progress="armed",

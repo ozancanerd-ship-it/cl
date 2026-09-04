@@ -49,11 +49,18 @@ from trading_agent.core.enums import (
 )
 from trading_agent.core.models import OHLCV
 from trading_agent.core.time import parse_timestamp
+from trading_agent.data.freshness import warn_if_stale
 from trading_agent.data.repository import MarketDataRepository
 from trading_agent.journal.ledger import TradeRecord
+from trading_agent.research.costs import CostModel, load_cost_model
 from trading_agent.research.metrics import compute_metrics
 from trading_agent.research.robustness import monte_carlo
-from trading_agent.research.validation import symbol_stability, time_stability, walk_forward_folds
+from trading_agent.research.validation import (
+    purge_embargo,
+    symbol_stability,
+    time_stability,
+    walk_forward_folds,
+)
 from trading_agent.strategy.primitives.atr import atr_series
 from trading_agent.strategy.primitives.models import StructureBreak, SwingPoint
 from trading_agent.strategy.primitives.structure import derive_structure_state, structure_breaks
@@ -622,7 +629,15 @@ _MANAGE = "fixed"  # "fixed" | "scaled"  (per --manage)
 
 
 def _simulate(
-    h4: list[OHLCV], sig: Signal, *, rr: float, cost_r: float, symbol: str, setup: str
+    h4: list[OHLCV],
+    sig: Signal,
+    *,
+    rr: float,
+    symbol: str,
+    setup: str,
+    atr: float,
+    cost_model: CostModel | None,
+    cost_r_flat: float,
 ) -> TradeRecord | None:
     ei = sig.at_index + 1
     if ei >= len(h4):
@@ -686,6 +701,13 @@ def _simulate(
         else:
             exit_price = h4[last].close
         gross_r = d * (exit_price - entry) / r_unit
+    # Kosten je Trade aus Einstiegspreis, Stop-Distanz und ATR (Befund F4).
+    # ``--cost-r`` bleibt als Override erhalten, um alte Laeufe zu reproduzieren.
+    cost_r = (
+        cost_model.cost_r(symbol, entry=entry, atr=atr, r_unit=r_unit)
+        if cost_model is not None
+        else cost_r_flat
+    )
     realized_r = gross_r - cost_r
     wl = "WIN" if realized_r > 0.02 else "LOSS" if realized_r < -0.02 else "SCRATCH"
     return TradeRecord(
@@ -720,7 +742,8 @@ def _run_detector(
     ctxs: list[Ctx],
     *,
     rr: float,
-    cost_r: float,
+    cost_model: CostModel | None,
+    cost_r_flat: float,
 ) -> list[TradeRecord]:
     trades: list[TradeRecord] = []
     for ctx in ctxs:
@@ -731,7 +754,16 @@ def _run_detector(
             sig = det(ctx, i)
             if sig is None:
                 continue
-            tr = _simulate(ctx.h4, sig, rr=rr, cost_r=cost_r, symbol=ctx.symbol, setup=name)
+            tr = _simulate(
+                ctx.h4,
+                sig,
+                rr=rr,
+                symbol=ctx.symbol,
+                setup=name,
+                atr=ctx.atr[sig.at_index],
+                cost_model=cost_model,
+                cost_r_flat=cost_r_flat,
+            )
             if tr is None:
                 continue
             trades.append(tr)
@@ -761,7 +793,17 @@ def _m(trades: list[TradeRecord]) -> dict[str, object]:
     }
 
 
-def _wf(trades: list[TradeRecord], start: datetime, end: datetime) -> list[dict[str, object]]:
+def _rolling_window_report(
+    trades: list[TradeRecord], start: datetime, end: datetime
+) -> list[dict[str, object]]:
+    """Rollierender 90-Tage-Bericht auf FESTEN Parametern.
+
+    Befund F8: Das hiess frueher ``_wf`` und wurde als Walk-Forward gezaehlt. Es ist
+    keiner — das Train-Fenster wird nie benutzt, je Fold wird nichts neu gefittet. Als
+    Stabilitaetsansicht ueber die Zeit ist es brauchbar; als Validierungsachse aus dem
+    Masterplan zaehlt es nicht. Ein echter Walk-Forward mit Refitting je Fold gehoert
+    zur TSMOM-Pruefkette.
+    """
     out: list[dict[str, object]] = []
     for f in walk_forward_folds(start, end, train_days=200, test_days=90, step_days=90):
         te = f.test_trades(trades)
@@ -782,6 +824,7 @@ def _wf(trades: list[TradeRecord], start: datetime, end: datetime) -> list[dict[
 
 
 def _mc(trades: list[TradeRecord]) -> dict[str, object]:
+    """Monte-Carlo-Bootstrap. ``bootstrap_fraction_positive`` ist KEIN Signifikanztest (F2)."""
     if len(trades) < 20:
         return {"note": "zu wenige Trades"}
     r = monte_carlo(trades, runs=2000, seed=7)
@@ -790,7 +833,9 @@ def _mc(trades: list[TradeRecord]) -> dict[str, object]:
         "final_r_p50": round(r.final_equity_r_p50, 2),
         "final_r_p95": round(r.final_equity_r_p95, 2),
         "max_dd_r_p95": round(r.max_dd_r_p95, 2),
-        "prob_positive": round(r.prob_positive, 4),
+        "bootstrap_fraction_positive": round(r.bootstrap_fraction_positive, 4),
+        "extra_cost_r": r.extra_cost_r,
+        "_hinweis": "kein Signifikanztest — siehe scripts/audit_multiple_testing.py",
     }
 
 
@@ -845,13 +890,17 @@ def _evaluate(
             is_pick[rr] = compute_metrics(is_t).expectancy_r
     best_rr = max(is_pick, key=lambda k: is_pick[k]) if is_pick else 2.0
     trades = trades_by_rr[best_rr]
-    # Purge/Embargo: Trades, deren Leben die IS/OOS-Grenze überspannt, fallen aus beiden Blöcken
-    # (max Haltedauer 60 H4-Bars = 10 Tage → 12-Tage-Puffer). Verhindert Leakage über die Grenze.
-    from datetime import timedelta as _td
-
-    embargo = _td(days=12)
-    is_t = [t for t in trades if t.exit_ts < split - embargo]
-    oos_t = [t for t in trades if t.entry_ts >= split + embargo]
+    # Purge/Embargo ueber die gemeinsame Funktion (F7: sie war definiert, exportiert und
+    # getestet, wurde aber nirgends im Produktivpfad aufgerufen — hier stand ein Nachbau).
+    kept = purge_embargo(
+        trades,
+        boundary=split,
+        timeframe=_H4,
+        max_hold_bars=_MAX_HOLD_H4,
+        embargo_bars=_MAX_HOLD_H4,
+    )
+    is_t = [t for t in kept if t.exit_ts < split]
+    oos_t = [t for t in kept if t.entry_ts >= split]
     ss = symbol_stability(oos_t if oos_t else trades)
     ts = time_stability(trades, window_days=90, step_days=45)
     return {
@@ -862,11 +911,15 @@ def _evaluate(
         "OOS": _m(oos_t),
         "dir_split_all": _dir_split(trades),
         "focus": {s: _focus(trades, s, split) for s in focus_symbols},
-        "walk_forward": _wf(trades, start, end),
-        "monte_carlo_full": _mc(trades),
+        "rolling_window_report": _rolling_window_report(trades, start, end),
+        "monte_carlo_oos": _mc(oos_t),
+        "monte_carlo_all": _mc(trades),
         "symbol_stability": {
             "per_symbol_total_r": ss.per_symbol_total_r,
+            "per_symbol_n": ss.per_symbol_n,
             "fraction_positive": ss.fraction_positive,
+            "min_trades": ss.min_trades,
+            "n_symbols_considered": ss.n_symbols_considered,
             "total_r_without_best": ss.total_r_without_best,
         },
         "time_windows_90d": [
@@ -901,7 +954,22 @@ def main() -> int:
     ap.add_argument("--start", default="2023-01-01")
     ap.add_argument("--split", default="2025-06-01")
     ap.add_argument("--end", default="2026-08-29")
-    ap.add_argument("--cost-r", type=float, default=0.03)
+    ap.add_argument(
+        "--cost-r",
+        type=float,
+        default=0.03,
+        help="Pauschale in R — nur wirksam mit --flat-costs (Reproduktion alter Laeufe)",
+    )
+    ap.add_argument(
+        "--costs",
+        default="config/costs.yaml",
+        help="Kostenmodell je Symbol (Default). Siehe Befund F4 im Methoden-Audit.",
+    )
+    ap.add_argument(
+        "--flat-costs",
+        action="store_true",
+        help="Statt des Modells die Pauschale aus --cost-r verwenden (nicht empfohlen)",
+    )
     ap.add_argument("--manage", choices=["fixed", "scaled"], default="fixed")
     ap.add_argument("--focus", nargs="+", default=["XAUUSDT", "XAUUSD-YF", "XAUUSD"])
     ap.add_argument("--dxy-symbol", default="DXY-YF", help="DXY-Reihe für den S16-Gegenwind-Filter")
@@ -911,6 +979,24 @@ def main() -> int:
     global _MANAGE
     _MANAGE = args.manage
     start, split, end = (parse_timestamp(x) for x in (args.start, args.split, args.end))
+
+    # Kostenmodell je Symbol ist der Default. --flat-costs reproduziert alte Laeufe.
+    cost_model: CostModel | None = None if args.flat_costs else load_cost_model(args.costs)
+    if cost_model is None:
+        print(f"  ! FLACHE KOSTEN {args.cost_r} R je Trade — nur fuer Reproduktion alter Laeufe")
+    else:
+        print(f"  Kostenmodell: {args.costs} (je Trade aus entry/ATR/r_unit)")
+
+    # Befund F12: veraltete Reihen haben die bisherige OOS-Aussage getragen.
+    # Ein Lauf auf alten Daten darf sein — aber nie mehr unbemerkt.
+    stale = warn_if_stale(args.repo, list(args.symbols))
+    if stale:
+        print("  ! VERALTETE DATENREIHEN — Ergebnisse entsprechend einordnen:")
+        for a in stale:
+            last = a.last.date().isoformat() if a.last else "leer"
+            print(
+                f"      {a.instrument:<12} bis {last}  ({a.age_days}d alt, Toleranz {a.tolerance_days}d)"
+            )
     repo = MarketDataRepository(args.repo)
 
     dxy_d1 = repo.read_ohlcv(args.dxy_symbol, _D1, start, end)
@@ -938,7 +1024,12 @@ def main() -> int:
     results: dict[str, object] = {}
     store: dict[str, dict[float, list[TradeRecord]]] = {}
     for name, det in DETECTORS.items():
-        by_rr = {rr: _run_detector(name, det, ctxs, rr=rr, cost_r=args.cost_r) for rr in _RRS}
+        by_rr = {
+            rr: _run_detector(
+                name, det, ctxs, rr=rr, cost_model=cost_model, cost_r_flat=args.cost_r
+            )
+            for rr in _RRS
+        }
         store[name] = by_rr
         results[name] = _evaluate(
             by_rr, split=split, start=start, end=end, focus_symbols=tuple(args.focus)

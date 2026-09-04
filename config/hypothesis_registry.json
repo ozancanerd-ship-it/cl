@@ -1,0 +1,5791 @@
+{
+  "version": 1,
+  "updated": "2026-09-04T10:12:26.290713+00:00",
+  "note": "Jede je getestete Konfiguration, auch die verworfenen. Diese Zahl geht in die Multiple-Testing-Korrektur ein (Bonferroni und Deflated Sharpe Ratio). Eine Hypothese, die hier fehlt, macht jedes Ergebnis zu gut. Siehe docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md, Befund F1.",
+  "total_configurations": 809,
+  "entries": [
+    {
+      "id": "setup_research_split-2024-06_scaled:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 902,
+        "oos_expectancy_r": -0.0056,
+        "sharpe_r": -0.0052,
+        "profit_factor": 0.989
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2024-06_scaled:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 282,
+        "oos_expectancy_r": 0.1944,
+        "sharpe_r": 0.1753,
+        "profit_factor": 1.438
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2024-06_scaled:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 101,
+        "oos_expectancy_r": 0.0278,
+        "sharpe_r": 0.0254,
+        "profit_factor": 1.056
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2024-06_scaled:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 80,
+        "oos_expectancy_r": -0.0287,
+        "sharpe_r": -0.0294,
+        "profit_factor": 0.938
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2024-06_scaled:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 30,
+        "oos_expectancy_r": 0.315,
+        "sharpe_r": 0.2746,
+        "profit_factor": 1.743
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2024-06_scaled:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 66,
+        "oos_expectancy_r": -0.0091,
+        "sharpe_r": -0.0087,
+        "profit_factor": 0.98
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2024-06_scaled:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_split-2024-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2024-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 925,
+        "oos_expectancy_r": 0.0044,
+        "sharpe_r": 0.0041,
+        "profit_factor": 1.009
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 99,
+        "oos_expectancy_r": 0.1624,
+        "sharpe_r": 0.0907,
+        "profit_factor": 1.233
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 49,
+        "oos_expectancy_r": 0.0383,
+        "sharpe_r": 0.0245,
+        "profit_factor": 1.056
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 17,
+        "oos_expectancy_r": -0.284,
+        "sharpe_r": -0.2364,
+        "profit_factor": 0.588
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 12,
+        "oos_expectancy_r": 0.0036,
+        "sharpe_r": 0.0027,
+        "profit_factor": 1.007
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 8,
+        "oos_expectancy_r": 0.0172,
+        "sharpe_r": 0.0101,
+        "profit_factor": 1.024
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 12,
+        "oos_expectancy_r": 0.0773,
+        "sharpe_r": 0.0682,
+        "profit_factor": 1.172
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_fixed:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_split-2025-06_fixed",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-06-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 98,
+        "oos_expectancy_r": 0.0598,
+        "sharpe_r": 0.0349,
+        "profit_factor": 1.084
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 111,
+        "oos_expectancy_r": 0.2406,
+        "sharpe_r": 0.1903,
+        "profit_factor": 1.536
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": 0.0135,
+        "sharpe_r": 0.0122,
+        "profit_factor": 1.026
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 19,
+        "oos_expectancy_r": -0.2322,
+        "sharpe_r": -0.225,
+        "profit_factor": 0.622
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 13,
+        "oos_expectancy_r": 0.0203,
+        "sharpe_r": 0.0208,
+        "profit_factor": 1.05
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 8,
+        "oos_expectancy_r": 0.2525,
+        "sharpe_r": 0.2156,
+        "profit_factor": 1.635
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 12,
+        "oos_expectancy_r": 0.1607,
+        "sharpe_r": 0.2061,
+        "profit_factor": 1.606
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_split-2025-06_scaled:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_split-2025-06_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 111,
+        "oos_expectancy_r": 0.2088,
+        "sharpe_r": 0.1687,
+        "profit_factor": 1.465
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 869,
+        "oos_expectancy_r": 0.0277,
+        "sharpe_r": 0.024,
+        "profit_factor": 1.056
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 346,
+        "oos_expectancy_r": 0.1848,
+        "sharpe_r": 0.1694,
+        "profit_factor": 1.423
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 137,
+        "oos_expectancy_r": -0.1223,
+        "sharpe_r": -0.1184,
+        "profit_factor": 0.777
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 103,
+        "oos_expectancy_r": 0.022,
+        "sharpe_r": 0.0211,
+        "profit_factor": 1.049
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 65,
+        "oos_expectancy_r": 0.3738,
+        "sharpe_r": 0.3444,
+        "profit_factor": 2.026
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 95,
+        "oos_expectancy_r": 0.09,
+        "sharpe_r": 0.0877,
+        "profit_factor": 1.219
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 38,
+        "oos_expectancy_r": 0.3253,
+        "sharpe_r": 0.288,
+        "profit_factor": 1.857
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": 0.4144,
+        "sharpe_r": 0.3865,
+        "profit_factor": 2.207
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 32,
+        "oos_expectancy_r": 0.4075,
+        "sharpe_r": 0.3584,
+        "profit_factor": 2.151
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 21,
+        "oos_expectancy_r": 0.0652,
+        "sharpe_r": 0.0605,
+        "profit_factor": 1.133
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 18,
+        "oos_expectancy_r": 0.345,
+        "sharpe_r": 0.3042,
+        "profit_factor": 1.861
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S14_regime_gate_er30",
+      "setup": "S14_regime_gate_er30",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 4,
+        "oos_expectancy_r": 0.72,
+        "sharpe_r": 0.6285,
+        "profit_factor": 3.796
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S15_regime_gate_er40",
+      "setup": "S15_regime_gate_er40",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:S16_dxy_headwind",
+      "setup": "S16_dxy_headwind",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 50,
+        "oos_expectancy_r": 0.395,
+        "sharpe_r": 0.3666,
+        "profit_factor": 2.128
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v10_dxy:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v10_dxy",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 901,
+        "oos_expectancy_r": 0.0387,
+        "sharpe_r": 0.0334,
+        "profit_factor": 1.078
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 670,
+        "oos_expectancy_r": 0.0462,
+        "sharpe_r": 0.0426,
+        "profit_factor": 1.093
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 216,
+        "oos_expectancy_r": 0.195,
+        "sharpe_r": 0.1742,
+        "profit_factor": 1.461
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 87,
+        "oos_expectancy_r": -0.0555,
+        "sharpe_r": -0.0546,
+        "profit_factor": 0.888
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 72,
+        "oos_expectancy_r": 0.0195,
+        "sharpe_r": 0.0183,
+        "profit_factor": 1.043
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 41,
+        "oos_expectancy_r": 0.409,
+        "sharpe_r": 0.3393,
+        "profit_factor": 2.252
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 68,
+        "oos_expectancy_r": 0.0732,
+        "sharpe_r": 0.0706,
+        "profit_factor": 1.172
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 28,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.4234,
+        "profit_factor": 2.597
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 34,
+        "oos_expectancy_r": 0.5729,
+        "sharpe_r": 0.4706,
+        "profit_factor": 3.101
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 24,
+        "oos_expectancy_r": 0.6262,
+        "sharpe_r": 0.5436,
+        "profit_factor": 3.432
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 16,
+        "oos_expectancy_r": -0.03,
+        "sharpe_r": -0.0289,
+        "profit_factor": 0.942
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 15,
+        "oos_expectancy_r": 0.3367,
+        "sharpe_r": 0.2797,
+        "profit_factor": 1.817
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S14_regime_gate_er30",
+      "setup": "S14_regime_gate_er30",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 4,
+        "oos_expectancy_r": 0.72,
+        "sharpe_r": 0.6285,
+        "profit_factor": 3.796
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S15_regime_gate_er40",
+      "setup": "S15_regime_gate_er40",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S16_dxy_headwind",
+      "setup": "S16_dxy_headwind",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 31,
+        "oos_expectancy_r": 0.5829,
+        "sharpe_r": 0.4793,
+        "profit_factor": 3.193
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S17_regime_gate_er20",
+      "setup": "S17_regime_gate_er20",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 16,
+        "oos_expectancy_r": 0.4387,
+        "sharpe_r": 0.3951,
+        "profit_factor": 2.363
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:S18_regime_gate_er25",
+      "setup": "S18_regime_gate_er25",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 11,
+        "oos_expectancy_r": 0.6064,
+        "sharpe_r": 0.5366,
+        "profit_factor": 3.159
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v11_regime_soft:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v11_regime_soft",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 685,
+        "oos_expectancy_r": 0.0671,
+        "sharpe_r": 0.0617,
+        "profit_factor": 1.137
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 703,
+        "oos_expectancy_r": -0.1221,
+        "sharpe_r": -0.0757,
+        "profit_factor": 0.841
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 324,
+        "oos_expectancy_r": 0.0294,
+        "sharpe_r": 0.0187,
+        "profit_factor": 1.042
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 136,
+        "oos_expectancy_r": -0.2109,
+        "sharpe_r": -0.1664,
+        "profit_factor": 0.7
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 112,
+        "oos_expectancy_r": 0.0137,
+        "sharpe_r": 0.011,
+        "profit_factor": 1.025
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": 0.1559,
+        "sharpe_r": 0.0949,
+        "profit_factor": 1.234
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 99,
+        "oos_expectancy_r": 0.0793,
+        "sharpe_r": 0.0615,
+        "profit_factor": 1.146
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.0094,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 39,
+        "oos_expectancy_r": 0.2531,
+        "sharpe_r": 0.1518,
+        "profit_factor": 1.399
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 45,
+        "oos_expectancy_r": 0.37,
+        "sharpe_r": 0.2158,
+        "profit_factor": 1.599
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 32,
+        "oos_expectancy_r": 0.5013,
+        "sharpe_r": 0.2887,
+        "profit_factor": 1.865
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 17,
+        "oos_expectancy_r": -0.4418,
+        "sharpe_r": -0.4166,
+        "profit_factor": 0.439
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 18,
+        "oos_expectancy_r": 0.3033,
+        "sharpe_r": 0.2035,
+        "profit_factor": 1.53
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S14_regime_gate_er30",
+      "setup": "S14_regime_gate_er30",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 6,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.3133,
+        "profit_factor": 1.913
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S15_regime_gate_er40",
+      "setup": "S15_regime_gate_er40",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S16_dxy_headwind",
+      "setup": "S16_dxy_headwind",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 42,
+        "oos_expectancy_r": 0.3033,
+        "sharpe_r": 0.1785,
+        "profit_factor": 1.476
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S17_regime_gate_er20",
+      "setup": "S17_regime_gate_er20",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 21,
+        "oos_expectancy_r": 0.2557,
+        "sharpe_r": 0.1722,
+        "profit_factor": 1.434
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:S18_regime_gate_er25",
+      "setup": "S18_regime_gate_er25",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 13,
+        "oos_expectancy_r": 0.3546,
+        "sharpe_r": 0.2371,
+        "profit_factor": 1.639
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v12_freshdata_c003:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v12_freshdata_c003",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 720,
+        "oos_expectancy_r": -0.1171,
+        "sharpe_r": -0.0726,
+        "profit_factor": 0.847
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 703,
+        "oos_expectancy_r": -0.2921,
+        "sharpe_r": -0.1811,
+        "profit_factor": 0.673
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 324,
+        "oos_expectancy_r": -0.1406,
+        "sharpe_r": -0.0894,
+        "profit_factor": 0.827
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 136,
+        "oos_expectancy_r": -0.3809,
+        "sharpe_r": -0.3005,
+        "profit_factor": 0.538
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 112,
+        "oos_expectancy_r": -0.1563,
+        "sharpe_r": -0.1249,
+        "profit_factor": 0.763
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": -0.0141,
+        "sharpe_r": -0.0086,
+        "profit_factor": 0.982
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 99,
+        "oos_expectancy_r": -0.0907,
+        "sharpe_r": -0.0705,
+        "profit_factor": 0.859
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": -0.1606,
+        "sharpe_r": 0.0,
+        "profit_factor": 0.0
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 39,
+        "oos_expectancy_r": 0.0831,
+        "sharpe_r": 0.0498,
+        "profit_factor": 1.112
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 45,
+        "oos_expectancy_r": 0.2,
+        "sharpe_r": 0.1166,
+        "profit_factor": 1.278
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 32,
+        "oos_expectancy_r": 0.3312,
+        "sharpe_r": 0.1908,
+        "profit_factor": 1.491
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 17,
+        "oos_expectancy_r": -0.6118,
+        "sharpe_r": -0.5769,
+        "profit_factor": 0.333
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 18,
+        "oos_expectancy_r": 0.1333,
+        "sharpe_r": 0.0894,
+        "profit_factor": 1.2
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S14_regime_gate_er30",
+      "setup": "S14_regime_gate_er30",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 6,
+        "oos_expectancy_r": 0.3,
+        "sharpe_r": 0.2,
+        "profit_factor": 1.5
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S15_regime_gate_er40",
+      "setup": "S15_regime_gate_er40",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S16_dxy_headwind",
+      "setup": "S16_dxy_headwind",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 42,
+        "oos_expectancy_r": 0.1333,
+        "sharpe_r": 0.0784,
+        "profit_factor": 1.179
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S17_regime_gate_er20",
+      "setup": "S17_regime_gate_er20",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 21,
+        "oos_expectancy_r": 0.0857,
+        "sharpe_r": 0.0577,
+        "profit_factor": 1.125
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:S18_regime_gate_er25",
+      "setup": "S18_regime_gate_er25",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 13,
+        "oos_expectancy_r": 0.1846,
+        "sharpe_r": 0.1234,
+        "profit_factor": 1.286
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v13_freshdata_c020:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v13_freshdata_c020",
+      "date": "2026-09-03",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.2,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 720,
+        "oos_expectancy_r": -0.2871,
+        "sharpe_r": -0.178,
+        "profit_factor": 0.678
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 958,
+        "oos_expectancy_r": -0.1964,
+        "sharpe_r": -0.1199,
+        "profit_factor": 0.766
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 459,
+        "oos_expectancy_r": -0.1221,
+        "sharpe_r": -0.078,
+        "profit_factor": 0.846
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 168,
+        "oos_expectancy_r": -0.2509,
+        "sharpe_r": -0.1682,
+        "profit_factor": 0.687
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 145,
+        "oos_expectancy_r": 0.0232,
+        "sharpe_r": 0.0156,
+        "profit_factor": 1.038
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 73,
+        "oos_expectancy_r": -0.0121,
+        "sharpe_r": -0.0074,
+        "profit_factor": 0.984
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 133,
+        "oos_expectancy_r": -0.0117,
+        "sharpe_r": -0.0081,
+        "profit_factor": 0.981
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.0198,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 52,
+        "oos_expectancy_r": 0.0476,
+        "sharpe_r": 0.0288,
+        "profit_factor": 1.064
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 61,
+        "oos_expectancy_r": 0.1417,
+        "sharpe_r": 0.0841,
+        "profit_factor": 1.197
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 42,
+        "oos_expectancy_r": 0.2322,
+        "sharpe_r": 0.1358,
+        "profit_factor": 1.339
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 24,
+        "oos_expectancy_r": -0.6676,
+        "sharpe_r": -0.5878,
+        "profit_factor": 0.304
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 24,
+        "oos_expectancy_r": 0.0603,
+        "sharpe_r": 0.0372,
+        "profit_factor": 1.083
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S14_regime_gate_er30",
+      "setup": "S14_regime_gate_er30",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 6,
+        "oos_expectancy_r": 0.4168,
+        "sharpe_r": 0.2796,
+        "profit_factor": 1.777
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S15_regime_gate_er40",
+      "setup": "S15_regime_gate_er40",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S16_dxy_headwind",
+      "setup": "S16_dxy_headwind",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 58,
+        "oos_expectancy_r": 0.0823,
+        "sharpe_r": 0.0494,
+        "profit_factor": 1.112
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S17_regime_gate_er20",
+      "setup": "S17_regime_gate_er20",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 25,
+        "oos_expectancy_r": 0.0309,
+        "sharpe_r": 0.0175,
+        "profit_factor": 1.04
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:S18_regime_gate_er25",
+      "setup": "S18_regime_gate_er25",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 13,
+        "oos_expectancy_r": 0.2991,
+        "sharpe_r": 0.2018,
+        "profit_factor": 1.518
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v14_realcosts:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v14_realcosts",
+      "date": "2026-09-04",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-01"
+      },
+      "result": {
+        "oos_n": 968,
+        "oos_expectancy_r": -0.1933,
+        "sharpe_r": -0.1181,
+        "profit_factor": 0.769
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 345,
+        "oos_expectancy_r": 0.0614,
+        "sharpe_r": 0.0521,
+        "profit_factor": 1.125
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 142,
+        "oos_expectancy_r": 0.21,
+        "sharpe_r": 0.1886,
+        "profit_factor": 1.479
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 49,
+        "oos_expectancy_r": -0.1622,
+        "sharpe_r": -0.1592,
+        "profit_factor": 0.712
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 37,
+        "oos_expectancy_r": -0.006,
+        "sharpe_r": -0.0057,
+        "profit_factor": 0.987
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 16,
+        "oos_expectancy_r": 0.1587,
+        "sharpe_r": 0.131,
+        "profit_factor": 1.342
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 32,
+        "oos_expectancy_r": 0.057,
+        "sharpe_r": 0.0574,
+        "profit_factor": 1.141
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v2_split-2025-01_scaled:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v2_split-2025-01_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 419,
+        "oos_expectancy_r": 0.0909,
+        "sharpe_r": 0.0785,
+        "profit_factor": 1.191
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 163,
+        "oos_expectancy_r": 0.0311,
+        "sharpe_r": 0.0262,
+        "profit_factor": 1.061
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 82,
+        "oos_expectancy_r": 0.2475,
+        "sharpe_r": 0.2317,
+        "profit_factor": 1.623
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 38,
+        "oos_expectancy_r": -0.0519,
+        "sharpe_r": -0.0509,
+        "profit_factor": 0.894
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 23,
+        "oos_expectancy_r": 0.0992,
+        "sharpe_r": 0.0919,
+        "profit_factor": 1.239
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 19,
+        "oos_expectancy_r": 0.44,
+        "sharpe_r": 0.3641,
+        "profit_factor": 2.314
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 19,
+        "oos_expectancy_r": 0.1382,
+        "sharpe_r": 0.1716,
+        "profit_factor": 1.495
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v3_gold-yf_scaled:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v3_gold-yf_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-06-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 171,
+        "oos_expectancy_r": 0.0576,
+        "sharpe_r": 0.0483,
+        "profit_factor": 1.115
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 533,
+        "oos_expectancy_r": -0.0056,
+        "sharpe_r": -0.0049,
+        "profit_factor": 0.989
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 222,
+        "oos_expectancy_r": 0.175,
+        "sharpe_r": 0.1633,
+        "profit_factor": 1.408
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 83,
+        "oos_expectancy_r": -0.1458,
+        "sharpe_r": -0.1443,
+        "profit_factor": 0.734
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 62,
+        "oos_expectancy_r": -0.0947,
+        "sharpe_r": -0.0951,
+        "profit_factor": 0.81
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 46,
+        "oos_expectancy_r": 0.5704,
+        "sharpe_r": 0.5586,
+        "profit_factor": 3.063
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 61,
+        "oos_expectancy_r": -0.0007,
+        "sharpe_r": -0.0007,
+        "profit_factor": 0.998
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v4_gold-fx_scaled:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v4_gold-fx_scaled",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 557,
+        "oos_expectancy_r": 0.0145,
+        "sharpe_r": 0.0127,
+        "profit_factor": 1.029
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 560,
+        "oos_expectancy_r": -0.0118,
+        "sharpe_r": -0.0103,
+        "profit_factor": 0.977
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 235,
+        "oos_expectancy_r": 0.1556,
+        "sharpe_r": 0.1444,
+        "profit_factor": 1.353
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 84,
+        "oos_expectancy_r": -0.1388,
+        "sharpe_r": -0.1379,
+        "profit_factor": 0.744
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 63,
+        "oos_expectancy_r": -0.0862,
+        "sharpe_r": -0.0871,
+        "profit_factor": 0.824
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 47,
+        "oos_expectancy_r": 0.5836,
+        "sharpe_r": 0.5755,
+        "profit_factor": 3.156
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 62,
+        "oos_expectancy_r": 0.0064,
+        "sharpe_r": 0.0064,
+        "profit_factor": 1.014
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v5_real-gold:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v5_real-gold",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-04-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 584,
+        "oos_expectancy_r": 0.0077,
+        "sharpe_r": 0.0067,
+        "profit_factor": 1.015
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 2280,
+        "oos_expectancy_r": -0.0305,
+        "sharpe_r": -0.0276,
+        "profit_factor": 0.943
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 751,
+        "oos_expectancy_r": 0.1181,
+        "sharpe_r": 0.108,
+        "profit_factor": 1.253
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.5,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 285,
+        "oos_expectancy_r": -0.0397,
+        "sharpe_r": -0.035,
+        "profit_factor": 0.926
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 235,
+        "oos_expectancy_r": 0.0355,
+        "sharpe_r": 0.0352,
+        "profit_factor": 1.078
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 114,
+        "oos_expectancy_r": 0.304,
+        "sharpe_r": 0.2565,
+        "profit_factor": 1.743
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 184,
+        "oos_expectancy_r": 0.0487,
+        "sharpe_r": 0.0453,
+        "profit_factor": 1.108
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v6_real2023:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v6_real2023",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2023-07-01",
+        "cost_r": 0.06,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 2337,
+        "oos_expectancy_r": -0.016,
+        "sharpe_r": -0.0144,
+        "profit_factor": 0.97
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 869,
+        "oos_expectancy_r": 0.0277,
+        "sharpe_r": 0.024,
+        "profit_factor": 1.056
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 346,
+        "oos_expectancy_r": 0.1848,
+        "sharpe_r": 0.1694,
+        "profit_factor": 1.423
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 137,
+        "oos_expectancy_r": -0.1223,
+        "sharpe_r": -0.1184,
+        "profit_factor": 0.777
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 103,
+        "oos_expectancy_r": 0.022,
+        "sharpe_r": 0.0211,
+        "profit_factor": 1.049
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 65,
+        "oos_expectancy_r": 0.3738,
+        "sharpe_r": 0.3444,
+        "profit_factor": 2.026
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 95,
+        "oos_expectancy_r": 0.09,
+        "sharpe_r": 0.0877,
+        "profit_factor": 1.219
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 38,
+        "oos_expectancy_r": 0.3253,
+        "sharpe_r": 0.288,
+        "profit_factor": 1.857
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": 0.4144,
+        "sharpe_r": 0.3865,
+        "profit_factor": 2.207
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v7_strict_variants:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v7_strict_variants",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 901,
+        "oos_expectancy_r": 0.0387,
+        "sharpe_r": 0.0334,
+        "profit_factor": 1.078
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 869,
+        "oos_expectancy_r": 0.0277,
+        "sharpe_r": 0.024,
+        "profit_factor": 1.056
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 346,
+        "oos_expectancy_r": 0.1848,
+        "sharpe_r": 0.1694,
+        "profit_factor": 1.423
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 137,
+        "oos_expectancy_r": -0.1223,
+        "sharpe_r": -0.1184,
+        "profit_factor": 0.777
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 103,
+        "oos_expectancy_r": 0.022,
+        "sharpe_r": 0.0211,
+        "profit_factor": 1.049
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 65,
+        "oos_expectancy_r": 0.3738,
+        "sharpe_r": 0.3444,
+        "profit_factor": 2.026
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 95,
+        "oos_expectancy_r": 0.09,
+        "sharpe_r": 0.0877,
+        "profit_factor": 1.219
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 38,
+        "oos_expectancy_r": 0.3253,
+        "sharpe_r": 0.288,
+        "profit_factor": 1.857
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": 0.4144,
+        "sharpe_r": 0.3865,
+        "profit_factor": 2.207
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 32,
+        "oos_expectancy_r": 0.4075,
+        "sharpe_r": 0.3584,
+        "profit_factor": 2.151
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 21,
+        "oos_expectancy_r": 0.0652,
+        "sharpe_r": 0.0605,
+        "profit_factor": 1.133
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 18,
+        "oos_expectancy_r": 0.345,
+        "sharpe_r": 0.3042,
+        "profit_factor": 1.861
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v8_confluence:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v8_confluence",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 901,
+        "oos_expectancy_r": 0.0387,
+        "sharpe_r": 0.0334,
+        "profit_factor": 1.078
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S0_sweep_reversal",
+      "setup": "S0_sweep_reversal",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 869,
+        "oos_expectancy_r": 0.0277,
+        "sharpe_r": 0.024,
+        "profit_factor": 1.056
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S1_breakout_retest",
+      "setup": "S1_breakout_retest",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 346,
+        "oos_expectancy_r": 0.1848,
+        "sharpe_r": 0.1694,
+        "profit_factor": 1.423
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S2_trend_pullback",
+      "setup": "S2_trend_pullback",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 137,
+        "oos_expectancy_r": -0.1223,
+        "sharpe_r": -0.1184,
+        "profit_factor": 0.777
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S3_htf_break_confirm",
+      "setup": "S3_htf_break_confirm",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 103,
+        "oos_expectancy_r": 0.022,
+        "sharpe_r": 0.0211,
+        "profit_factor": 1.049
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S4_breakout_retest_trendfilter",
+      "setup": "S4_breakout_retest_trendfilter",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 65,
+        "oos_expectancy_r": 0.3738,
+        "sharpe_r": 0.3444,
+        "profit_factor": 2.026
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S5_d1trend_h4break",
+      "setup": "S5_d1trend_h4break",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 3.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 95,
+        "oos_expectancy_r": 0.09,
+        "sharpe_r": 0.0877,
+        "profit_factor": 1.219
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S6_coil_strong_thrust",
+      "setup": "S6_coil_strong_thrust",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S7_range_contraction",
+      "setup": "S7_range_contraction",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 1,
+        "oos_expectancy_r": 0.47,
+        "sharpe_r": 0.0,
+        "profit_factor": "inf"
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S8_session_filter",
+      "setup": "S8_session_filter",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 38,
+        "oos_expectancy_r": 0.3253,
+        "sharpe_r": 0.288,
+        "profit_factor": 1.857
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S9_htf_confluence",
+      "setup": "S9_htf_confluence",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 54,
+        "oos_expectancy_r": 0.4144,
+        "sharpe_r": 0.3865,
+        "profit_factor": 2.207
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S10_quality_combo",
+      "setup": "S10_quality_combo",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S11_htf_conf_session",
+      "setup": "S11_htf_conf_session",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 32,
+        "oos_expectancy_r": 0.4075,
+        "sharpe_r": 0.3584,
+        "profit_factor": 2.151
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S12_htf_conf_thrust06",
+      "setup": "S12_htf_conf_thrust06",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 21,
+        "oos_expectancy_r": 0.0652,
+        "sharpe_r": 0.0605,
+        "profit_factor": 1.133
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S13_htf_conf_coil3",
+      "setup": "S13_htf_conf_coil3",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 1.5,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 18,
+        "oos_expectancy_r": 0.345,
+        "sharpe_r": 0.3042,
+        "profit_factor": 1.861
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S14_regime_gate_er30",
+      "setup": "S14_regime_gate_er30",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 4,
+        "oos_expectancy_r": 0.72,
+        "sharpe_r": 0.6285,
+        "profit_factor": 3.796
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:S15_regime_gate_er40",
+      "setup": "S15_regime_gate_er40",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 0,
+        "oos_expectancy_r": null,
+        "sharpe_r": null,
+        "profit_factor": null
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "setup_research_v9_regime:COMBINED_S0_plus_best",
+      "setup": "COMBINED_S0_plus_best",
+      "run": "setup_research_v9_regime",
+      "date": "2026-08-31",
+      "n_configs": 4,
+      "params": {
+        "rr_grid": [
+          1.5,
+          2.0,
+          2.5,
+          3.0
+        ],
+        "chosen_rr_on_is": 2.0,
+        "split": "2025-01-01",
+        "cost_r": 0.03,
+        "start": "2023-01-01",
+        "end": "2026-08-29"
+      },
+      "result": {
+        "oos_n": 901,
+        "oos_expectancy_r": 0.0387,
+        "sharpe_r": 0.0334,
+        "profit_factor": 1.078
+      },
+      "verdict": "getestet",
+      "note": ""
+    },
+    {
+      "id": "tsmom_research:28",
+      "setup": "TSMOM",
+      "run": "scripts/tsmom_research.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "lookback": 28
+      },
+      "result": {},
+      "verdict": "Erstbefund, nicht validiert",
+      "note": "long-only, Vol-Ziel 40 %, 0.2 % Kosten je Wechsel, BTC/ETH/BNB/XRP 2017-2026"
+    },
+    {
+      "id": "tsmom_research:56",
+      "setup": "TSMOM",
+      "run": "scripts/tsmom_research.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "lookback": 56
+      },
+      "result": {},
+      "verdict": "Erstbefund, nicht validiert",
+      "note": "long-only, Vol-Ziel 40 %, 0.2 % Kosten je Wechsel, BTC/ETH/BNB/XRP 2017-2026"
+    },
+    {
+      "id": "tsmom_research:90",
+      "setup": "TSMOM",
+      "run": "scripts/tsmom_research.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "lookback": 90
+      },
+      "result": {},
+      "verdict": "Erstbefund, nicht validiert",
+      "note": "long-only, Vol-Ziel 40 %, 0.2 % Kosten je Wechsel, BTC/ETH/BNB/XRP 2017-2026"
+    },
+    {
+      "id": "tsmom_research:120",
+      "setup": "TSMOM",
+      "run": "scripts/tsmom_research.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "lookback": 120
+      },
+      "result": {},
+      "verdict": "Erstbefund, nicht validiert",
+      "note": "long-only, Vol-Ziel 40 %, 0.2 % Kosten je Wechsel, BTC/ETH/BNB/XRP 2017-2026"
+    },
+    {
+      "id": "tsmom_research:180",
+      "setup": "TSMOM",
+      "run": "scripts/tsmom_research.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "lookback": 180
+      },
+      "result": {},
+      "verdict": "Erstbefund, nicht validiert",
+      "note": "long-only, Vol-Ziel 40 %, 0.2 % Kosten je Wechsel, BTC/ETH/BNB/XRP 2017-2026"
+    },
+    {
+      "id": "tsmom_research:ensemble",
+      "setup": "TSMOM",
+      "run": "scripts/tsmom_research.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "lookbacks": [
+          28,
+          56,
+          90,
+          120,
+          180
+        ]
+      },
+      "result": {},
+      "verdict": "Erstbefund, nicht validiert",
+      "note": "long-only, Vol-Ziel 40 %, 0.2 % Kosten je Wechsel, BTC/ETH/BNB/XRP 2017-2026"
+    },
+    {
+      "id": "tsmom_validation:basis_eingefroren",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "basis_eingefroren"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:fenster_minus20",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "fenster_minus20"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:fenster_plus20",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "fenster_plus20"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:nur_3_fenster",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "nur_3_fenster"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:vol_fenster_30",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "vol_fenster_30"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:vol_fenster_90",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "vol_fenster_90"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:vol_ziel_30",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "vol_ziel_30"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:vol_ziel_50",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "vol_ziel_50"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_validation:zustimmung_60",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_validation.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "variant": "zustimmung_60"
+      },
+      "result": {},
+      "verdict": "Robustheitsvariante",
+      "note": "Robustheitspruefung ist selbst zusaetzliches Testen und wird deshalb gezaehlt (F1)."
+    },
+    {
+      "id": "tsmom_multiasset:multiasset_portfolio",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_multiasset.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "universe": "crypto3+equity6+fx3+gold1",
+        "split": "2025-01-01",
+        "rule": "eingefroren, unveraendert"
+      },
+      "result": {
+        "oos_sharpe": 1.083,
+        "oos_max_dd": 0.084,
+        "all_sharpe": 1.377,
+        "sharpe_r": 0.0567,
+        "oos_p": 0.0814
+      },
+      "verdict": "PRIMAERKRITERIUM NICHT ERFUELLT - Hypothese verworfen",
+      "note": "TSMOM auf 13 Instrumenten in 4 Assetklassen, gleichgewichtet — siehe docs/PRAEREGISTRIERUNG-TSMOM-MULTIASSET.md"
+    },
+    {
+      "id": "tsmom_multiasset:multiasset_buyhold_benchmark",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "scripts/tsmom_multiasset.py",
+      "date": "2026-09-04",
+      "n_configs": 1,
+      "params": {
+        "universe": "crypto3+equity6+fx3+gold1",
+        "split": "2025-01-01",
+        "rule": "eingefroren, unveraendert"
+      },
+      "result": {
+        "oos_sharpe": 0.773
+      },
+      "verdict": "Benchmark",
+      "note": "Gleichgewichtetes Buy & Hold desselben Universums — siehe docs/PRAEREGISTRIERUNG-TSMOM-MULTIASSET.md"
+    }
+  ]
+}

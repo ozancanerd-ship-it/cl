@@ -230,12 +230,15 @@ def test_evaluate_from_mtf_routes_to_breakout_when_smc_not_actionable(monkeypatc
     assert result.breakout is not None and result.breakout.is_armed
     assert result.decision.entry is not None and result.decision.tp2 is not None
 
-    # Governance: SETUP-BREAKOUT-RETEST-01 ist IN_VALIDATION → SHADOW, nicht LIVE
+    # Governance: SETUP-BREAKOUT-RETEST-01 ist seit 2026-09-04 REFUTED → BLOCKED.
+    # Frueher war es IN_VALIDATION → SHADOW. Der Detektor erzeugt die Geometrie weiterhin
+    # korrekt (das prueft dieser Test), aber die Governance laesst sie nicht mehr durch —
+    # auch nicht als Schatten-Signal. Ein widerlegter Weg soll nicht weiter mitlaufen.
     from trading_agent.governance import ValidationRegistry, apply_live_gate
 
     gated = apply_live_gate(result, registry=ValidationRegistry.default())
     assert not gated.is_actionable_live
-    assert gated.live_gate.eligibility.value == "shadow"  # type: ignore[union-attr]
+    assert gated.live_gate.eligibility.value == "blocked"  # type: ignore[union-attr]
 
 
 def test_evaluate_from_mtf_keeps_smc_buy_when_actionable(monkeypatch) -> None:

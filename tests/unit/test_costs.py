@@ -1,132 +1,103 @@
-"""Phase 3 · Kosten-/Slippage-Modell für Paper-Positionen (``strategy.costs`` + ``strategy.position``).
-
-Default 0.0 (nichts erfunden) · bps→R-Umrechnung · Entry-/Exit-Kosten · Funding · Long/Short ·
-``realized_r`` wird netto, ``gross_realized_r`` bleibt brutto.
-"""
+"""Kostenmodell je Symbol — Befund F4 aus docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+import pytest
 
-from trading_agent.core.enums import Direction, RiskTier
-from trading_agent.strategy.costs import CostConfig, from_fee_schedule, funding_cost_r, leg_cost_r
-from trading_agent.strategy.decision import Decision
-from trading_agent.strategy.position import PositionManager, PositionParams, PriceBar
+from trading_agent.research.costs import CostModel, load_cost_model
 
-T0 = datetime(2024, 6, 3, 5, 0, tzinfo=UTC)
-
-
-def _long(entry=100.0, sl=95.0, tp1=110.0, tp2=120.0) -> Decision:
-    return Decision.trade(
-        "BTCUSD", T0, Direction.LONG, entry=entry, sl=sl, tp1=tp1, tp2=tp2, tier=RiskTier.A
-    )
-
-
-def _bar(i, hi, lo, close=None) -> PriceBar:
-    return PriceBar(
-        T0 + timedelta(minutes=5 * i), hi, lo, close if close is not None else (hi + lo) / 2
-    )
-
-
-# --------------------------------------------------------------------------- costs unit
-
-
-def test_default_is_zero() -> None:
-    c = CostConfig()
-    assert c.is_zero
-    assert leg_cost_r(c, price=100.0, r_unit=5.0, is_maker=True).total_r == 0.0
-    assert (
-        funding_cost_r(
-            c, price=100.0, r_unit=5.0, direction=Direction.LONG, bars_held=10, bar_seconds=300
-        )
-        == 0.0
-    )
+_DOC = {
+    "classes": {
+        "spot": {
+            "taker_fee_pct": 0.10,
+            "slippage_atr_frac": 0.04,
+            "min_slippage_pct": 0.02,
+            "tradeable": True,
+        },
+        "indicative": {
+            "taker_fee_pct": 0.0,
+            "slippage_atr_frac": 0.03,
+            "min_slippage_pct": 0.008,
+            "tradeable": False,
+        },
+    },
+    "symbols": {
+        "BTCUSDT": {"class": "spot"},
+        "WILD": {"class": "spot", "slippage_atr_frac": 0.10},
+        "EURUSD-YF": {"class": "indicative"},
+    },
+    "fallback": {"class": "spot"},
+}
 
 
-def test_leg_cost_bps_to_r() -> None:
-    # entry 100, r_unit 5 → 1 bps am Preis = 0.01 Preis = 0.002 R
-    c = CostConfig(taker_fee_bps=5.0, half_spread_bps=2.0, slippage_bps=1.0)
-    lc = leg_cost_r(c, price=100.0, r_unit=5.0, is_maker=False)
-    assert round(lc.fee_r, 6) == round(100.0 * 5e-4 / 5.0, 6)  # 0.01
-    assert round(lc.spread_r, 6) == round(100.0 * 2e-4 / 5.0, 6)
-    assert round(lc.slippage_r, 6) == round(100.0 * 1e-4 / 5.0, 6)
-    assert round(lc.total_r, 6) == round((5 + 2 + 1) * 1e-4 * 100.0 / 5.0, 6)  # 0.016
+@pytest.fixture
+def model() -> CostModel:
+    return CostModel(_DOC)
 
 
-def test_maker_vs_taker() -> None:
-    c = CostConfig(taker_fee_bps=5.0, maker_fee_bps=1.0)
-    assert (
-        leg_cost_r(c, price=100.0, r_unit=5.0, is_maker=True).fee_r
-        < leg_cost_r(c, price=100.0, r_unit=5.0, is_maker=False).fee_r
-    )
+def test_fee_and_slippage_are_charged_on_both_sides(model: CostModel) -> None:
+    # entry 100, ATR 10 -> Gebuehr 0.10 je Seite, Slippage max(0.02, 0.4) = 0.4 je Seite
+    c = model.for_symbol("BTCUSDT")
+    assert c.cost_quote(entry=100.0, atr=10.0) == pytest.approx(2 * (0.10 + 0.40))
 
 
-def test_funding_long_pays_short_receives() -> None:
-    c = CostConfig(funding_bps_per_day=10.0)
-    long = funding_cost_r(
-        c, price=100.0, r_unit=5.0, direction=Direction.LONG, bars_held=288, bar_seconds=300
-    )
-    short = funding_cost_r(
-        c, price=100.0, r_unit=5.0, direction=Direction.SHORT, bars_held=288, bar_seconds=300
-    )
-    assert long > 0 and short < 0 and abs(long + short) < 1e-9  # 288 M5 = 1 Tag
-    assert round(long, 6) == round(100.0 * 10e-4 / 5.0, 6)
+def test_cost_in_r_scales_with_stop_distance(model: CostModel) -> None:
+    """Der Kernfehler von F4: ein enger Stop macht dieselben Kosten teurer."""
+    tight = model.cost_r("BTCUSDT", entry=100.0, atr=10.0, r_unit=4.0)
+    wide = model.cost_r("BTCUSDT", entry=100.0, atr=10.0, r_unit=40.0)
+    assert tight == pytest.approx(wide * 10)
+    assert tight > wide
 
 
-def test_from_fee_schedule() -> None:
-    c = from_fee_schedule(taker_bps=5.5, maker_bps=2.0, half_spread_bps=1.0)
-    assert c.taker_fee_bps == 5.5 and c.maker_fee_bps == 2.0 and c.half_spread_bps == 1.0
-    assert c.slippage_bps == 0.0 and c.funding_bps_per_day == 0.0  # nichts erfunden
+def test_low_volatility_symbol_is_more_expensive_per_r() -> None:
+    """Gold: niedrigste relative Volatilitaet -> engster Stop -> hoechster Kostenanteil."""
+    m = CostModel(_DOC)
+    # gleiches Preisniveau, unterschiedliche ATR; Stop jeweils 0.8 x ATR
+    lowvol = m.cost_r("BTCUSDT", entry=1000.0, atr=7.0, r_unit=0.8 * 7.0)
+    highvol = m.cost_r("BTCUSDT", entry=1000.0, atr=70.0, r_unit=0.8 * 70.0)
+    assert lowvol > highvol
 
 
-# --------------------------------------------------------------------------- position integration
+def test_min_slippage_floor_applies_when_atr_is_tiny(model: CostModel) -> None:
+    c = model.for_symbol("BTCUSDT")
+    # ATR-Anteil 0.04*0.1 = 0.004 liegt unter dem Boden 0.02 % von 100 = 0.02
+    assert c.cost_quote(entry=100.0, atr=0.1) == pytest.approx(2 * (0.10 + 0.02))
 
 
-def test_position_zero_cost_unchanged() -> None:
-    m = PositionManager()  # kein cost
-    pos = m.open(_long(), at=T0, pending=False)
-    u = m.on_bar(pos, _bar(1, 111, 101))  # TP1
-    assert u.position.realized_r == u.position.gross_realized_r == 1.0
-    assert u.position.total_cost_r == 0.0
+def test_symbol_override_beats_class(model: CostModel) -> None:
+    assert model.for_symbol("WILD").slippage_atr_frac == 0.10
+    assert model.for_symbol("BTCUSDT").slippage_atr_frac == 0.04
+    assert model.for_symbol("WILD").taker_fee_pct == 0.10  # aus der Klasse geerbt
 
 
-def test_position_with_costs_reduces_realized() -> None:
-    cost = CostConfig(taker_fee_bps=5.0, maker_fee_bps=2.0, half_spread_bps=1.0)
-    m = PositionManager(cost=cost)
-    pos = m.open(_long(), at=T0, pending=False)  # Entry = Maker
-    assert pos.entry_cost_r > 0.0
-    pos = m.on_bar(pos, _bar(1, 111, 101)).position  # TP1 (Exit = Taker)
-    u = m.on_bar(pos, _bar(2, 96, 94))  # BE-Stop auf Rest
-    p = u.position
-    assert p.gross_realized_r > p.realized_r  # Kosten drücken das Netto
-    assert p.fees_r > 0.0 and p.entry_cost_r > 0.0 and p.exit_cost_r > 0.0
-    assert round(p.realized_r, 8) == round(
-        p.gross_realized_r - p.entry_cost_r - p.exit_cost_r - p.funding_r, 8
-    )
+def test_indicative_series_are_marked_not_tradeable(model: CostModel) -> None:
+    assert model.is_tradeable("BTCUSDT") is True
+    assert model.is_tradeable("EURUSD-YF") is False
 
 
-def test_position_funding_accrues_over_hold() -> None:
-    cost = CostConfig(funding_bps_per_day=30.0)
-    m = PositionManager(cost=cost, params=PositionParams(bar_seconds=300))
-    pos = m.open(_long(), at=T0, pending=False)
-    # 20 Bars halten, dann Stop
-    for i in range(1, 21):
-        r = m.on_bar(pos, _bar(i, 101, 99.5))
-        pos = r.position
-        if pos.state.is_terminal:
-            break
-    u = m.on_bar(pos, _bar(21, 100, 94))  # SL
-    assert u.position.funding_r > 0.0  # Long zahlt Funding über die Haltedauer
-    assert u.position.realized_r < u.position.gross_realized_r
+def test_unknown_symbol_falls_back_and_is_not_cheaper(model: CostModel) -> None:
+    unknown = model.cost_r("NEVERHEARDOF", entry=100.0, atr=10.0, r_unit=8.0)
+    known = model.cost_r("BTCUSDT", entry=100.0, atr=10.0, r_unit=8.0)
+    assert unknown >= known
 
 
-def test_short_costs_symmetry() -> None:
-    cost = CostConfig(taker_fee_bps=5.0, half_spread_bps=1.0)
-    m = PositionManager(cost=cost)
-    short = Decision.trade(
-        "BTCUSD", T0, Direction.SHORT, entry=100.0, sl=105.0, tp1=90.0, tp2=80.0, tier=RiskTier.A
-    )
-    pos = m.open(short, at=T0, pending=False)
-    u = m.on_bar(pos, _bar(1, 91, 89))  # TP1
-    assert u.position.gross_realized_r > u.position.realized_r
-    assert u.position.entry_cost_r > 0.0
+def test_zero_or_negative_r_unit_is_free_not_infinite(model: CostModel) -> None:
+    assert model.cost_r("BTCUSDT", entry=100.0, atr=10.0, r_unit=0.0) == 0.0
+    assert model.cost_r("BTCUSDT", entry=100.0, atr=10.0, r_unit=-1.0) == 0.0
+
+
+def test_shipped_config_loads_and_covers_the_panel() -> None:
+    m = load_cost_model("config/costs.yaml")
+    for sym in ("XAUUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT", "SEIUSDT", "EURUSD-YF"):
+        assert m.for_symbol(sym).taker_fee_pct >= 0.0
+    assert m.is_tradeable("XAUUSDT") is True
+    assert m.is_tradeable("XAUUSD-YF") is False
+
+
+def test_shipped_config_reproduces_the_audit_magnitudes() -> None:
+    """XAUUSDT auf H4 muss deutlich ueber der alten Pauschale von 0.03 R liegen."""
+    m = load_cost_model("config/costs.yaml")
+    price, atr_h4 = 3300.0, 3300.0 * 0.00708
+    cost = m.cost_r("XAUUSDT", entry=price, atr=atr_h4, r_unit=0.8 * atr_h4)
+    assert 0.30 < cost < 0.60, cost
+    assert cost > 10 * 0.03

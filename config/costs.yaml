@@ -1,0 +1,109 @@
+# Handelskosten je Venue und Symbol.
+#
+# GRUNDSATZ: Worst Case, nicht Durchschnitt. Ein Setup, das nach diesen Kosten noch
+# steht, ist ein echtes Setup. Hintergrund: docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md,
+# Befund F4 — die vorherige Pauschale von 0.03 R war fuer XAUUSDT um Faktor 13 zu niedrig.
+#
+# Die Kosten werden NICHT als fester R-Wert angesetzt, sondern je Trade aus dem
+# tatsaechlichen Einstiegspreis, der tatsaechlichen Stop-Distanz (r_unit) und der
+# aktuellen ATR gerechnet. Damit skalieren sie korrekt mit Timeframe und Volatilitaet.
+#
+#   Kosten je Seite = entry * fee_pct/100  +  max(entry * min_slippage_pct/100,
+#                                                 slippage_atr_frac * atr)
+#   Kosten gesamt   = 2 * Kosten je Seite          (Einstieg + Ausstieg)
+#   cost_r          = Kosten gesamt / r_unit
+
+version: 1
+
+classes:
+
+  crypto_spot:
+    # Binance Spot Taker 0.10 % je Seite (ohne BNB-Rabatt — Worst Case).
+    # Ein- und Ausstieg sind Market-Orders: Einstieg zur Folgebar-Eroeffnung,
+    # Ausstieg per Stop. Beides Taker.
+    taker_fee_pct: 0.10
+    slippage_atr_frac: 0.04    # Anteil einer ATR-Einheit je Seite
+    min_slippage_pct: 0.020    # Untergrenze in % des Preises
+    tradeable: true
+
+  crypto_spot_illiquid:
+    # Kleinere Caps: gleiche Gebuehr, spuerbar mehr Slippage.
+    taker_fee_pct: 0.10
+    slippage_atr_frac: 0.08
+    min_slippage_pct: 0.050
+    tradeable: true
+
+  fx_indicative:
+    # Yahoo-Reihen sind INDIKATIV — auf ihnen kann nicht gehandelt werden.
+    # Kosten trotzdem realistisch angesetzt, damit Vergleiche fair bleiben,
+    # aber tradeable=false, damit Reports das trennen koennen.
+    taker_fee_pct: 0.0
+    slippage_atr_frac: 0.03
+    min_slippage_pct: 0.008
+    tradeable: false
+
+  equity_indicative:
+    taker_fee_pct: 0.0
+    slippage_atr_frac: 0.04
+    min_slippage_pct: 0.015
+    tradeable: false
+
+symbols:
+
+  # --- Gold ---
+  # Am teuersten im ganzen Panel: niedrigste relative Volatilitaet -> engster Stop
+  # -> hoechster Kostenanteil je Risikoeinheit. Auf H4 rund 0.41 R.
+  XAUUSDT:    {class: crypto_spot}
+  XAUUSD:     {class: fx_indicative}
+  "XAUUSD-YF": {class: fx_indicative}
+
+  # --- Crypto Majors ---
+  BTCUSDT:    {class: crypto_spot}
+  ETHUSDT:    {class: crypto_spot}
+  BNBUSDT:    {class: crypto_spot}
+  SOLUSDT:    {class: crypto_spot}
+  XRPUSDT:    {class: crypto_spot}
+  LINKUSDT:   {class: crypto_spot}
+  DOGEUSDT:   {class: crypto_spot, slippage_atr_frac: 0.05}
+
+  # --- Crypto Mid/Small Caps (Ozans Bestaende + Panel) ---
+  SEIUSDT:    {class: crypto_spot_illiquid}
+  INJUSDT:    {class: crypto_spot_illiquid}
+  OPUSDT:     {class: crypto_spot_illiquid}
+  FETUSDT:    {class: crypto_spot_illiquid}
+  RENDERUSDT: {class: crypto_spot_illiquid}
+  JUPUSDT:    {class: crypto_spot_illiquid}
+  ARBUSDT:    {class: crypto_spot_illiquid}
+  TAOUSDT:    {class: crypto_spot_illiquid}
+  WIFUSDT:    {class: crypto_spot_illiquid, slippage_atr_frac: 0.10}
+  PEPEUSDT:   {class: crypto_spot_illiquid, slippage_atr_frac: 0.10}
+  ADAUSDT:    {class: crypto_spot}
+  AVAXUSDT:   {class: crypto_spot}
+  LTCUSDT:    {class: crypto_spot}
+  DOTUSDT:    {class: crypto_spot}
+  ATOMUSDT:   {class: crypto_spot_illiquid}
+  NEARUSDT:   {class: crypto_spot_illiquid}
+  APTUSDT:    {class: crypto_spot_illiquid}
+  SUIUSDT:    {class: crypto_spot_illiquid}
+  TRXUSDT:    {class: crypto_spot}
+  UNIUSDT:    {class: crypto_spot_illiquid}
+  AAVEUSDT:   {class: crypto_spot_illiquid}
+  FILUSDT:    {class: crypto_spot_illiquid}
+  TIAUSDT:    {class: crypto_spot_illiquid}
+
+  # --- FX (indikativ, Yahoo) ---
+  "EURUSD-YF": {class: fx_indicative}
+  "GBPUSD-YF": {class: fx_indicative}
+  "USDJPY-YF": {class: fx_indicative}
+
+  # --- Aktien / Makro (indikativ, Yahoo) ---
+  "NVDA-YF":  {class: equity_indicative}
+  "AAPL-YF":  {class: equity_indicative}
+  "MSFT-YF":  {class: equity_indicative}
+  "AMD-YF":   {class: equity_indicative}
+  "GOOGL-YF": {class: equity_indicative}
+  "META-YF":  {class: equity_indicative}
+
+# Fallback fuer alles, was oben nicht steht. Bewusst teuer: ein unbekanntes Symbol
+# soll nicht versehentlich guenstiger gerechnet werden als ein bekanntes.
+fallback: {class: crypto_spot_illiquid}

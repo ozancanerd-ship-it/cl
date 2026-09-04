@@ -71,7 +71,11 @@ def evaluate_live_gate(
     eh = edge_health.health if edge_health is not None else None
     reasons: list[str] = []
 
-    if sv.status in (ValidationStatus.RETIRED, ValidationStatus.EDGE_DEGRADED):
+    if sv.status in (
+        ValidationStatus.RETIRED,
+        ValidationStatus.EDGE_DEGRADED,
+        ValidationStatus.REFUTED,
+    ):
         reasons.append(f"Setup-Status {sv.status.value}")
         elig = LiveEligibility.BLOCKED
     elif eh is EdgeHealth.BROKEN:
@@ -87,11 +91,11 @@ def evaluate_live_gate(
         elig = LiveEligibility.LIVE
     else:  # UNVALIDATED / IN_VALIDATION
         reasons.append(
-            f"Setup {sv.status.value} — historische OOS-Edge "
+            f"Setup {sv.status.value} — "
             + (
-                "belegt, sammelt Forward-Trades"
+                "in der Pruefkette, sammelt Forward-Daten"
                 if sv.status is ValidationStatus.IN_VALIDATION
-                else "nicht belegt"
+                else "keine belegte OOS-Edge"
             )
         )
         if sv.status is ValidationStatus.IN_VALIDATION:

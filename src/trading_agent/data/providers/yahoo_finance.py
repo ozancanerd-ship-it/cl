@@ -157,6 +157,14 @@ class YahooFinanceProvider(AsyncOHLCVSource):
             # Yahoo-Intraday-Stamps sind i. d. R. an der Grenze; sonst abrunden.
             if timeframe is not Timeframe.D1 and not is_aligned(open_time, timeframe):
                 open_time = _align_down(open_time, timeframe)
+            elif timeframe is Timeframe.D1:
+                # Tagesbars stempelt Yahoo auf die HANDELSEROEFFNUNG (US-Aktien 13:30 UTC,
+                # VIX 07:00, DXY 04:00, ^TNX 12:20), nicht auf Mitternacht. Die
+                # Repository-Konvention fuer D1 ist 00:00 UTC, und das OHLCV-Modell setzt
+                # sie durch. Alle beobachteten Stempel liegen im selben UTC-Kalendertag,
+                # das Abschneiden verschiebt also keinen Bar auf einen anderen Tag.
+                # OHLC-Werte bleiben unberuehrt.
+                open_time = open_time.replace(hour=0, minute=0, second=0, microsecond=0)
             close_time = bar_close_time(open_time, timeframe)
             if close_time > now:  # noch formende Bar
                 continue

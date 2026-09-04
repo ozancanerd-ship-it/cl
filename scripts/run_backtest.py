@@ -90,7 +90,7 @@ def _validation_block(trades: list, cfg: BacktestConfig) -> dict:
             "final_equity_r_p50": round(mc.final_equity_r_p50, 3),
             "final_equity_r_p95": round(mc.final_equity_r_p95, 3),
             "max_dd_r_p95": round(mc.max_dd_r_p95, 3),
-            "prob_positive": round(mc.prob_positive, 4),
+            "bootstrap_fraction_positive": round(mc.bootstrap_fraction_positive, 4),
             "ruin_probability": round(mc.ruin_probability, 4),
         },
         "time_stability": {

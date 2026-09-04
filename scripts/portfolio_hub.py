@@ -109,7 +109,7 @@ async def _kraken(as_of: datetime, prices: dict[str, float]) -> AccountPortfolio
             await a.aclose()
 
 
-async def _bybit(as_of: datetime) -> AccountPortfolio | None:
+async def _bybit(as_of: datetime, prices: dict[str, float]) -> AccountPortfolio | None:
     from trading_agent.data.providers.bybit_account import BybitAccountAdapter
 
     a = BybitAccountAdapter()
@@ -117,12 +117,47 @@ async def _bybit(as_of: datetime) -> AccountPortfolio | None:
         return None
     try:
         w = await a.get_wallet_balance()
-        pos = await a.get_positions(category="linear")
-        return map_derivatives_account(
+        perps = list((await a.get_positions(category="linear")).get("positions") or [])
+
+        # Unified Account: die eigentlichen Coin-Bestaende stehen in ``nonzero_balances``.
+        # Bis 2026-09-03 wurden sie hier verworfen und nur ``equity`` + Linear-Perps
+        # verwendet — dadurch lief das gesamte Bybit-Wallet als "Cash" mit und keine
+        # einzige Bybit-Position wurde bewertet oder gescort.
+        coins = dict(w.nonzero_balances or {})
+        need = {
+            f"{k}USDT"
+            for k in coins
+            if k.upper() not in ("USDT", "USDC", "BUSD", "USD", "EUR", "DAI")
+        }
+        if need:
+            prices.update(await _prices(need))
+        spot = map_spot_account(
+            account="bybit",
+            as_of=as_of,
+            balances=coins,
+            prices=prices,
+            quote_ccy="USDT",
+            read_only_verified=True,
+        )
+        if not perps:
+            return spot
+
+        # Offene Perps zusaetzlich abbilden und die gebundene Margin vom Cash abziehen.
+        deriv = map_derivatives_account(
             account="bybit",
             as_of=as_of,
             equity=w.equity,
-            positions=list(pos.get("positions") or []),
+            positions=perps,
+            quote_ccy="USDT",
+            read_only_verified=True,
+        )
+        used = sum(h.cost_basis for h in deriv.holdings)
+        return AccountPortfolio(
+            account="bybit",
+            as_of=as_of,
+            cash=round(max(0.0, spot.cash - used), 8),
+            holdings=tuple(spot.holdings) + tuple(deriv.holdings),
+            currency="USDT",
             read_only_verified=True,
         )
     finally:
@@ -168,7 +203,7 @@ async def main() -> int:
 
     results = await asyncio.gather(
         _kraken(as_of, prices),
-        _bybit(as_of),
+        _bybit(as_of, prices),
         _binance(as_of, prices),
         return_exceptions=True,
     )

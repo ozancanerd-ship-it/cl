@@ -152,7 +152,7 @@ class TestRobustness:
         assert rep.runs == 200
         assert rep.final_equity_r_p05 <= rep.final_equity_r_p50 <= rep.final_equity_r_p95
         assert 0.0 <= rep.ruin_probability <= 1.0
-        assert 0.0 <= rep.prob_positive <= 1.0
+        assert 0.0 <= rep.bootstrap_fraction_positive <= 1.0
 
     def test_monte_carlo_deterministic(self) -> None:
         trades = [_trade(i, 1.0 if i % 2 else -1.0) for i in range(1, 41)]

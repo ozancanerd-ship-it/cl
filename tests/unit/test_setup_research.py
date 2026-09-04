@@ -11,6 +11,8 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from trading_agent.core.enums import Timeframe
 from trading_agent.core.models import OHLCV
 from trading_agent.core.time import bar_close_time
@@ -60,7 +62,9 @@ def test_simulate_enters_next_bar_open_no_lookahead() -> None:
         ]
     )
     sig = sr.Signal(at_index=2, direction=1, stop=99.0, reason="x")
-    tr = sr._simulate(bars, sig, rr=2.0, cost_r=0.0, symbol="TEST", setup="S")
+    tr = sr._simulate(
+        bars, sig, rr=2.0, symbol="TEST", setup="S", atr=1.0, cost_model=None, cost_r_flat=0.0
+    )
     assert tr is not None
     assert tr.entry_price == 100.0  # bar[3].open
     assert tr.entry_ts == bars[3].open_time
@@ -79,7 +83,9 @@ def test_simulate_stop_before_target_worst_case() -> None:
         ]
     )
     sig = sr.Signal(at_index=2, direction=1, stop=98.0, reason="x")
-    tr = sr._simulate(bars, sig, rr=2.0, cost_r=0.0, symbol="TEST", setup="S")
+    tr = sr._simulate(
+        bars, sig, rr=2.0, symbol="TEST", setup="S", atr=1.0, cost_model=None, cost_r_flat=0.0
+    )
     assert tr is not None and tr.exit_reason == "stop" and tr.realized_r == -1.0
 
 
@@ -115,3 +121,65 @@ def test_detectors_only_fire_with_valid_geometry() -> None:
                 assert sig.at_index == i
                 assert sig.direction in (-1, 1)
                 assert sig.stop > 0
+
+
+def test_simulate_uses_cost_model_when_given() -> None:
+    """Befund F4: Kosten kommen je Trade aus entry/ATR/r_unit, nicht als Pauschale."""
+    from trading_agent.research.costs import CostModel
+
+    model = CostModel(
+        {
+            "classes": {
+                "spot": {
+                    "taker_fee_pct": 0.10,
+                    "slippage_atr_frac": 0.0,
+                    "min_slippage_pct": 0.0,
+                    "tradeable": True,
+                }
+            },
+            "symbols": {"TEST": {"class": "spot"}},
+            "fallback": {"class": "spot"},
+        }
+    )
+    bars = _bars(
+        [
+            (100, 101, 99, 100),
+            (100, 101, 99, 100),
+            (100, 101, 99, 100),
+            (100, 100, 100, 100),
+            (100, 115, 100, 110),
+        ]
+    )
+    sig = sr.Signal(at_index=2, direction=1, stop=99.0, reason="x")
+    free = sr._simulate(
+        bars, sig, rr=2.0, symbol="TEST", setup="S", atr=1.0, cost_model=None, cost_r_flat=0.0
+    )
+    costed = sr._simulate(
+        bars, sig, rr=2.0, symbol="TEST", setup="S", atr=1.0, cost_model=model, cost_r_flat=0.0
+    )
+    assert free is not None and costed is not None
+    # Gebuehr 0.10 % je Seite auf entry=100 -> 0.20 absolut, r_unit=1.0 -> 0.20 R
+    assert costed.realized_r == pytest.approx(free.realized_r - 0.20)
+
+
+def test_tighter_stop_pays_more_of_the_same_cost() -> None:
+    """Der Kern von F4: identische Kosten, engerer Stop -> groesserer Anteil des Risikos."""
+    from trading_agent.research.costs import CostModel
+
+    model = CostModel(
+        {
+            "classes": {
+                "spot": {
+                    "taker_fee_pct": 0.10,
+                    "slippage_atr_frac": 0.0,
+                    "min_slippage_pct": 0.0,
+                    "tradeable": True,
+                }
+            },
+            "symbols": {},
+            "fallback": {"class": "spot"},
+        }
+    )
+    wide = model.cost_r("TEST", entry=100.0, atr=1.0, r_unit=4.0)
+    tight = model.cost_r("TEST", entry=100.0, atr=1.0, r_unit=1.0)
+    assert tight == pytest.approx(4 * wide)

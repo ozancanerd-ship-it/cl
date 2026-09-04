@@ -141,23 +141,48 @@ def fraction_positive_windows(stats: Sequence[WindowStat], *, min_trades: int = 
 @dataclass(frozen=True, slots=True)
 class SymbolStabilityReport:
     per_symbol_total_r: dict[str, float]
-    fraction_positive: float
+    fraction_positive: float | None
+    """``None``, wenn kein Symbol ``min_trades`` erreicht — dann ist die Kennzahl bedeutungslos."""
+
     total_r_without_best: float
+    per_symbol_n: dict[str, int]
+    min_trades: int
+    n_symbols_considered: int
 
 
-def symbol_stability(trades: Sequence[TradeRecord]) -> SymbolStabilityReport:
+def symbol_stability(
+    trades: Sequence[TradeRecord], *, min_trades: int = 10
+) -> SymbolStabilityReport:
+    """Anteil der Symbole mit positivem Gesamtergebnis.
+
+    ``min_trades`` (Befund F9): Symbole mit zu wenigen Trades fliessen NICHT in
+    ``fraction_positive`` ein. Vorher fehlte diese Schwelle — bei 34 OOS-Trades auf sieben
+    Symbolen ergab das rund fuenf Trades je Symbol, und ``fraction_positive = 1.00`` hiess
+    nur, dass sieben Muenzwuerfe zufaellig positiv ausgingen. ``fraction_positive_windows``
+    hatte die Schwelle laengst; hier fehlte sie.
+    """
     by_sym: dict[str, float] = {}
+    n_sym: dict[str, int] = {}
     for t in trades:
         by_sym[t.instrument] = by_sym.get(t.instrument, 0.0) + t.realized_r
+        n_sym[t.instrument] = n_sym.get(t.instrument, 0) + 1
     if not by_sym:
-        return SymbolStabilityReport({}, 0.0, 0.0)
+        return SymbolStabilityReport({}, None, 0.0, {}, min_trades, 0)
     best = max(by_sym, key=lambda k: by_sym[k])
     total_wo_best = sum(v for k, v in by_sym.items() if k != best)
-    frac_pos = sum(1 for v in by_sym.values() if v > 0) / len(by_sym)
+    considered = [k for k in by_sym if n_sym[k] >= min_trades]
+    frac_pos = (
+        round(sum(1 for k in considered if by_sym[k] > 0) / len(considered), 4)
+        if considered
+        else None
+    )
     return SymbolStabilityReport(
         {k: round(v, 4) for k, v in by_sym.items()},
-        round(frac_pos, 4),
+        frac_pos,
         round(total_wo_best, 4),
+        dict(n_sym),
+        min_trades,
+        len(considered),
     )
 
 

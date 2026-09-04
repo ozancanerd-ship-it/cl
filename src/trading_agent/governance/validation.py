@@ -29,10 +29,27 @@ _DEFAULT_FORWARD_REQUIRED = 100  # Masterplan §44
 
 class ValidationStatus(StrEnum):
     UNVALIDATED = "unvalidated"
+    """Noch nicht geprueft, oder geprueft ohne Ergebnis. Kein Live-Signal."""
+
     IN_VALIDATION = "in_validation"
+    """In der Pruefkette, sammelt Forward-Daten. Kein Live-Signal."""
+
     VALIDATED = "validated"
+    """Einziger Status, der ein Live-Signal erlaubt."""
+
     EDGE_DEGRADED = "edge_degraded"
+    """War validiert, hat auf jungen Daten die Edge verloren. Blockiert."""
+
     RETIRED = "retired"
+    """Ausser Dienst gestellt. Blockiert."""
+
+    REFUTED = "refuted"
+    """WIDERLEGT: auf belastbarer Stichprobe signifikant negativ. Blockiert, dauerhaft.
+
+    Bewusst getrennt von UNVALIDATED. "Nicht belegt" und "nachweislich schlecht" sind
+    verschiedene Aussagen — und nur die zweite verhindert, dass jemand denselben Weg in
+    sechs Monaten erneut geht. Siehe docs/STRATEGIE-ENTSCHEID-2026-09-04.md.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,30 +111,36 @@ _BUILTIN: dict[tuple[str, str], SetupValidation] = {
     ("SMC-SWEEP-REV-01", STRATEGY_VERSION): SetupValidation(
         setup_id="SMC-SWEEP-REV-01",
         strategy_version=STRATEGY_VERSION,
-        status=ValidationStatus.UNVALIDATED,
+        status=ValidationStatus.REFUTED,
         notes=(
-            "Baseline OOS-kalibriert + gesperrt, aber ohne nachgewiesene OOS-Edge "
-            "(Stufe B / Strategy-Edge-Investigation 2026-08). Live-Signale = SHADOW."
+            "WIDERLEGT 2026-09-04. Mit Kostenmodell je Symbol und vollstaendigen Daten: "
+            "958 OOS-Trades, Expectancy -0.196 R, t = -3.71. Kein Setup aus 809 "
+            "registrierten Konfigurationen besteht die Multiple-Testing-Korrektur. "
+            "docs/STRATEGIE-ENTSCHEID-2026-09-04.md"
         ),
     ),
-    # 2. Setup-Typ: historische OOS-Edge auf Gold *plausibel* (S4-Forschung), aber auf
-    # indikativen Yahoo-Daten + kleiner OOS-Stichprobe → sammelt Forward-Trades.
     ("SETUP-BREAKOUT-RETEST-01", STRATEGY_VERSION): SetupValidation(
         setup_id="SETUP-BREAKOUT-RETEST-01",
         strategy_version=STRATEGY_VERSION,
-        status=ValidationStatus.IN_VALIDATION,
-        baseline=BaselineMetrics(
-            expectancy_r=0.28, profit_factor=1.8, win_rate=0.60, max_drawdown_r=9.0, n_trades=112
-        ),
-        validated_window=("2023-01-01", "2026-08-28"),
+        status=ValidationStatus.REFUTED,
         notes=(
-            "S4→S9 (Breakout+Retest, D1-Trend + jüngster-D1-BOS-Konfluenz). Diagnose "
-            "docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md: S9 dominiert S4 im Panel (12 Instrumente) "
-            "auf jeder Achse — OOS exp +0.37→+0.41, PF 2.03→2.21, MC pp 0.61→0.79, sym-stab "
-            "0.75→0.83. Weitere Filter (S11-S13) verschlechtern → Stopp (kein Overfitting). "
-            "CAVEATS: echtes Spot-XAUUSD 2023 (Range-Jahr) bleibt negativ (n=4-6, zu klein); "
-            "Panel-OOS ruht stark auf Yahoo-indikativen + FX-Proxy-Daten. IN_VALIDATION → "
-            "SHADOW. VALIDATED nur nach vollständiger Dukascopy-Historie UND ≥100 Forward-Trades."
+            "WIDERLEGT 2026-09-04, zusammen mit der SMC-Familie. Die fruehere Aussage "
+            "'OOS-Edge plausibel' beruhte auf zwei Fehlern: 430 Tage veraltete "
+            "Krypto-Reihen (F12) und eine Kostenpauschale, die fuer XAUUSDT um Faktor 13 "
+            "zu niedrig war (F4). Nach Korrektur wurden 14 von 15 Setups schlechter."
+        ),
+    ),
+    ("SETUP-TSMOM-ENSEMBLE-01", STRATEGY_VERSION): SetupValidation(
+        setup_id="SETUP-TSMOM-ENSEMBLE-01",
+        strategy_version=STRATEGY_VERSION,
+        status=ValidationStatus.IN_VALIDATION,
+        validated_window=None,
+        notes=(
+            "Time-Series-Momentum, Parameter eingefroren und vorab registriert. Zwei "
+            "Pruefrunden, beide nach ihrer Vorab-Registrierung verworfen: nur Krypto "
+            "OOS-Sharpe -0.21 (p = 0.758); vier Assetklassen OOS-Sharpe +1.08 (p = 0.081, "
+            "Schwelle 0.0000618). NICHT widerlegt, aber auch nicht belegt — die "
+            "Stichprobe ist zu kurz. IN_VALIDATION -> SHADOW, sammelt Forward-Daten."
         ),
     ),
 }

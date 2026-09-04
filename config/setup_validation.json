@@ -4,16 +4,16 @@
     {
       "setup_id": "SMC-SWEEP-REV-01",
       "strategy_version": "0.1.1",
-      "status": "unvalidated",
+      "status": "refuted",
       "baseline": null,
       "validated_window": null,
       "forward_trades_required": 100,
-      "notes": "Baseline OOS-kalibriert + gesperrt, aber ohne nachgewiesene OOS-Edge (docs/STRATEGY-EDGE-INVESTIGATION-2026-08.md: 6 Setup-Konstruktionen, keine mit robuster OOS-Edge). Live-Signale = SHADOW, bis eine belegte Edge + Forward-Bestaetigung vorliegt."
+      "notes": "WIDERLEGT (2026-09-04, docs/STRATEGIE-ENTSCHEID-2026-09-04.md). Nach Korrektur zweier Fehler ist die Aussage eindeutig: (F12) die sechs Kern-Krypto-Reihen endeten am 2025-06-30, waehrend die Forschung mit --end 2026-08-29 lief - das OOS-Fenster war sechs statt zwanzig Monate. (F4) die Kostenpauschale von 0.03 R war fuer XAUUSDT um Faktor 13 zu niedrig. Mit vollstaendigen Daten wurden 14 von 15 Setups schlechter (Durchschnitt -0.175 R). Mit Kostenmodell je Symbol: S0_sweep_reversal bei 958 OOS-Trades -0.196 R, t = -3.71 - SIGNIFIKANT NEGATIV, ebenso COMBINED (968, t = -3.67). Kein Setup aus 798 registrierten Konfigurationen besteht die Multiple-Testing-Korrektur (config/hypothesis_registry.json, Deflated Sharpe < 0.07). Der Setup-Typ bleibt als dokumentiertes Negativergebnis im Code - ein widerlegter Weg ist Forschungsstand, kein Muell, und verhindert, dass ihn jemand erneut geht."
     },
     {
       "setup_id": "SETUP-BREAKOUT-RETEST-01",
       "strategy_version": "0.1.1",
-      "status": "in_validation",
+      "status": "refuted",
       "baseline": {
         "expectancy_r": 0.28,
         "profit_factor": 1.8,
@@ -21,9 +21,75 @@
         "max_drawdown_r": 9.0,
         "n_trades": 112
       },
-      "validated_window": ["2023-01-01", "2026-08-28"],
+      "validated_window": [
+        "2023-01-01",
+        "2026-08-28"
+      ],
       "forward_trades_required": 100,
-      "notes": "S4->S9 aus scripts/setup_research.py + Diagnose docs/GOLD-BREAKOUT-DIAGNOSIS-2026-08.md (2026-08-31). VERBESSERUNG INTEGRIERT: 'require_htf_bos_confluence' (S9) -- zusaetzlich zum D1-Struktur-Trend ein juengster D1-BOS in dieselbe Richtung. Panel (12 Instrumente, IS/OOS split 2025-01): S4 OOS exp +0.374 PF 2.03 MC pp 0.61 sym-stab 0.75  ->  S9 OOS exp +0.414 PF 2.21 MC pp 0.79 sym-stab 0.83 (n=112, 54 OOS). S9 dominiert S4 auf jeder Achse; weitere Filter (Session/Thrust/Coil, S11-S13) verschlechtern -> Stopp bei S9 (kein Overfitting). EVIDENZ-CAVEATS UNVERAENDERT: (--) ECHTES Dukascopy-SPOT-XAUUSD 2023 (einziges reales Spot-Jahr, gold's choppigstes): S9 4 Signale -4.0R/0% WR -- Breakout-Continuation hat in einem Range-Regime strukturell keine Edge, 4-6 Trades zu wenig fuer ein Urteil. (+) XAUUSD-YF (GC=F Futures, 2024-26 Trend): S9 15 Signale +9.0R/73% WR. OOS-Edge des Panels ruht stark auf Yahoo-indikativen Daten + FX-Proxy. IN_VALIDATION / SHADOW bleibt (Nutzer-Vorgabe bis vollstaendige Dukascopy-Historie). REGIME-GATE GEPRUEFT (docs/BREAKOUT-REGIME-GATE-2026-09.md): harte (S14/S15 ER>=0.30/0.40) UND sanfte (S17/S18 ER>=0.20/0.25) Efficiency-Ratio-Gates getestet -- ALLE senken Monte-Carlo prob_positive (0.93->0.58) und Symbol-Stabilitaet (1.0->0.6) und halbieren die Stichprobe. Kein robuster Fortschritt -> NICHT integriert, S9-Baseline bleibt. NEXT: Forward-Paper-Trades sammeln (Daemon 24/7) + vollstaendige Dukascopy-Spot-Historie auf Nutzer-Maschine."
+      "notes": "WIDERLEGT (2026-09-04, docs/STRATEGIE-ENTSCHEID-2026-09-04.md). Nach Korrektur zweier Fehler ist die Aussage eindeutig: (F12) die sechs Kern-Krypto-Reihen endeten am 2025-06-30, waehrend die Forschung mit --end 2026-08-29 lief - das OOS-Fenster war sechs statt zwanzig Monate. (F4) die Kostenpauschale von 0.03 R war fuer XAUUSDT um Faktor 13 zu niedrig. Mit vollstaendigen Daten wurden 14 von 15 Setups schlechter (Durchschnitt -0.175 R). Mit Kostenmodell je Symbol: S0_sweep_reversal bei 958 OOS-Trades -0.196 R, t = -3.71 - SIGNIFIKANT NEGATIV, ebenso COMBINED (968, t = -3.67). Kein Setup aus 798 registrierten Konfigurationen besteht die Multiple-Testing-Korrektur (config/hypothesis_registry.json, Deflated Sharpe < 0.07). Der Setup-Typ bleibt als dokumentiertes Negativergebnis im Code - ein widerlegter Weg ist Forschungsstand, kein Muell, und verhindert, dass ihn jemand erneut geht."
+    },
+    {
+      "setup_id": "SETUP-TSMOM-ENSEMBLE-01",
+      "strategy_version": "0.1.1",
+      "status": "in_validation",
+      "baseline": {
+        "sharpe": 0.86,
+        "cagr": 0.235,
+        "annual_vol": 0.297,
+        "max_drawdown_pct": 0.372,
+        "time_in_market": 0.822,
+        "sample": "BTC/ETH/BNB/XRP D1, 2017-2026, zwei volle Zyklen inkl. Baerenmaerkte 2018 und 2022",
+        "benchmark_buy_and_hold": {
+          "sharpe": 0.76,
+          "cagr": 0.336,
+          "max_drawdown_pct": 0.814
+        }
+      },
+      "validated_window": null,
+      "forward_trades_required": 100,
+      "preregistered": {
+        "lookbacks": [
+          28,
+          56,
+          90,
+          120,
+          180
+        ],
+        "vol_window": 60,
+        "target_vol": 0.4,
+        "max_weight": 1.0,
+        "min_agreement": 0.2,
+        "frozen_at": "2026-09-04",
+        "rule": "Parameter sind eingefroren. Jede Aenderung ist eine neue Hypothese, gehoert ins Register und setzt die Forward-Zaehlung zurueck."
+      },
+      "notes": "Time-Series-Momentum mit Volatilitaets-Zielsteuerung. Ersetzt die widerlegte SMC-/Breakout-Familie. Entscheidend ist die Herkunft der Hypothese: sie haelt AUSSERHALB dieses Projekts - Moskowitz/Ooi/Pedersen (JFE 2012) ueber 58 Futures, vier Assetklassen, 25 Jahre, Sharpe > 1; Han/Kang/Ryu fuer Krypto. Fuer SMC gibt es keine begutachtete Studie, und ein unabhaengiger Test von 54 mechanischen Varianten auf 2,55 Mio. EURUSD-M1-Bars fand 0 profitable nach Kosten. EIGENER ERSTBEFUND, KEIN BELEG: stabil ueber alle fuenf Fenster (Sharpe 0.63-0.95, keines negativ), Drawdown durchgehend etwa halbiert; gibt absolute Rendite ab (6.3x statt 17.9x ueber neun Jahre). Sechs Konfigurationen im Hypothesen-Register. IN_VALIDATION -> SHADOW, bis die volle Pruefkette durch ist UND >= 100 Forward-Trades vorliegen.  PRUEFRUNDE 1 (2026-09-04): BESTEHT NICHT. OOS-Sharpe -0.21, p = 0.758, Bootstrap-Intervall [-0.82, +0.36] schliesst die Null ein. Bleibt in_validation / SHADOW. Nicht widerlegt (anders als SMC, dort t = -3.71 signifikant negativ), aber auch nicht belegt. Details: docs/TSMOM-VALIDATION-2026-09-04.md",
+      "validation_round_1": {
+        "date": "2026-09-04",
+        "doc": "docs/TSMOM-VALIDATION-2026-09-04.md",
+        "split": "2025-01-01",
+        "verdict": "BESTEHT NICHT",
+        "oos_sharpe": -0.21,
+        "oos_sharpe_ci95": [
+          -0.82,
+          0.36
+        ],
+        "oos_p_value": 0.758,
+        "deflated_sharpe": 0.0,
+        "n_trials_at_test": 807,
+        "symbols_oos_positive": "2/7",
+        "held_up": {
+          "sharpe_beats_buy_and_hold": "7/7",
+          "drawdown_better_than_buy_and_hold": "7/7",
+          "parameter_robustness_sharpe_range": [
+            0.75,
+            0.88
+          ],
+          "positive_years": "3/4"
+        },
+        "diagnosis": "Das OOS-Fenster (2025+2026) faellt vollstaendig in einen fallenden Kryptomarkt. Die Regel hat dort getan, wofuer Trendfolge gebaut ist: 2025 -1.3 % gegen -24.8 % Markt, 2026 -9.2 % gegen -36.7 % Markt, Zeit im Markt faellt auf 52.8 %. Der absolute Ertrag ist dabei leicht negativ - und genau den misst das vorab gestellte Kriterium. Die relative Frage (schlaegt es das Halten?) sieht OOS deutlich besser aus, war aber NICHT vorab registriert und ist daher eine Hypothese fuer die naechste Runde, kein Resultat dieser.",
+        "next": "Vorab registrieren BEVOR neue Daten gesehen werden: primaer risikoadjustierter Ueberschuss gegenueber Buy & Hold, sekundaer Drawdown-Reduktion. Dazu Historie ab 2017 ingestieren - das aktuelle Repository beginnt 2022-12-31, das OOS-Fenster ist effektiv EINE Regime-Beobachtung."
+      },
+      "setup_params_version": "tsmom-ensemble-1"
     }
   ]
 }
