@@ -86,10 +86,19 @@ jobs:
                      data/repository_real/live/tsmom_forward_corrections.jsonl || true
           if git diff --cached --quiet; then
             echo "keine neue Zeile — nichts zu sichern"
-          else
-            git commit -m "forward: Journalzeile $(date -u +%Y-%m-%d)"
-            git push
+            exit 0
           fi
+          git commit -m "forward: Journalzeile $(date -u +%Y-%m-%d)"
+          # Zwei Laeufe koennen sich ueberschneiden (Zeitplan trifft auf einen Push).
+          # Dann ist der lokale Stand hinterher und ein blosses push scheitert. Rebase
+          # holt den fremden Commit davor; scheitert auch das, ist die Seite trotzdem
+          # gebaut und der Plan verschickt — die Zeile kommt beim naechsten Lauf mit.
+          for i in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "Push abgelehnt (Versuch $i) — hole den aktuellen Stand"
+            git pull --rebase --autostash || break
+          done
+          echo "::warning::Journalzeile konnte nicht gesichert werden — kommt beim naechsten Lauf mit"
 
       - uses: actions/upload-pages-artifact@v3
         with:
