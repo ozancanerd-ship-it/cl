@@ -460,6 +460,7 @@ def main() -> int:
     ap.add_argument("--journal", default=JOURNAL)
     ap.add_argument("--risk", default=RISK)
     ap.add_argument("--send", action="store_true", help="zusaetzlich per Telegram schicken")
+    ap.add_argument("--json", action="store_true", help="Plan als JSON ausgeben (fuer die App)")
     ap.add_argument("--force", action="store_true", help="auch ohne Aenderung senden")
     args = ap.parse_args()
 
@@ -480,6 +481,23 @@ def main() -> int:
     plan = build_plan(latest, risk)
     prev_plan = build_plan(prev_row, risk) if prev_row else None
     d = diff_plans(plan, prev_plan)
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "plan": plan,
+                    "diff": {k: v for k, v in d.items() if k != "first_run"},
+                    "first_run": d["first_run"],
+                    "expect": EXPECT,
+                    "journal_days": len({r.get("date") for r in rows}),
+                    "signals": latest.get("instruments", []),
+                },
+                ensure_ascii=False,
+                default=str,
+            )
+        )
+        return 0
 
     text = render(plan, d)
     print(text)
