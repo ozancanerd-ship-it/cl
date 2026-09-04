@@ -496,6 +496,14 @@ def main() -> int:
     ap.add_argument("--send", action="store_true", help="zusaetzlich per Telegram schicken")
     ap.add_argument("--json", action="store_true", help="Plan als JSON ausgeben (fuer die App)")
     ap.add_argument("--force", action="store_true", help="auch ohne Aenderung senden")
+    ap.add_argument(
+        "--weekly",
+        action="store_true",
+        help=(
+            "Wochenstand: sendet auch ohne Aenderung, mit Einordnung statt Handlungsliste. "
+            "Gedacht fuer einen festen Tag in der Woche, damit es keine wochenlange Stille gibt."
+        ),
+    )
     args = ap.parse_args()
 
     _load_env_file()
@@ -563,8 +571,25 @@ def main() -> int:
         return 0
 
     changed = bool(d["buy"] or d["sell"] or d["adjust"]) or d["first_run"]
-    if not changed and not args.force:
+    if not changed and not (args.force or args.weekly):
         print("\n(nichts geaendert — kein Telegram, kein Spam)")
+        return 0
+
+    if not changed and args.weekly:
+        # Wochenstand ohne Aenderung: nicht dieselbe Handlungsliste nochmal schicken —
+        # sonst lernt man, sie zu ueberlesen. Stattdessen kurz, wo man steht.
+        body = (
+            f"WOCHENSTAND {plan['date']}\n\n"
+            "Diese Woche gab es nichts zu tun. Der Plan von vorher gilt unveraendert.\n\n"
+            + "\n".join(f"  {x['instrument']:<12} {x['eur']:>5.0f} EUR" for x in plan["positions"])
+            + f"\n  {'Cash':<12} {plan['cash_eur']:>5.0f} EUR\n\n"
+            f"{plan['n_long']} von {plan['n_total']} Instrumenten im Aufwaertstrend.\n"
+            "Nichtstun ist hier ein Ergebnis, kein Ausfall: der Gewinn kam historisch aus "
+            "Positionen, die man ueber Monate liegen laesst."
+        )
+        print(body)
+        ok = _send(body, title=f"Wochenstand {plan['date']}")
+        print(f"\nTelegram: {'gesendet' if ok else 'nicht gesendet'}")
         return 0
 
     ok = _send(

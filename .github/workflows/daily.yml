@@ -78,7 +78,15 @@ jobs:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/daily_report.py --send
+        # Sonntags zusaetzlich ein Wochenstand, auch wenn sich nichts geaendert hat.
+        # Sonst kann es Wochen still bleiben, und dann weiss man nicht, ob nichts passiert
+        # ist oder ob etwas kaputt ist.
+        run: |
+          if [ "$(date -u +%u)" = "7" ]; then
+            python scripts/daily_report.py --send --weekly
+          else
+            python scripts/daily_report.py --send
+          fi
 
       - name: Web-App bauen
         env:
