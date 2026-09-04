@@ -188,6 +188,7 @@ def _journal(path: str) -> list[dict]:
     if not p.exists():
         return []
     rows = []
+    kaputt = 0
     for line in p.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -195,7 +196,12 @@ def _journal(path: str) -> list[dict]:
         try:
             rows.append(json.loads(line))
         except json.JSONDecodeError:
-            continue
+            kaputt += 1
+    if kaputt:
+        # Stilles Ueberspringen waere hier gefaehrlich: fehlt ausgerechnet die Zeile von
+        # gestern, meldet der Vergleich Kaeufe und Verkaeufe, die es nie gab.
+        print(f"::warning::{kaputt} defekte Journalzeile(n) uebersprungen — {path}")
+        print(f"! {kaputt} Journalzeile(n) unlesbar. Der Vortagsvergleich kann falsch sein.")
     return rows
 
 

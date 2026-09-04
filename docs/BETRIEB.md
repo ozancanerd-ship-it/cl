@@ -81,6 +81,21 @@ python3 scripts/build_site.py --out _site  # App lokal bauen
 Mac ein. **Nicht zusätzlich zu GitHub Actions laufen lassen** — zwei Telegram-
 Nachrichten am Tag und zwei Schreiber auf derselben Journaldatei.
 
+## Wenn Daten fehlen
+
+Die Journalzeile trägt `complete` und `missing`. Fehlt auch nur ein Instrument des
+präregistrierten Universums, ist die Zeile **keine gültige Beobachtung**: die Gewichte
+verteilen sich auf weniger Titel, und ein Vergleich mit gestern misst den Ausfall statt
+den Markt. Dann passiert Folgendes:
+
+- `tsmom_forward.py` endet mit Code 2 und nennt die fehlenden Instrumente
+- `daily_report.py` baut **keinen** Plan, sondern schickt eine Ausfallmeldung
+- die Web-App zeigt die Warnung ganz oben, vor allem anderen
+- der Workflow läuft trotzdem zu Ende (damit Warnung und Seite rausgehen) und wird
+  erst danach gezielt rot
+
+Der Tag zählt nicht als Forward-Tag mit.
+
 ## Stolperfallen, die schon einmal zugeschlagen haben
 
 - **Veraltete Reihen sehen aus wie ein Kurssprung.** Am 2026-09-04 endeten die
@@ -91,6 +106,13 @@ Nachrichten am Tag und zwei Schreiber auf derselben Journaldatei.
 - **Ein fehlendes Secret darf den Lauf nicht killen.** `daily_report.py --send`
   gibt bewusst 0 zurück, wenn Telegram nicht konfiguriert ist. Sonst wäre die Seite
   nie gebaut worden.
+- **Binance sperrt Rechenzentren.** `api.binance.com` antwortet GitHub-Runnern mit
+  "Service unavailable from a restricted location". Beim ersten Cloud-Lauf fielen BTC,
+  ETH und BNB lautlos aus, der Lauf war grün, und der Tagesplan bestand nur noch aus
+  Aktien und Gold. Gegenmittel: die Host-Kette in `BINANCE_HOSTS` (der öffentliche
+  Spiegel `data-api.binance.vision` funktioniert) plus die Vollständigkeitsprüfung oben.
+  **Nie eine andere Börse als Ersatz einsetzen** — unterschiedliche Kurse an
+  unterschiedlichen Tagen liest die Regel als Kursbewegung.
 - **Kein Take-Profit.** Die Regel hat keinen. Positionen enden, wenn das Signal
   dreht. 59 von 398 historischen Positionen liefen über drei Monate und trugen
   praktisch den gesamten Gewinn — wer früh verkauft, verkauft genau diese weg.
