@@ -7,14 +7,19 @@
 # Damit verschiebt sich die gesamte Sicherheit von "vorher pruefen" auf DIESE DATEI.
 # Sie ist keine Empfehlung. Die Risk Engine setzt sie hart durch und hat Vetorecht.
 #
-# Die Zahlen sind bewusst klein. Bei ~400 EUR Equity geht es nicht darum, wie viel man
-# verdienen kann, sondern darum, dass ein Irrtum 5 % kostet und nicht 100 %.
+# Die Zahlen sind bewusst klein. Es geht nicht darum, wie viel man verdienen kann,
+# sondern darum, dass ein Irrtum 5 % kostet und nicht 100 %.
+#
+# 2026-09-04: Die Annahme von 400 EUR war falsch. Mit dem Trade-Republic-Depot sind es
+# 1.201 EUR (Bybit 278, Kraken 107, Binance 0, Trade Republic 816). Das aendert die
+# Positionsgroessen erheblich — und es aendert vor allem, dass die Gebuehrenschwelle
+# nicht mehr der bindende Engpass ist.
 
 schema_version: 1
 
 account:
   currency: EUR
-  starting_equity: 400
+  starting_equity: 1200
 
 # ── Risiko je Position ───────────────────────────────────────────────────────
 # TSMOM ist eine Allokationsregel, keine Setup-Strategie: das Gewicht kommt aus der

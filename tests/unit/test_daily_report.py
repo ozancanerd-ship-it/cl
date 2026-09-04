@@ -204,8 +204,20 @@ def test_render_survives_a_completely_flat_day() -> None:
 
 
 def test_risk_config_parser_reads_the_real_file() -> None:
-    cfg = dr._risk_config(str(Path(__file__).resolve().parents[2] / "config" / "risk.yaml"))
-    assert cfg["equity"] == 400.0
+    """Gegen die echte Datei pruefen, nicht gegen eingetippte Zahlen.
+
+    Die Equity aendert sich, wenn Ozan Geld bewegt — ein fester Wert im Test wuerde nur
+    bedeuten, dass jemand ihn nachtraegt. Geprueft wird, dass der Parser die Datei
+    wirklich liest und die Grenzen zueinander passen.
+    """
+    pfad = Path(__file__).resolve().parents[2] / "config" / "risk.yaml"
+    cfg = dr._risk_config(str(pfad))
+    roh = pfad.read_text(encoding="utf-8")
+
+    assert f"starting_equity: {cfg['equity']:.0f}" in roh
+    assert cfg["equity"] > 0
     assert cfg["max_positions"] == 8
     assert cfg["max_exposure_pct"] == 60.0
     assert cfg["min_cash_pct"] == 40.0
+    # Zusammen duerfen investiert + Mindest-Cash nie ueber 100 % liegen.
+    assert cfg["max_exposure_pct"] + cfg["min_cash_pct"] <= 100.0

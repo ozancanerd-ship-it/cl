@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updated": "2026-09-04T10:12:26.290713+00:00",
+  "updated": "2026-09-04T20:32:31.008707+00:00",
   "note": "Jede je getestete Konfiguration, auch die verworfenen. Diese Zahl geht in die Multiple-Testing-Korrektur ein (Bonferroni und Deflated Sharpe Ratio). Eine Hypothese, die hier fehlt, macht jedes Ergebnis zu gut. Siehe docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md, Befund F1.",
-  "total_configurations": 809,
+  "total_configurations": 815,
   "entries": [
     {
       "id": "setup_research_split-2024-06_scaled:S0_sweep_reversal",
@@ -5786,6 +5786,35 @@
       },
       "verdict": "Benchmark",
       "note": "Gleichgewichtetes Buy & Hold desselben Universums — siehe docs/PRAEREGISTRIERUNG-TSMOM-MULTIASSET.md"
+    },
+    {
+      "id": "HYP-ENTRY-TIMING-01:warte-varianten",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "entry_timing_research",
+      "date": "2026-09-04",
+      "n_configs": 6,
+      "params": {
+        "varianten": [
+          "sofort",
+          "limit_2",
+          "limit_5",
+          "tranchen_3",
+          "dip_5d",
+          "warte_5t"
+        ],
+        "max_warte_tage": 10,
+        "praeregistriert": true,
+        "frage": "Verbessert Warten auf einen Ruecksetzer den Einstieg?"
+      },
+      "result": {
+        "n_signale": 400,
+        "beste_variante": "sofort (Grundlinie) — keine Warte-Variante besser",
+        "staerkster_effekt_t": -2.19,
+        "bonferroni_schwelle_t": 2.64,
+        "schluss": "WIDERLEGT: alle sechs Varianten schlechter als sofortiger Einstieg"
+      },
+      "verdict": "widerlegt",
+      "note": "Alle sechs Warte-Varianten schlechter als sofortiger Einstieg. docs/EINSTIEGS-TIMING-ERGEBNIS.md"
     }
   ]
 }
