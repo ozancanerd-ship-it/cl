@@ -118,6 +118,96 @@ BLOCKED_HINT = {
 }
 
 
+# Welche echten Bestaende dieselbe Wette abbilden wie eine Planzeile. Ohne diese Bruecke
+# vergleicht der Bericht Aepfel mit Birnen: der Plan kennt "BTCUSDT", im Depot liegt
+# derselbe Bitcoin je nach Konto als BTCUSDT, BTC-EUR oder XBT.
+DECKUNG: dict[str, tuple[str, ...]] = {
+    "BTCUSDT": ("BTCUSDT", "BTC-EUR", "BTC", "XBT"),
+    "ETHUSDT": ("ETHUSDT", "ETH-EUR", "ETH"),
+    "BNBUSDT": ("BNBUSDT", "BNB"),
+    "XAUUSD-YFD": ("PAXGUSDT", "XAUTUSDT", "PAXG", "XAUT"),
+    "NVDA-YFD": ("NVDA",),
+    "AAPL-YFD": ("AAPL",),
+    "MSFT-YFD": ("MSFT",),
+    "AMD-YFD": ("AMD",),
+    "GOOGL-YFD": ("GOOGL", "GOOG"),
+    "META-YFD": ("META",),
+    "EURUSD-YFD": (),
+    "GBPUSD-YFD": (),
+    "USDJPY-YFD": (),
+}
+
+
+def _bestand(snapshot: dict) -> dict[str, float]:
+    """Instrument -> Euro-Wert aus dem Portfolio-Snapshot."""
+    eq = float(snapshot.get("equity", 0.0))
+    out: dict[str, float] = {}
+    for r in snapshot.get("ranking", []):
+        inst = str(r.get("instrument", "")).upper()
+        out[inst] = out.get(inst, 0.0) + float(r.get("weight_pct", 0.0)) / 100.0 * eq
+    return out
+
+
+def abgleich(plan: dict, snapshot: dict) -> dict:
+    """Ziel gegen Bestand. Das ist die Frage, die der Plan bisher nicht beantwortet hat.
+
+    Ohne sie empfiehlt der Bericht NVIDIA zu kaufen, waehrend NVIDIA schon ein Viertel
+    des Vermoegens ist. Genau das ist am 2026-09-04 passiert.
+    """
+    bestand = _bestand(snapshot)
+    genutzt: set[str] = set()
+    zeilen = []
+    for pos in plan["positions"]:
+        deckung = DECKUNG.get(pos["instrument"], ())
+        ist = 0.0
+        for k in deckung:
+            if k in bestand:
+                ist += bestand[k]
+                genutzt.add(k)
+        zeilen.append({**pos, "ist_eur": ist, "delta_eur": pos["eur"] - ist})
+
+    # Was der Plan gar nicht kennt: Altbestand, Hebelprodukte, alles ausserhalb der Regel.
+    alle_gedeckt = {k for ks in DECKUNG.values() for k in ks}
+    draussen = sorted(
+        ((k, v) for k, v in bestand.items() if k not in genutzt and k not in alle_gedeckt),
+        key=lambda kv: -kv[1],
+    )
+    return {
+        "equity_echt": float(snapshot.get("equity", 0.0)),
+        "as_of": snapshot.get("as_of", "?"),
+        "zeilen": zeilen,
+        "draussen": draussen,
+        "draussen_eur": sum(v for _, v in draussen),
+    }
+
+
+def render_abgleich(a: dict) -> str:
+    L = ["", "== ABGLEICH MIT DEINEM DEPOT ==", f"   Stand {str(a['as_of'])[:16]}"]
+    for z in sorted(a["zeilen"], key=lambda x: -abs(x["delta_eur"])):
+        d = z["delta_eur"]
+        tat = "KAUFEN" if d > 0 else "REDUZIEREN"
+        if abs(d) < 15:
+            tat = "passt"
+        L.append(
+            f"  {z['instrument']:<12} Ziel {z['eur']:>5.0f}  hast {z['ist_eur']:>5.0f}"
+            f"  -> {tat} {abs(d):>5.0f} EUR"
+            if tat != "passt"
+            else f"  {z['instrument']:<12} Ziel {z['eur']:>5.0f}  hast {z['ist_eur']:>5.0f}  -> passt"
+        )
+    if a["draussen"]:
+        anteil = a["draussen_eur"] / max(a["equity_echt"], 1e-9)
+        L.append("")
+        L.append(
+            f"  AUSSERHALB DER REGEL: {a['draussen_eur']:.0f} EUR ({anteil:.0%} deines Geldes)"
+        )
+        for k, v in a["draussen"][:10]:
+            L.append(f"    {k:<18} {v:>6.0f} EUR")
+        if len(a["draussen"]) > 10:
+            L.append(f"    ... und {len(a['draussen']) - 10} weitere")
+        L.append("  Diese Positionen bewertet die Regel nicht und hat keinen Ausstieg dafuer.")
+    return "\n".join(L)
+
+
 def venue_of(instrument: str) -> dict | None:
     key = INSTRUMENT_VENUE.get(instrument)
     return VENUES.get(key) if key else None
@@ -495,6 +585,14 @@ def main() -> int:
     ap.add_argument("--risk", default=RISK)
     ap.add_argument("--send", action="store_true", help="zusaetzlich per Telegram schicken")
     ap.add_argument("--json", action="store_true", help="Plan als JSON ausgeben (fuer die App)")
+    ap.add_argument(
+        "--portfolio",
+        default="",
+        help=(
+            "Portfolio-Snapshot (portfolio_hub --snapshot). Ergaenzt den Abgleich Ziel gegen "
+            "Bestand. NICHT fuer die oeffentliche Seite — enthaelt echte Depotdaten."
+        ),
+    )
     ap.add_argument("--force", action="store_true", help="auch ohne Aenderung senden")
     ap.add_argument(
         "--weekly",
@@ -543,6 +641,17 @@ def main() -> int:
     prev_plan = build_plan(prev_row, risk) if prev_row else None
     d = diff_plans(plan, prev_plan)
 
+    # Der Abgleich mit dem echten Depot wird einmal berechnet und haengt an jedem
+    # Sendeweg: Tagesplan wie Wochenstand. Er geht NICHT in --json und damit nicht
+    # auf die oeffentliche Seite.
+    zusatz = ""
+    if args.portfolio and Path(args.portfolio).exists():
+        zusatz = "\n" + render_abgleich(
+            abgleich(plan, json.loads(Path(args.portfolio).read_text(encoding="utf-8")))
+        )
+    elif args.portfolio:
+        print(f"! Portfolio-Snapshot fehlt: {args.portfolio} — Abgleich uebersprungen")
+
     if args.json:
         print(
             json.dumps(
@@ -565,6 +674,10 @@ def main() -> int:
         return 0
 
     text = render(plan, d)
+    if args.portfolio and Path(args.portfolio).exists():
+        text += "\n" + render_abgleich(
+            abgleich(plan, json.loads(Path(args.portfolio).read_text(encoding="utf-8")))
+        )
     print(text)
 
     if not args.send:
@@ -587,13 +700,14 @@ def main() -> int:
             "Nichtstun ist hier ein Ergebnis, kein Ausfall: der Gewinn kam historisch aus "
             "Positionen, die man ueber Monate liegen laesst."
         )
+        body += zusatz
         print(body)
         ok = _send(body, title=f"Wochenstand {plan['date']}")
         print(f"\nTelegram: {'gesendet' if ok else 'nicht gesendet'}")
         return 0
 
     ok = _send(
-        render(plan, d),
+        text,
         title=f"Tagesplan {plan['date']}",
         severity_high=bool(d["buy"] or d["sell"]),
     )

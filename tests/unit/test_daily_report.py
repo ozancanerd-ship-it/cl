@@ -12,6 +12,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 _PATH = Path(__file__).resolve().parents[2] / "scripts" / "daily_report.py"
 _spec = importlib.util.spec_from_file_location("daily_report", _PATH)
 assert _spec and _spec.loader
@@ -221,3 +223,56 @@ def test_risk_config_parser_reads_the_real_file() -> None:
     assert cfg["min_cash_pct"] == 40.0
     # Zusammen duerfen investiert + Mindest-Cash nie ueber 100 % liegen.
     assert cfg["max_exposure_pct"] + cfg["min_cash_pct"] <= 100.0
+
+
+# ── Abgleich mit dem echten Depot ────────────────────────────────────────────────
+# Warum getestet: ohne diesen Abgleich empfahl der Bericht am 2026-09-04, NVIDIA zu
+# kaufen — waehrend NVIDIA bereits ein Viertel von Ozans Vermoegen war. Der Fehler war
+# nicht die Rechnung, sondern dass der Plan den Bestand gar nicht kannte.
+
+
+def _snapshot(equity: float, gewichte: dict[str, float]) -> dict:
+    return {
+        "as_of": "2026-09-04T20:00:00+00:00",
+        "equity": equity,
+        "ranking": [{"instrument": k, "weight_pct": v * 100.0} for k, v in gewichte.items()],
+    }
+
+
+def test_abgleich_erkennt_uebergewicht() -> None:
+    plan = dr.build_plan(_entry({"NVDA-YFD": 1.0, "BTCUSDT": 1.0}, portfolio_weight=0.6), RISK)
+    a = dr.abgleich(plan, _snapshot(400.0, {"NVDA": 0.60}))
+    nvda = next(z for z in a["zeilen"] if z["instrument"] == "NVDA-YFD")
+    assert nvda["ist_eur"] == pytest.approx(240.0)
+    assert nvda["delta_eur"] < 0, "zu viel NVIDIA muss als Reduzieren erscheinen"
+
+
+def test_abgleich_zaehlt_dasselbe_asset_ueber_konten_zusammen() -> None:
+    """Bitcoin liegt je nach Konto als BTCUSDT oder BTC-EUR — das ist eine Position."""
+    plan = dr.build_plan(_entry({"BTCUSDT": 1.0}, portfolio_weight=0.6), RISK)
+    a = dr.abgleich(plan, _snapshot(400.0, {"BTCUSDT": 0.10, "BTC-EUR": 0.15}))
+    btc = next(z for z in a["zeilen"] if z["instrument"] == "BTCUSDT")
+    assert btc["ist_eur"] == pytest.approx(100.0)
+
+
+def test_abgleich_weist_alles_ausserhalb_der_regel_aus() -> None:
+    plan = dr.build_plan(_entry({"BTCUSDT": 1.0}, portfolio_weight=0.6), RISK)
+    a = dr.abgleich(plan, _snapshot(1000.0, {"BTCUSDT": 0.10, "SEIUSDT": 0.30, "PLTR": 0.05}))
+    namen = [k for k, _ in a["draussen"]]
+    assert namen == ["SEIUSDT", "PLTR"]  # nach Groesse sortiert
+    assert a["draussen_eur"] == pytest.approx(350.0)
+    assert "BTCUSDT" not in namen  # gedeckte Positionen gehoeren nicht dorthin
+
+
+def test_jedes_plan_instrument_hat_eine_deckungsregel() -> None:
+    """Ein fehlender Eintrag hiesse: Bestand wird stillschweigend als 0 gelesen."""
+    for inst in dr.INSTRUMENT_VENUE:
+        assert inst in dr.DECKUNG, f"{inst} fehlt in DECKUNG"
+
+
+def test_render_abgleich_nennt_beide_richtungen() -> None:
+    plan = dr.build_plan(_entry({"NVDA-YFD": 1.0, "BTCUSDT": 1.0}, portfolio_weight=0.6), RISK)
+    txt = dr.render_abgleich(dr.abgleich(plan, _snapshot(1000.0, {"NVDA": 0.50, "SEIUSDT": 0.20})))
+    assert "REDUZIEREN" in txt
+    assert "KAUFEN" in txt
+    assert "AUSSERHALB DER REGEL" in txt

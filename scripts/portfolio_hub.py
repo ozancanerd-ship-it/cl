@@ -236,6 +236,15 @@ async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", action="store_true")
     ap.add_argument(
+        "--snapshot",
+        default="",
+        help=(
+            "Ergebnis zusaetzlich hier ablegen. daily_report --portfolio liest die Datei "
+            "und rechnet den Abgleich Ziel gegen Bestand. Sie enthaelt echte Depotdaten "
+            "und ist gitignored — das Repo ist oeffentlich."
+        ),
+    )
+    ap.add_argument(
         "--alerts-journal",
         default="data/repository_real/live/context_alerts.jsonl",
         help="Kontext-Alerts (Portfolio-Risk / Re-Entry) hier anhängen. '' zum Deaktivieren.",
@@ -347,6 +356,11 @@ async def main() -> int:
         with jp.open("a") as fh:
             for row in alerts_out:
                 fh.write(json.dumps(row, default=str) + "\n")
+
+    if args.snapshot:
+        Path(args.snapshot).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.snapshot).write_text(json.dumps(d, indent=2, default=str), encoding="utf-8")
+        print(f"Snapshot: {args.snapshot}")
 
     if args.json:
         print(json.dumps(d, indent=2, default=str))
