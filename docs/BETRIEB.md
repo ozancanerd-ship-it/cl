@@ -1,5 +1,9 @@
 # Betrieb — was wann läuft
 
+App: **https://ozancanerd-ship-it.github.io/cl/**
+Repo: **https://github.com/ozancanerd-ship-it/cl** (public — alles auf der App-Seite
+ist öffentlich lesbar; echte Depotdaten gehören deshalb nicht dorthin)
+
 Stand 2026-09-04. Diese Datei beschreibt, wie das System **im Alltag** arbeitet.
 Forschung und Ergebnisse stehen woanders (siehe unten).
 
