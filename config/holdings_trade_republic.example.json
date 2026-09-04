@@ -1,0 +1,17 @@
+{
+  "_hinweis": "Kopiere diese Datei nach config/holdings_trade_republic.json und trage dein Depot ein. Trade Republic hat keine Schnittstelle - siehe docs/TRADE-REPUBLIC-ANBINDUNG.md. Die echte Datei ist gitignored und landet nicht auf GitHub.",
+  "_pflege": "Nach jedem Kauf oder Verkauf hier nachtragen und as_of auf das heutige Datum setzen. Steht der Stand laenger als 30 Tage, meldet der Portfolio-Hub das von selbst.",
+  "as_of": "2026-09-04",
+  "cash_eur": 0.0,
+  "positions": [
+    {
+      "symbol": "NVDA",
+      "isin": "US67066G1040",
+      "quantity": 0.5,
+      "avg_price_eur": 210.0,
+      "_symbol": "Yahoo-Kuerzel - darueber wird der aktuelle Kurs geholt und in EUR umgerechnet",
+      "_quantity": "Stueckzahl, auch Bruchteile (Trade Republic erlaubt Teilaktien)",
+      "_avg_price_eur": "dein Einstandskurs je Stueck in Euro, nicht der aktuelle Kurs"
+    }
+  ]
+}

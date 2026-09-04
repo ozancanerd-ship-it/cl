@@ -25,6 +25,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_agent.data.providers.binance import BinancePublicDataProvider
+from trading_agent.data.providers.trade_republic_manual import DEFAULT_PATH as TR_PATH
+from trading_agent.data.providers.trade_republic_manual import (
+    load_depot as load_tr_depot,
+)
+from trading_agent.data.providers.trade_republic_manual import (
+    missing_prices as tr_missing_prices,
+)
+from trading_agent.data.providers.trade_republic_manual import (
+    to_account as tr_to_account,
+)
 from trading_agent.portfolio_intel import PortfolioIntelligenceEngine
 from trading_agent.portfolio_intel.account_mapping import (
     map_derivatives_account,
@@ -188,6 +198,40 @@ async def _binance(as_of: datetime, prices: dict[str, float]) -> AccountPortfoli
             await a.aclose()
 
 
+async def _equity_prices_eur(symbols: list[str]) -> dict[str, float]:
+    """Aktienkurse in EUR ueber Yahoo. Stumme Quelle heisst: kein Kurs, nicht Kurs null."""
+    import httpx
+
+    if not symbols:
+        return {}
+    out: dict[str, float] = {}
+    eurusd = 1.0
+    async with httpx.AsyncClient(
+        timeout=20, headers={"User-Agent": "Mozilla/5.0 (compatible; trading-agent/0.1)"}
+    ) as c:
+        with contextlib.suppress(Exception):
+            r = (
+                await c.get(
+                    "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X",
+                    params={"interval": "1d", "range": "5d"},
+                )
+            ).json()
+            eurusd = float(r["chart"]["result"][0]["meta"]["regularMarketPrice"])
+        for sym in symbols:
+            with contextlib.suppress(Exception):
+                r = (
+                    await c.get(
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}",
+                        params={"interval": "1d", "range": "5d"},
+                    )
+                ).json()
+                meta = r["chart"]["result"][0]["meta"]
+                px = float(meta["regularMarketPrice"])
+                ccy = str(meta.get("currency", "USD")).upper()
+                out[sym] = px if ccy == "EUR" else (px / eurusd if eurusd > 0 else px)
+    return out
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", action="store_true")
@@ -216,6 +260,34 @@ async def main() -> int:
             skipped.append(
                 f"{name}: {r if isinstance(r, Exception) else 'kein Key / kein Guthaben'}"
             )
+
+    # Trade Republic hat keine Schnittstelle (docs/TRADE-REPUBLIC-ANBINDUNG.md). Ohne diese
+    # Datei ist der Aktienteil des Depots unsichtbar — und damit auch die Frage, ob eine
+    # neue Aktienposition ueberhaupt noch ins Risikobudget passt.
+    tr_note: str | None = None
+    try:
+        depot = load_tr_depot()
+    except ValueError as exc:
+        tr_note = f"Trade Republic: Datei fehlerhaft — {exc}"
+        depot = None
+    if depot is not None:
+        tr_prices = await _equity_prices_eur([q.symbol for q in depot.positions])
+        accounts.append(tr_to_account(depot, tr_prices))
+        fehlend = tr_missing_prices(depot, tr_prices)
+        hinweise = []
+        if depot.stale_days > 30:
+            hinweise.append(f"Stand ist {depot.stale_days} Tage alt")
+        if fehlend:
+            hinweise.append(f"kein Kurs fuer {', '.join(fehlend)} — Einstand angesetzt")
+        if hinweise:
+            tr_note = "Trade Republic: " + "; ".join(hinweise)
+    elif tr_note is None:
+        tr_note = (
+            "Trade Republic: nicht gepflegt — der Aktienteil des Depots fehlt im Gesamtbild "
+            f"({TR_PATH})"
+        )
+    if tr_note:
+        skipped.append(tr_note)
 
     if not accounts:
         print(json.dumps({"error": "kein Account lesbar", "skipped": skipped}, indent=2))

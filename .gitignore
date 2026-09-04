@@ -32,6 +32,9 @@ config/*.yml
 !config/risk.yaml
 !config/costs.yaml
 
+# Echtes Depot: Ozans Positionen. Bleibt lokal, das Repo ist oeffentlich.
+config/holdings_trade_republic.json
+
 # Secrets / Umgebung (NIE committen)
 .env
 .env.*
