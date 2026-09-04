@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updated": "2026-09-04T20:32:31.008707+00:00",
+  "updated": "2026-09-04T20:58:42.753193+00:00",
   "note": "Jede je getestete Konfiguration, auch die verworfenen. Diese Zahl geht in die Multiple-Testing-Korrektur ein (Bonferroni und Deflated Sharpe Ratio). Eine Hypothese, die hier fehlt, macht jedes Ergebnis zu gut. Siehe docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md, Befund F1.",
-  "total_configurations": 815,
+  "total_configurations": 820,
   "entries": [
     {
       "id": "setup_research_split-2024-06_scaled:S0_sweep_reversal",
@@ -5815,6 +5815,35 @@
       },
       "verdict": "widerlegt",
       "note": "Alle sechs Warte-Varianten schlechter als sofortiger Einstieg. docs/EINSTIEGS-TIMING-ERGEBNIS.md"
+    },
+    {
+      "id": "HYP-UNIVERSE-01:groesse-und-streuung",
+      "setup": "SETUP-TSMOM-ENSEMBLE-01",
+      "run": "universe_study",
+      "date": "2026-09-04",
+      "n_configs": 5,
+      "params": {
+        "universen": [
+          "heute_13",
+          "handelbar_breit",
+          "alles_ohne_etf",
+          "mit_anleihen_rohstoffen",
+          "nur_fehlende_klassen"
+        ],
+        "zeitraum_jahre": 4.9,
+        "frage": "Verbessert ein groesseres Universum das Ergebnis?"
+      },
+      "result": {
+        "n_eff_krypto_11": 1.6,
+        "n_eff_aktien_24": 3.6,
+        "n_eff_anleihen_rohstoffe_10": 4.0,
+        "n_eff_alles_49": 7.4,
+        "sharpe_heute": 1.28,
+        "sharpe_mit_anleihen_rohstoffen": 1.38,
+        "schluss": "Mehr Coins/Aktien bringen nichts; Anleihen und Rohstoffe schon. Sharpe-Unterschied im Rauschen, Volatilitaetsreduktion belastbar."
+      },
+      "verdict": "teilweise bestaetigt",
+      "note": "docs/UNIVERSUM-STUDIE.md — nur ~5 Jahre, ueberwiegend Aufwaertsmarkt."
     }
   ]
 }
