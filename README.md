@@ -2,6 +2,10 @@
 
 Professionelles, modulares Multi-Asset-AI-Trading-System.
 
+**App: https://ozancanerd-ship-it.github.io/cl/** — Gesamtmarkt-Scan, eingezeichnete
+Chartanalyse, Portfolio-Cockpit. Läuft stündlich über GitHub Actions.
+Betriebsanleitung: [`docs/BETRIEB.md`](docs/BETRIEB.md).
+
 > ⚠️ **Status: DEVELOPMENT / PAPER / DEMO TRADING**
 >
 > - Keine echten Orders.
@@ -22,7 +26,7 @@ Schnittstellen, TradingView als Analyse-/Chartquelle).
 
 | Klasse | Beispiele | Ausführung (später) |
 |--------|-----------|---------------------|
-| Aktien | US Large Caps, ETFs | Trade Republic (nur offizielle/zulässige APIs) |
+| Aktien | US Large Caps, **keine ETFs** | Trade Republic (nur offizielle/zulässige APIs) |
 | Crypto | BTC, ETH, liquide Altcoins | Bybit |
 | Gold   | XAUUSD | Forex/CFD-Broker (später) |
 | Forex  | Majors | Forex-Broker (später) |

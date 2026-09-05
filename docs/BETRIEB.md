@@ -49,9 +49,12 @@ PYTHONPATH=src python3 scripts/run_live_daemon.py \
 │     Übersetzt die Zeile in einen Euro-Plan unter config/risk.yaml und schickt ihn
 │     per Telegram — aber nur, wenn sich gegenüber gestern etwas geändert hat.
 │
-├─ 3. scripts/build_scan_data.py --out web/scan.json      (auch stündlich)
-│     Der Gesamtmarkt in einem Durchgang: 28 Coins, 30 Einzelaktien, Gold über
-│     PAXG/XAUT. Je Instrument ein Chart-Score aus sechs Faktoren, Ziele und Stop.
+├─ 3. scripts/build_scan_data.py --out web                (auch stündlich)
+│     Der Gesamtmarkt in einem Durchgang. Das Krypto-Universum kommt von der
+│     Börse, nicht aus dem Code: ~490 USDT-Paare, gefiltert auf Liquidität und
+│     Qualität, nach Umsatz gekappt. Dazu 40 Einzelaktien und Gold (PAXG/XAUT).
+│     Je Wert: Chart-Score aus sechs Faktoren, Ziele, Stop, Note, Muster,
+│     MTF-Tabelle, Kommentar und die Koordinaten für die Zeichnung.
 │
 ├─ 4. scripts/scan_alert.py --send                       (auch stündlich)
 │     Vergleicht mit dem letzten Stand und schickt NUR die Änderung: neues A+/A-
@@ -77,6 +80,54 @@ Job nicht gelaufen — und genau das soll sichtbar sein. Eine Seite, die ihre Da
 live nachlädt, sähe bei einem Ausfall weiterhin richtig aus und würde alte Zahlen
 zeigen, ohne dass es jemand merkt. Bei etwas, nach dem gehandelt wird, ist das die
 gefährlichere Bauweise.
+
+## Das Krypto-Universum
+
+Es gibt **keine Coin-Liste im Code**. Bei jedem Lauf:
+
+```
+alle USDT-Paare der Börse            ~490
+ ├─ Stablecoins, verpackte Doppel      raus  (USDC, FDUSD, WBTC, WBETH …)
+ ├─ Hebel-Token                        raus  (…UP/…DOWN/…BULL/…BEAR, 3L/3S)
+ ├─ tokenisierte Aktien und ETFs       raus  (NVDAB, TSLAB, QQQB, SOXLB …)
+ ├─ unter 3 Mio USDT Umsatz in 24 h    raus
+ ├─ unter 3.000 Abschlüssen            raus
+ ├─ Kurs unter 0,0005                  raus
+ └─ nach Umsatz sortiert, gekappt      ~85–95 Paare
+```
+
+**Warum die Schwellen so liegen.** 3 Mio USDT klingt niedrig, ist es aber nicht:
+eine Position von 50–200 € ist dort ein Tropfen. Höhere Schwellen (10 Mio)
+halbieren das Universum, ohne dass es für dieses Kapital einen Unterschied macht —
+dann fehlen genau die Altcoins, die sich schnell bewegen.
+
+**Tokenisierte Aktien** erkennt `ist_tokenisierte_aktie()` an der Endung `B`, mit
+einer kurzen Ausnahmeliste für echte Coins (BNB, ARB, SHIB, TRB, CKB, DGB, BB, YB).
+Der Test schlägt im Zweifel zum Ausschluss aus: ein neues Aktien-Token fällt
+automatisch raus, ein neuer Coin auf B müsste einmal eingetragen werden. Die
+Ausgeschlossenen stehen mit Namen im Bericht und im System-Tab der App — ein
+falsch aussortierter Coin fällt auf, statt zu verschwinden.
+
+## Die Notenskala
+
+Nicht mehr binär. Drei Größen entscheiden, nicht eine:
+
+| | Score | CRV | erwartete Bewegung |
+|---|---|---|---|
+| A+ | ≥ 66 | ≥ 1:2,2 | ≥ 5 % |
+| A | ≥ 57 | ≥ 1:1,8 | ≥ 3,5 % |
+| A− | ≥ 50 | ≥ 1:1,5 | ≥ 2,5 % |
+| B+ | ≥ 43 | ≥ 1:1,3 | ≥ 1,8 % |
+| B | ≥ 36 | ≥ 1:1,15 | ≥ 1,2 % |
+
+(Profil `aggressiv`, der Standard. `ausgewogen` und `konservativ` verlangen mehr.)
+
+Dazu zwei Sonderregeln: eine sehr große erwartete Bewegung mit solidem CRV hebt
+die Note auf mindestens A−; unter 1 % Bewegung ist nie mehr als WATCH möglich,
+egal wie sauber der Chart aussieht.
+
+**Ohne Invalidierung gibt es in keinem Profil eine handelbare Note.** Mehr
+Risikobereitschaft heißt größere Position oder weiterer Stop — nicht kein Stop.
 
 ## Die drei Filter im Tagesplan
 
@@ -104,7 +155,8 @@ ein Plan wird, greifen drei Filter — in dieser Reihenfolge:
 | Vorlage der Web-App | `site/template.html` |
 | Erzeugte Web-App | `_site/` — nicht versioniert |
 | Secrets | `.env`, Rechte 0600, gitignored; in der CI als GitHub Secrets |
-| Gesamtmarkt-Scan | `web/scan.json` — bei jedem Lauf neu |
+| Gesamtmarkt-Scan (Rangliste) | `web/scan.json` — bei jedem Lauf neu |
+| Detailansicht je Wert | `web/asset/<SYM>.json` — Zeichnung, MTF, Muster, Kommentar |
 | Alarm-Stand (wogegen verglichen wird) | `data/repository_real/live/scan_alert_state.json` — **muss mitcommittet werden** |
 | Alarm-Verlauf (was rausging) | `data/repository_real/live/alerts.jsonl` |
 
@@ -117,7 +169,9 @@ python3 scripts/tsmom_forward.py --report  # Signale zeigen, nichts schreiben
 python3 scripts/check_data_freshness.py --profile live
 python3 scripts/portfolio_hub.py           # echte Konten
 python3 scripts/build_site.py --out _site  # App lokal bauen
-python3 scripts/build_scan_data.py --out web/scan.json     # Gesamtmarkt scannen
+python3 scripts/build_scan_data.py --out web                # Gesamtmarkt scannen
+python3 scripts/build_scan_data.py --out web --profil konservativ   # strengere Noten
+python3 scripts/opportunity_scan.py --symbols BTCUSDT --top 5       # einzeln
 python3 scripts/scan_alert.py --dry-run    # zeigen, was gemeldet würde — Stand bleibt
 python3 scripts/trader_analysis.py BTCUSDT # Struktur, Liquidität, Zonen im Detail
 ```
@@ -168,6 +222,19 @@ Der Tag zählt nicht als Forward-Tag mit.
   alle Krypto-Setups plötzlich „entfallen". Der Wachposten trägt den alten Stand
   unverändert weiter und meldet nichts — geprüft in
   `tests/unit/test_scan_alerting.py::test_stumme_anlageklasse_erzeugt_keinen_wegbruch`.
+- **Der Scan lief in den Speicher.** Der erste Durchgang über 133 Werte hat alle
+  MTF-Kontexte gesammelt (jeder hält sämtliche Bars aller fünf Zeitebenen plus die
+  Analyseobjekte). Der Kernel hat den Prozess abgeräumt — **ohne Fehlermeldung**, der
+  Lauf war einfach weg, das Log endete mitten im Satz. Gegenmittel: die Detaildatei
+  wird geschrieben, solange der Kontext noch lebt, danach wird er freigegeben. Wer
+  hier etwas ergänzt, darf den Kontext nicht wieder aufheben.
+- **Was live ist und was nicht, muss auf der Seite unterscheidbar sein.** Krypto-
+  und Goldkurse kommen per Websocket direkt von der Börse in den Browser; die
+  eingezeichnete Analyse stammt aus dem letzten Scan, bei Aktien auch der Kurs.
+  Eine Seite, die beides gleich aussehen lässt, verleitet dazu, einen Stand von vor
+  einer Stunde für den aktuellen Kurs zu halten.
+- **Das Portfolio gehört nicht ins Repo.** Es ist öffentlich. Die Positionen liegen
+  ausschließlich im Browser (localStorage) und werden dort gerechnet.
 - **Kein Take-Profit.** Die Regel hat keinen. Positionen enden, wenn das Signal
   dreht. 59 von 398 historischen Positionen liefen über drei Monate und trugen
   praktisch den gesamten Gewinn — wer früh verkauft, verkauft genau diese weg.
