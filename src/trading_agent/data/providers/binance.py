@@ -43,6 +43,23 @@ from trading_agent.net.client import HttpClient, NetError
 _SPOT_BASE = "https://api.binance.com"
 _FUTURES_USDM_BASE = "https://fapi.binance.com"
 
+# Binance beantwortet Anfragen aus Rechenzentren nicht ("Service unavailable from a
+# restricted location"). Der erste GitHub-Actions-Lauf verlor dadurch stillschweigend
+# die gesamte Anlageklasse Krypto. data-api.binance.vision ist der oeffentliche
+# Datenspiegel derselben Boerse — dieselben Kurse, ueblicherweise ohne Geosperre.
+#
+# Eine ANDERE Boerse waere hier falsch: unterschiedliche Kurse an unterschiedlichen
+# Tagen liest die Regel als Kursbewegung.
+_SPOT_FALLBACKS = (
+    "https://data-api.binance.vision",
+    "https://api-gcp.binance.com",
+    "https://api1.binance.com",
+)
+_FUTURES_FALLBACKS = ("https://fapi1.binance.com", "https://fapi2.binance.com")
+
+# Setzt die Umgebung BINANCE_BASE_URL, wird ausschliesslich diese benutzt.
+_ENV_BASE = "BINANCE_BASE_URL"
+
 _INTERVAL: dict[Timeframe, str] = {
     Timeframe.M1: "1m",
     Timeframe.M5: "5m",
@@ -84,8 +101,17 @@ class BinancePublicDataProvider(
         self._futures = market == "futures_usdm"
         base = _FUTURES_USDM_BASE if self._futures else _SPOT_BASE
         self._prefix = "/fapi/v1" if self._futures else "/api/v3"
+        import os
+
+        if env := os.environ.get(_ENV_BASE, "").strip():
+            self._bases: tuple[str, ...] = (env,)
+        else:
+            fb = _FUTURES_FALLBACKS if self._futures else _SPOT_FALLBACKS
+            self._bases = (base, *fb)
+        self._transport = transport
+        self._injiziert = client is not None
         self._client = client or HttpClient(
-            base, name=f"{self.name}_{market}", rate_per_sec=10.0, transport=transport
+            self._bases[0], name=f"{self.name}_{market}", rate_per_sec=10.0, transport=transport
         )
         self._health = HealthTracker(self.name, clock=self._clock)
 
@@ -96,11 +122,30 @@ class BinancePublicDataProvider(
         await self._client.aclose()
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        try:
-            return await self._client.get_json(path, params or {})
-        except Exception as exc:
-            self._health.record_failure(str(exc))
-            raise
+        """Der Reihe nach ueber die bekannten Adressen. Erst wenn alle schweigen, Fehler.
+
+        Ein injizierter Client (Tests) wird nicht ersetzt — sonst wuerde der Fallback die
+        Testtransporte umgehen und stillschweigend echte Netzwerkaufrufe machen.
+        """
+        letzte: Exception | None = None
+        for i, base in enumerate(self._bases):
+            if i and not self._injiziert:
+                await self._client.aclose()
+                self._client = HttpClient(
+                    base,
+                    name=f"{self.name}_{self.market}",
+                    rate_per_sec=10.0,
+                    transport=self._transport,
+                )
+            try:
+                return await self._client.get_json(path, params or {})
+            except Exception as exc:
+                letzte = exc
+                if self._injiziert:
+                    break
+        self._health.record_failure(str(letzte))
+        assert letzte is not None
+        raise letzte
 
     def _require_futures(self, what: str) -> None:
         if not self._futures:
