@@ -42,11 +42,16 @@ darunter steht. Jeder Übergang wird genau einmal gemeldet; der Zustand liegt in
 2. Der Takt ist 15 Minuten, nicht Echtzeit. Für Swing-Trades über Tage kein
    Unterschied; für Scalping wäre es einer.
 
+**Was aufs Telefon geht:** alles, was einen laufenden Trade betrifft (Einstieg, Ziel,
+Stop, ungültig) — immer, unabhängig von der Note. Neue Setups nur ab **A−**; B und B+
+stehen auf der Wachliste und in der App, klingeln aber nicht. Beim ersten Lauf waren es
+17 Setups auf einmal; ohne diese Grenze wäre das eine Lawine gewesen.
+
 **Wer meldet was** — damit dieselbe Nachricht nicht zweimal kommt:
 
 | Meldung | Skript |
 |---|---|
-| Neues Setup mit Einstieg, Stop, Zielen, CRV | `watch_levels.py --vollstaendig` |
+| Neues Setup mit Einstieg, Stop, Zielen, CRV — **nur ab A−** | `watch_levels.py --vollstaendig` |
 | Einstieg / TP1 / TP2 / TP3 / Stop erreicht | `watch_levels.py` |
 | Setup abgelaufen, Richtung gedreht | `watch_levels.py` |
 | Setup weggebrochen, neue Nummer 1, Chart zieht an | `scan_alert.py --ohne-setups` |

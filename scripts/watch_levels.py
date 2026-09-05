@@ -128,6 +128,17 @@ async def main() -> int:
         action="store_true",
         help="neue Setups aufnehmen und ueberholte verwerfen (nach einem Scan)",
     )
+    ap.add_argument(
+        "--alle-setups",
+        action="store_true",
+        help=(
+            "Auch B- und B+-Setups aufs Telefon schicken. Standard: nur A−/A/A+. "
+            "Alles Handelbare steht so oder so auf der Wachliste und in der App — "
+            "aber jede Stunde ein paar B-Setups zu melden waere genau der Spam, den "
+            "wir nicht wollen. Einstieg, Ziel und Stop werden IMMER gemeldet, "
+            "unabhaengig von der Note: da bist du dann im Trade."
+        ),
+    )
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
     args = ap.parse_args()
 
@@ -159,11 +170,18 @@ async def main() -> int:
         print(f"Kurse fuer {len(kurse)} von {len(offen)} Werten")
         ereignisse += liste.pruefen(kurse, jetzt=jetzt)
 
-    print(f"\n{len(ereignisse)} Ereignis(se)")
+    # Neue Setups unterhalb von A− landen auf der Wachliste und in der App, aber nicht
+    # aufs Telefon. Alles, was einen laufenden Trade betrifft, geht immer raus.
+    zu_senden = [e for e in ereignisse if e.art != "NEUES_SETUP" or e.dringend or args.alle_setups]
+    still = len(ereignisse) - len(zu_senden)
+
+    print(
+        f"\n{len(ereignisse)} Ereignis(se)" + (f", davon {still} nur in der App" if still else "")
+    )
     for e in ereignisse:
         print(f"\n[{'!' if e.dringend else ' '}] {e.titel}\n{e.text}")
 
-    if args.send and ereignisse:
+    if args.send and zu_senden:
         tg = TelegramSink(min_severity=Severity.INFO)
         if not tg.available():
             print(
@@ -175,7 +193,7 @@ async def main() -> int:
         # dedup_window 0: die Ereignisschluessel sind schon einmalig je Wache.
         n = Notifier(sinks, max_per_window=10, dedup_window_s=0.0)
         raus = 0
-        for e in ereignisse:
+        for e in zu_senden:
             if n.notify(
                 Notification(
                     severity=Severity.CRITICAL if e.dringend else Severity.WARNING,
@@ -186,7 +204,7 @@ async def main() -> int:
                 )
             ):
                 raus += 1
-        print(f"\n{raus} von {len(ereignisse)} verschickt ({n.active_sinks})")
+        print(f"\n{raus} von {len(zu_senden)} verschickt ({n.active_sinks})")
 
     # Hat sich am Zustand etwas geaendert? Nur dann muss der Stand gesichert werden.
     # Sonst wuerde die CI viermal pro Stunde einen Commit erzeugen, der nichts sagt
