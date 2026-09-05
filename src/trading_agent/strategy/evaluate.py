@@ -93,7 +93,7 @@ from trading_agent.strategy.setups.breakout_retest import (
 )
 from trading_agent.strategy.veto import VetoParams, VetoReport, assess_vetoes
 
-_HIGHER = (Timeframe.M15, Timeframe.H4, Timeframe.D1)
+_HIGHER = (Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
 
 
 # --------------------------------------------------------------------------------- Parameter

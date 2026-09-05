@@ -79,9 +79,18 @@ from trading_agent.strategy.primitives.structure import (
 )
 from trading_agent.strategy.primitives.swings import detect_swings
 
-MTF_TF_ORDER: tuple[Timeframe, ...] = (Timeframe.M5, Timeframe.M15, Timeframe.H4, Timeframe.D1)
+# H1 war hier nie enthalten — die Analyse sprang von 4 Stunden direkt auf 15 Minuten.
+# Fuer Swing-Entscheidungen ist H1 aber die Bruecke zwischen Tagesbild und Ausfuehrung:
+# dort zeigt sich, ob ein Bruch im H4-Bild von der naechstkleineren Ebene getragen wird.
+MTF_TF_ORDER: tuple[Timeframe, ...] = (
+    Timeframe.M5,
+    Timeframe.M15,
+    Timeframe.H1,
+    Timeframe.H4,
+    Timeframe.D1,
+)
 _HTF: tuple[Timeframe, ...] = (Timeframe.D1, Timeframe.H4)
-_HIGHER: tuple[Timeframe, ...] = (Timeframe.M15, Timeframe.H4, Timeframe.D1)
+_HIGHER: tuple[Timeframe, ...] = (Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
 
 
 class MtfError(ValueError):
@@ -89,7 +98,13 @@ class MtfError(ValueError):
 
 
 def _default_min_bars() -> dict[Timeframe, int]:
-    return {Timeframe.M5: 200, Timeframe.M15: 200, Timeframe.H4: 120, Timeframe.D1: 120}
+    return {
+        Timeframe.M5: 200,
+        Timeframe.M15: 200,
+        Timeframe.H1: 200,
+        Timeframe.H4: 120,
+        Timeframe.D1: 120,
+    }
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -480,7 +495,13 @@ def _provisional_analysis_confidence(per_tf: Mapping[Timeframe, TimeframeContext
             return 0.6
         return 0.25
 
-    weights = {Timeframe.D1: 0.35, Timeframe.H4: 0.35, Timeframe.M15: 0.2, Timeframe.M5: 0.1}
+    weights = {
+        Timeframe.D1: 0.32,
+        Timeframe.H4: 0.30,
+        Timeframe.H1: 0.18,
+        Timeframe.M15: 0.14,
+        Timeframe.M5: 0.06,
+    }
     total = sum(weights.get(tf, 0.0) for tf in per_tf)
     if total <= 0:
         return 0.0

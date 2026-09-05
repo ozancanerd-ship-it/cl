@@ -59,7 +59,7 @@ from trading_agent.strategy.paper_live import PaperLiveRunner, PaperLiveStep
 
 _log = logging.getLogger("trading_agent.runtime.live")
 
-_HIGHER: tuple[Timeframe, ...] = (Timeframe.M15, Timeframe.H4, Timeframe.D1)
+_HIGHER: tuple[Timeframe, ...] = (Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
 
 
 class RestMarketData(Protocol):
@@ -75,13 +75,13 @@ class RestMarketData(Protocol):
 
 
 def _default_higher_warmup() -> dict[Timeframe, int]:
-    return {Timeframe.M15: 450, Timeframe.H4: 300, Timeframe.D1: 220}
+    return {Timeframe.M15: 450, Timeframe.H1: 400, Timeframe.H4: 300, Timeframe.D1: 220}
 
 
 def _default_higher_rest_every() -> dict[Timeframe, int]:
     # REST-Refresh-Kadenz je höherer TF in M5-Bars. M15 wird per Default aus dem M5-Strom
     # **rollierend resampelt** (kein REST); H4/D1 ändern sich langsam ⇒ selten nachladen.
-    return {Timeframe.M15: 3, Timeframe.H4: 48, Timeframe.D1: 288}
+    return {Timeframe.M15: 3, Timeframe.H1: 12, Timeframe.H4: 48, Timeframe.D1: 288}
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
