@@ -470,23 +470,36 @@ const chart = (()=>{
     const a = Math.max(0, Math.min(i0, Math.max(0, B.length-5)));
     return B.slice(a, a + anz);
   }
+  /* Preisspanne der Ansicht.
+     Wichtig ist die Reihenfolge: Der erlaubte Rahmen wird EINMAL aus den Kerzen
+     bestimmt und danach nicht mehr verändert. Vorher wurde er in der Schleife
+     mitgezogen — dann hat jedes akzeptierte Level den Rahmen für das nächste
+     geweitet, und ein paar entfernte Liquiditätsmarken haben die Kerzen zu einem
+     Streifen in der Mitte zusammengedrückt. Was ausserhalb liegt, wird nicht
+     weggelassen, sondern als Marke am Rand gezeigt. */
+  let ausserhalb = [];
   function spanne(v){
-    let hi = -Infinity, lo = Infinity;
-    for (const b of v){ if (b.h > hi) hi = b.h; if (b.l < lo) lo = b.l; }
-    const extra = [];
+    let khi = -Infinity, klo = Infinity;
+    for (const b of v){ if (b.h > khi) khi = b.h; if (b.l < klo) klo = b.l; }
+    if (!isFinite(khi) || !isFinite(klo) || khi === klo){
+      khi = (khi||1) * 1.01; klo = (klo||1) * 0.99;
+    }
+    const kspanne = khi - klo;
+    const maxHi = khi + kspanne * 0.55, minLo = klo - kspanne * 0.55;
+    let hi = khi, lo = klo;
+    ausserhalb = [];
+    const kandidaten = [];
     if (EBENEN.ziele && C){
-      for (const k of ['kurs','ziel','tp2','tp3','invalidierung'])
-        if (C[k] != null) extra.push(C[k]);
+      for (const [lab, k] of [['Kurs','kurs'],['TP1','ziel'],['TP2','tp2'],['TP3','tp3'],['Stop','invalidierung']])
+        if (C[k] != null) kandidaten.push([lab, C[k]]);
     }
-    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[])) extra.push(x.p);
-    for (const p of extra){
+    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[])) kandidaten.push([null, x.p]);
+    for (const [lab, p] of kandidaten){
       if (!isFinite(p)) continue;
-      // Nur einbeziehen, was nicht absurd weit weg liegt — sonst staucht ein einzelnes
-      // Level die Kerzen zu einer Linie zusammen.
-      if (p < lo - (hi-lo)*1.2 || p > hi + (hi-lo)*1.2) continue;
-      if (p > hi) hi = p; if (p < lo) lo = p;
+      if (p > maxHi || p < minLo){ if (lab) ausserhalb.push([lab, p, p > maxHi]); continue; }
+      if (p > hi) hi = p;
+      if (p < lo) lo = p;
     }
-    if (!isFinite(hi) || !isFinite(lo) || hi === lo){ hi = (hi||1)*1.01; lo = (lo||1)*0.99; }
     const luft = (hi - lo) * 0.06;
     return {hi: hi + luft, lo: lo - luft};
   }
@@ -612,6 +625,18 @@ const chart = (()=>{
       }
     }
 
+    // Was ausserhalb der Ansicht liegt, als Marke am Rand — statt es zu verschweigen
+    // oder dafür die Kerzen platt zu drücken.
+    if (ausserhalb.length){
+      ctx.font = '9.5px "IBM Plex Mono",monospace'; ctx.textAlign = 'right';
+      let obenN = 0, untenN = 0;
+      for (const [lab, p, oben] of ausserhalb){
+        const y = oben ? M.t + 10 + (obenN++)*13 : H - M.b - 8 - (untenN++)*13;
+        ctx.fillStyle = lab === 'Stop' ? cBad : cLong;
+        ctx.fillText(`${lab} ${num(p, d)} ${oben?'↑':'↓'}`, W - M.r - 6, y);
+      }
+    }
+
     // Letzter Kurs als Marke an der Achse
     if (letzterPreis != null){
       const y = Y(letzterPreis);
@@ -648,6 +673,7 @@ const chart = (()=>{
     }
   }
 
+  let globalGebunden = false;
   function binde(){
     cv = $('cv'); if (!cv) return;
     groesse();
@@ -674,7 +700,9 @@ const chart = (()=>{
     const hoch = ()=>{ ziehen = null; };
     cv.addEventListener('pointerdown', runter);
     cv.addEventListener('pointermove', bewegen);
-    window.addEventListener('pointerup', hoch);
+    // Nur einmal aufs Fenster hängen: die Chart-Ansicht wird bei jedem Wechsel des
+    // Instruments oder der Zeitebene neu gebaut, und sonst sammeln sich die Handler.
+    if (!globalGebunden){ window.addEventListener('pointerup', ()=>{ ziehen = null; }); globalGebunden = true; }
     cv.addEventListener('pointerleave', ()=>{ hoverX = hoverY = null; zeichne(); });
     cv.addEventListener('touchstart', runter, {passive:true});
     cv.addEventListener('touchmove', bewegen, {passive:true});
