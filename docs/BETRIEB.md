@@ -265,6 +265,11 @@ Der Tag zählt nicht als Forward-Tag mit.
   alle Krypto-Setups plötzlich „entfallen". Der Wachposten trägt den alten Stand
   unverändert weiter und meldet nichts — geprüft in
   `tests/unit/test_scan_alerting.py::test_stumme_anlageklasse_erzeugt_keinen_wegbruch`.
+- **Ein Stop 0,06 % entfernt ist kein Stop.** Am 2026-09-05 stand UUSDT (ein Wert
+  nahe 1 USDT) mit Einstieg 0,9993, Stop 0,9999 und Ziel 0,984 auf der Wachliste —
+  auf dem Papier Chance-Risiko 1:25, in Wirklichkeit ein sicherer Verlust: allein Hin-
+  und Rückweg kosten rund 0,2 %. Gegenmittel: `MIN_STOP_PCT = 0,6` als zweite
+  Untergrenze neben den 1,5 ATR. Die größere der beiden gewinnt.
 - **Der Scan lief in den Speicher.** Der erste Durchgang über 133 Werte hat alle
   MTF-Kontexte gesammelt (jeder hält sämtliche Bars aller fünf Zeitebenen plus die
   Analyseobjekte). Der Kernel hat den Prozess abgeräumt — **ohne Fehlermeldung**, der

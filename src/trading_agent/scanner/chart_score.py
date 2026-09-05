@@ -63,6 +63,15 @@ TF_GEWICHT: dict[Timeframe, float] = {
     Timeframe.M15: 0.10,
 }
 
+#: Der Stop muss mindestens so weit weg sein — in Prozent vom Kurs.
+#: Begruendung sind die Kosten, nicht der Chart: bei Binance kostet ein Trade rund
+#: 0,1 % je Seite, also 0,2 % hin und zurueck, dazu der Spread. Ein Stop 0,06 %
+#: entfernt ist damit schon vom Gebuehrenband erledigt, bevor der Markt ueberhaupt
+#: etwas tut. Genau das ist bei UUSDT passiert: Stop 0,06 % weg, Ziel 1,5 % weg,
+#: Chance-Risiko 1:25 auf dem Papier — und in der Wirklichkeit ein sicherer Verlust.
+#: Der Wert ist bewusst das Dreifache der Rundlaufkosten.
+MIN_STOP_PCT = 0.6
+
 MAX_PUNKTE: dict[str, float] = {
     "mtf_ausrichtung": 25.0,
     "struktur_frisch": 20.0,
@@ -273,12 +282,14 @@ def _invalidierung(
         p = float(p)
         if (richtung is Direction.LONG and p < kurs) or (richtung is Direction.SHORT and p > kurs):
             kand.append(p)
-    mindest = 1.5 * atr
+    # Zwei Untergrenzen, beide noetig: 1,5 ATR gegen das Rauschen des Marktes,
+    # MIN_STOP_PCT gegen die eigenen Kosten. Die groessere gewinnt.
+    mindest = max(1.5 * atr, kurs * MIN_STOP_PCT / 100.0)
     if richtung is Direction.LONG:
         tauglich = [p for p in kand if kurs - p >= mindest]
-        return max(tauglich) if tauglich else kurs - 2.0 * atr
+        return max(tauglich) if tauglich else kurs - max(2.0 * atr, mindest)
     tauglich = [p for p in kand if p - kurs >= mindest]
-    return min(tauglich) if tauglich else kurs + 2.0 * atr
+    return min(tauglich) if tauglich else kurs + max(2.0 * atr, mindest)
 
 
 def bewerte_chart(
@@ -459,10 +470,9 @@ def bewerte_chart(
     # Invalidierung noch Luft ist — sonst waere der Stop schon beim Einstieg
     # erreicht, und das schoene Chance-Risiko-Verhaeltnis waere gerechnet, nicht real.
     if einstieg is not None and inval is not None and richtung is not None:
+        puffer = max(0.3 * atr, einstieg * MIN_STOP_PCT / 200.0)
         zu_tief = (
-            einstieg <= inval + 0.3 * atr
-            if richtung is Direction.LONG
-            else einstieg >= inval - 0.3 * atr
+            einstieg <= inval + puffer if richtung is Direction.LONG else einstieg >= inval - puffer
         )
         if zu_tief:
             einstieg, einstieg_art, einstieg_zone = kurs, "sofort", None
@@ -600,4 +610,11 @@ def _v_enum(x: Any) -> str:
     return str(getattr(x, "value", x) if x is not None else "")
 
 
-__all__ = ["MAX_PUNKTE", "TF_GEWICHT", "ChartChance", "ChartFaktor", "bewerte_chart"]
+__all__ = [
+    "MAX_PUNKTE",
+    "MIN_STOP_PCT",
+    "TF_GEWICHT",
+    "ChartChance",
+    "ChartFaktor",
+    "bewerte_chart",
+]

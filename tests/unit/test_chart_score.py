@@ -250,3 +250,30 @@ def test_score_bleibt_in_der_skala() -> None:
     c = bewerte_chart("TEST", _Mtf(per_tf), 100.0)
     assert 0.0 <= c.score <= 100.0
     assert sum(MAX_PUNKTE.values()) == 100.0
+
+
+def test_stop_haelt_mindestabstand_gegen_die_eigenen_gebuehren() -> None:
+    """Ein Stop 0,06 % entfernt ist vom Gebuehrenband erledigt, bevor der Markt etwas tut.
+
+    Genau das ist am 2026-09-05 bei UUSDT passiert: Stop 0,9999 gegen Einstieg 0,9993,
+    Ziel 0,984 — auf dem Papier Chance-Risiko 1:25, in Wirklichkeit ein sicherer
+    Verlust, weil allein Hin- und Rueckweg rund 0,2 % kosten.
+    """
+    from trading_agent.scanner.chart_score import MIN_STOP_PCT, _invalidierung
+
+    kurs = 1.0
+    winzig_atr = 0.00002
+    per_tf: dict[Timeframe, Any] = {
+        Timeframe.H4: _Tfc(
+            atr=winzig_atr,
+            structure=_Struktur(last_swing_low=_Swing(0.9999), last_swing_high=_Swing(1.0001)),
+        )
+    }
+    stop = _invalidierung(per_tf, kurs, Direction.LONG, winzig_atr)
+    assert stop is not None
+    abstand_pct = (kurs - stop) / kurs * 100
+    assert abstand_pct >= MIN_STOP_PCT - 1e-9, f"Stop nur {abstand_pct:.3f} % entfernt"
+
+    stop_short = _invalidierung(per_tf, kurs, Direction.SHORT, winzig_atr)
+    assert stop_short is not None
+    assert (stop_short - kurs) / kurs * 100 >= MIN_STOP_PCT - 1e-9
