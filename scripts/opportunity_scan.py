@@ -24,6 +24,7 @@ import argparse
 import asyncio
 import contextlib
 import json
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from trading_agent.core.enums import AssetClass, Direction, Timeframe
@@ -38,7 +39,44 @@ from trading_agent.utils.logging import configure_logging
 
 # Handelbar ueber Binance/Kraken/Bybit. Bewusst breit — die Frage ist ja gerade,
 # wo etwas passiert, nicht ob BTC heute gut aussieht.
+# Einzelaktien ueber Trade Republic handelbar, ueber Sektoren gestreut statt acht
+# Technologiewerte. Keine ETFs — Ozans Vorgabe.
+AKTIEN = [
+    "NVDA",
+    "AMD",
+    "MSFT",
+    "GOOGL",
+    "META",
+    "AAPL",
+    "AMZN",
+    "TSLA",
+    "PLTR",
+    "AVGO",
+    "JNJ",
+    "LLY",
+    "UNH",
+    "XOM",
+    "CVX",
+    "JPM",
+    "V",
+    "PG",
+    "KO",
+    "WMT",
+    "CAT",
+    "HON",
+    "NEE",
+    "LIN",
+    "DIS",
+    "BA",
+    "T",
+    "MCD",
+    "NKE",
+    "CRM",
+]
+
 PRESETS: dict[str, list[str]] = {
+    "aktien": AKTIEN,
+    "gold_yahoo": ["GC=F"],
     "krypto": [
         "BTCUSDT",
         "ETHUSDT",
@@ -71,6 +109,54 @@ PRESETS: dict[str, list[str]] = {
     ],
     "gold": ["PAXGUSDT", "XAUTUSDT"],
 }
+
+
+async def _scan_yahoo(symbols: list[str], asset_class: str) -> list[Any]:
+    """Aktien und Gold ueber Yahoo — dieselbe Bewertung, andere Datenquelle.
+
+    Die Live-Pipeline ist auf Krypto-Boersen gebaut (Websocket, 24/7, Bid/Ask). Aktien
+    brauchen das nicht: fuer eine Swing-Bewertung reichen abgeschlossene Bars. Geholt
+    werden M5/M15/H1/D1 direkt bei Yahoo, H4 entsteht per Resampling aus M5 — genau so,
+    wie es die MTF-Schicht ohnehin tut, wenn eine native Reihe fehlt.
+    """
+    from trading_agent.analysis.mtf import build_mtf_context
+    from trading_agent.data.providers.yahoo_finance import YahooFinanceProvider
+
+    ac = AssetClass(asset_class)
+    prov = YahooFinanceProvider()
+    jetzt = datetime.now(UTC)
+    ergebnis = []
+    try:
+        for sym in symbols:
+            try:
+                reihen: dict[Timeframe, list] = {}
+                for tf, tage in (
+                    (Timeframe.M5, 55),
+                    (Timeframe.M15, 55),
+                    (Timeframe.H1, 700),
+                    (Timeframe.D1, 730),
+                ):
+                    reihen[tf] = await prov.fetch_ohlcv(
+                        sym, tf, jetzt - timedelta(days=tage), jetzt
+                    )
+                m5 = reihen.pop(Timeframe.M5)
+                if len(m5) < 120 or len(reihen[Timeframe.D1]) < 60:
+                    print(f"  {sym:<12} zu wenig Historie")
+                    continue
+                mtf = build_mtf_context(
+                    m5,
+                    instrument=sym,
+                    asset_class=ac,
+                    now=m5[-1].close_time,
+                    native_higher={tf: b for tf, b in reihen.items() if b},
+                )
+                ergebnis.append(bewerte_chart(sym, mtf, m5[-1].close))
+            except Exception as exc:
+                print(f"  {sym:<12} uebersprungen ({type(exc).__name__})")
+    finally:
+        with contextlib.suppress(Exception):
+            await prov.aclose()
+    return ergebnis
 
 
 async def _scan(symbols: list[str], exchange: str, asset_class: str) -> list[Any]:
@@ -154,14 +240,30 @@ async def main() -> int:
     ap.add_argument("--preset", choices=sorted(PRESETS), default=None)
     ap.add_argument("--symbols", nargs="+", default=None)
     ap.add_argument("--exchange", default="binance")
+    ap.add_argument(
+        "--source",
+        choices=("boerse", "yahoo"),
+        default=None,
+        help="yahoo fuer Aktien und Gold; ohne Angabe aus dem Preset abgeleitet",
+    )
     ap.add_argument("--asset-class", default="crypto")
     ap.add_argument("--top", type=int, default=10)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     configure_logging("WARNING")
 
-    symbols = args.symbols or PRESETS.get(args.preset or "krypto", [])
-    chancen = await _scan(symbols, args.exchange, args.asset_class)
+    preset = args.preset or "krypto"
+    symbols = args.symbols or PRESETS.get(preset, [])
+    quelle = args.source or ("yahoo" if preset in ("aktien", "gold_yahoo") else "boerse")
+    klasse = args.asset_class
+    if quelle == "yahoo" and klasse == "crypto":
+        klasse = "equity" if preset == "aktien" else "gold"
+
+    chancen = (
+        await _scan_yahoo(symbols, klasse)
+        if quelle == "yahoo"
+        else await _scan(symbols, args.exchange, klasse)
+    )
     if not chancen:
         print("nichts auswertbar")
         return 1
