@@ -59,57 +59,11 @@ KLASSE: dict[str, str] = {
     "XAUUSD-YFD": "Rohstoffe",
 }
 
+
 # Aus scripts/tsmom_trade_stats.py auf dem Multi-Asset-Panel, Stand 2026-09-04, 398
 # Positionen. Bewusst eingefroren: das beschreibt die Vergangenheit und aendert sich nicht
 # taeglich. Neu berechnen heisst, das Skript mit dem vollen Parquet-Repo laufen zu lassen —
 # in der CI liegen diese 271 MB nicht, und sie sollen dort auch nicht liegen.
-BUCKETS: dict[str, dict[str, float]] = {
-    "unter 1 Woche": {"n": 231, "win_rate": 31.17, "ret_sum": -54.82},
-    "1 bis 4 Wochen": {"n": 75, "win_rate": 13.33, "ret_sum": -60.29},
-    "1 bis 3 Monate": {"n": 33, "win_rate": 3.03, "ret_sum": -85.46},
-    "\u00fcber 3 Monate": {"n": 59, "win_rate": 62.71, "ret_sum": 2060.67},
-}
-
-
-def _series(repo: Path, bars: int = 200) -> dict[str, list[float]]:
-    """Kursverlauf je Instrument fuer die Charts — gekuerzt auf das, was gezeigt wird.
-
-    Die Regel schaut 180 Tage zurueck; mehr braucht die Zeichnung nicht. Gerundet wird
-    auf sechs signifikante Stellen, sonst blaeht JSON die Seite mit Nachkommastellen auf,
-    die auf 320 Pixel Breite ohnehin niemand sieht.
-    """
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("tf", repo / "scripts" / "tsmom_forward.py")
-    assert spec and spec.loader
-    tf = importlib.util.module_from_spec(spec)
-    sys.modules["tf"] = tf
-    spec.loader.exec_module(tf)
-
-    out: dict[str, list[float]] = {}
-    for canon, (source, sym) in tf.UNIVERSE.items():
-        try:
-            hist = tf._api_history(source, sym, bars=max(bars + 20, 400))
-        except Exception as exc:  # eine stumme Quelle darf die Seite nicht verhindern
-            print(f"  ! {canon}: Kursverlauf nicht geladen ({type(exc).__name__})")
-            continue
-        if hist:
-            out[canon] = [float(f"{c:.6g}") for _, c in hist[-bars:]]
-    return out
-
-
-def _scan_json(repo: Path) -> dict:
-    """Der Gesamtmarkt-Scan, falls vorhanden. Fehlt er, bleibt die Seite ohne Rangliste
-    statt mit einer alten — ein veralteter Scan waere schlimmer als keiner."""
-    f = repo / "web" / "scan.json"
-    if not f.exists():
-        return {}
-    try:
-        return json.loads(f.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return {}
-
-
 def _alarm_verlauf(repo: Path, grenze: int = 25) -> list[dict]:
     """Die zuletzt tatsaechlich verschickten Alarme.
 
@@ -132,6 +86,31 @@ def _alarm_verlauf(repo: Path, grenze: int = 25) -> list[dict]:
         if isinstance(eintrag, dict):
             zeilen.append(eintrag)
     return zeilen[-grenze:][::-1]
+
+
+def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
+    """``web/scan.json`` und ``web/asset/*.json`` in die Ausgabe legen.
+
+    Fehlt der Scan, wird bewusst NICHTS kopiert und auch nichts Altes stehengelassen:
+    die App zeigt dann „kein Scan vorhanden" statt einer Rangliste von gestern. Ein
+    veralteter Scan ist gefaehrlicher als gar keiner — er sieht richtig aus.
+    """
+    import shutil
+
+    quelle = repo / "web"
+    stat = {"scan": 0, "assets": 0}
+    f = quelle / "scan.json"
+    if f.exists():
+        shutil.copy2(f, out / "scan.json")
+        stat["scan"] = 1
+    ordner = quelle / "asset"
+    if ordner.is_dir():
+        ziel = out / "asset"
+        ziel.mkdir(parents=True, exist_ok=True)
+        for datei in sorted(ordner.glob("*.json")):
+            shutil.copy2(datei, ziel / datei.name)
+            stat["assets"] += 1
+    return stat
 
 
 def _plan_json(repo: Path) -> dict:
@@ -213,26 +192,29 @@ def main() -> int:
 
     d = _plan_json(repo)
     plan = d["plan"]
-    series = _series(repo)
-    scan = _scan_json(repo)
+    # Der Gesamtmarkt-Scan wird NICHT mehr eingebettet, sondern zur Laufzeit geholt.
+    # Mit dynamischem Universum sind das schnell mehrere hundert Kilobyte plus je Wert
+    # eine Detaildatei mit Kerzen — eingebettet muesste die App das alles laden, bevor
+    # sie die erste Zeile zeigt. Getrennt laedt sie die Rangliste sofort und den Rest
+    # erst beim Antippen. Nebenwirkung, die wir wollen: die Seite zieht sich den neuen
+    # Stundenscan selbst, ohne dass die Seite neu gebaut werden muss.
+    scan_kopiert = _kopiere_scan(repo, out)
     payload = {
         "plan": plan,
         "diff": d["diff"],
         "first_run": d["first_run"],
-        "signals": d["signals"],
-        "expect": d["expect"],
-        "buckets": BUCKETS,
-        "series": series,
-        "scan": scan,
         "alarme": _alarm_verlauf(repo),
         "rules": _rules(repo),
         "names": NAMES,
         "klasse": KLASSE,
         "journal_days": d["journal_days"],
+        "scan_dateien": scan_kopiert,
         "setup": "TSMOM-Ensemble",
-        "params_version": d["signals"][0].get("params_version", "tsmom-ensemble-1")
-        if d["signals"]
-        else "tsmom-ensemble-1",
+        "params_version": (
+            d["signals"][0].get("params_version", "tsmom-ensemble-1")
+            if d.get("signals")
+            else "tsmom-ensemble-1"
+        ),
         "subtitle": (
             f"Time-Series-Momentum \u00fcber {plan['n_total']} Instrumente in vier "
             "Anlageklassen. Nichts wird automatisch ausgef\u00fchrt."

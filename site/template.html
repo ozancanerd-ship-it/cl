@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Trading-Signale</title>
-<meta name="description" content="Taeglicher Handelsplan aus einer eingefrorenen Momentum-Regel. Paper.">
+<title>Trading Desk</title>
+<meta name="description" content="Live AI Trading Desk — Gesamtmarkt-Scan, eingezeichnete Chartanalyse, Portfolio. Paper, kein Echtgeld.">
 <meta name="theme-color" content="#F3F5F4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0C1214" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Signale">
+<meta name="apple-mobile-web-app-title" content="Desk">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
@@ -26,6 +26,7 @@
   --flat:#7A8B8D; --flat-bg:#E8ECEB;
   --warn:#A8720E; --warn-bg:#F7EDDA;
   --bad:#9E2B2B; --bad-bg:#F6E4E4;
+  --grid:#E7ECEB; --wick:#8C9B9D;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --paper:#0C1214; --surface:#131B1D; --surface-2:#1A2426; --sunk:#0F1719;
@@ -36,6 +37,7 @@
   --flat:#6D8082; --flat-bg:#1A2426;
   --warn:#D9A441; --warn-bg:#2C2415;
   --bad:#D97878; --bad-bg:#2C1A1A;
+  --grid:#1C2628; --wick:#5C6E70;
 }}
 :root[data-theme="dark"]{
   --paper:#0C1214; --surface:#131B1D; --surface-2:#1A2426; --sunk:#0F1719;
@@ -46,6 +48,7 @@
   --flat:#6D8082; --flat-bg:#1A2426;
   --warn:#D9A441; --warn-bg:#2C2415;
   --bad:#D97878; --bad-bg:#2C1A1A;
+  --grid:#1C2628; --wick:#5C6E70;
 }
 *{box-sizing:border-box}
 body{margin:0; background:var(--paper); color:var(--ink);
@@ -53,773 +56,1194 @@ body{margin:0; background:var(--paper); color:var(--ink);
   font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
   padding-top:env(safe-area-inset-top)}
 img{max-width:100%}
-.wrap{max-width:640px; margin:0 auto; padding:0 16px 80px}
+.wrap{max-width:760px; margin:0 auto; padding:0 16px 90px}
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
-header{background:var(--surface); border-bottom:1px solid var(--rule)}
-.hd{max-width:640px; margin:0 auto; padding:26px 16px 0}
+header{background:var(--surface); border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:40}
+.hd{max-width:760px; margin:0 auto; padding:18px 16px 0}
 .crumb{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.14em;
-  text-transform:uppercase; color:var(--ink-3); display:flex; gap:10px;
-  align-items:center; flex-wrap:wrap}
-h1{font-family:Newsreader,Georgia,serif; font-weight:500; font-size:30px;
-  line-height:1.1; letter-spacing:-.015em; margin:9px 0 0}
-.stamp{font-size:13px; color:var(--ink-3); margin-top:5px}
-.hero{display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; margin-top:20px;
-  background:var(--rule); border:1px solid var(--rule); border-radius:4px; overflow:hidden}
-.hero div{background:var(--surface); padding:13px 12px}
-.hero .k{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.1em;
-  text-transform:uppercase; color:var(--ink-3); margin-bottom:5px}
-.hero .v{font-family:Newsreader,Georgia,serif; font-size:24px; line-height:1;
-  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
-.hero .n{font-size:11.5px; color:var(--ink-3); margin-top:4px}
+  text-transform:uppercase; color:var(--ink-3); display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+h1{font-family:Newsreader,Georgia,serif; font-weight:500; font-size:26px;
+  line-height:1.1; letter-spacing:-.015em; margin:7px 0 0}
+h2{font-family:Newsreader,Georgia,serif; font-weight:500; font-size:21px; letter-spacing:-.01em;
+  margin:30px 0 10px}
+h3{font-size:14px; font-weight:600; margin:20px 0 8px; letter-spacing:.01em}
+.stamp{font-size:12.5px; color:var(--ink-3); margin-top:4px}
 .chip{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10px;
-  font-weight:500; letter-spacing:.07em; text-transform:uppercase;
-  padding:3px 8px; border-radius:100px}
+  font-weight:500; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px}
 .chip.paper{background:var(--warn-bg); color:var(--warn)}
-.tabs{display:flex; gap:2px; margin-top:20px; overflow-x:auto}
+.chip.live{background:var(--long-bg); color:var(--long)}
+.chip.tot{background:var(--flat-bg); color:var(--flat)}
+.dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--long);
+  margin-right:5px; vertical-align:middle}
+.dot.aus{background:var(--flat)}
+.puls{animation:puls 2s ease-in-out infinite}
+@keyframes puls{0%,100%{opacity:1}50%{opacity:.28}}
+.tabs{display:flex; gap:2px; margin-top:16px; overflow-x:auto; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
 .tab{appearance:none; background:none; border:0; border-bottom:2px solid transparent;
   font:inherit; font-size:13.5px; font-weight:500; color:var(--ink-3);
-  padding:9px 13px 10px; cursor:pointer; white-space:nowrap}
-.tab[aria-selected="true"]{color:var(--accent); border-bottom-color:var(--accent)}
-.tab:focus-visible{outline:2px solid var(--accent); outline-offset:-2px; border-radius:3px}
-.panel{padding-top:24px}
-.panel[hidden]{display:none}
-h2{font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:500;
-  letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3);
-  margin:30px 0 11px; display:flex; align-items:center; gap:9px}
-h2:first-child{margin-top:0}
-h2::after{content:""; flex:1; height:1px; background:var(--rule)}
-p{margin:0 0 13px; color:var(--ink-2); font-size:14.5px; max-width:62ch}
-p.lead{color:var(--ink); font-size:15.5px}
-strong{color:var(--ink); font-weight:600}
-.act{background:var(--surface); border:1px solid var(--rule); border-left-width:3px;
-  border-radius:4px; margin-bottom:8px; padding:13px 15px}
-.act.buy{border-left-color:var(--long)}
-.act.sell{border-left-color:var(--bad)}
-.act.hold{border-left-color:var(--rule-strong)}
-.act-h{display:flex; align-items:baseline; gap:10px}
-.act-h .nm{font-weight:600; font-size:16px}
-.act-h .eur{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:19px;
-  font-weight:600; font-variant-numeric:tabular-nums}
-.buy .eur{color:var(--long)} .sell .eur{color:var(--bad)}
-.act-m{font-size:12.5px; color:var(--ink-3); margin-top:6px; display:flex;
-  flex-wrap:wrap; gap:4px 12px; font-family:"IBM Plex Mono",monospace}
-.sig{background:var(--surface); border:1px solid var(--rule); border-radius:4px;
-  margin-bottom:7px; overflow:hidden}
-.sig-top{display:flex; align-items:center; gap:12px; padding:12px 14px}
-.sig-name{flex:1; min-width:0}
-.sig-name .nm{font-weight:600; font-size:15.5px; display:block; line-height:1.2}
-.sig-name .cl{font-size:12px; color:var(--ink-3); margin-top:2px}
-.sig-w{text-align:right; flex:none}
-.sig-w .num{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600;
-  font-variant-numeric:tabular-nums; line-height:1}
-.sig-w .lab{font-size:10.5px; color:var(--ink-3); margin-top:3px;
-  font-family:"IBM Plex Mono",monospace; letter-spacing:.06em; text-transform:uppercase}
-.long .num{color:var(--long)} .flat .num{color:var(--flat)}
-.bar{height:4px; background:var(--sunk)}
-.bar i{display:block; height:100%; background:var(--long)}
-.flat .bar i{background:var(--flat)}
-.sig-foot{display:flex; align-items:center; gap:10px; padding:9px 14px 11px;
-  border-top:1px solid var(--rule); background:var(--surface-2)}
-.dots{display:flex; gap:4px; flex:none}
-.dot{width:19px; height:5px; border-radius:2px; background:var(--rule-strong)}
-.dot.on{background:var(--long)}
-.dots-lab{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-3);
-  letter-spacing:.05em}
-.px{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12.5px;
-  color:var(--ink-3); font-variant-numeric:tabular-nums}
-.tw{overflow-x:auto; border:1px solid var(--rule); border-radius:4px;
-  background:var(--surface); margin:16px 0}
-table{border-collapse:collapse; width:100%; font-size:13.5px}
-th,td{padding:9px 13px; text-align:left; border-bottom:1px solid var(--rule); white-space:nowrap}
-th{font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:500;
-  letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3);
-  border-bottom:1px solid var(--rule-strong)}
-tbody tr:last-child td{border-bottom:0}
-td.num,th.num{text-align:right; font-family:"IBM Plex Mono",monospace;
-  font-variant-numeric:tabular-nums}
-tr.key td{background:var(--long-bg)}
-.pos{color:var(--long)} .neg{color:var(--bad)}
-.note{border-left:2px solid var(--accent); background:var(--accent-soft);
-  padding:14px 16px; border-radius:0 4px 4px 0; margin:20px 0}
-.note.warn{border-left-color:var(--warn); background:var(--warn-bg)}
-.note.bad{border-left-color:var(--bad); background:var(--bad-bg)}
-.note .nt{font-weight:600; display:block; margin-bottom:5px; font-size:14.5px; color:var(--ink)}
-.note p{margin:0; font-size:14px}
-.note p+p{margin-top:8px}
-.bk{margin-bottom:14px}
-.bk-h{display:flex; align-items:baseline; gap:8px; margin-bottom:5px}
-.bk-h .t{font-weight:600; font-size:14.5px}
-.bk-h .s{font-size:12.5px; color:var(--ink-3); margin-left:auto;
-  font-family:"IBM Plex Mono",monospace}
-.bk-bar{height:12px; background:var(--sunk); border-radius:3px; overflow:hidden}
-.bk-bar i{display:block; height:100%; background:var(--accent)}
-.bk-sum{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600;
-  margin-top:5px; text-align:right; font-variant-numeric:tabular-nums}
-.card{background:var(--surface); border:1px solid var(--rule); border-radius:4px;
-  margin-bottom:14px; overflow:hidden}
-.card-h{display:flex; align-items:center; gap:10px; padding:13px 15px 10px}
-.card-h .nm{font-weight:600; font-size:16px}
-.card-h .cl{font-size:12px; color:var(--ink-3)}
-.card-h .w{margin-left:auto; text-align:right}
-.card-h .w b{font-family:"IBM Plex Mono",monospace; font-size:18px; font-weight:600;
-  font-variant-numeric:tabular-nums; display:block; line-height:1}
-.card-h .w s{font-size:10px; color:var(--ink-3); text-decoration:none;
-  font-family:"IBM Plex Mono",monospace; letter-spacing:.06em; text-transform:uppercase}
-.chart{display:block; width:100%; height:auto; background:var(--surface)}
-.card-b{padding:2px 15px 14px}
-.rowx{display:flex; gap:10px; font-size:13.5px; padding:5px 0;
-  border-top:1px solid var(--rule)}
-.rowx:first-child{border-top:0}
-.rowx .lab{color:var(--ink-2); flex:1; min-width:0}
-.rowx .val{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
-  white-space:nowrap}
-.win{display:flex; gap:5px; padding:9px 15px; background:var(--surface-2);
-  border-top:1px solid var(--rule); flex-wrap:wrap}
-.wchip{font-family:"IBM Plex Mono",monospace; font-size:10.5px; padding:2px 7px;
-  border-radius:3px; background:var(--flat-bg); color:var(--ink-3)}
-.wchip.on{background:var(--long-bg); color:var(--long)}
-.wchip.off{background:var(--bad-bg); color:var(--bad)}
-.alarm{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
-  border-radius:4px; padding:14px 16px; margin-bottom:9px}
-.alarm.hot{border-left-color:var(--long); background:var(--long-bg)}
-.alarm .ah{font-weight:600; font-size:15.5px; display:flex; gap:10px; align-items:baseline}
-.alarm .ah .d{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px;
-  color:var(--ink-3)}
-.alarm p{margin:5px 0 0; font-size:13.5px}
+  padding:9px 12px; cursor:pointer; white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+.panel{padding-top:18px}
+.lead{font-size:14px; color:var(--ink-2); margin:0 0 16px}
+
+/* ---------- Statuszeile ---------- */
+.status{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin-top:14px;
+  background:var(--rule); border:1px solid var(--rule); border-radius:4px; overflow:hidden}
+.status div{background:var(--surface); padding:10px 11px}
+.status .k{font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:3px}
+.status .v{font-family:Newsreader,Georgia,serif; font-size:21px; line-height:1;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.status .v.gut{color:var(--long)} .status .v.mittel{color:var(--warn)} .status .v.aus{color:var(--ink-3)}
+@media (max-width:520px){.status{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- Radar-Zeilen ---------- */
+.filter{display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 4px}
+.fb{appearance:none; border:1px solid var(--rule-strong); background:var(--surface);
+  color:var(--ink-2); font:inherit; font-size:11.5px; font-weight:500; padding:5px 11px;
+  border-radius:100px; cursor:pointer}
+.fb[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
 .opp{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
-  border-radius:4px; margin-bottom:8px; overflow:hidden}
-.opp.aplus{border-left-color:var(--long)}
-.opp.a{border-left-color:var(--long); opacity:.95}
-.opp.watch{border-left-color:var(--warn)}
-.opp-h{display:flex; align-items:baseline; gap:9px; padding:12px 14px 8px}
-.opp-h .nm{font-weight:600; font-size:15.5px}
-.opp-h .dir{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
-  padding:2px 6px; border-radius:3px; background:var(--surface-2); color:var(--ink-3)}
+  border-radius:4px; margin-bottom:8px; cursor:pointer; transition:border-color .12s}
+.opp:hover{border-color:var(--rule-strong)}
+.opp.n-A_PLUS{border-left-color:var(--long)} .opp.n-A{border-left-color:var(--long)}
+.opp.n-A_MINUS{border-left-color:var(--accent)} .opp.n-B_PLUS{border-left-color:var(--accent)}
+.opp.n-B{border-left-color:var(--warn)} .opp.n-WATCH{border-left-color:var(--rule-strong)}
+.opp-h{display:flex; align-items:baseline; gap:8px; padding:11px 13px 6px; flex-wrap:wrap}
+.opp-h .rk{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); min-width:22px}
+.opp-h .nm{font-weight:600; font-size:15px}
+.opp-h .kl{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-3)}
+.opp-h .dir{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.08em;
+  padding:2px 6px; border-radius:3px}
 .opp-h .dir.long{background:var(--long-bg); color:var(--long)}
 .opp-h .dir.short{background:var(--bad-bg); color:var(--bad)}
-.opp-h .sc{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:19px;
+.opp-h .note{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
+  padding:2px 7px; border-radius:3px; background:var(--surface-2); color:var(--ink-2)}
+.opp-h .note.gut{background:var(--long-bg); color:var(--long)}
+.opp-h .note.mittel{background:var(--accent-soft); color:var(--accent)}
+.opp-h .sc{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:18px;
   font-weight:600; font-variant-numeric:tabular-nums}
-.opp-h .ur{font-family:"IBM Plex Mono",monospace; font-size:10.5px; padding:2px 7px;
-  border-radius:100px; background:var(--surface-2); color:var(--ink-3)}
-.opp-h .ur.aplus,.opp-h .ur.a{background:var(--long-bg); color:var(--long)}
-.opp-h .ur.watch{background:var(--warn-bg); color:var(--warn)}
-.opp-b{padding:0 14px 12px}
-.fak{display:grid; grid-template-columns:8.5em 3.5em 1fr; gap:4px 8px; align-items:start;
-  font-size:12.5px; margin-top:5px}
-.fak .fb{margin-top:4px}
-.fak .fn{color:var(--ink-2); font-size:12px}
-.fak .fb{height:6px; background:var(--sunk); border-radius:2px; overflow:hidden}
-.fak .fb i{display:block; height:100%; background:var(--accent)}
-.fak .fd{color:var(--ink-3); font-size:11.5px; font-family:"IBM Plex Mono",monospace;
-  line-height:1.35; word-break:break-word}
-.zt{display:flex; gap:14px; flex-wrap:wrap; margin-top:9px; padding-top:9px;
-  border-top:1px solid var(--rule); font-family:"IBM Plex Mono",monospace; font-size:12px}
-.zt b{color:var(--ink); font-weight:600}
-.foot{margin-top:36px; padding-top:16px; border-top:1px solid var(--rule);
-  font-size:12.5px; color:var(--ink-3)}
-.foot p{font-size:12.5px; color:var(--ink-3)}
-@media(max-width:430px){
-  .hero{grid-template-columns:1fr 1fr}
-  .hero div:last-child{grid-column:1/-1; display:flex; align-items:baseline; gap:10px}
-  .hero div:last-child .k{margin:0; flex:none; align-self:center}
-  .hero div:last-child .v{font-size:20px; margin-left:auto}
-  .hero div:last-child .n{margin:0; align-self:center}
-}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.opp-b{padding:0 13px 11px; font-size:12.5px; color:var(--ink-2)}
+.kpi{display:flex; gap:14px; flex-wrap:wrap; font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px; color:var(--ink-2); margin-top:5px}
+.kpi b{color:var(--ink); font-weight:600}
+.kpi .up{color:var(--long)} .kpi .dn{color:var(--bad)}
+.warnz{margin-top:6px; font-size:11.5px; color:var(--warn)}
+.muz{margin-top:5px; font-size:11.5px; color:var(--ink-3)}
+.fak{display:grid; grid-template-columns:8.5em 3.2em 1fr; gap:3px 8px; align-items:center;
+  font-size:11.5px; color:var(--ink-3); margin-top:3px}
+.fak .fn{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase}
+.fak .fb2{height:5px; background:var(--sunk); border-radius:3px; overflow:hidden}
+.fak .fb2 i{display:block; height:100%; background:var(--accent)}
+.fak .fd{color:var(--ink-2)}
+
+/* ---------- Chart ---------- */
+.chartbox{background:var(--surface); border:1px solid var(--rule); border-radius:4px; overflow:hidden}
+.chart-h{display:flex; align-items:center; gap:9px; padding:10px 12px; border-bottom:1px solid var(--rule);
+  flex-wrap:wrap}
+.chart-h .nm{font-weight:600; font-size:16px}
+.chart-h .px{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:17px; font-weight:600}
+.chart-h .px.up{color:var(--long)} .chart-h .px.dn{color:var(--bad)}
+.tfbar{display:flex; gap:2px; padding:7px 10px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
+.tfb{appearance:none; border:0; background:none; font:inherit; font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px; color:var(--ink-3); padding:4px 10px; border-radius:3px; cursor:pointer}
+.tfb[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent); font-weight:600}
+.layers{display:flex; gap:5px; padding:6px 10px 8px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
+.lb{appearance:none; border:1px solid var(--rule); background:var(--surface); font:inherit;
+  font-size:10.5px; color:var(--ink-3); padding:3px 8px; border-radius:100px; cursor:pointer}
+.lb[aria-pressed="true"]{background:var(--surface-2); color:var(--ink); border-color:var(--rule-strong)}
+#cv{display:block; width:100%; height:420px; touch-action:none; cursor:crosshair}
+@media (max-width:520px){#cv{height:330px}}
+.legende{display:flex; gap:12px; flex-wrap:wrap; padding:8px 12px; border-top:1px solid var(--rule);
+  font-size:10.5px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
+.legende span{display:flex; align-items:center; gap:4px}
+.legende i{width:11px; height:3px; border-radius:2px; display:inline-block}
+.readout{padding:7px 12px; border-top:1px solid var(--rule); font-family:"IBM Plex Mono",monospace;
+  font-size:11px; color:var(--ink-2); min-height:30px}
+
+/* ---------- Analyse ---------- */
+.mtf{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px}
+.mtf th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--rule)}
+.mtf td{padding:7px 8px; border-bottom:1px solid var(--rule); vertical-align:top}
+.mtf td.tf{font-family:"IBM Plex Mono",monospace; font-weight:600}
+.mtf .up{color:var(--long)} .mtf .dn{color:var(--bad)} .mtf .nu{color:var(--ink-3)}
+.satzliste{margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-2)}
+.satzliste li{margin-bottom:5px}
+.karte{background:var(--surface); border:1px solid var(--rule); border-radius:4px; padding:13px 14px; margin-bottom:10px}
+.karte h3{margin-top:0}
+.karte.gut{border-left:3px solid var(--long)} .karte.warn{border-left:3px solid var(--warn)}
+.karte.bad{border-left:3px solid var(--bad)}
+.zt{display:flex; gap:12px; flex-wrap:wrap; font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+  color:var(--ink-2); margin-top:8px; padding-top:8px; border-top:1px dashed var(--rule)}
+.zt b{color:var(--ink)}
+.note-box{background:var(--surface-2); border:1px solid var(--rule); border-radius:4px;
+  padding:11px 13px; font-size:12.5px; color:var(--ink-2); margin:12px 0}
+.note-box.warn{background:var(--warn-bg); border-color:transparent; color:var(--warn)}
+.note-box.bad{background:var(--bad-bg); border-color:transparent; color:var(--bad)}
+.note-box .nt{display:block; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
+  letter-spacing:.1em; text-transform:uppercase; margin-bottom:5px; font-weight:600}
+.alarm{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
+  border-radius:4px; padding:11px 13px; margin-bottom:8px}
+.alarm.hot{border-left-color:var(--long); background:var(--long-bg)}
+.alarm .ah{font-weight:600; font-size:14.5px; display:flex; gap:10px; align-items:baseline}
+.alarm .ah .d{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
+.alarm p{margin:5px 0 0; font-size:12.5px}
+.rowx{display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--rule);
+  font-size:13px}
+.rowx:last-child{border-bottom:0}
+.rowx .lab{color:var(--ink-2)} .rowx .val{font-family:"IBM Plex Mono",monospace; font-weight:500}
+.tw{overflow-x:auto}
+.leer{color:var(--ink-3); font-size:13px; padding:16px 0}
+.foot{max-width:760px; margin:0 auto; padding:26px 16px 40px; border-top:1px solid var(--rule);
+  font-size:11.5px; color:var(--ink-3)}
+.foot p{margin:0 0 7px}
+button.link{appearance:none; background:none; border:0; font:inherit; font-size:12.5px;
+  color:var(--accent); cursor:pointer; padding:0; text-decoration:underline}
 </style>
 </head>
 <body>
 <header>
   <div class="hd">
     <div class="crumb">
-      <span>AI Trading Agent</span><span>·</span>
-      <span id="stamp">—</span>
-      <span class="chip paper" id="mode">Paper</span>
+      <span>AI Trading Desk</span>
+      <span class="chip paper">Paper</span>
+      <span id="livechip" class="chip tot"><span class="dot aus"></span>offline</span>
     </div>
-    <h1>Trading-Signale</h1>
-    <p class="stamp" id="sub">—</p>
-    <div class="hero">
-      <div><div class="k">Investiert</div><div class="v" id="hInv">—</div>
-        <div class="n" id="hInvN">—</div></div>
-      <div><div class="k">Cash</div><div class="v" id="hCash">—</div>
-        <div class="n" id="hCashN">—</div></div>
-      <div><div class="k">Long-Signale</div><div class="v" id="hLong">—</div>
-        <div class="n" id="hLongN">—</div></div>
-    </div>
+    <h1 id="kopf">Markt</h1>
+    <div class="stamp" id="stempel">—</div>
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true"  aria-controls="p1" id="t1">Heute</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">Chancen</button>
+      <button class="tab" role="tab" aria-selected="true"  aria-controls="p0" id="t0">Markt</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p1" id="t1">Chart</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2">Analyse</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Alarme</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Erwartung</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Regeln</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Portfolio</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Plan</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Alarme</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">System</button>
     </div>
   </div>
 </header>
-<div class="wrap">
 
-<section class="panel" id="p1" role="tabpanel" aria-labelledby="t1">
-  <p class="lead" id="planLead">—</p>
-  <div id="acts"></div>
-  <div id="waiting"></div>
-  <div id="noAccount"></div>
-</section>
+<main class="wrap">
+  <section class="panel" id="p0" role="tabpanel" aria-labelledby="t0">
+    <div id="marktstatus"></div>
+    <div class="filter" id="filter"></div>
+    <div id="radar"><p class="leer">Scan wird geladen …</p></div>
+  </section>
 
-<section class="panel" id="p6" role="tabpanel" aria-labelledby="t6" hidden>
-  <p class="lead">Der ganze verfügbare Markt, nach Chartzustand sortiert. Nicht jeden Tag
-    dieselbe Liste — was oben steht, ändert sich mit dem Markt.</p>
-  <div id="chancen"></div>
-</section>
+  <section class="panel" id="p1" role="tabpanel" aria-labelledby="t1" hidden>
+    <div id="chartansicht"></div>
+  </section>
 
-<section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
-  <p class="lead">Die Regel vergleicht den heutigen Kurs mit dem von vor 28, 56, 90, 120 und
-    180 Tagen. Jede gestrichelte Linie im Chart ist einer dieser Vergleichskurse. Liegt der
-    Kurs darüber, ist das Fenster grün.</p>
-  <div class="note">
-    <span class="nt">Das ist keine Prognose</span>
-    <p>Niemand hier sagt, wohin der Kurs geht — auch ich nicht. Der Chart zeigt, was die
-      Regel <em>sieht</em>, und die Zahlen darunter sagen, <strong>ab welchem Kurs sie ihre
-      Meinung ändert.</strong> Das ist überprüfbar; eine Prognose wäre es nicht.</p>
-  </div>
-  <div id="analyse"></div>
-</section>
+  <section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
+    <div id="analyse"></div>
+  </section>
 
-<section class="panel" id="p3" role="tabpanel" aria-labelledby="t3" hidden>
-  <p class="lead">Nur ein Alarm, und nur dann, wenn er etwas wert ist.</p>
-  <div id="alarme"></div>
-</section>
+  <section class="panel" id="p3" role="tabpanel" aria-labelledby="t3" hidden>
+    <div id="portfolio"></div>
+  </section>
 
-<section class="panel" id="p4" role="tabpanel" aria-labelledby="t4" hidden>
-  <p class="lead">Aus 398 vergangenen Positionen. Es ist eine Beschreibung, keine Zusage.</p>
-  <div id="expect"></div>
-</section>
+  <section class="panel" id="p4" role="tabpanel" aria-labelledby="t4" hidden>
+    <div id="plan"></div>
+  </section>
 
-<section class="panel" id="p5" role="tabpanel" aria-labelledby="t5" hidden>
-  <div id="rules"></div>
-</section>
+  <section class="panel" id="p5" role="tabpanel" aria-labelledby="t5" hidden>
+    <div id="alarme"></div>
+  </section>
+
+  <section class="panel" id="p6" role="tabpanel" aria-labelledby="t6" hidden>
+    <div id="system"></div>
+  </section>
+</main>
 
 <div class="foot">
   <p id="built">—</p>
-  <p>Diese Seite baut sich jeden Tag um 23:10 UTC selbst neu. Wenn oben ein altes Datum
-    steht, ist der Job nicht gelaufen — dann stimmt etwas nicht.</p>
-  <p><strong>Es wird nichts automatisch gehandelt.</strong> Jede Order legst du selbst.</p>
+  <p>Nichts wird automatisch ausgeführt. Kein Echtgeld. Die Kurse laufen live von der
+     Börse, die eingezeichnete Analyse stammt aus dem letzten Scan — beides steht mit
+     eigenem Zeitstempel da, damit man es nicht verwechselt.</p>
 </div>
-</div>
+
 <script id="payload" type="application/json">__DATA__</script>
 <script>
+'use strict';
+/* =====================================================================
+   AI TRADING DESK — Client
+   Zwei Datenquellen, bewusst getrennt gehalten:
+     D    der eingebettete Plan (TSMOM-Regel, Portfolio, Alarme) — Stand des Baus
+     S    scan.json, zur Laufzeit geholt — der Gesamtmarkt-Scan
+     L    Live-Kurse per Websocket von der Börse — jetzt
+   Was live ist, ist mit einem Punkt markiert. Was aus dem Scan stammt, trägt dessen
+   Zeitstempel. Eine Seite, die alles gleich aussehen lässt, verleitet dazu, einen
+   Stand von vor einer Stunde für den aktuellen Kurs zu halten.
+   ===================================================================== */
 const D = JSON.parse(document.getElementById('payload').textContent);
-const eur = n => Math.round(n).toLocaleString('de-DE') + ' €';
-const pct = n => (n*100).toFixed(1).replace('.',',') + ' %';
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-/* tabs */
-(function(){
-  const tabs=[...document.querySelectorAll('.tab')];
-  const show=i=>tabs.forEach((t,j)=>{
-    t.setAttribute('aria-selected', j===i);
-    document.getElementById(t.getAttribute('aria-controls')).hidden = j!==i;
-  });
-  tabs.forEach((t,i)=>{
-    t.addEventListener('click',()=>show(i));
-    t.addEventListener('keydown',e=>{
-      if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;
-      e.preventDefault();
-      const n=(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length;
-      tabs[n].focus(); show(n);
-    });
-  });
-})();
-
-/* Kopf */
 const P = D.plan;
+let S = null;                 // scan.json
+let AKTIV = null;             // gewähltes Instrument (Detailobjekt)
+let AKTIV_TF = 'H4';
+const DETAIL = new Map();     // Instrument -> Detaildaten
+const L = new Map();          // Instrument -> {p, pct, t}
+let WS = null, WS_OK = false, WS_TRY = 0;
 
-/* Ein Datenausfall darf nicht als normaler Plan durchgehen. Er steht ganz oben,
-   vor allem anderen, und sagt was fehlt. */
-if (D.incomplete) {
-  document.querySelector('.wrap').insertAdjacentHTML('afterbegin',
-    `<div class="note bad" style="margin:20px 0 0">
-      <span class="nt">Datenausfall — kein gültiger Plan</span>
-      <p>Für ${D.missing.length} Instrument(e) kamen keine Kurse:
-        <strong>${D.missing.map(esc).join(', ')}</strong>.</p>
-      <p>Was unten steht, ist auf weniger Instrumenten gerechnet als die Regel vorsieht.
-        <strong>Nicht danach handeln.</strong> Bestand halten, bis der nächste Lauf
-        vollständig durchgeht.</p>
-    </div>`);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+
+function digits(v){ v = Math.abs(v||0);
+  return v >= 1000 ? 2 : v >= 10 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8; }
+function num(v, d){ if (v == null || !isFinite(v)) return '—';
+  return Number(v).toLocaleString('de-DE',
+    {minimumFractionDigits: d ?? digits(v), maximumFractionDigits: d ?? digits(v)}); }
+function pct(v, k){ if (v == null || !isFinite(v)) return '—';
+  return (v>0?'+':'') + Number(v).toFixed(k ?? 2).replace('.',',') + ' %'; }
+function zeit(iso){ if (!iso) return '—';
+  try { return new Date(iso).toLocaleString('de-DE',
+    {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return '—'; } }
+function vorMin(iso){ if (!iso) return null;
+  const t = Date.parse(iso); return isFinite(t) ? Math.round((Date.now()-t)/60000) : null; }
+function name(sym){ return (D.names && D.names[sym]) || sym; }
+
+const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
+
+/* ---------------------------------------------------------------- Tabs */
+const TABS = [...document.querySelectorAll('.tab')];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Plan','Alarme','System'];
+function zeigeTab(i){
+  TABS.forEach((t,k)=>{
+    t.setAttribute('aria-selected', k===i ? 'true':'false');
+    $('p'+k).hidden = k!==i;
+  });
+  $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
+  if (i===1) requestAnimationFrame(()=>chart.groesse());
+  try { history.replaceState(null,'','#'+i); } catch(e){}
 }
-document.getElementById('stamp').textContent = 'Stand ' + P.date;
-document.getElementById('sub').textContent = D.subtitle;
-document.getElementById('mode').textContent = P.eligibility === 'live' ? 'Live' : 'Paper';
-document.getElementById('hInv').textContent  = eur(P.invested_eur);
-document.getElementById('hInvN').textContent = pct(P.invested_eur/P.equity) + ' der Equity';
-document.getElementById('hCash').textContent  = eur(P.cash_eur);
-document.getElementById('hCashN').textContent = pct(P.cash_eur/P.equity) + ' Puffer';
-document.getElementById('hLong').textContent  = P.n_long + '/' + P.n_total;
-document.getElementById('hLongN').textContent = (P.klassen||[])
-  .map(k => k.charAt(0).toUpperCase()+k.slice(1)).join(' · ') || '—';
+TABS.forEach((t,i)=>t.addEventListener('click',()=>zeigeTab(i)));
 
-/* Heute */
-const acts = document.getElementById('acts');
-const rows = [];
-(D.diff.sell||[]).forEach(x => rows.push(['sell','VERKAUFEN', x,
-  'Regel ist nicht mehr long, oder aus den Top-Plätzen gefallen']));
-(D.diff.buy||[]).forEach(x => rows.push(['buy', D.first_run ? 'AUFBAUEN' : 'KAUFEN', x, null]));
-(D.diff.adjust||[]).forEach(x => rows.push(['hold',
-  x.eur > x.eur_before ? 'AUFSTOCKEN' : 'REDUZIEREN', x,
-  'vorher ' + eur(x.eur_before)]));
-
-document.getElementById('planLead').textContent = rows.length
-  ? (D.first_run
-      ? 'Erster Lauf — das ist der Startbestand, keine Änderung.'
-      : 'Das hat sich seit gestern geändert. Alles andere bleibt, wie es ist.')
-  : 'Keine Änderung. Bestand halten, nichts tun. Das ist ein gültiges Ergebnis.';
-
-acts.innerHTML = rows.map(([cls,label,x,note]) => `
-  <div class="act ${cls}">
-    <div class="act-h">
-      <span class="nm">${esc(D.names[x.instrument]||x.instrument)}</span>
-      <span class="mono" style="font-size:10.5px;letter-spacing:.09em;color:var(--ink-3)">${label}</span>
-      <span class="eur">${eur(x.eur)}</span>
-    </div>
-    <div class="act-m">
-      <span>${esc(x.venue||'')}</span>
-      ${x.agreement!=null?`<span>Zustimmung ${Math.round(x.agreement*100)} %</span>`:''}
-      ${x.vol!=null?`<span>Vola ${Math.round(x.vol*100)} % p.a.</span>`:''}
-      ${x.cost_pct!=null?`<span>Gebühr rein+raus ${x.cost_pct.toFixed(1).replace('.',',')} %</span>`:''}
-    </div>
-    ${note?`<div class="act-m"><span>${esc(note)}</span></div>`:''}
-  </div>`).join('') || '';
-
-if (!rows.length) {
-  acts.innerHTML = `<div class="note"><span class="nt">Nichts zu tun</span>
-    <p>Der Plan von gestern gilt weiter. Positionen laufen lassen.</p></div>`;
-}
-
-/* Bestand */
-if (P.positions.length) {
-  acts.insertAdjacentHTML('beforeend', `
-    <h2>Sollbestand</h2>
-    <div class="tw"><table>
-      <thead><tr><th>Instrument</th><th class="num">Euro</th><th class="num">Anteil</th><th>Bestand</th></tr></thead>
-      <tbody>${P.positions.slice().sort((a,b)=>b.eur-a.eur).map(x=>`
-        <tr><td>${esc(D.names[x.instrument]||x.instrument)}</td>
-        <td class="num">${eur(x.eur)}</td>
-        <td class="num">${pct(x.weight)}</td>
-        <td>${esc(x.api ? 'auto' : 'von Hand')}</td></tr>`).join('')}
-      <tr class="key"><td><strong>investiert</strong></td>
-        <td class="num"><strong>${eur(P.invested_eur)}</strong></td>
-        <td class="num"><strong>${pct(P.invested_eur/P.equity)}</strong></td><td></td></tr>
-      <tr><td>Cash</td><td class="num">${eur(P.cash_eur)}</td>
-        <td class="num">${pct(P.cash_eur/P.equity)}</td><td></td></tr>
-      </tbody>
-    </table></div>`);
-}
-
-const w = document.getElementById('waiting');
-if ((P.zu_klein||[]).length) {
-  w.innerHTML = `<h2>Warten</h2>
-    <p>${eur(P.investierbar_eur)} reichen für ${P.positions.length} ordentliche Positionen,
-    mehr nicht. Eine 20-€-Aktienposition kostet bei 1 € Ordergebühr 10 % rein und raus —
-    die wird deshalb gar nicht erst vorgeschlagen.</p>
-    <div class="tw"><table>
-      <thead><tr><th>Instrument</th><th>Klasse</th><th class="num">Mindestgröße</th></tr></thead>
-      <tbody>${P.zu_klein.map(x=>`<tr><td>${esc(D.names[x.instrument]||x.instrument)}</td>
-        <td>${esc(x.klasse)}</td><td class="num">${eur(x.min_order_eur)}</td></tr>`).join('')}</tbody>
-    </table></div>
-    <p><strong>Mehr Kapital heißt hier mehr Streuung, nicht größere Wetten.</strong></p>`;
-}
-
-const na = document.getElementById('noAccount');
-if ((P.ohne_konto||[]).length) {
-  na.innerHTML = `<h2>Kein Konto</h2>
-    <p>Die Regel will das, aber es gibt keine Anbindung:</p>
-    <div class="tw"><table>
-      <thead><tr><th>Instrument</th><th>fehlt</th></tr></thead>
-      <tbody>${P.ohne_konto.map(x=>`<tr><td>${esc(D.names[x.instrument]||x.instrument)}</td>
-        <td>${esc(x.blocked_by)}</td></tr>`).join('')}</tbody>
-    </table></div>`;
-}
-
-/* ---------- Analyse: Chart + Begruendung je Instrument ---------- */
-const num = (v, d) => Number(v).toLocaleString('de-DE',
-  {minimumFractionDigits:d, maximumFractionDigits:d});
-const digits = v => v >= 1000 ? 0 : v >= 10 ? 2 : 4;
-
-/* Vergleichskurs je Fenster: heutiger Kurs zurueckgerechnet ueber die Fensterrendite.
-   Genau diese Linie prueft die Regel — deshalb wird sie gezeichnet, nicht beschrieben. */
-function levels(s){
-  const out = [];
-  for (const [lb, r] of Object.entries(s.lookback_returns || {})) {
-    const lvl = s.close / (1 + r);
-    if (isFinite(lvl) && lvl > 0) out.push({lb:+lb, level:lvl, ret:r, up:r > 0});
-  }
-  return out.sort((a,b)=>a.lb-b.lb);
-}
-
-function chart(s, L){
-  const px = D.series[s.instrument];
-  if (!px || px.length < 10) return '<div class="card-b"><p>kein Kursverlauf verfügbar</p></div>';
-  const W=320, H=132, padL=3, padR=44, padT=9, padB=15;
-  const vals = px.concat(L.map(l=>l.level));
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  const span = (hi-lo) || Math.abs(hi) || 1;
-  lo -= span*0.06; hi += span*0.06;
-  const X = i => padL + i*(W-padL-padR)/(px.length-1);
-  const Y = v => padT + (hi-v)*(H-padT-padB)/(hi-lo);
-
-  const line = px.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
-  const area = `${line} L${X(px.length-1).toFixed(1)} ${H-padB} L${padL} ${H-padB} Z`;
-
-  // Liegen zwei Vergleichskurse dicht beieinander, ueberlagern sich ihre Beschriftungen
-  // und beide werden unlesbar. Die Linien bleiben, wo sie hingehoeren; nur die Texte
-  // werden auseinandergeschoben.
-  const marked = L.map(l=>({...l, y: Y(l.level), ty: Y(l.level)})).sort((a,b)=>a.y-b.y);
-  const GAP = 9.5;
-  for (let i=1;i<marked.length;i++)
-    if (marked[i].ty - marked[i-1].ty < GAP) marked[i].ty = marked[i-1].ty + GAP;
-  const over = marked.length ? marked[marked.length-1].ty - (H-padB) : 0;
-  if (over > 0) marked.forEach(m => m.ty -= over);   // nach oben zurueckschieben
-
-  const marks = marked.map(l=>{
-    const y = l.y.toFixed(1), ty = l.ty.toFixed(1);
-    const col = l.up ? 'var(--long)' : 'var(--bad)';
-    const leader = Math.abs(l.ty - l.y) > 1.5
-      ? `<line x1="${W-padR}" y1="${y}" x2="${W-padR+3}" y2="${ty}" stroke="${col}"
-          stroke-width=".7" opacity=".6"/>` : '';
-    return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="${col}"
-      stroke-width="1" stroke-dasharray="3 3" opacity=".75"/>${leader}
-      <text x="${W-padR+5}" y="${+ty+3.2}" fill="${col}" font-size="9"
-        font-family="IBM Plex Mono, monospace">${l.lb}d</text>`;
-  }).join('');
-
-  const cy = Y(px[px.length-1]).toFixed(1), cx = X(px.length-1).toFixed(1);
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="Kursverlauf ${esc(D.names[s.instrument]||s.instrument)} mit den fünf Vergleichskursen">
-    <path d="${area}" fill="var(--accent)" opacity=".07"/>
-    ${marks}
-    <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.4"
-      stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${cx}" cy="${cy}" r="2.8" fill="var(--accent)"/>
-    <text x="${padL}" y="${H-4}" fill="var(--ink-3)" font-size="8.5"
-      font-family="IBM Plex Mono, monospace">vor ${px.length} Tagen</text>
-    <text x="${W-padR}" y="${H-4}" text-anchor="end" fill="var(--ink-3)" font-size="8.5"
-      font-family="IBM Plex Mono, monospace">heute</text>
-  </svg>`;
-}
-
-/* Was muesste passieren, damit die Regel ihre Meinung aendert?
-   Das naechste gruene Fenster unter dem Kurs ist die Schwelle nach unten,
-   das naechste rote darueber die Schwelle nach oben. */
-function schwellen(s, L){
-  const d = digits(s.close);
-  const gruen = L.filter(l=>l.up).sort((a,b)=>b.level-a.level);
-  const rot   = L.filter(l=>!l.up).sort((a,b)=>a.level-b.level);
-  const out = [];
-  if (gruen.length) {
-    const n = gruen[0];
-    const abst = (s.close/n.level - 1) * 100;
-    out.push(['Fällt unter', `${num(n.level,d)} (${n.lb}d)`,
-      `${abst.toFixed(1).replace('.',',')} % Puffer — dann kippt dieses Fenster auf rot`]);
-  }
-  if (rot.length) {
-    const n = rot[0];
-    const abst = (n.level/s.close - 1) * 100;
-    out.push(['Steigt über', `${num(n.level,d)} (${n.lb}d)`,
-      `${abst.toFixed(1).replace('.',',')} % entfernt — dann wird dieses Fenster grün`]);
-  }
-  return out;
-}
-
-document.getElementById('analyse').innerHTML = D.signals.slice()
-  .sort((a,b)=>b.target_weight-a.target_weight).map(s=>{
-  const L = levels(s);
-  const d = digits(s.close);
-  const inPlan = P.positions.find(p=>p.instrument===s.instrument);
-  const chips = L.map(l=>`<span class="wchip ${l.up?'on':'off'}">${l.lb}d ${
-    l.ret>0?'+':''}${(l.ret*100).toFixed(0)} %</span>`).join('');
-  const rows = [];
-  rows.push(['Kurs', num(s.close,d)]);
-  rows.push(['Schwankung im Jahr', `${(s.realized_vol*100).toFixed(0)} %`]);
-  rows.push(['Zielgröße daraus',
-    `${s.vol_scalar.toFixed(2).replace('.',',')} × ${Math.round(s.agreement*100)} % = ${
-    s.target_weight.toFixed(2).replace('.',',')}`]);
-  if (inPlan) rows.push(['Im Plan', `${Math.round(inPlan.eur)} € · ${inPlan.venue}`]);
-  else rows.push(['Im Plan', 'nein']);
-
-  const sw = schwellen(s, L).map(([a,b,c])=>
-    `<div class="rowx"><span class="lab">${a} <strong>${b}</strong><br>
-      <span style="color:var(--ink-3);font-size:12.5px">${c}</span></span></div>`).join('');
-
-  const urteil = s.target_weight === 0
-    ? 'Kein Trend, den die Regel akzeptiert — kein Gewicht.'
-    : s.agreement >= 1
-      ? 'Alle fünf Zeiträume zeigen nach oben. Stärkstes Signal, das die Regel kennt.'
-      : `${Math.round(s.agreement*5)} von 5 Zeiträumen positiv.` +
-        (s.vol_scalar < 0.99
-          ? ' Die Größe begrenzt hier die Schwankung, nicht das Signal.'
-          : ' Die Schwankung ist niedrig genug für volle Größe.');
-
-  return `<div class="card">
-    <div class="card-h">
-      <div><span class="nm">${esc(D.names[s.instrument]||s.instrument)}</span>
-        <span class="cl">${esc(D.klasse[s.instrument]||'')}</span></div>
-      <div class="w"><b style="color:${s.target_weight>0?'var(--long)':'var(--flat)'}">${
-        s.target_weight.toFixed(2).replace('.',',')}</b><s>Gewicht</s></div>
-    </div>
-    ${chart(s, L)}
-    <div class="win">${chips}</div>
-    <div class="card-b">
-      <p style="margin:10px 0 6px">${urteil}</p>
-      ${rows.map(([a,b])=>`<div class="rowx"><span class="lab">${a}</span>
-        <span class="val">${b}</span></div>`).join('')}
-      ${sw}
-    </div>
-  </div>`;
-}).join('');
-
-
-/* ---------- Chancen: der Gesamtmarkt-Scan ---------- */
-(function(){
-  const el = document.getElementById('chancen');
-  const S = D.scan || {};
-  const alle = S.gesamt || [];
-  if (!alle.length) {
-    el.innerHTML = `<div class="note warn"><span class="nt">Kein Scan vorhanden</span>
-      <p>Der Marktscan lief beim letzten Bau nicht. Es wird bewusst keine alte Rangliste
-        gezeigt — ein veralteter Scan wäre schlimmer als keiner.</p></div>`;
+/* ------------------------------------------------------- Scan laden */
+async function ladeScan(){
+  try {
+    const r = await fetch('scan.json?v=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    S = await r.json();
+  } catch(e){
+    S = null;
+    $('radar').innerHTML = `<div class="note-box bad"><span class="nt">Scan nicht ladbar</span>
+      <p>${esc(e.message)}. Es wird bewusst keine alte Rangliste gezeigt — ein veralteter
+      Scan wäre schlimmer als keiner.</p></div>`;
     return;
   }
-  const fehler = Object.entries(S.fehler || {});
-  const anz = S.anzahl || {};
-  const kand = alle.filter(o => o.urteil === 'A_PLUS' || o.urteil === 'A');
-  const nice = {krypto:'Krypto', aktien:'Aktien', gold:'Gold'};
+  zeichneStatus(); zeichneFilter(); zeichneRadar(); zeichneSystem();
+  const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
+  if (start && !AKTIV) waehle(start.instrument, false);
+  starteLive();
+}
 
-  let h = `<div class="note"><span class="nt">${alle.length} Instrumente gescannt</span>
-    <p>${Object.entries(anz).map(([k,v]) => `${nice[k]||k} ${v}`).join(' · ')}
-    — ${kand.length ? `<strong>${kand.length} Kandidat(en)</strong> mit Score und
-    Chance-Risiko-Verhältnis gleichzeitig gut.` : 'kein Kandidat: nirgends liegt das Ziel weiter weg als der Stop.'}</p></div>`;
+async function ladeDetail(sym){
+  if (DETAIL.has(sym)) return DETAIL.get(sym);
+  try {
+    const r = await fetch('asset/' + encodeURIComponent(sym) + '.json?v=' + (S?.erzeugt||''),
+      {cache:'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    DETAIL.set(sym, d);
+    return d;
+  } catch(e){ DETAIL.set(sym, null); return null; }
+}
 
-  if (fehler.length) {
-    h += `<div class="note bad"><span class="nt">Eine Anlageklasse fehlt</span>
-      <p>${fehler.map(([k,v]) => `${nice[k]||k}: ${esc(v)}`).join('<br>')}</p>
-      <p>Die Rangliste ist dadurch unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>`;
+async function waehle(sym, wechseln = true){
+  const d = await ladeDetail(sym);
+  AKTIV = d || {instrument: sym, zeichnung:{}, mtf:[], muster:[], kommentar:null,
+                chance: (S?.gesamt||[]).find(o=>o.instrument===sym) || null};
+  const ebenen = Object.keys(AKTIV.zeichnung||{});
+  if (!ebenen.includes(AKTIV_TF)) AKTIV_TF = ebenen.includes('H4') ? 'H4' : (ebenen[0]||'H4');
+  zeichneChartAnsicht(); zeichneAnalyse(); abonniere(sym);
+  if (wechseln) zeigeTab(1);
+  $('kopf').textContent = sym;
+}
+
+/* ------------------------------------------------------------ Live */
+/* Die Börse liefert die Kurse direkt an den Browser. Kein eigener Server, keine
+   Zwischenspeicherung, kein Schlüssel — es ist der öffentliche Marktdaten-Stream.
+   Aktien haben kein frei zugängliches Live-Feed mit CORS; sie bleiben auf dem Stand
+   des Scans und werden auch so beschriftet. */
+function kryptoSymbole(){
+  if (!S) return [];
+  const aus = [];
+  for (const o of (S.gesamt||[])) if (o.klasse === 'krypto' || o.klasse === 'gold')
+    aus.push(o.instrument.toLowerCase());
+  return aus.slice(0, 180);
+}
+function setzeLiveChip(an, text){
+  const el = $('livechip');
+  el.className = 'chip ' + (an ? 'live' : 'tot');
+  el.innerHTML = `<span class="dot ${an?'puls':'aus'}"></span>${esc(text)}`;
+}
+function starteLive(){
+  const syms = kryptoSymbole();
+  if (!syms.length) { setzeLiveChip(false,'keine Krypto-Werte'); return; }
+  if (WS) { try{ WS.close(); }catch(e){} }
+  setzeLiveChip(false,'verbinde …');
+  let url;
+  try { url = 'wss://stream.binance.com:9443/ws/!miniTicker@arr'; WS = new WebSocket(url); }
+  catch(e){ setzeLiveChip(false,'kein Livestream'); return; }
+  WS.onopen = ()=>{ WS_OK = true; WS_TRY = 0; setzeLiveChip(true,'live'); };
+  WS.onerror = ()=>{ if(!WS_OK) setzeLiveChip(false,'Stream blockiert'); };
+  WS.onclose = ()=>{
+    WS_OK = false; setzeLiveChip(false,'getrennt');
+    if (WS_TRY++ < 6) setTimeout(starteLive, Math.min(30000, 2000 * Math.pow(2, WS_TRY)));
+  };
+  WS.onmessage = ev => {
+    let arr; try { arr = JSON.parse(ev.data); } catch(e){ return; }
+    if (!Array.isArray(arr)) return;
+    let neu = false;
+    for (const t of arr){
+      const sym = t.s;
+      if (!sym) continue;
+      const p = parseFloat(t.c), o = parseFloat(t.o);
+      if (!isFinite(p)) continue;
+      L.set(sym, {p, pct: o ? (p/o-1)*100 : null, t: Date.now()});
+      neu = true;
+    }
+    if (neu) planeAuffrischen();
+  };
+}
+let _auf = 0;
+function planeAuffrischen(){
+  if (_auf) return;
+  _auf = setTimeout(()=>{ _auf = 0; frischeAuf(); }, 900);
+}
+function frischeAuf(){
+  aktualisiereRadarKurse();
+  aktualisiereChartKurs();
+  aktualisierePortfolioKurse();
+}
+function abonniere(sym){ /* miniTicker liefert alle Symbole; nichts zu tun. */ }
+function livePreis(sym){ const e = L.get(sym); return e ? e.p : null; }
+
+/* ================================================================
+   CHART — eigener Renderer auf Canvas.
+   Warum keine Bibliothek: die Analyse besteht zum grössten Teil aus Zonen, Levels,
+   Strukturbrüchen und Beschriftungen. Jede fertige Chart-Bibliothek müsste dafür
+   erweitert werden, und die Erweiterung wäre grösser als der Renderer selbst.
+   Ausserdem lädt die Seite so nichts nach.
+   ================================================================ */
+const chart = (()=>{
+  let cv = null, ctx = null, B = [], Z = null, C = null;
+  let i0 = 0, anz = 120, hoverX = null, hoverY = null;
+  let ziehen = null, letzterPreis = null;
+  const EBENEN = {swings:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true};
+  const M = {l: 6, r: 62, t: 10, b: 22};
+
+  function farbe(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+  function setze(kerzen, zeichnungTf, chance){
+    B = (kerzen||[]).map(k=>({t:k[0], o:k[1], h:k[2], l:k[3], c:k[4], v:k[5]}));
+    Z = zeichnungTf || null; C = chance || null;
+    anz = Math.min(140, Math.max(40, B.length));
+    i0 = Math.max(0, B.length - anz);
+    letzterPreis = B.length ? B[B.length-1].c : null;
+    zeichne();
+  }
+  function setzeLivePreis(p){
+    if (!B.length || !isFinite(p)) return;
+    const last = B[B.length-1];
+    last.c = p; if (p > last.h) last.h = p; if (p < last.l) last.l = p;
+    letzterPreis = p; zeichne();
+  }
+  function ebene(k, an){ EBENEN[k] = an; zeichne(); }
+  function ebenen(){ return EBENEN; }
+
+  function groesse(){
+    cv = $('cv'); if (!cv) return;
+    ctx = cv.getContext('2d');
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const r = cv.getBoundingClientRect();
+    cv.width = Math.max(1, Math.round(r.width * dpr));
+    cv.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    zeichne();
   }
 
-  h += alle.slice(0, 25).map(o => {
-    const kl = o.urteil === 'A_PLUS' ? 'aplus' : o.urteil === 'A' ? 'a'
-             : o.urteil === 'WATCH' ? 'watch' : '';
-    const ul = {A_PLUS:'A+', A:'A', WATCH:'WATCH', NO_TRADE:'—'}[o.urteil] || '—';
-    const dir = o.richtung === 'long' ? 'long' : o.richtung === 'short' ? 'short' : '';
-    const d = o.kurs >= 1000 ? 0 : o.kurs >= 10 ? 2 : 4;
-    const num = v => v == null ? '—' : Number(v).toLocaleString('de-DE',
-      {minimumFractionDigits:d, maximumFractionDigits:d});
-    return `<div class="opp ${kl}">
-      <div class="opp-h">
-        <span class="nm">${esc(D.names[o.instrument] || o.instrument)}</span>
-        ${dir ? `<span class="dir ${dir}">${dir.toUpperCase()}</span>` : ''}
-        <span class="ur ${kl}">${ul}</span>
-        <span class="sc">${o.score.toFixed(0)}</span>
-      </div>
-      <div class="opp-b">
-        ${(o.faktoren||[]).map(f => `<div class="fak">
-          <span class="fn">${esc(f.name.replace(/_/g,' '))}</span>
-          <span class="fb"><i style="width:${(f.punkte/f.max*100).toFixed(0)}%"></i></span>
-          <span class="fd">${esc(f.detail)}</span>
-        </div>`).join('')}
-        ${o.ziel ? `<div class="zt">
-          <span>Kurs <b>${num(o.kurs)}</b></span>
-          <span>TP1 <b>${num(o.ziel)}</b></span>
-          ${o.tp2 ? `<span>TP2 <b>${num(o.tp2)}</b></span>` : ''}
-          ${o.tp3 ? `<span>TP3 <b>${num(o.tp3)}</b></span>` : ''}
-          <span>Stop <b>${num(o.invalidierung)}</b></span>
-          ${o.rr ? `<span>R:R <b>1:${o.rr.toFixed(1)}</b></span>` : ''}
-        </div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
+  function sicht(){
+    const a = Math.max(0, Math.min(i0, Math.max(0, B.length-5)));
+    return B.slice(a, a + anz);
+  }
+  function spanne(v){
+    let hi = -Infinity, lo = Infinity;
+    for (const b of v){ if (b.h > hi) hi = b.h; if (b.l < lo) lo = b.l; }
+    const extra = [];
+    if (EBENEN.ziele && C){
+      for (const k of ['kurs','ziel','tp2','tp3','invalidierung'])
+        if (C[k] != null) extra.push(C[k]);
+    }
+    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[])) extra.push(x.p);
+    for (const p of extra){
+      if (!isFinite(p)) continue;
+      // Nur einbeziehen, was nicht absurd weit weg liegt — sonst staucht ein einzelnes
+      // Level die Kerzen zu einer Linie zusammen.
+      if (p < lo - (hi-lo)*1.2 || p > hi + (hi-lo)*1.2) continue;
+      if (p > hi) hi = p; if (p < lo) lo = p;
+    }
+    if (!isFinite(hi) || !isFinite(lo) || hi === lo){ hi = (hi||1)*1.01; lo = (lo||1)*0.99; }
+    const luft = (hi - lo) * 0.06;
+    return {hi: hi + luft, lo: lo - luft};
+  }
 
-  h += `<div class="note warn" style="margin-top:22px">
-    <span class="nt">Was der Score ist — und was nicht</span>
-    <p>Er beschreibt, was am Chart gerade zusammenpasst: Ausrichtung der Zeitebenen,
-      frischer Strukturbruch, Weg zum nächsten Liquiditätsziel, offene Zonen, Momentum,
-      Lage in der Spanne.</p>
-    <p><strong>Er ist kein belegter Gewinnhinweis.</strong> Die Gewichte sind gesetzt, nicht
-      an historische Ergebnisse angepasst — das wäre genau das Overfitting, das wir
-      vermeiden. Ob ein hoher Score Geld bringt, ist eine eigene Frage.</p>
-  </div>`;
-  el.innerHTML = h;
+  function zeichne(){
+    if (!cv || !ctx) { cv = $('cv'); if (!cv) return; ctx = cv.getContext('2d'); }
+    const r = cv.getBoundingClientRect(), W = r.width, H = r.height;
+    ctx.clearRect(0,0,W,H);
+    const v = sicht(); if (!v.length) return;
+    const {hi, lo} = spanne(v);
+    const px = W - M.l - M.r, py = H - M.t - M.b;
+    const X = i => M.l + (i + 0.5) * (px / v.length);
+    const Y = p => M.t + (hi - p) / (hi - lo) * py;
+    const bw = Math.max(1.2, Math.min(11, px / v.length * 0.68));
+
+    const cRule = farbe('--grid'), cInk = farbe('--ink'), cInk3 = farbe('--ink-3');
+    const cLong = farbe('--long'), cBad = farbe('--bad'), cWick = farbe('--wick');
+    const cAcc = farbe('--accent'), cWarn = farbe('--warn'), cSurf = farbe('--surface');
+
+    // Raster + Preisachse
+    ctx.font = '10px "IBM Plex Mono",monospace'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = cRule; ctx.lineWidth = 1;
+    const stufen = 5, d = digits((hi+lo)/2);
+    for (let k=0;k<=stufen;k++){
+      const p = lo + (hi-lo)*k/stufen, y = Math.round(Y(p)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(W-M.r, y); ctx.stroke();
+      ctx.fillStyle = cInk3; ctx.textAlign = 'left';
+      ctx.fillText(num(p, d), W-M.r+5, y);
+    }
+
+    // Zonen (hinter den Kerzen)
+    if (EBENEN.zonen && Z) for (const z of (Z.zonen||[])){
+      const y1 = Y(z.bis), y2 = Y(z.von);
+      if (y2 < M.t-40 || y1 > H-M.b+40) continue;
+      const lang = z.richtung === 'bullish' || z.richtung === 'long';
+      ctx.fillStyle = (lang ? cLong : cBad) + '1f';
+      ctx.fillRect(M.l, Math.min(y1,y2), px, Math.max(1.5, Math.abs(y2-y1)));
+      ctx.fillStyle = cInk3; ctx.font = '9px "IBM Plex Mono",monospace'; ctx.textAlign = 'left';
+      if (Math.abs(y2-y1) > 9) ctx.fillText(z.art, M.l+3, Math.min(y1,y2)+6);
+    }
+
+    // Premium / Discount
+    if (EBENEN.pd && Z && Z.pd){
+      const yh = Y(Z.pd.hoch), ym = Y(Z.pd.mitte), yl = Y(Z.pd.tief);
+      ctx.strokeStyle = cAcc + '77'; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
+      for (const y of [yh, ym, yl]){ ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke(); }
+      ctx.setLineDash([]);
+      ctx.fillStyle = cAcc; ctx.font = '9px "IBM Plex Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('EQ', M.l+2, ym-6);
+    }
+
+    // Liquidität
+    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[])){
+      const y = Y(x.p); if (y < M.t-20 || y > H-M.b+20) continue;
+      const weg = x.zustand === 'swept';
+      ctx.strokeStyle = weg ? cInk3 + '55' : cWarn + 'aa';
+      ctx.setLineDash(weg ? [1,4] : [5,4]);
+      ctx.lineWidth = Math.min(2, 0.7 + (x.staerke||0)*1.6);
+      ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Kerzen
+    for (let i=0;i<v.length;i++){
+      const b = v[i], x = X(i), auf = b.c >= b.o;
+      ctx.strokeStyle = cWick; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(Math.round(x)+0.5, Y(b.h)); ctx.lineTo(Math.round(x)+0.5, Y(b.l)); ctx.stroke();
+      ctx.fillStyle = auf ? cLong : cBad;
+      const yo = Y(b.o), yc = Y(b.c);
+      ctx.fillRect(x - bw/2, Math.min(yo,yc), bw, Math.max(1.2, Math.abs(yc-yo)));
+    }
+
+    // Swings
+    if (EBENEN.swings && Z){
+      const idx = new Map(v.map((b,i)=>[b.t, i]));
+      ctx.font = '9px "IBM Plex Mono",monospace';
+      for (const s of (Z.swings||[])){
+        const i = idx.get(s.t); if (i == null) continue;
+        const x = X(i), y = Y(s.p);
+        ctx.fillStyle = s.hoch ? cBad : cLong;
+        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 6.2832); ctx.fill();
+        if (s.label && s.label !== 'NONE'){
+          ctx.textAlign = 'center'; ctx.fillStyle = cInk3;
+          ctx.fillText(s.label, x, y + (s.hoch ? -9 : 12));
+        }
+      }
+    }
+
+    // Strukturbrüche
+    if (EBENEN.brueche && Z){
+      const idx = new Map(v.map((b,i)=>[b.t, i]));
+      ctx.font = '9px "IBM Plex Mono",monospace';
+      for (const br of (Z.brueche||[])){
+        const i = idx.get(br.t);
+        const y = Y(br.p);
+        if (y < M.t-20 || y > H-M.b+20) continue;
+        const lang = br.richtung === 'bullish';
+        ctx.strokeStyle = (lang ? cLong : cBad) + 'cc'; ctx.setLineDash([6,3]); ctx.lineWidth = 1.4;
+        const x0 = i == null ? M.l : X(i);
+        ctx.beginPath(); ctx.moveTo(Math.max(M.l, x0-40), y); ctx.lineTo(W-M.r, y); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = lang ? cLong : cBad; ctx.textAlign = 'left';
+        ctx.fillText(br.art, Math.max(M.l+2, x0-38), y-4);
+      }
+    }
+
+    // Entry / Stop / Ziele
+    if (EBENEN.ziele && C){
+      const linien = [
+        ['Kurs', C.kurs, cInk],
+        ['TP1', C.ziel, cLong], ['TP2', C.tp2, cLong], ['TP3', C.tp3, cLong],
+        ['Stop', C.invalidierung, cBad],
+      ];
+      ctx.font = '9.5px "IBM Plex Mono",monospace';
+      for (const [lab, p, col] of linien){
+        if (p == null || !isFinite(p)) continue;
+        const y = Y(p); if (y < M.t-14 || y > H-M.b+14) continue;
+        ctx.strokeStyle = col; ctx.lineWidth = lab==='Kurs' ? 1 : 1.6;
+        ctx.setLineDash(lab==='Kurs' ? [1,3] : []);
+        ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = col; ctx.textAlign = 'left';
+        ctx.fillText(lab, M.l+3, y-4);
+      }
+    }
+
+    // Letzter Kurs als Marke an der Achse
+    if (letzterPreis != null){
+      const y = Y(letzterPreis);
+      if (y > M.t && y < H-M.b){
+        ctx.fillStyle = cAcc; ctx.fillRect(W-M.r, y-8, M.r, 16);
+        ctx.fillStyle = cSurf; ctx.font = '10px "IBM Plex Mono",monospace';
+        ctx.textAlign = 'left'; ctx.fillText(num(letzterPreis, d), W-M.r+4, y);
+      }
+    }
+
+    // Zeitachse
+    ctx.fillStyle = cInk3; ctx.font = '9.5px "IBM Plex Mono",monospace'; ctx.textAlign = 'center';
+    const schritt = Math.max(1, Math.floor(v.length/5));
+    for (let i=0;i<v.length;i+=schritt){
+      const t = v[i].t ? new Date(v[i].t) : null; if (!t) continue;
+      ctx.fillText(t.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}), X(i), H-M.b+11);
+    }
+
+    // Fadenkreuz
+    if (hoverX != null && hoverX > M.l && hoverX < W-M.r){
+      const i = Math.max(0, Math.min(v.length-1, Math.floor((hoverX-M.l)/(px/v.length))));
+      ctx.strokeStyle = cInk3 + '66'; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(i), M.t); ctx.lineTo(X(i), H-M.b); ctx.stroke();
+      if (hoverY != null){ ctx.beginPath(); ctx.moveTo(M.l,hoverY); ctx.lineTo(W-M.r,hoverY); ctx.stroke(); }
+      ctx.setLineDash([]);
+      const b = v[i], el = $('readout');
+      if (el){
+        const p = hoverY != null ? hi - (hoverY-M.t)/py*(hi-lo) : null;
+        el.textContent =
+          `${b.t ? new Date(b.t).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}` +
+          `   O ${num(b.o,d)}  H ${num(b.h,d)}  L ${num(b.l,d)}  C ${num(b.c,d)}` +
+          (p != null ? `   ·   Cursor ${num(p,d)}` : '');
+      }
+    }
+  }
+
+  function binde(){
+    cv = $('cv'); if (!cv) return;
+    groesse();
+    cv.addEventListener('wheel', e=>{
+      e.preventDefault();
+      const alt = anz;
+      anz = Math.round(Math.max(25, Math.min(B.length || 400, anz * (e.deltaY > 0 ? 1.15 : 0.87))));
+      i0 = Math.max(0, Math.min(B.length - anz, i0 + Math.round((alt - anz)/2)));
+      zeichne();
+    }, {passive:false});
+    const runter = e=>{ ziehen = {x: (e.touches?e.touches[0]:e).clientX, i0}; };
+    const bewegen = e=>{
+      const t = e.touches ? e.touches[0] : e;
+      const r = cv.getBoundingClientRect();
+      hoverX = t.clientX - r.left; hoverY = t.clientY - r.top;
+      if (ziehen){
+        const px = r.width - M.l - M.r;
+        const dx = t.clientX - ziehen.x;
+        i0 = Math.max(0, Math.min(Math.max(0,B.length - anz),
+             ziehen.i0 - Math.round(dx / (px / anz))));
+      }
+      zeichne();
+    };
+    const hoch = ()=>{ ziehen = null; };
+    cv.addEventListener('pointerdown', runter);
+    cv.addEventListener('pointermove', bewegen);
+    window.addEventListener('pointerup', hoch);
+    cv.addEventListener('pointerleave', ()=>{ hoverX = hoverY = null; zeichne(); });
+    cv.addEventListener('touchstart', runter, {passive:true});
+    cv.addEventListener('touchmove', bewegen, {passive:true});
+    cv.addEventListener('touchend', hoch);
+  }
+  window.addEventListener('resize', ()=>groesse());
+  return {setze, setzeLivePreis, zeichne, groesse, binde, ebene, ebenen};
 })();
 
-/* ---------- Alarme ---------- */
-/* Zwei Quellen, bewusst getrennt:
-   1. Der Chart-Scan laeuft stuendlich und meldet die AENDERUNG — neues A+/A-Setup,
-      weggebrochenes Setup, neue Nummer 1. Kein Alarm ist hier das normale Ergebnis.
-   2. Die TSMOM-Allokationsregel kennt keinen Einstiegsmoment; ihr staerkstes Signal
-      ist "alle fuenf Zeitfenster gruen". Alles darunter waere erfunden. */
-(function(){
-  const el = document.getElementById('alarme');
-  let h = '';
+/* ============================================================ MARKT / RADAR */
+let FILTER = 'handelbar';
 
-  /* --- 1. Was das System jetzt melden wuerde --- */
-  const kand = ((D.scan||{}).gesamt||[]).filter(o=>o.urteil==='A_PLUS'||o.urteil==='A');
-  h += '<h2>Aktive Setups</h2>';
-  if (kand.length) {
-    h += kand.map(o=>{
-      const d = o.kurs >= 1000 ? 0 : o.kurs >= 10 ? 2 : 4;
-      const n = v => v == null ? '—' : Number(v).toLocaleString('de-DE',
-        {minimumFractionDigits:d, maximumFractionDigits:d});
-      const dir = o.richtung === 'long' ? 'LONG' : o.richtung === 'short' ? 'SHORT' : '';
-      return `<div class="alarm ${o.urteil==='A_PLUS'?'hot':''}">
-        <div class="ah"><span>${esc(D.names[o.instrument]||o.instrument)} ${dir}</span>
-          <span class="d">${o.urteil==='A_PLUS'?'A+':'A'} · ${o.score.toFixed(0)}/100</span></div>
-        <p>Kurs <strong>${n(o.kurs)}</strong> · Ziel <strong>${n(o.ziel)}</strong>${
-          o.tp2?` / ${n(o.tp2)}`:''}${o.tp3?` / ${n(o.tp3)}`:''} ·
-          falsch ab <strong>${n(o.invalidierung)}</strong>${
-          o.rr?` · R:R 1:${o.rr.toFixed(1)}`:''}</p>
+function zeichneStatus(){
+  if (!S) return;
+  const g = S.gesamt || [], st = S.statistik || {};
+  const handelbar = g.filter(o=>o.handelbar).length;
+  const alter = vorMin(S.erzeugt);
+  const fehler = Object.keys(S.fehler||{}).length;
+  $('marktstatus').innerHTML = `
+    <div class="status">
+      <div><div class="k">Gescannt</div><div class="v">${g.length}</div>
+        <div class="n">${Object.entries(S.anzahl||{}).map(([k,v])=>`${k} ${v}`).join(' · ')}</div></div>
+      <div><div class="k">Handelbar</div><div class="v ${handelbar?'gut':'aus'}">${handelbar}</div>
+        <div class="n">A+ ${st.A_PLUS||0} · A ${st.A||0} · A− ${st.A_MINUS||0} · B+ ${st.B_PLUS||0} · B ${st.B||0}</div></div>
+      <div><div class="k">Beobachten</div><div class="v ${st.WATCH?'mittel':'aus'}">${st.WATCH||0}</div>
+        <div class="n">kein Trade: ${st.NO_TRADE||0}</div></div>
+      <div><div class="k">Scan</div><div class="v ${alter!=null&&alter<90?'gut':'mittel'}">${alter!=null?alter+'′':'—'}</div>
+        <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
+    </div>
+    ${fehler ? `<div class="note-box bad"><span class="nt">Eine Anlageklasse fehlt</span>
+      <p>${Object.entries(S.fehler).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>')}</p>
+      <p>Die Rangliste ist unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>` : ''}`;
+  $('stempel').textContent = `${g.length} Instrumente · Scan ${zeit(S.erzeugt)}` +
+    (alter != null ? ` (vor ${alter} Min.)` : '');
+}
+
+function zeichneFilter(){
+  const f = [
+    ['handelbar','Handelbar'], ['alle','Alles'], ['krypto','Krypto'],
+    ['aktien','Aktien'], ['gold','Gold'], ['long','Long'], ['short','Short'],
+  ];
+  $('filter').innerHTML = f.map(([k,t])=>
+    `<button class="fb" data-f="${k}" aria-pressed="${FILTER===k}">${t}</button>`).join('');
+  $('filter').querySelectorAll('.fb').forEach(b=>b.addEventListener('click',()=>{
+    FILTER = b.dataset.f; zeichneFilter(); zeichneRadar();
+  }));
+}
+
+function gefiltert(){
+  const g = (S?.gesamt || []).slice();
+  switch (FILTER){
+    case 'handelbar': return g.filter(o=>o.handelbar);
+    case 'krypto': case 'aktien': case 'gold': return g.filter(o=>o.klasse===FILTER);
+    case 'long': return g.filter(o=>o.richtung==='long');
+    case 'short': return g.filter(o=>o.richtung==='short');
+    default: return g;
+  }
+}
+
+function oppZeile(o, rang){
+  const nk = NOTE_KLASSE[o.note] || '';
+  const live = L.get(o.instrument);
+  const kurs = live ? live.p : o.kurs;
+  const d = digits(kurs);
+  return `<div class="opp n-${o.urteil}" data-sym="${esc(o.instrument)}">
+    <div class="opp-h">
+      <span class="rk">#${rang}</span>
+      <span class="nm">${esc(name(o.instrument))}</span>
+      <span class="kl">${esc(o.klasse||'')}</span>
+      ${o.richtung?`<span class="dir ${o.richtung}">${o.richtung.toUpperCase()}</span>`:''}
+      <span class="note ${nk}">${esc(o.note)}</span>
+      <span class="sc">${(o.score||0).toFixed(0)}</span>
+    </div>
+    <div class="opp-b">
+      <div class="kpi">
+        <span data-px="${esc(o.instrument)}">Kurs <b>${num(kurs,d)}</b>${
+          live?` <span class="${live.pct>=0?'up':'dn'}">${pct(live.pct,2)}</span>`:''}</span>
+        ${o.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${o.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(o.erwartete_bewegung_pct,1)}</b></span>`:''}
+        ${o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:''}
+        ${o.confidence?`<span>Confidence <b>${Math.round(o.confidence*100)} %</b></span>`:''}
+      </div>
+      <div class="kpi">
+        ${o.ziel!=null?`<span>TP1 <b>${num(o.ziel,d)}</b></span>`:''}
+        ${o.tp2!=null?`<span>TP2 <b>${num(o.tp2,d)}</b></span>`:''}
+        ${o.tp3!=null?`<span>TP3 <b>${num(o.tp3,d)}</b></span>`:''}
+        ${o.invalidierung!=null?`<span>Stop <b>${num(o.invalidierung,d)}</b></span>`:''}
+      </div>
+      ${(o.muster||[]).length?`<div class="muz">Muster: ${o.muster.map(m=>esc(m.name)+' ('+m.zeitebene+')').join(' · ')}</div>`:''}
+      ${(o.warnungen||[]).length?`<div class="warnz">⚠ ${o.warnungen.map(esc).join(' · ')}</div>`:''}
+      <div class="muz">${esc(o.headline||'')}</div>
+    </div>
+  </div>`;
+}
+
+function zeichneRadar(){
+  const g = gefiltert();
+  if (!g.length){ $('radar').innerHTML = `<p class="leer">Kein Wert in dieser Auswahl.</p>`; return; }
+  $('radar').innerHTML = g.slice(0,60).map((o,i)=>oppZeile(o,i+1)).join('') +
+    (g.length>60?`<p class="leer">… und ${g.length-60} weitere.</p>`:'');
+  $('radar').querySelectorAll('.opp').forEach(el=>
+    el.addEventListener('click',()=>waehle(el.dataset.sym)));
+}
+
+function aktualisiereRadarKurse(){
+  document.querySelectorAll('#radar [data-px]').forEach(el=>{
+    const sym = el.getAttribute('data-px'), e = L.get(sym);
+    if (!e) return;
+    el.innerHTML = `Kurs <b>${num(e.p, digits(e.p))}</b> <span class="${e.pct>=0?'up':'dn'}">${pct(e.pct,2)}</span>`;
+  });
+}
+
+/* ============================================================ CHART-ANSICHT */
+function zeichneChartAnsicht(){
+  if (!AKTIV){ $('chartansicht').innerHTML = `<p class="leer">Wähle oben im Markt einen Wert.</p>`; return; }
+  const c = AKTIV.chance || {}, zg = AKTIV.zeichnung || {};
+  const ebenen = Object.keys(zg);
+  const live = L.get(AKTIV.instrument);
+  const kurs = live ? live.p : c.kurs;
+  const d = digits(kurs);
+  const E = chart.ebenen();
+  const lagen = [['swings','Swings'],['brueche','BOS/CHoCH'],['liq','Liquidität'],
+                 ['zonen','FVG/OB'],['pd','Premium/Discount'],['ziele','Entry/SL/TP']];
+  $('chartansicht').innerHTML = `
+    <div class="chartbox">
+      <div class="chart-h">
+        <span class="nm">${esc(name(AKTIV.instrument))}</span>
+        ${c.richtung?`<span class="dir ${c.richtung}">${c.richtung.toUpperCase()}</span>`:''}
+        ${c.note?`<span class="note ${NOTE_KLASSE[c.note]||''}">${esc(c.note)}</span>`:''}
+        <span class="px ${live && live.pct>=0?'up':live?'dn':''}" id="chartpx">${num(kurs,d)}</span>
+      </div>
+      <div class="tfbar" id="tfbar">${ebenen.map(t=>
+        `<button class="tfb" data-tf="${t}" aria-pressed="${t===AKTIV_TF}">${t}</button>`).join('')}
+        <span style="margin-left:auto;font-size:10.5px;color:var(--ink-3);align-self:center">
+          ${AKTIV.live_quelle ? 'Kurs live · Analyse vom Scan' : 'Kurs und Analyse vom Scan'}
+        </span>
+      </div>
+      <div class="layers" id="layers">${lagen.map(([k,t])=>
+        `<button class="lb" data-l="${k}" aria-pressed="${!!E[k]}">${t}</button>`).join('')}</div>
+      <canvas id="cv"></canvas>
+      <div class="readout" id="readout">Ziehen zum Verschieben, Scrollen zum Zoomen.</div>
+      <div class="legende">
+        <span><i style="background:var(--long)"></i>Ziele / bullish</span>
+        <span><i style="background:var(--bad)"></i>Stop / bearish</span>
+        <span><i style="background:var(--warn)"></i>Liquidität</span>
+        <span><i style="background:var(--accent)"></i>Premium/Discount</span>
+      </div>
+    </div>
+    ${c.begruendung?`<div class="note-box"><span class="nt">Note ${esc(c.note||'')}</span>
+      <p>${esc(c.begruendung)}</p></div>`:''}`;
+  const tf = zg[AKTIV_TF] || {};
+  chart.binde();
+  chart.setze(tf.kerzen, tf, c);
+  $('tfbar').querySelectorAll('.tfb').forEach(b=>b.addEventListener('click',()=>{
+    AKTIV_TF = b.dataset.tf; zeichneChartAnsicht();
+  }));
+  $('layers').querySelectorAll('.lb').forEach(b=>b.addEventListener('click',()=>{
+    const an = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', an ? 'true':'false');
+    chart.ebene(b.dataset.l, an);
+  }));
+}
+
+function aktualisiereChartKurs(){
+  if (!AKTIV) return;
+  const e = L.get(AKTIV.instrument); if (!e) return;
+  const el = $('chartpx');
+  if (el){ el.textContent = num(e.p, digits(e.p)); el.className = 'px ' + (e.pct>=0?'up':'dn'); }
+  chart.setzeLivePreis(e.p);
+}
+
+/* ============================================================ ANALYSE */
+function zeichneAnalyse(){
+  if (!AKTIV){ $('analyse').innerHTML = `<p class="leer">Wähle oben im Markt einen Wert.</p>`; return; }
+  const c = AKTIV.chance || {}, K = AKTIV.kommentar, M = AKTIV.muster || [];
+  const live = L.get(AKTIV.instrument);
+  const kurs = live ? live.p : c.kurs, d = digits(kurs);
+
+  let h = `<div class="karte ${c.handelbar?'gut':(c.urteil==='WATCH'?'warn':'')}">
+    <h3>${esc(name(AKTIV.instrument))} — ${esc(c.note||'—')}${c.richtung?' '+c.richtung.toUpperCase():''}</h3>
+    <div class="kpi">
+      <span>Score <b>${(c.score||0).toFixed(0)}/100</b></span>
+      ${c.confidence?`<span>Confidence <b>${Math.round(c.confidence*100)} %</b></span>`:''}
+      ${c.rr?`<span>CRV <b>1:${c.rr.toFixed(2)}</b></span>`:''}
+      ${c.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${c.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(c.erwartete_bewegung_pct,1)}</b></span>`:''}
+      <span>Profil <b>${esc(c.profil||'')}</b></span>
+    </div>
+    <div class="zt">
+      <span>Kurs <b>${num(kurs,d)}</b>${live?' <span style="color:var(--long)">live</span>':''}</span>
+      ${c.ziel!=null?`<span>TP1 <b>${num(c.ziel,d)}</b></span>`:''}
+      ${c.tp2!=null?`<span>TP2 <b>${num(c.tp2,d)}</b></span>`:''}
+      ${c.tp3!=null?`<span>TP3 <b>${num(c.tp3,d)}</b></span>`:''}
+      ${c.invalidierung!=null?`<span>Stop <b>${num(c.invalidierung,d)}</b></span>`:''}
+    </div>
+    ${c.begruendung?`<p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(c.begruendung)}</p>`:''}
+  </div>`;
+
+  if ((c.warnungen||[]).length)
+    h += `<div class="note-box warn"><span class="nt">Was dagegen spricht</span>
+      <ul class="satzliste">${c.warnungen.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+
+  h += `<h2>Was die Zeitebenen sagen</h2><div class="tw"><table class="mtf">
+    <thead><tr><th>TF</th><th>Regime</th><th>Letzter Bruch</th><th>Lage</th><th>Liquidität</th></tr></thead>
+    <tbody>${(AKTIV.mtf||[]).map(z=>{
+      const kl = z.regime_roh==='trend_up'?'up':z.regime_roh==='trend_down'?'dn':'nu';
+      const br = z.letzter_bruch;
+      return `<tr>
+        <td class="tf">${esc(z.tf)}</td>
+        <td class="${kl}">${esc(z.regime)}${z.staerke?` <span class="nu">${z.staerke.toFixed(2)}</span>`:''}<br>
+          <span class="nu" style="font-size:11px">${esc(z.volatilitaet)} · ${esc(z.phase)}</span></td>
+        <td>${br?`${esc(br.art)} <span class="${br.richtung==='bullish'?'up':'dn'}">${br.richtung==='bullish'?'↑':'↓'}</span><br>
+          <span class="nu" style="font-size:11px">${num(br.preis,d)}</span>`:'<span class="nu">—</span>'}</td>
+        <td>${z.pd?`${esc({premium:'teuer',discount:'günstig',equilibrium:'Mitte'}[z.pd.zone]||z.pd.zone)}<br>
+          <span class="nu" style="font-size:11px">${(z.pd.position*100).toFixed(0)} %</span>`:'<span class="nu">—</span>'}</td>
+        <td><span class="nu" style="font-size:11px">
+          ${z.liquiditaet_oben!=null?'↑ '+num(z.liquiditaet_oben,d):''}
+          ${z.liquiditaet_unten!=null?'<br>↓ '+num(z.liquiditaet_unten,d):''}</span></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+
+  if (M.length){
+    h += `<h2>Erkannte Muster</h2>`;
+    h += M.map(m=>`<div class="karte ${m.richtung==='long'?'gut':m.richtung==='short'?'bad':''}">
+      <h3>${esc(m.name)} <span class="mono" style="color:var(--ink-3);font-weight:400">${esc(m.zeitebene)} · Güte ${(m.guete*100).toFixed(0)} %</span></h3>
+      <p style="margin:0;font-size:13px;color:var(--ink-2)">${esc(m.beschreibung)}</p>
+      ${(m.linien||[]).length?`<div class="zt">${m.linien.map(l=>`<span>${esc(l.name)} <b>${num(l.preis,d)}</b></span>`).join('')}</div>`:''}
+    </div>`).join('');
+    h += `<div class="note-box"><span class="nt">Wichtig</span>
+      <p>Ein erkanntes Muster ist <strong>kein Handelssignal</strong>. Es beschreibt die Form
+      des Charts und geht als Kontext in die Bewertung ein. Ob ein Muster historisch trägt,
+      ist eine eigene Frage und hier nicht beantwortet.</p></div>`;
+  }
+
+  if (K){
+    const block = (titel, zeilen, klasse) => zeilen && zeilen.length
+      ? `<div class="karte ${klasse||''}"><h3>${titel}</h3>
+         <ul class="satzliste">${zeilen.map(z=>`<li>${esc(z)}</li>`).join('')}</ul></div>` : '';
+    h += `<h2>Was die AI sieht</h2>`;
+    h += block('Beobachtung', K.was_ich_sehe);
+    h += block('Warum jetzt', K.warum_jetzt, 'gut');
+    h += block('Was erwartet wird', K.erwartung);
+    h += block('Was die These widerlegen würde', K.was_waere_falsch, 'bad');
+  }
+
+  h += `<h2>Wie der Score zustande kommt</h2>`;
+  h += (c.faktoren||[]).map(f=>`<div class="fak">
+      <span class="fn">${esc(String(f.name).replace(/_/g,' '))}</span>
+      <span class="fb2"><i style="width:${(f.punkte/f.max*100).toFixed(0)}%"></i></span>
+      <span class="fd">${esc(f.detail)} <span class="mono" style="color:var(--ink-3)">${f.punkte.toFixed(1)}/${f.max}</span></span>
+    </div>`).join('');
+  h += `<div class="note-box warn"><span class="nt">Was der Score ist — und was nicht</span>
+    <p>Er beschreibt, was am Chart gerade zusammenpasst. <strong>Er ist kein belegter
+    Gewinnhinweis.</strong> Die Gewichte sind gesetzt, nicht an historische Ergebnisse
+    angepasst — das wäre Overfitting. Ob ein hoher Score Geld bringt, ist offen.</p></div>`;
+
+  $('analyse').innerHTML = h;
+}
+
+/* ============================================================ PORTFOLIO
+   Die Positionen liegen ausschliesslich in diesem Browser (localStorage). Das Repo
+   und damit diese Seite sind oeffentlich — echte Depotdaten gehoeren dort nicht hin.
+   So bekommt Ozan trotzdem das Cockpit: gerechnet wird im Geraet, hochgeladen nichts.
+   ============================================================ */
+const SPEICHER = 'desk.positionen.v1';
+function ladePositionen(){
+  try { const r = localStorage.getItem(SPEICHER); const a = r ? JSON.parse(r) : [];
+        return Array.isArray(a) ? a : []; } catch(e){ return []; }
+}
+function speicherePositionen(a){
+  try { localStorage.setItem(SPEICHER, JSON.stringify(a)); } catch(e){}
+}
+function scanRow(sym){ return (S?.gesamt||[]).find(o=>o.instrument===sym) || null; }
+
+function bewertePosition(pos){
+  const row = scanRow(pos.sym);
+  const live = L.get(pos.sym);
+  const kurs = live ? live.p : (row ? row.kurs : null);
+  const wert = kurs != null ? kurs * pos.menge : null;
+  const einstand = pos.einstieg ? pos.einstieg * pos.menge : null;
+  const gv = (wert != null && einstand != null) ? wert - einstand : null;
+  const gvPct = (gv != null && einstand) ? gv / einstand * 100 : null;
+  let r = null;
+  if (row && row.invalidierung != null && pos.einstieg){
+    const risiko = Math.abs(pos.einstieg - row.invalidierung);
+    if (risiko > 0 && kurs != null) r = (kurs - pos.einstieg) / risiko;
+  }
+  const score = row ? row.score : null;
+  let urteil = 'UNBEKANNT', kl = '';
+  if (score != null){
+    const gegen = row.richtung === 'short';
+    if (gegen) { urteil = 'GEGEN DIE THESE'; kl = 'bad'; }
+    else if (score >= 66) { urteil = 'STRONG HOLD'; kl = 'gut'; }
+    else if (score >= 52) { urteil = 'HOLD'; kl = 'gut'; }
+    else if (score >= 40) { urteil = 'WATCH'; kl = 'warn'; }
+    else { urteil = 'REDUZIEREN'; kl = 'bad'; }
+  }
+  return {pos, row, kurs, wert, einstand, gv, gvPct, r, score, urteil, kl, live: !!live};
+}
+
+function zeichnePortfolio(){
+  const positionen = ladePositionen();
+  const bew = positionen.map(bewertePosition);
+  const gesamt = bew.reduce((s,b)=>s + (b.wert||0), 0);
+  const gv = bew.reduce((s,b)=>s + (b.gv||0), 0);
+  const einstand = bew.reduce((s,b)=>s + (b.einstand||0), 0);
+  const jeKlasse = {};
+  for (const b of bew){
+    const k = b.row?.klasse || 'unbekannt';
+    jeKlasse[k] = (jeKlasse[k]||0) + (b.wert||0);
+  }
+  const groesste = bew.slice().sort((a,b)=>(b.wert||0)-(a.wert||0))[0];
+  const konz = (groesste && gesamt) ? (groesste.wert||0)/gesamt*100 : 0;
+
+  let h = `<div class="note-box"><span class="nt">Nur auf diesem Gerät</span>
+    <p>Deine Positionen werden ausschließlich lokal in diesem Browser gespeichert. Sie
+    gehen nicht ins Repo, nicht auf die öffentliche Seite und nicht an mich. Auf einem
+    anderen Gerät musst du sie erneut eintragen.</p></div>`;
+
+  if (bew.length){
+    h += `<div class="status">
+      <div><div class="k">Depotwert</div><div class="v">${num(gesamt,0)} €*</div>
+        <div class="n">${bew.length} Position(en)</div></div>
+      <div><div class="k">Gewinn / Verlust</div><div class="v ${gv>=0?'gut':'aus'}">${num(gv,0)}</div>
+        <div class="n">${einstand?pct(gv/einstand*100,1):'—'}</div></div>
+      <div><div class="k">Konzentration</div><div class="v ${konz>35?'mittel':'gut'}">${konz.toFixed(0)} %</div>
+        <div class="n">größte: ${esc(groesste?name(groesste.pos.sym):'—')}</div></div>
+      <div><div class="k">Aufteilung</div><div class="v" style="font-size:14px;font-family:'IBM Plex Mono',monospace">
+        ${Object.entries(jeKlasse).map(([k,v])=>`${k.slice(0,3)} ${gesamt?Math.round(v/gesamt*100):0}%`).join('<br>')||'—'}</div></div>
+    </div>
+    <p class="leer" style="padding:6px 0">* in der Währung deiner Eingabe gerechnet — Kurse
+      kommen für Krypto live von der Börse, für Aktien aus dem letzten Scan.</p>`;
+
+    h += `<h2>Positionen</h2>`;
+    h += bew.map(b=>{
+      const d = digits(b.kurs||1);
+      const r = b.row;
+      return `<div class="karte ${b.kl}">
+        <h3>${esc(name(b.pos.sym))} <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
+          <span style="float:right" class="note ${b.kl==='gut'?'gut':''}">${esc(b.urteil)}</span></h3>
+        <div class="kpi">
+          <span>Menge <b>${num(b.pos.menge, 6)}</b></span>
+          <span>Einstieg <b>${num(b.pos.einstieg,d)}</b></span>
+          <span>Kurs <b>${num(b.kurs,d)}</b>${b.live?' <span class="up">live</span>':''}</span>
+          ${b.gvPct!=null?`<span>G/V <b class="${b.gvPct>=0?'up':'dn'}">${pct(b.gvPct,1)}</b></span>`:''}
+          ${b.r!=null?`<span>R <b class="${b.r>=0?'up':'dn'}">${b.r.toFixed(2)}R</b></span>`:''}
+        </div>
+        ${r?`<div class="zt">
+          <span>Score <b>${r.score.toFixed(0)}</b></span>
+          <span>Note <b>${esc(r.note)}</b></span>
+          ${r.ziel!=null?`<span>TP1 <b>${num(r.ziel,d)}</b></span>`:''}
+          ${r.tp2!=null?`<span>TP2 <b>${num(r.tp2,d)}</b></span>`:''}
+          ${r.invalidierung!=null?`<span>Stop <b>${num(r.invalidierung,d)}</b></span>`:''}
+        </div>
+        <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.headline||'')}</p>`
+        : `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">
+             Nicht im letzten Scan — keine Bewertung. Entweder außerhalb des Universums
+             oder die Datenquelle war stumm.</p>`}
+        <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
+          ${r?` · <button class="link" data-zeig="${esc(b.pos.sym)}">Chart ansehen</button>`:''}</p>
+      </div>`;
+    }).join('');
+
+    // Rotation
+    const beste = (S?.gesamt||[]).filter(o=>o.handelbar)[0];
+    const schwaechste = bew.filter(b=>b.score!=null).sort((a,b)=>a.score-b.score)[0];
+    if (beste && schwaechste && beste.score - schwaechste.score >= 15 &&
+        beste.instrument !== schwaechste.pos.sym){
+      h += `<div class="note-box warn"><span class="nt">Kapital könnte besser stehen</span>
+        <p><strong>${esc(name(schwaechste.pos.sym))}</strong> steht bei Score
+        ${schwaechste.score.toFixed(0)}, während <strong>${esc(name(beste.instrument))}</strong>
+        gerade ${beste.score.toFixed(0)} hat (${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+pct(beste.erwartete_bewegung_pct,1):''}).</p>
+        <p>Das ist ein Hinweis, keine Anweisung — und nichts wird automatisch umgeschichtet.
+        Ein Wechsel kostet Gebühren und Spread und wirft die laufende These weg.</p></div>`;
+    }
+  } else {
+    h += `<p class="leer">Noch keine Positionen eingetragen.</p>`;
+  }
+
+  h += `<h2>Position eintragen</h2>
+    <div class="karte">
+      <div class="rowx"><span class="lab">Symbol</span>
+        <input id="pf_sym" class="val" placeholder="BTCUSDT oder NVDA" style="width:52%"></div>
+      <div class="rowx"><span class="lab">Menge</span>
+        <input id="pf_menge" class="val" inputmode="decimal" placeholder="0,25" style="width:52%"></div>
+      <div class="rowx"><span class="lab">Einstiegskurs</span>
+        <input id="pf_einstieg" class="val" inputmode="decimal" placeholder="61000" style="width:52%"></div>
+      <div class="rowx"><span class="lab">Konto</span>
+        <input id="pf_konto" class="val" placeholder="Bybit / Trade Republic" style="width:52%"></div>
+      <p style="margin:11px 0 0"><button class="link" id="pf_add">Hinzufügen</button>
+        ${bew.length?` · <button class="link" id="pf_clear">alle löschen</button>`:''}</p>
+    </div>`;
+
+  $('portfolio').innerHTML = h;
+  $('portfolio').querySelectorAll('[data-weg]').forEach(b=>b.addEventListener('click',()=>{
+    speicherePositionen(ladePositionen().filter(p=>p.sym!==b.dataset.weg)); zeichnePortfolio();
+  }));
+  $('portfolio').querySelectorAll('[data-zeig]').forEach(b=>b.addEventListener('click',()=>
+    waehle(b.dataset.zeig)));
+  const add = $('pf_add');
+  if (add) add.addEventListener('click',()=>{
+    const sym = ($('pf_sym').value||'').trim().toUpperCase();
+    const menge = parseFloat(($('pf_menge').value||'').replace(',','.'));
+    const einstieg = parseFloat(($('pf_einstieg').value||'').replace(',','.'));
+    if (!sym || !isFinite(menge) || menge <= 0) return;
+    const a = ladePositionen().filter(p=>p.sym!==sym);
+    a.push({sym, menge, einstieg: isFinite(einstieg)?einstieg:null,
+            konto: ($('pf_konto').value||'').trim()});
+    speicherePositionen(a); zeichnePortfolio();
+  });
+  const clear = $('pf_clear');
+  if (clear) clear.addEventListener('click',()=>{ speicherePositionen([]); zeichnePortfolio(); });
+}
+let _pfZuletzt = 0;
+function aktualisierePortfolioKurse(){
+  if ($('p3').hidden) return;
+  // Nicht neu zeichnen, waehrend jemand tippt — sonst springt der Fokus aus dem Feld.
+  const a = document.activeElement;
+  if (a && a.tagName === 'INPUT') return;
+  if (Date.now() - _pfZuletzt < 5000) return;
+  _pfZuletzt = Date.now();
+  zeichnePortfolio();
+}
+
+/* ============================================================ PLAN (TSMOM) */
+function zeichnePlan(){
+  if (!P){ $('plan').innerHTML = `<p class="leer">Kein Plan vorhanden.</p>`; return; }
+  const pos = P.positions || [];
+  let h = `<div class="note-box"><span class="nt">Zweite, unabhängige Quelle</span>
+    <p>Das hier ist <strong>nicht</strong> der Chart-Scan. Es ist die eingefrorene
+    Momentum-Regel: sie verteilt Kapital nach Trendstärke über vier Anlageklassen und
+    kennt keinen Einstiegszeitpunkt. Beide Ansätze stehen bewusst nebeneinander —
+    wer sie vermischt, weiß hinterher nicht, worauf ein Ergebnis zurückgeht.</p></div>`;
+  h += `<div class="status">
+    <div><div class="k">Kapital</div><div class="v">${num(P.equity,0)} €</div>
+      <div class="n">${pos.length} Position(en) geplant</div></div>
+    <div><div class="k">Investiert</div><div class="v">${num(P.invested||0,0)} €</div>
+      <div class="n">${P.equity?Math.round((P.invested||0)/P.equity*100):0} % vom Kapital</div></div>
+    <div><div class="k">Cash</div><div class="v">${num((P.equity||0)-(P.invested||0),0)} €</div>
+      <div class="n">Puffer</div></div>
+    <div><div class="k">Journaltage</div><div class="v">${D.journal_days||0}</div>
+      <div class="n">Forward-Datenspur</div></div>
+  </div>`;
+  if (pos.length){
+    h += `<h2>Zielaufteilung</h2>`;
+    h += pos.map(p2=>`<div class="karte">
+      <h3>${esc(name(p2.instrument))} <span class="mono" style="float:right;font-weight:400">${num(p2.eur,0)} €</span></h3>
+      <div class="kpi"><span>Konto <b>${esc(p2.venue||'—')}</b></span>
+        <span>Klasse <b>${esc(D.klasse&&D.klasse[p2.instrument]||'—')}</b></span></div>
+    </div>`).join('');
+  } else {
+    h += `<p class="leer">Die Regel schlägt gerade keine Position vor. Das ist ein Ergebnis,
+      kein Ausfall.</p>`;
+  }
+  h += `<h2>Grenzen</h2><div class="karte">
+    ${Object.entries(D.rules||{}).map(([k,v])=>`<div class="rowx">
+      <span class="lab">${esc(k.replace(/_/g,' '))}</span><span class="val">${num(v,1)}</span></div>`).join('')}
+  </div>`;
+  $('plan').innerHTML = h;
+}
+
+/* ============================================================ ALARME */
+function zeichneAlarme(){
+  let h = '';
+  const kand = (S?.gesamt||[]).filter(o=>o.handelbar);
+  h += `<h2>Aktive Setups</h2>`;
+  if (kand.length){
+    h += kand.slice(0,12).map(o=>{
+      const d = digits(o.kurs);
+      return `<div class="alarm ${o.urteil==='A_PLUS'||o.urteil==='A'?'hot':''}" data-sym="${esc(o.instrument)}">
+        <div class="ah"><span>${esc(name(o.instrument))} ${o.richtung?o.richtung.toUpperCase():''}</span>
+          <span class="d">${esc(o.note)} · ${(o.score||0).toFixed(0)}/100</span></div>
+        <p>Kurs <strong>${num(o.kurs,d)}</strong> · Ziel <strong>${num(o.ziel,d)}</strong>${
+          o.tp2!=null?' / '+num(o.tp2,d):''}${o.tp3!=null?' / '+num(o.tp3,d):''} ·
+          falsch ab <strong>${num(o.invalidierung,d)}</strong>${o.rr?' · CRV 1:'+o.rr.toFixed(2):''}${
+          o.erwartete_bewegung_pct!=null?' · erwartet '+pct(o.erwartete_bewegung_pct,1):''}</p>
         <p style="color:var(--ink-3)">${esc(o.headline||'')}</p>
       </div>`;
     }).join('');
   } else {
-    h += `<div class="alarm"><div class="ah"><span>Kein Setup</span></div>
-      <p>Im letzten Scan hatte kein Instrument Score und Chance-Risiko-Verhältnis
-        gleichzeitig gut genug. Das ist ein Ergebnis, kein Ausfall: nicht einsteigen.</p></div>`;
+    h += `<div class="alarm"><div class="ah"><span>Kein handelbares Setup</span></div>
+      <p>Im letzten Scan hat kein Wert Score, Chance-Risiko-Verhältnis und erwartete
+      Bewegung gleichzeitig erreicht. Das ist ein Ergebnis, kein Ausfall.</p></div>`;
   }
 
-  /* --- 2. Was tatsaechlich rausgegangen ist --- */
   const A = D.alarme || [];
-  h += '<h2>Zuletzt verschickt</h2>';
-  if (A.length) {
-    h += A.map(a=>{
-      let t = a.ts || '';
-      try { t = new Date(a.ts).toLocaleString('de-DE',
-        {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e) {}
-      const crit = a.severity === 'CRITICAL';
-      return `<div class="alarm ${crit?'hot':''}">
-        <div class="ah"><span>${esc(a.title||'')}</span><span class="d">${esc(t)}</span></div>
-        ${a.body?`<p style="white-space:pre-wrap">${esc(a.body)}</p>`:''}
-      </div>`;
-    }).join('');
-  } else {
-    h += `<div class="alarm"><div class="ah"><span>Noch nichts verschickt</span></div>
-      <p>Seit dem Start hat sich nichts geändert, das eine Meldung wert war — oder
-        Telegram ist noch nicht eingerichtet. Beides steht hier gleich aus, deshalb:
-        wenn der Verlauf tagelang leer bleibt und oben trotzdem Setups stehen, fehlen
-        die beiden Telegram-Schlüssel.</p></div>`;
-  }
+  h += `<h2>Zuletzt verschickt</h2>`;
+  h += A.length ? A.map(a=>`<div class="alarm ${a.severity==='CRITICAL'?'hot':''}">
+      <div class="ah"><span>${esc(a.title||'')}</span><span class="d">${zeit(a.ts)}</span></div>
+      ${a.body?`<p style="white-space:pre-wrap">${esc(a.body)}</p>`:''}
+    </div>`).join('')
+    : `<div class="alarm"><div class="ah"><span>Noch nichts verschickt</span></div>
+       <p>Entweder hat sich nichts geändert, das eine Meldung wert war — oder Telegram ist
+       noch nicht eingerichtet. Bleibt der Verlauf tagelang leer, während oben Setups
+       stehen, fehlen die beiden Telegram-Schlüssel.</p></div>`;
 
-  /* --- 3. Die Allokationsregel getrennt davon --- */
-  const stark = D.signals.filter(s=>s.agreement>=1 && s.target_weight>0)
-    .sort((a,b)=>b.target_weight-a.target_weight);
-  const knapp = D.signals.filter(s=>s.agreement>=0.8 && s.agreement<1)
-    .sort((a,b)=>b.agreement-a.agreement);
-  h += '<h2>Allokationsregel — voller Rückenwind</h2>';
-  if (stark.length) {
-    h += stark.map(s=>{
-      const p = P.positions.find(x=>x.instrument===s.instrument);
-      return `<div class="alarm hot">
-        <div class="ah"><span>${esc(D.names[s.instrument]||s.instrument)}</span>
-          <span class="d">${p ? Math.round(p.eur)+' €' : 'nicht im Plan'}</span></div>
-        <p>Alle fünf Zeiträume positiv, Schwankung ${(s.realized_vol*100).toFixed(0)} % im Jahr.
-          ${p ? 'Steht im heutigen Plan.'
-              : 'Steht nicht im Plan — entweder kein Konto dafür oder das Geld reicht nicht für eine ordentliche Position.'}</p>
-      </div>`;
-    }).join('');
-  } else {
-    h += `<div class="alarm"><div class="ah"><span>Kein starkes Signal</span></div>
-      <p>Zurzeit hat kein Instrument alle fünf Zeiträume grün. Das ist kein Fehler,
-        sondern ein Ergebnis: nicht eingreifen.</p></div>`;
-  }
-  if (knapp.length) {
-    h += '<h2>Kurz davor — 4 von 5</h2>';
-    h += knapp.map(s=>{
-      const L = levels(s), rot = L.filter(l=>!l.up).sort((a,b)=>a.level-b.level)[0];
-      const d = digits(s.close);
-      return `<div class="alarm">
-        <div class="ah"><span>${esc(D.names[s.instrument]||s.instrument)}</span>
-          <span class="d">${Math.round(s.agreement*100)} %</span></div>
-        <p>${rot ? `Über <strong>${num(rot.level,d)}</strong> wäre auch das ${rot.lb}-Tage-Fenster
-          grün — das sind ${((rot.level/s.close-1)*100).toFixed(1).replace('.',',')} % von hier.`
-          : 'Ein Fenster fehlt noch.'}</p>
-      </div>`;
-    }).join('');
-  }
+  h += `<div class="note-box warn" style="margin-top:22px"><span class="nt">Warum so wenige Alarme</span>
+    <p>Der Marktscan läuft <strong>stündlich</strong>. Aufs Handy geht nur die
+    <strong>Änderung</strong>: ein Setup entsteht, ein Setup bricht weg, die Nummer 1
+    wechselt. Dieselbe Meldung frühestens nach zwölf Stunden wieder.</p>
+    <p>Fällt eine Anlageklasse aus, gelten ihre Werte als <em>unbekannt</em>, nicht als
+    verschwunden — sonst meldet das System „Setup entfallen", obwohl nur die Kursquelle
+    geschwiegen hat.</p></div>`;
+  $('alarme').innerHTML = h;
+  $('alarme').querySelectorAll('[data-sym]').forEach(el=>
+    el.addEventListener('click',()=>waehle(el.dataset.sym)));
+}
 
-  h += `<div class="note warn" style="margin-top:26px">
-    <span class="nt">Warum so wenige Alarme</span>
-    <p>Der Marktscan läuft <strong>stündlich</strong> über Krypto, Aktien und Gold.
-      Aufs Handy geht davon nur die <strong>Änderung</strong>: ein Setup entsteht, ein
-      Setup bricht weg, die Nummer 1 wechselt. Dieselbe Meldung frühestens nach zwölf
-      Stunden wieder. „Immer noch WATCH" ist keine Nachricht.</p>
-    <p>Fällt eine Anlageklasse aus, gelten ihre Instrumente als <em>unbekannt</em>, nicht
-      als verschwunden — sonst meldet das System „Setup entfallen", obwohl nur die
-      Kursquelle geschwiegen hat.</p>
+/* ============================================================ SYSTEM */
+function zeichneSystem(){
+  const u = S?.universum || {};
+  const k = u.krypto || {};
+  let h = `<h2>Letzter Scan</h2><div class="karte">
+    <div class="rowx"><span class="lab">Zeitpunkt</span><span class="val">${zeit(S?.erzeugt)}</span></div>
+    <div class="rowx"><span class="lab">Dauer</span><span class="val">${S?.dauer_s??'—'} s</span></div>
+    <div class="rowx"><span class="lab">Profil</span><span class="val">${esc(S?.profil||'—')}</span></div>
+    <div class="rowx"><span class="lab">Instrumente</span><span class="val">${(S?.gesamt||[]).length}</span></div>
+    <div class="rowx"><span class="lab">Detailansichten</span><span class="val">${(S?.detail_vorhanden||[]).length}</span></div>
   </div>`;
-  el.innerHTML = h;
-})();
-
-/* Erwartung */
-const E = D.expect, B = D.buckets || {};
-const maxN = Math.max(1, ...Object.values(B).map(b=>b.n));
-document.getElementById('expect').innerHTML = `
-  <div class="tw"><table>
-    <tbody>
-      <tr><td>Positionen, die gewinnen</td><td class="num">${Math.round(E.win_rate*100)} %</td></tr>
-      <tr><td>typischer Gewinner</td><td class="num pos">+${E.typ_win_pct.toFixed(1).replace('.',',')} %</td></tr>
-      <tr><td>typischer Verlierer</td><td class="num neg">${E.typ_loss_pct.toFixed(1).replace('.',',')} %</td></tr>
-      <tr><td>tiefster Zwischenstand</td><td class="num neg">${E.worst_dip_pct.toFixed(1).replace('.',',')} %</td></tr>
-      <tr class="key"><td>Median-Haltedauer der Gewinner</td><td class="num">${E.median_winner_days} Tage</td></tr>
-    </tbody>
-  </table></div>
-  <h2>Wo der Gewinn herkommt</h2>
-  ${Object.entries(B).map(([k,b])=>`
-    <div class="bk">
-      <div class="bk-h"><span class="t">${esc(k)}</span>
-        <span class="s">${b.n} Positionen · ${b.win_rate.toFixed(0)} % Treffer</span></div>
-      <div class="bk-bar"><i style="width:${(b.n/maxN*100).toFixed(1)}%"></i></div>
-      <div class="bk-sum ${b.ret_sum>0?'pos':'neg'}">${b.ret_sum>0?'+':''}${b.ret_sum.toFixed(0)} % Ergebnis</div>
-    </div>`).join('')}
-  <div class="note warn">
-    <span class="nt">Das ist der ganze Punkt</span>
-    <p>Über 3 Monate: 59 von 398 Positionen — und sie tragen praktisch den gesamten Gewinn.
-      Alles Kurzfristige war zusammen ein Minus.</p>
-    <p><strong>Wer früh verkauft, verkauft genau die Positionen weg, die das Geld verdienen.</strong>
-      Verkauft wird, wenn im Tab „Heute" VERKAUFEN steht — nicht, weil eine Zahl rot ist.</p>
-  </div>`;
-
-/* Regeln */
-const R = D.rules;
-document.getElementById('rules').innerHTML = `
-  <p class="lead">Es gibt keinen statistischen Beweis, dass diese Regel funktioniert — und es
-    wird auch keinen geben: ein Sharpe um 1 bräuchte über ein Jahrzehnt sauberer Daten.
-    Deshalb liegt die gesamte Sicherheit in diesen Grenzen.</p>
-  <h2>Notbremsen</h2>
-  <div class="tw"><table>
-    <tbody>
-      <tr><td>−${R.daily_loss_pct} % an einem Tag</td><td>keine neuen Käufe bis morgen</td></tr>
-      <tr><td>−${R.weekly_loss_pct} % in einer Woche</td><td>Pause bis Wochenwechsel</td></tr>
-      <tr class="key"><td>−${R.max_dd_pct} % vom Höchststand</td><td>Kill-Switch, alles raus</td></tr>
-    </tbody>
-  </table></div>
-  <h2>Dauerhafte Grenzen</h2>
-  <div class="tw"><table>
-    <tbody>
-      <tr><td>höchstens investiert</td><td class="num">${R.max_exposure_pct} %</td></tr>
-      <tr><td>Cash, den nichts anfasst</td><td class="num">${R.min_cash_pct} %</td></tr>
-      <tr><td>Positionen gleichzeitig</td><td class="num">max. ${R.max_positions}</td></tr>
-    </tbody>
-  </table></div>
-  <div class="note bad">
-    <span class="nt">Was hier NICHT steht</span>
-    <p>Kein Beweis, keine Garantie, keine erwartete Rendite. Die Regel kann über Monate
-      verlieren. Der Kill-Switch bei −${R.max_dd_pct} % ist keine Zierde — er ist der Grund,
-      warum ein Irrtum ${R.max_dd_pct} % kostet und nicht alles.</p>
+  if (k.gesamt){
+    h += `<h2>Krypto-Universum</h2><div class="karte">
+      <div class="rowx"><span class="lab">Paare an der Börse</span><span class="val">${k.gesamt}</span></div>
+      <div class="rowx"><span class="lab">nach Ausschluss</span><span class="val">${k.nach_ausschluss}</span></div>
+      <div class="rowx"><span class="lab">liquide genug</span><span class="val">${k.nach_liquiditaet}</span></div>
+      <div class="rowx"><span class="lab">gescannt</span><span class="val">${k.genommen}</span></div>
+      ${k.verworfen?Object.entries(k.verworfen).filter(([,v])=>v).map(([kk,v])=>
+        `<div class="rowx"><span class="lab">verworfen: ${esc(kk)}</span><span class="val">${v}</span></div>`).join(''):''}
+    </div>
+    <div class="note-box"><span class="nt">Warum gefiltert wird</span>
+      <p>Ein Altcoin darf nicht deshalb attraktiv aussehen, weil er extrem schwankt — er
+      muss auch handelbar sein. Ohne Umsatz bekommt man den Einstieg nicht zum
+      angezeigten Kurs und den Ausstieg gar nicht. Stablecoins, Hebel-Token und
+      verpackte Doppel (WBTC …) fliegen raus, weil sie keine eigene Wette sind.</p></div>`;
+  }
+  h += `<h2>Live-Kurse</h2><div class="karte">
+    <div class="rowx"><span class="lab">Verbindung</span><span class="val">${WS_OK?'offen':'getrennt'}</span></div>
+    <div class="rowx"><span class="lab">Quelle</span><span class="val">Börsen-Websocket</span></div>
+    <div class="rowx"><span class="lab">Werte mit Livekurs</span><span class="val">${L.size}</span></div>
   </div>
-  <h2>Forward-Aufzeichnung</h2>
-  <p>Seit dem Start werden <strong>${D.journal_days} Tag(e)</strong> aufgezeichnet. Erst diese
-    Daten sind unverbraucht — alle historischen wurden beim Entwickeln mehrfach angesehen.
-    Ab etwa 100 Tagen lässt sich sagen, ob die Regel live hält, was sie im Test versprach.</p>`;
+  <div class="note-box"><span class="nt">Was hier live ist und was nicht</span>
+    <p><strong>Live:</strong> die Kurse für Krypto und Gold — direkt von der Börse an
+    deinen Browser, ohne Umweg.</p>
+    <p><strong>Nicht live:</strong> die eingezeichnete Analyse. Sie stammt aus dem
+    stündlichen Scan und trägt dessen Zeitstempel. Für Aktien gibt es kein frei
+    zugängliches Live-Feed; dort ist auch der Kurs der Stand des Scans.</p>
+    <p>Diese Trennung ist Absicht. Eine Seite, die alles gleich aussehen lässt, verleitet
+    dazu, einen Stand von vor einer Stunde für den aktuellen Kurs zu halten.</p></div>`;
+  h += `<h2>Was noch fehlt</h2><div class="karte">
+    <div class="rowx"><span class="lab">Nachführung laufender Trades in Echtzeit</span><span class="val">offen</span></div>
+    <div class="rowx"><span class="lab">News und Makro im Score</span><span class="val">offen</span></div>
+    <div class="rowx"><span class="lab">Fundamentaldaten bei Aktien</span><span class="val">offen</span></div>
+    <div class="rowx"><span class="lab">Dauerlauf-Daemon auf einem Server</span><span class="val">offen</span></div>
+  </div>`;
+  $('system').innerHTML = h;
+}
 
-document.getElementById('built').textContent =
-  'Gebaut ' + D.built_at + ' · Regel ' + D.setup + ' ' + D.params_version;
+/* ============================================================ START */
+function start(){
+  $('built').textContent = 'Gebaut: ' + (D.built_at || '—') +
+    ' · Setup ' + (D.setup||'') + ' · ' + (D.params_version||'');
+  zeichnePlan(); zeichneAlarme(); zeichnePortfolio(); zeichneSystem();
+  $('chartansicht').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
+  $('analyse').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
+  const t = parseInt((location.hash||'').replace('#',''), 10);
+  zeigeTab(isFinite(t) && t>=0 && t<TABS.length ? t : 0);
+  ladeScan();
+  // Der Scan wird stuendlich neu gebaut. Alle fuenf Minuten nachsehen kostet nichts und
+  // erspart das manuelle Neuladen.
+  setInterval(()=>{ ladeScan(); }, 5*60*1000);
+}
+start();
 </script>
 </body>
 </html>

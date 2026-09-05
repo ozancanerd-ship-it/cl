@@ -249,3 +249,38 @@ async def test_bruecke_schickt_kritische_alerts_und_schluckt_rauschen() -> None:
     assert bruecke.geschickt == 1
     assert sammler.notes[0].severity is Severity.CRITICAL
     assert "BTCUSDT" in sammler.notes[0].title
+
+
+def test_die_volle_notenleiter_wird_gemeldet() -> None:
+    """Ozans Korrektur: das Mittelfeld darf nicht unsichtbar sein."""
+    doc = _doc(
+        [
+            _chance("AAA", score=80.0, urteil="A_PLUS"),
+            _chance("BBB", score=70.0, urteil="A"),
+            _chance("CCC", score=62.0, urteil="A_MINUS"),
+            _chance("DDD", score=55.0, urteil="B_PLUS"),
+            _chance("EEE", score=45.0, urteil="B"),
+            _chance("FFF", score=38.0, urteil="WATCH"),
+        ]
+    )
+    alarme, _ = ScanWaechter().pruefen(doc, None, jetzt=T0)
+    gemeldet = {a.instrument for a in alarme if a.art == "NEUES_SETUP"}
+    assert gemeldet == {"AAA", "BBB", "CCC", "DDD", "EEE"}
+    assert "FFF" not in gemeldet
+
+    stufen = {a.instrument: a.severity for a in alarme if a.art == "NEUES_SETUP"}
+    assert stufen["AAA"] is Severity.CRITICAL
+    assert stufen["CCC"] is Severity.WARNING
+    # B klingelt nicht — es steht nur im Verlauf.
+    assert stufen["EEE"] is Severity.INFO
+
+
+def test_abrutschen_von_b_auf_watch_ist_ein_wegbruch() -> None:
+    w = ScanWaechter()
+    _, stand = w.pruefen(_doc([_chance("XYZ", score=48.0, urteil="B")]), None, jetzt=T0)
+    alarme, _ = w.pruefen(
+        _doc([_chance("XYZ", score=30.0, urteil="WATCH")]),
+        stand,
+        jetzt=T0 + timedelta(hours=6),
+    )
+    assert any(a.art == "ENTFALLEN" and a.instrument == "XYZ" for a in alarme)

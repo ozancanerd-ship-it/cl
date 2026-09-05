@@ -61,7 +61,7 @@ permissions:
 jobs:
   tagesplan:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -105,13 +105,16 @@ jobs:
 
       # Der Gesamtmarkt-Scan. continue-on-error, weil eine stumme Kursquelle die Seite
       # nicht verhindern darf — build_site zeigt dann keine Rangliste statt einer alten.
+      # Der Gesamtmarkt-Scan: dynamisches Krypto-Universum von der Boerse, Aktien,
+      # Gold. Schreibt die Rangliste UND je Wert eine Detaildatei mit Zeichnung,
+      # MTF-Tabelle, Mustern und Kommentar.
       - name: Markt scannen
         id: scan
         continue-on-error: true
-        timeout-minutes: 8
+        timeout-minutes: 14
         env:
           PYTHONPATH: src
-        run: python scripts/build_scan_data.py --out web/scan.json
+        run: python scripts/build_scan_data.py --out web --krypto 110 --aktien 40 --detail 60
 
       # Der eigentliche Grund fuer den Stundentakt. Verglichen wird gegen den letzten Stand,
       # geschickt wird nur die Aenderung: neues A+/A-Setup, weggebrochenes Setup, neue

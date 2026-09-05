@@ -26,10 +26,17 @@ sind bewusst NICHT an historische Ergebnisse angepasst, weil genau das Overfitti
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from trading_agent.core.enums import Direction, Timeframe
+from trading_agent.scanner.grading import (
+    HANDELBAR,
+    NOTE_KURZ,
+    Profil,
+    benote,
+    confidence,
+)
 
 
 def _passt(objekt_richtung: Any, wette: Direction) -> bool:
@@ -96,7 +103,28 @@ class ChartChance:
     bewegung_atr: float | None
     rr: float | None  # Ziel gegen Invalidierung
     headline: str
-    urteil: str  # A_PLUS | A | WATCH | NO_TRADE
+    urteil: str  # A_PLUS | A | A_MINUS | B_PLUS | B | WATCH | NO_TRADE
+    #: Wie weit es bis TP2 laufen koennte, in Prozent. Die Groesse, an der ein
+    #: aggressiver Swing-Trade haengt — nicht der Score allein.
+    erwartete_bewegung_pct: float | None = None
+    #: 0..1 — wie einheitlich das Bild ist. NICHT die Trefferwahrscheinlichkeit.
+    confidence: float = 0.0
+    profil: str = "aggressiv"
+    begruendung: str = ""
+    #: Was die Note nach oben begrenzt hat.
+    bremse: str | None = None
+    #: Dinge, die gegen den Trade sprechen, ohne ihn auszuschliessen.
+    warnungen: tuple[str, ...] = ()
+    #: Kennzahlen von aussen (Umsatz, 24h-Bewegung) — Kontext, kein Score-Bestandteil.
+    zusatz: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def note_kurz(self) -> str:
+        return NOTE_KURZ.get(self.urteil, "—")
+
+    @property
+    def handelbar(self) -> bool:
+        return self.urteil in HANDELBAR
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +142,19 @@ class ChartChance:
             "rr": round(self.rr, 2) if self.rr else None,
             "headline": self.headline,
             "urteil": self.urteil,
+            "note": self.note_kurz,
+            "handelbar": self.handelbar,
+            "erwartete_bewegung_pct": (
+                round(self.erwartete_bewegung_pct, 2)
+                if self.erwartete_bewegung_pct is not None
+                else None
+            ),
+            "confidence": self.confidence,
+            "profil": self.profil,
+            "begruendung": self.begruendung,
+            "bremse": self.bremse,
+            "warnungen": list(self.warnungen),
+            "zusatz": dict(self.zusatz),
             "faktoren": [
                 {
                     "name": f.name,
@@ -232,8 +273,22 @@ def _invalidierung(
     return min(tauglich) if tauglich else kurs + 2.0 * atr
 
 
-def bewerte_chart(instrument: str, mtf: Any, kurs: float) -> ChartChance:
-    """Sechs Faktoren, 100 Punkte. Kein Setup noetig — der Chartzustand allein zaehlt."""
+def bewerte_chart(
+    instrument: str,
+    mtf: Any,
+    kurs: float,
+    *,
+    zusatz: dict[str, Any] | None = None,
+    profil: Profil | str = Profil.AGGRESSIV,
+) -> ChartChance:
+    """Sechs Faktoren, 100 Punkte, dann eine Note aus Score, CRV und erwarteter Bewegung.
+
+    ``zusatz`` sind Kennzahlen von aussen (24h-Umsatz, 24h-Bewegung). Sie gehen NICHT in
+    den Score ein — sie erzeugen Warnungen und stehen als Kontext in der Ausgabe. Wer
+    Liquiditaet in den Score rechnet, bekommt eine Rangliste der grossen Coins statt
+    eine der guten Charts.
+    """
+    zusatz = dict(zusatz or {})
     per_tf: dict[Timeframe, Any] = dict(getattr(mtf, "per_tf", {}) or {})
     richtung, einigkeit, bias_text = _bias(per_tf)
     atr = _atr(per_tf)
@@ -366,28 +421,50 @@ def bewerte_chart(instrument: str, mtf: Any, kurs: float) -> ChartChance:
     if rr_ziel is not None and inval is not None and abs(kurs - inval) > 0:
         rr = abs(rr_ziel - kurs) / abs(kurs - inval)
 
-    # Urteil. Score allein reicht nicht: ein gut ausgerichteter Chart, dessen naechstes
-    # Ziel naeher liegt als die Invalidierung, ist trotzdem kein Trade. Beide Bedingungen
-    # muessen zusammenkommen — das ist der Unterschied zu "sieht gut aus".
-    if richtung is None or rr is None:
-        urteil = "NO_TRADE"
-    elif score >= 70 and rr >= 2.0:
-        urteil = "A_PLUS"
-    elif score >= 60 and rr >= 1.5:
-        urteil = "A"
-    elif score >= 40:
-        urteil = "WATCH"
-    else:
-        urteil = "NO_TRADE"
+    # Die erwartete Bewegung bis TP2 — die Groesse, an der ein Swing-Trade haengt.
+    swing_ziel = tp2 if tp2 is not None else ziel
+    erwartet = (abs(swing_ziel - kurs) / kurs * 100.0) if swing_ziel else None
+
+    warnungen = _warnungen(zusatz, per_tf, richtung, score)
+
+    urteilung = benote(
+        score=score,
+        rr=rr,
+        move_pct=erwartet,
+        hat_invalidierung=inval is not None and richtung is not None,
+        profil=profil,
+    )
+
+    daten_ok = all(
+        not getattr(per_tf.get(tf), "blocks_trading", False)
+        for tf in (Timeframe.D1, Timeframe.H4)
+        if per_tf.get(tf) is not None
+    )
+    erfuellt = sum(1 for x in f if x.anteil >= 0.5) / max(1, len(f))
+    conf = confidence(
+        einigkeit=einigkeit,
+        score=score,
+        faktoren_erfuellt=erfuellt,
+        daten_ok=daten_ok,
+        warnungen=len(warnungen),
+    )
 
     if richtung is None:
         kopf = "kein klarer Trend"
-    elif score >= 70:
-        kopf = f"{'LONG' if richtung is Direction.LONG else 'SHORT'} — stark ausgerichtet"
-    elif score >= 50:
-        kopf = f"{'LONG' if richtung is Direction.LONG else 'SHORT'} — brauchbar"
     else:
-        kopf = f"{'LONG' if richtung is Direction.LONG else 'SHORT'} — schwach"
+        seite = "LONG" if richtung is Direction.LONG else "SHORT"
+        note_text = NOTE_KURZ.get(urteilung.note, "—")
+        if urteilung.note in HANDELBAR:
+            luft = f", {erwartet:.1f} % bis TP2" if erwartet else ""
+            kopf = (
+                f"{seite} {note_text} — Score {score:.0f}, CRV 1:{rr:.1f}{luft}"
+                if rr
+                else (f"{seite} {note_text} — Score {score:.0f}")
+            )
+        elif urteilung.note == "WATCH":
+            kopf = f"{seite} beobachten — {urteilung.bremse or 'noch nicht handelbar'}"
+        else:
+            kopf = f"{seite} — kein Trade: {urteilung.bremse or 'nichts passt zusammen'}"
 
     return ChartChance(
         instrument=instrument,
@@ -404,8 +481,64 @@ def bewerte_chart(instrument: str, mtf: Any, kurs: float) -> ChartChance:
         bewegung_atr=bew_atr,
         rr=rr,
         headline=kopf,
-        urteil=urteil,
+        urteil=urteilung.note,
+        erwartete_bewegung_pct=erwartet,
+        confidence=conf,
+        profil=str(urteilung.profil.value),
+        begruendung=urteilung.begruendung,
+        bremse=urteilung.bremse,
+        warnungen=tuple(warnungen),
+        zusatz=zusatz,
     )
+
+
+def _warnungen(
+    zusatz: dict[str, Any], per_tf: dict[Timeframe, Any], richtung: Direction | None, score: float
+) -> list[str]:
+    """Was gegen den Trade spricht, ohne ihn auszuschliessen.
+
+    Bewusst getrennt vom Score. Eine Warnung soll sichtbar sein, nicht heimlich Punkte
+    abziehen — sonst weiss niemand mehr, warum ein Chart schlechter bewertet wurde.
+    """
+    w: list[str] = []
+    bewegung = zusatz.get("bewegung_24h_pct")
+    spanne = zusatz.get("spanne_24h_pct")
+    umsatz = zusatz.get("umsatz_24h")
+
+    if bewegung is not None and abs(float(bewegung)) >= 25.0:
+        w.append(
+            f"in 24 h bereits {float(bewegung):+.0f} % gelaufen — ein Einstieg hier kauft "
+            "die Bewegung, nicht den Aufbau"
+        )
+    if spanne is not None and float(spanne) >= 40.0:
+        w.append(
+            f"Tagesspanne {float(spanne):.0f} % — Stops brauchen entsprechend Abstand, "
+            "die Position wird dadurch klein"
+        )
+    if umsatz is not None and float(umsatz) < 5_000_000:
+        w.append(f"nur {float(umsatz) / 1e6:.1f} Mio USDT Umsatz — duenn fuer schnelle Ausstiege")
+
+    for tf in (Timeframe.D1, Timeframe.H4):
+        tfc = per_tf.get(tf)
+        if tfc is not None and getattr(tfc, "blocks_trading", False):
+            w.append(
+                f"Reihe auf {tf.value} nicht frisch — bei Aktien ausserhalb der "
+                "Boersenzeit normal, bei Krypto ein echter Ausfall"
+            )
+            break
+
+    if richtung is not None:
+        soll = "trend_up" if richtung is Direction.LONG else "trend_down"
+        d1 = per_tf.get(Timeframe.D1)
+        d1_richtung = getattr(getattr(d1, "regime", None), "directional", None)
+        if d1 is not None and _v_enum(d1_richtung) not in (soll, "range", "unclear", ""):
+            w.append("Tagestrend zeigt in die Gegenrichtung — das ist ein Trade gegen D1")
+
+    return w
+
+
+def _v_enum(x: Any) -> str:
+    return str(getattr(x, "value", x) if x is not None else "")
 
 
 __all__ = ["MAX_PUNKTE", "TF_GEWICHT", "ChartChance", "ChartFaktor", "bewerte_chart"]

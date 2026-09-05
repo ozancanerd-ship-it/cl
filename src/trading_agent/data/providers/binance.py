@@ -252,6 +252,53 @@ class BinancePublicDataProvider(
             "price_change_pct": float(payload["priceChangePercent"]),
         }
 
+    async def fetch_ticker_24h_all(self) -> list[dict[str, Any]]:
+        """Alle 24h-Ticker in EINEM Aufruf — Grundlage fuer das dynamische Universum.
+
+        Einzeln abgefragt waeren das ueber 400 Anfragen und ein Rate-Limit-Bann. Der
+        Sammelaufruf kostet Binance-seitig 80 Gewicht und liefert denselben Inhalt.
+        """
+        payload = await self._get(f"{self._prefix}/ticker/24hr")
+        out: list[dict[str, Any]] = []
+        for row in payload if isinstance(payload, list) else []:
+            try:
+                out.append(
+                    {
+                        "instrument": str(row["symbol"]).upper(),
+                        "last": float(row["lastPrice"]),
+                        "high": float(row["highPrice"]),
+                        "low": float(row["lowPrice"]),
+                        "quote_volume": float(row["quoteVolume"]),
+                        "price_change_pct": float(row["priceChangePercent"]),
+                        "trades": int(row.get("count") or 0),
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        self._health.record_success(latency_ms=1.0)
+        return out
+
+    async def list_symbol_info(self, *, quote: str | None = None) -> list[dict[str, Any]]:
+        """Symbole mit Basis/Quote und Status — mehr als ``list_symbols`` liefert."""
+        payload = await self._get(f"{self._prefix}/exchangeInfo")
+        out: list[dict[str, Any]] = []
+        for s in payload.get("symbols", []):
+            if s.get("status") not in ("TRADING", None):
+                continue
+            if quote and s.get("quoteAsset") != quote.upper():
+                continue
+            out.append(
+                {
+                    "instrument": str(s["symbol"]).upper(),
+                    "basis": str(s.get("baseAsset") or "").upper(),
+                    "quote": str(s.get("quoteAsset") or "").upper(),
+                    "spot": bool(s.get("isSpotTradingAllowed", True)),
+                    "permissions": [str(x) for x in (s.get("permissions") or [])],
+                }
+            )
+        self._health.record_success(latency_ms=1.0)
+        return out
+
     # ---- Futures-only: Mark Price / Funding / OI ---------------------
     async def fetch_mark_price(self, instrument: str) -> dict[str, Any]:
         self._require_futures("mark price")

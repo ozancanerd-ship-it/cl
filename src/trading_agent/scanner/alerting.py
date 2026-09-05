@@ -25,8 +25,37 @@ from typing import Any, ClassVar
 
 from trading_agent.ops.notify import Notification, Notifier, Severity
 
-# Ein Urteil ist "handelbar", wenn es A oder besser ist.
-_RANG = {"NO_TRADE": 0, "WATCH": 1, "A": 2, "A_PLUS": 3}
+# Die volle Notenleiter, von unten nach oben. Alles ab ``_HANDELBAR_AB`` gilt als
+# handelbare Gelegenheit — das war frueher erst ab A und hat genau das Mittelfeld
+# unsichtbar gemacht, das Ozan sehen will.
+_RANG = {
+    "NO_TRADE": 0,
+    "WATCH": 1,
+    "B": 2,
+    "B_PLUS": 3,
+    "A_MINUS": 4,
+    "A": 5,
+    "A_PLUS": 6,
+}
+_HANDELBAR_AB = 2
+
+#: Wie dringend eine neue Note ist. B bleibt bewusst INFO: es soll im Verlauf stehen,
+#: aber nicht klingeln — sonst ist die Spam-Bremse umsonst.
+_STUFE = {
+    "A_PLUS": Severity.CRITICAL,
+    "A": Severity.CRITICAL,
+    "A_MINUS": Severity.WARNING,
+    "B_PLUS": Severity.WARNING,
+    "B": Severity.INFO,
+}
+
+_MARKE = {
+    "A_PLUS": "A+ SETUP",
+    "A": "A SETUP",
+    "A_MINUS": "A− SETUP",
+    "B_PLUS": "B+ SETUP",
+    "B": "B SETUP",
+}
 
 #: Dieselbe Meldung fuer dasselbe Instrument fruehestens nach dieser Zeit wieder.
 ABKUEHLUNG = timedelta(hours=12)
@@ -137,9 +166,9 @@ class ScanWaechter:
             hoch_neu, hoch_alt = _RANG.get(urteil_neu, 0), _RANG.get(urteil_alt, 0)
 
             # 1. Ein Setup ist neu da — oder hat die Richtung gedreht.
-            if hoch_neu >= 2 and (hoch_neu > hoch_alt or richtung_neu != richtung_alt):
-                sev = Severity.CRITICAL if urteil_neu == "A_PLUS" else Severity.WARNING
-                marke = "A+ SETUP" if urteil_neu == "A_PLUS" else "A SETUP"
+            if hoch_neu >= _HANDELBAR_AB and (hoch_neu > hoch_alt or richtung_neu != richtung_alt):
+                sev = _STUFE.get(urteil_neu, Severity.INFO)
+                marke = _MARKE.get(urteil_neu, "SETUP")
                 alarme.append(
                     ScanAlert(
                         art="NEUES_SETUP",
@@ -153,7 +182,7 @@ class ScanWaechter:
                 continue
 
             # 2. Ein Setup ist weggebrochen — das ist die Invalidierung.
-            if hoch_alt >= 2 and hoch_neu < 2:
+            if hoch_alt >= _HANDELBAR_AB and hoch_neu < _HANDELBAR_AB:
                 alarme.append(
                     ScanAlert(
                         art="ENTFALLEN",
