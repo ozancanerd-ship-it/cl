@@ -1,4 +1,12 @@
-# Der 24/7-Lauf — kostenlos, ohne Server, ohne dass der Mac an sein muss.
+# Die Marktueberwachung — kostenlos, ohne Server, ohne dass der Mac an sein muss.
+#
+# WAS "24/7" HIER HEISST, WOERTLICH: kein dauerlaufender Prozess, sondern ein Zeitplan.
+# Stuendlich (:25) ein voller Marktscan ueber Krypto, Aktien und Gold mit Alarm bei
+# Aenderung; einmal taeglich (23:10) zusaetzlich die Forward-Journalzeile und der
+# Tagesplan. Der echte Dauerlauf-Daemon (scripts/run_live_daemon.py) existiert und ist
+# fertig verdrahtet, er braucht aber eine Maschine, die durchlaeuft. Solange es die nicht
+# gibt, ist der Stundentakt die ehrliche Antwort — und nicht die Behauptung, es liefe
+# etwas rund um die Uhr.
 #
 # Warum GitHub Actions und nicht Oracle Cloud: Oracle verlangt eine Kreditkarten-
 # Verifizierung und lehnt viele Anmeldungen ohne Begruendung ab. Actions braucht nur ein
@@ -19,14 +27,19 @@
 # Ohne die Secrets laeuft der Job trotzdem: er schreibt die Zeile, baut die Seite und
 # meldet nur, dass er nicht senden konnte.
 
-name: Taeglicher Tagesplan
+name: Marktueberwachung
 
 on:
   schedule:
-    # 23:10 UTC — nach US-Boersenschluss (22:00 UTC), vor dem Tageswechsel.
-    # GitHub-Cron laeuft in UTC und kann sich bei Last um einige Minuten verspaeten;
-    # das ist hier egal, die Regel arbeitet auf Tagesschlusskursen.
+    # 23:10 UTC — der Tageslauf: Forward-Zeile + Tagesplan. Nach US-Boersenschluss
+    # (22:00 UTC), vor dem Tageswechsel. GitHub-Cron laeuft in UTC und kann sich bei Last
+    # um einige Minuten verspaeten; egal, die Regel arbeitet auf Tagesschlusskursen.
     - cron: "10 23 * * *"
+    # :25 jede Stunde — der Marktscan. Das ist unser "24/7" ohne eigenen Server: kein
+    # dauerlaufender Prozess, sondern 24 Durchgaenge am Tag. Krypto laeuft durch, Aktien
+    # bewegen sich nur waehrend der Boersenzeit — die stillen Laeufe kosten nichts und
+    # melden nichts. Ein Alarm geht nur bei einer ECHTEN Aenderung raus.
+    - cron: "25 * * * *"
   workflow_dispatch: {}   # Knopf zum Selbststarten, fuer Tests
   push:
     branches: [main]      # nach einer Aenderung sofort neu bauen, statt bis 23:10 zu warten
@@ -66,6 +79,7 @@ jobs:
       # Ende gezielt rot gemacht, damit der Ausfall sichtbar bleibt.
       - name: Forward-Zeile aufzeichnen
         id: forward
+        if: github.event.schedule != '25 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -73,6 +87,7 @@ jobs:
 
       - name: Tagesplan schicken
         id: report
+        if: github.event.schedule != '25 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -98,6 +113,19 @@ jobs:
           PYTHONPATH: src
         run: python scripts/build_scan_data.py --out web/scan.json
 
+      # Der eigentliche Grund fuer den Stundentakt. Verglichen wird gegen den letzten Stand,
+      # geschickt wird nur die Aenderung: neues A+/A-Setup, weggebrochenes Setup, neue
+      # Nummer 1. Kein Alarm ist hier das normale Ergebnis — "nicht 200 mal am Tag".
+      # Eine stumme Anlageklasse erzeugt bewusst KEINEN Wegbruch-Alarm.
+      - name: Alarm bei Aenderung
+        id: alarm
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/scan_alert.py --scan web/scan.json --send
+
       - name: Web-App bauen
         env:
           PYTHONPATH: src
@@ -107,13 +135,16 @@ jobs:
         run: |
           git config user.name  "trading-agent[bot]"
           git config user.email "trading-agent@users.noreply.github.com"
+          # Der Alarm-Stand MUSS mit. Ohne ihn faengt jeder Lauf bei null an und meldet
+          # alles neu — genau der Spam, den wir nicht wollen.
           git add -f data/repository_real/live/tsmom_forward.jsonl \
-                     data/repository_real/live/tsmom_forward_corrections.jsonl || true
+                     data/repository_real/live/tsmom_forward_corrections.jsonl \
+                     data/repository_real/live/scan_alert_state.json || true
           if git diff --cached --quiet; then
-            echo "keine neue Zeile — nichts zu sichern"
+            echo "kein neuer Stand — nichts zu sichern"
             exit 0
           fi
-          git commit -m "forward: Journalzeile $(date -u +%Y-%m-%d)"
+          git commit -m "lauf: Stand $(date -u +%Y-%m-%dT%H:%MZ)"
           # Zwei Laeufe koennen sich ueberschneiden (Zeitplan trifft auf einen Push).
           # Dann ist der lokale Stand hinterher und ein blosses push scheitert. Rebase
           # holt den fremden Commit davor; scheitert auch das, ist die Seite trotzdem
@@ -131,7 +162,9 @@ jobs:
 
       # Jetzt erst scheitern. Bis hierher sind Warnung und Seite draussen.
       - name: Ausfall melden
-        if: steps.forward.outcome == 'failure' || steps.report.outcome == 'failure'
+        if: >-
+          steps.forward.outcome == 'failure' || steps.report.outcome == 'failure'
+          || steps.scan.outcome == 'failure' || steps.alarm.outcome == 'failure'
         run: |
           echo "::error::Der Lauf war unvollstaendig — siehe die Schritte oben."
           exit 1

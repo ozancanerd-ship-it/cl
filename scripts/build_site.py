@@ -110,6 +110,30 @@ def _scan_json(repo: Path) -> dict:
         return {}
 
 
+def _alarm_verlauf(repo: Path, grenze: int = 25) -> list[dict]:
+    """Die zuletzt tatsaechlich verschickten Alarme.
+
+    Nicht "was koennte man melden", sondern was rausgegangen ist. Damit steht auf der
+    Seite dasselbe wie im Telegram-Verlauf und man sieht, ob das System still war, weil
+    nichts los war — oder weil es kaputt ist.
+    """
+    f = repo / "data" / "repository_real" / "live" / "alerts.jsonl"
+    if not f.exists():
+        return []
+    zeilen: list[dict] = []
+    for zeile in f.read_text(encoding="utf-8").splitlines():
+        zeile = zeile.strip()
+        if not zeile:
+            continue
+        try:
+            eintrag = json.loads(zeile)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(eintrag, dict):
+            zeilen.append(eintrag)
+    return zeilen[-grenze:][::-1]
+
+
 def _plan_json(repo: Path) -> dict:
     """daily_report.py als Unterprozess — eine Quelle fuer die Zahlen, nicht zwei."""
     out = subprocess.run(
@@ -200,6 +224,7 @@ def main() -> int:
         "buckets": BUCKETS,
         "series": series,
         "scan": scan,
+        "alarme": _alarm_verlauf(repo),
         "rules": _rules(repo),
         "names": NAMES,
         "klasse": KLASSE,

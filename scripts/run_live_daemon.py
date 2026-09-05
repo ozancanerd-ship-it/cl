@@ -84,6 +84,20 @@ async def main() -> int:
         default="config/economic_calendar.csv",
         help="Lokaler CSV-Kalender → HIGH_IMPACT_NEWS-Kontext-Alerts. '' zum Deaktivieren.",
     )
+    ap.add_argument(
+        "--notify",
+        action="store_true",
+        help=(
+            "Alerts zusaetzlich per Telegram/Datei rausschicken (ops/notify). Ohne diesen "
+            "Schalter landen sie nur im Audit-Log — also auf keinem Telefon."
+        ),
+    )
+    ap.add_argument(
+        "--notify-min",
+        choices=["info", "warning", "critical"],
+        default="warning",
+        help="ab welcher Stufe geschickt wird. Standard: warning.",
+    )
     ap.add_argument("--max-seconds", type=float, default=None, help="Test-Deckel; sonst 24/7")
     ap.add_argument("--status-json", default=None, help="Endstand als JSON hierhin schreiben")
     args = ap.parse_args()
@@ -183,6 +197,35 @@ async def main() -> int:
 
     pipe.bus.subscribe(AlertRaised, _on_alert)
 
+    # Alerts wirklich rausschicken. Bis hierher endeten sie im Audit-Log; ein Alarm, den
+    # niemand sieht, ist kein Alarm (Masterplan Punkt 21).
+    bruecke = None
+    if args.notify:
+        from trading_agent.ops.notify import (
+            ConsoleSink,
+            FileSink,
+            Notifier,
+            Severity,
+            TelegramSink,
+        )
+        from trading_agent.scanner.alerting import AlertBruecke
+
+        stufe = {"info": Severity.INFO, "warning": Severity.WARNING, "critical": Severity.CRITICAL}[
+            args.notify_min
+        ]
+        tg = TelegramSink(min_severity=Severity.INFO)
+        if not tg.available():
+            _log.warning("Telegram nicht konfiguriert — Alerts gehen nur in Datei und Konsole")
+        sinks: list = [
+            ConsoleSink(min_severity=stufe),
+            FileSink("data/repository_real/live/alerts.jsonl"),
+        ]
+        if tg.available():
+            sinks.insert(0, tg)
+        # dedup_window: derselbe Alert-Typ je Instrument hoechstens alle 15 Minuten.
+        notifier = Notifier(sinks, dedup_window_s=900.0, rate_window_s=300.0, max_per_window=10)
+        bruecke = AlertBruecke(notifier, min_severity=stufe).attach(pipe.bus)
+
     # --- Kontext-Alerts: HIGH_IMPACT_NEWS (Wirtschaftskalender) + RE_ENTRY_SETUP (§38/§51) ---
     # (Portfolio-Risk läuft im One-Shot-Pfad portfolio_hub.py — braucht die Konto-Adapter.)
     from trading_agent.runtime.context_alert_bridge import ContextAlertBridge
@@ -237,6 +280,14 @@ async def main() -> int:
     if recorder is not None:
         status["_decision_ledger_rows"] = recorder.rows_written
     status["_scanner_evaluations"] = scanner.evaluations
+    if bruecke is not None:
+        status["_notify"] = {
+            "alerts_gesehen": bruecke.gesehen,
+            "alerts_geschickt": bruecke.geschickt,
+            "kanaele": bruecke.notifier.active_sinks,
+            "dedup": bruecke.notifier.deduped,
+            "rate_limited": bruecke.notifier.rate_limited,
+        }
     status["_signals_emitted"] = emitted_signals
     status["_shadow_signals"] = shadow_signals
     status["_validation"] = [sv.as_dict() for sv in validation.all()]

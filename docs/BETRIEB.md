@@ -4,8 +4,36 @@ App: **https://ozancanerd-ship-it.github.io/cl/**
 Repo: **https://github.com/ozancanerd-ship-it/cl** (public — alles auf der App-Seite
 ist öffentlich lesbar; echte Depotdaten gehören deshalb nicht dorthin)
 
-Stand 2026-09-04. Diese Datei beschreibt, wie das System **im Alltag** arbeitet.
+Stand 2026-09-05. Diese Datei beschreibt, wie das System **im Alltag** arbeitet.
 Forschung und Ergebnisse stehen woanders (siehe unten).
+
+## Was „24/7" hier wörtlich heißt
+
+Es gibt **keinen dauerlaufenden Prozess**. Es gibt einen Zeitplan:
+
+| Wann | Was |
+|---|---|
+| stündlich, :25 UTC | voller Marktscan (Krypto, Aktien, Gold) → Alarm **nur bei Änderung** → Seite neu bauen |
+| täglich, 23:10 UTC | zusätzlich Forward-Journalzeile + Tagesplan per Telegram |
+
+Der echte Dauerlauf-Daemon (`scripts/run_live_daemon.py`) existiert und ist fertig
+verdrahtet: WebSocket-Stream → MarketContext → MTF → Strategie → Entscheidung →
+Signal → Alert → Risiko → Paper-Position, dazu Heartbeat (10 s), Watchdog (20 s),
+Snapshot (60 s), Wiederanlauf aus dem Snapshot mit REST-Backfill der Lücke, SIGTERM-
+Behandlung und Neustart der Pipeline, wenn ihr Task stirbt. **Er braucht aber eine
+Maschine, die durchläuft.** Solange es die nicht gibt, ist der Stundentakt die
+ehrliche Antwort — und nicht die Behauptung, es liefe etwas rund um die Uhr.
+
+Was der Stundentakt gegenüber dem Daemon **nicht** kann: auf eine Bewegung innerhalb
+der Stunde reagieren, und Positionen live nachführen (Stop nachziehen, Teilgewinn).
+Wer das braucht, braucht den Daemon auf einem Server.
+
+Daemon von Hand starten (read-only, sendet nie eine Order):
+
+```bash
+PYTHONPATH=src python3 scripts/run_live_daemon.py \
+  --exchange binance_spot --symbols BTCUSDT ETHUSDT --notify --max-seconds 600
+```
 
 ## Die tägliche Kette
 
@@ -21,13 +49,22 @@ Forschung und Ergebnisse stehen woanders (siehe unten).
 │     Übersetzt die Zeile in einen Euro-Plan unter config/risk.yaml und schickt ihn
 │     per Telegram — aber nur, wenn sich gegenüber gestern etwas geändert hat.
 │
-├─ 3. scripts/build_site.py --out _site
+├─ 3. scripts/build_scan_data.py --out web/scan.json      (auch stündlich)
+│     Der Gesamtmarkt in einem Durchgang: 28 Coins, 30 Einzelaktien, Gold über
+│     PAXG/XAUT. Je Instrument ein Chart-Score aus sechs Faktoren, Ziele und Stop.
+│
+├─ 4. scripts/scan_alert.py --send                       (auch stündlich)
+│     Vergleicht mit dem letzten Stand und schickt NUR die Änderung: neues A+/A-
+│     Setup, weggebrochenes Setup, neue Nummer 1. Dieselbe Meldung frühestens nach
+│     zwölf Stunden wieder. Kein Alarm ist das normale Ergebnis.
+│
+├─ 5. scripts/build_site.py --out _site
 │     Baut die Web-App aus derselben Rechnung (daily_report.py --json).
 │
-├─ 4. Journal committen und pushen
+├─ 6. Journal und Alarm-Stand committen und pushen
 │     Die Forward-Datenspur darf nicht auf einem einzigen Rechner liegen.
 │
-└─ 5. GitHub Pages veröffentlichen
+└─ 7. GitHub Pages veröffentlichen
       Feste Adresse, PWA-fähig, auf dem iPhone-Homescreen wie eine App.
 ```
 
@@ -67,6 +104,9 @@ ein Plan wird, greifen drei Filter — in dieser Reihenfolge:
 | Vorlage der Web-App | `site/template.html` |
 | Erzeugte Web-App | `_site/` — nicht versioniert |
 | Secrets | `.env`, Rechte 0600, gitignored; in der CI als GitHub Secrets |
+| Gesamtmarkt-Scan | `web/scan.json` — bei jedem Lauf neu |
+| Alarm-Stand (wogegen verglichen wird) | `data/repository_real/live/scan_alert_state.json` — **muss mitcommittet werden** |
+| Alarm-Verlauf (was rausging) | `data/repository_real/live/alerts.jsonl` |
 
 ## Von Hand nachsehen
 
@@ -77,6 +117,9 @@ python3 scripts/tsmom_forward.py --report  # Signale zeigen, nichts schreiben
 python3 scripts/check_data_freshness.py --profile live
 python3 scripts/portfolio_hub.py           # echte Konten
 python3 scripts/build_site.py --out _site  # App lokal bauen
+python3 scripts/build_scan_data.py --out web/scan.json     # Gesamtmarkt scannen
+python3 scripts/scan_alert.py --dry-run    # zeigen, was gemeldet würde — Stand bleibt
+python3 scripts/trader_analysis.py BTCUSDT # Struktur, Liquidität, Zonen im Detail
 ```
 
 ## Alternative ohne GitHub
@@ -117,6 +160,14 @@ Der Tag zählt nicht als Forward-Tag mit.
   Spiegel `data-api.binance.vision` funktioniert) plus die Vollständigkeitsprüfung oben.
   **Nie eine andere Börse als Ersatz einsetzen** — unterschiedliche Kurse an
   unterschiedlichen Tagen liest die Regel als Kursbewegung.
+- **Ein fehlender Alarm-Stand meldet alles neu.** `scan_alert_state.json` ist die
+  einzige Erinnerung des Wachpostens. Fehlt sie im Repo, fängt jeder Lauf bei null an
+  und schickt sämtliche Setups erneut — das wäre der Spam, den die Abkühlzeit gerade
+  verhindern soll. Deshalb steht sie im `git add -f` des Workflows.
+- **Eine stumme Anlageklasse ist kein weggebrochenes Setup.** Fällt Krypto aus, wären
+  alle Krypto-Setups plötzlich „entfallen". Der Wachposten trägt den alten Stand
+  unverändert weiter und meldet nichts — geprüft in
+  `tests/unit/test_scan_alerting.py::test_stumme_anlageklasse_erzeugt_keinen_wegbruch`.
 - **Kein Take-Profit.** Die Regel hat keinen. Positionen enden, wenn das Signal
   dreht. 59 von 398 historischen Positionen liefen über drei Monate und trugen
   praktisch den gesamten Gewinn — wer früh verkauft, verkauft genau diese weg.

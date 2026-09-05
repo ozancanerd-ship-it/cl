@@ -650,17 +650,69 @@ document.getElementById('analyse').innerHTML = D.signals.slice()
 })();
 
 /* ---------- Alarme ---------- */
-/* Bewusst streng: TSMOM ist eine Allokationsregel, keine Einstiegs-Timing-Regel.
-   Den "perfekten Moment" kennt sie nicht. Das Naechste daran: ein Instrument springt
-   auf 5 von 5 gruenen Fenstern. Alles darunter ist Rauschen und wird nicht gemeldet. */
+/* Zwei Quellen, bewusst getrennt:
+   1. Der Chart-Scan laeuft stuendlich und meldet die AENDERUNG — neues A+/A-Setup,
+      weggebrochenes Setup, neue Nummer 1. Kein Alarm ist hier das normale Ergebnis.
+   2. Die TSMOM-Allokationsregel kennt keinen Einstiegsmoment; ihr staerkstes Signal
+      ist "alle fuenf Zeitfenster gruen". Alles darunter waere erfunden. */
 (function(){
+  const el = document.getElementById('alarme');
+  let h = '';
+
+  /* --- 1. Was das System jetzt melden wuerde --- */
+  const kand = ((D.scan||{}).gesamt||[]).filter(o=>o.urteil==='A_PLUS'||o.urteil==='A');
+  h += '<h2>Aktive Setups</h2>';
+  if (kand.length) {
+    h += kand.map(o=>{
+      const d = o.kurs >= 1000 ? 0 : o.kurs >= 10 ? 2 : 4;
+      const n = v => v == null ? '—' : Number(v).toLocaleString('de-DE',
+        {minimumFractionDigits:d, maximumFractionDigits:d});
+      const dir = o.richtung === 'long' ? 'LONG' : o.richtung === 'short' ? 'SHORT' : '';
+      return `<div class="alarm ${o.urteil==='A_PLUS'?'hot':''}">
+        <div class="ah"><span>${esc(D.names[o.instrument]||o.instrument)} ${dir}</span>
+          <span class="d">${o.urteil==='A_PLUS'?'A+':'A'} · ${o.score.toFixed(0)}/100</span></div>
+        <p>Kurs <strong>${n(o.kurs)}</strong> · Ziel <strong>${n(o.ziel)}</strong>${
+          o.tp2?` / ${n(o.tp2)}`:''}${o.tp3?` / ${n(o.tp3)}`:''} ·
+          falsch ab <strong>${n(o.invalidierung)}</strong>${
+          o.rr?` · R:R 1:${o.rr.toFixed(1)}`:''}</p>
+        <p style="color:var(--ink-3)">${esc(o.headline||'')}</p>
+      </div>`;
+    }).join('');
+  } else {
+    h += `<div class="alarm"><div class="ah"><span>Kein Setup</span></div>
+      <p>Im letzten Scan hatte kein Instrument Score und Chance-Risiko-Verhältnis
+        gleichzeitig gut genug. Das ist ein Ergebnis, kein Ausfall: nicht einsteigen.</p></div>`;
+  }
+
+  /* --- 2. Was tatsaechlich rausgegangen ist --- */
+  const A = D.alarme || [];
+  h += '<h2>Zuletzt verschickt</h2>';
+  if (A.length) {
+    h += A.map(a=>{
+      let t = a.ts || '';
+      try { t = new Date(a.ts).toLocaleString('de-DE',
+        {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e) {}
+      const crit = a.severity === 'CRITICAL';
+      return `<div class="alarm ${crit?'hot':''}">
+        <div class="ah"><span>${esc(a.title||'')}</span><span class="d">${esc(t)}</span></div>
+        ${a.body?`<p style="white-space:pre-wrap">${esc(a.body)}</p>`:''}
+      </div>`;
+    }).join('');
+  } else {
+    h += `<div class="alarm"><div class="ah"><span>Noch nichts verschickt</span></div>
+      <p>Seit dem Start hat sich nichts geändert, das eine Meldung wert war — oder
+        Telegram ist noch nicht eingerichtet. Beides steht hier gleich aus, deshalb:
+        wenn der Verlauf tagelang leer bleibt und oben trotzdem Setups stehen, fehlen
+        die beiden Telegram-Schlüssel.</p></div>`;
+  }
+
+  /* --- 3. Die Allokationsregel getrennt davon --- */
   const stark = D.signals.filter(s=>s.agreement>=1 && s.target_weight>0)
     .sort((a,b)=>b.target_weight-a.target_weight);
   const knapp = D.signals.filter(s=>s.agreement>=0.8 && s.agreement<1)
     .sort((a,b)=>b.agreement-a.agreement);
-  let h = '';
+  h += '<h2>Allokationsregel — voller Rückenwind</h2>';
   if (stark.length) {
-    h += '<h2>Voller Rückenwind — 5 von 5</h2>';
     h += stark.map(s=>{
       const p = P.positions.find(x=>x.instrument===s.instrument);
       return `<div class="alarm hot">
@@ -690,15 +742,18 @@ document.getElementById('analyse').innerHTML = D.signals.slice()
       </div>`;
     }).join('');
   }
+
   h += `<div class="note warn" style="margin-top:26px">
     <span class="nt">Warum so wenige Alarme</span>
-    <p>Diese Regel sucht keine Einstiegsmomente, sie verteilt Kapital nach Trendstärke.
-      Ein Alarm bei jeder kleinen Bewegung wäre erfunden. Gemeldet wird nur, was die
-      Regel selbst als stärkstes Signal kennt: <strong>alle fünf Zeiträume grün.</strong></p>
-    <p>Per Telegram bekommst du ohnehin nur etwas, wenn sich der Plan ändert —
-      also wenn wirklich gekauft, verkauft oder umgeschichtet wird.</p>
+    <p>Der Marktscan läuft <strong>stündlich</strong> über Krypto, Aktien und Gold.
+      Aufs Handy geht davon nur die <strong>Änderung</strong>: ein Setup entsteht, ein
+      Setup bricht weg, die Nummer 1 wechselt. Dieselbe Meldung frühestens nach zwölf
+      Stunden wieder. „Immer noch WATCH" ist keine Nachricht.</p>
+    <p>Fällt eine Anlageklasse aus, gelten ihre Instrumente als <em>unbekannt</em>, nicht
+      als verschwunden — sonst meldet das System „Setup entfallen", obwohl nur die
+      Kursquelle geschwiegen hat.</p>
   </div>`;
-  document.getElementById('alarme').innerHTML = h;
+  el.innerHTML = h;
 })();
 
 /* Erwartung */
