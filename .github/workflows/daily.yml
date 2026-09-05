@@ -109,6 +109,18 @@ jobs:
 
       # Der Gesamtmarkt-Scan. continue-on-error, weil eine stumme Kursquelle die Seite
       # nicht verhindern darf — build_site zeigt dann keine Rangliste statt einer alten.
+      # Makrolage und Wirtschaftskalender. Bewusst VOR dem Scan: die Hinweise gehen als
+      # Warnung in jedes Setup ein. Faellt der Schritt aus, laeuft der Scan trotzdem —
+      # nur ohne die Makro-Hinweise.
+      - name: Makrolage holen
+        id: makro
+        if: github.event.schedule != '5,20,35,50 * * * *'
+        continue-on-error: true
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+        run: python scripts/fetch_macro.py --out web/macro.json
+
       # Der Gesamtmarkt-Scan: dynamisches Krypto-Universum von der Boerse, Aktien,
       # Gold. Schreibt die Rangliste UND je Wert eine Detaildatei mit Zeichnung,
       # MTF-Tabelle, Mustern und Kommentar.

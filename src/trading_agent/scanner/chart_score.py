@@ -570,6 +570,10 @@ def _warnungen(
     abziehen — sonst weiss niemand mehr, warum ein Chart schlechter bewertet wurde.
     """
     w: list[str] = []
+    # Von aussen gereichte Makro-Hinweise stehen vorn: sie betreffen den ganzen Markt
+    # und nicht nur dieses eine Chartbild.
+    for satz in zusatz.get("makro_warnungen") or []:
+        w.append(str(satz))
     bewegung = zusatz.get("bewegung_24h_pct")
     spanne = zusatz.get("spanne_24h_pct")
     umsatz = zusatz.get("umsatz_24h")

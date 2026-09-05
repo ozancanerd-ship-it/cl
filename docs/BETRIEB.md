@@ -169,6 +169,37 @@ egal wie sauber der Chart aussieht.
 **Ohne Invalidierung gibt es in keinem Profil eine handelbare Note.** Mehr
 Risikobereitschaft heißt größere Position oder weiterer Stop — nicht kein Stop.
 
+## News und Makro
+
+Vier Kennzahlen, täglich über Yahoo geholt, plus ein Wirtschaftskalender:
+
+| Größe | Warum |
+|---|---|
+| VIX | Preis der Absicherung. Steigt er schnell, wird alles Riskante gleichzeitig verkauft |
+| Dollar-Index | starker Dollar zieht Gold und Krypto Liquidität ab |
+| 10-Jahres-Rendite | Gegenwind für Wachstumswerte und für Gold, das keine Zinsen zahlt |
+| S&P 500 | Referenz für relative Stärke |
+
+Daraus **risk-on / neutral / risk-off**. Der Kalender kommt von
+`nfs.faireconomy.media/ff_calendar_thisweek.json` (frei, ohne Schlüssel; `nextweek`
+und `lastweek` existieren dort nicht, und bei häufigen Abrufen kommt 429 — deshalb
+werden die noch kommenden Termine aus der alten Datei übernommen, statt sie zu
+verlieren).
+
+**Nichts davon geht in den Score ein.** Ozans Vorgabe: „News sollen nicht blind als
+Trading-Signal verwendet werden. Sie sollen den technischen Kontext und das Risiko
+beeinflussen." Die Makrolage erzeugt **Warnungen** neben dem Score — „risk-off, Long
+läuft gegen den Wind", „NFP in 5 h" —, und die stehen sichtbar am Setup. Ein heimlicher
+Punktabzug wäre nicht nachvollziehbar.
+
+Die Zusammenhänge sind **gesetzt, nicht optimiert**. Sie halten oft und brechen
+manchmal.
+
+**Achtung, zwei Module mit ähnlichem Namen:**
+`analysis/macro.py` ist die strenge Point-in-Time-Schicht über FRED-Vintages für den
+Backtest (jede Zahl mit ihrem Bekanntwerdungszeitpunkt).
+`analysis/macro_context.py` ist die Lage *jetzt*, für den laufenden Betrieb.
+
 ## Die drei Filter im Tagesplan
 
 Die Regel liefert je Instrument ein volatilitätsskaliertes Zielgewicht. Bis daraus

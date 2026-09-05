@@ -27,6 +27,7 @@ import argparse
 import asyncio
 import json
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from trading_agent.analysis.macro_context import MacroLage, warnungen_fuer
 from trading_agent.core.enums import AssetClass, Timeframe
 from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnung
 from trading_agent.scanner.chart_score import bewerte_chart
@@ -131,8 +133,29 @@ def _fortschritt(name: str) -> Any:
     return melde
 
 
+def _bewerter_mit_makro(lage: MacroLage | None, klasse: str) -> Any:
+    """``bewerte_chart``, danach die Makro-Hinweise angehaengt.
+
+    Erst nach der Bewertung, weil die Richtung vorher nicht feststeht: ob „risk-off"
+    gegen ein Setup spricht, haengt daran, ob es long oder short ist. Und bewusst als
+    Warnung neben dem Score, nicht als Abzug darin — ein heimlicher Punktabzug waere
+    nicht nachvollziehbar, und die Makrolage ist ein Zusammenhang, kein Gesetz.
+    """
+
+    def bewerte(name: str, mtf: Any, kurs: float, **kw: Any) -> Any:
+        chance = bewerte_chart(name, mtf, kurs, **kw)
+        if lage is None or chance.richtung is None:
+            return chance
+        saetze = warnungen_fuer(lage, klasse, chance.richtung.value)
+        if not saetze:
+            return chance
+        return replace(chance, warnungen=tuple(saetze) + tuple(chance.warnungen))
+
+    return bewerte
+
+
 async def _krypto(
-    profil: Profil, limit: int, verarbeite: Any
+    profil: Profil, limit: int, verarbeite: Any, lage: MacroLage | None
 ) -> tuple[list[Any], dict[str, Any], str | None]:
     from trading_agent.data.providers.binance import BinancePublicDataProvider
 
@@ -148,7 +171,7 @@ async def _krypto(
             prov,
             namen,
             asset_class=AssetClass.CRYPTO,
-            bewerter=bewerte_chart,
+            bewerter=_bewerter_mit_makro(lage, "krypto"),
             zusatz=zusatz,
             profil=profil,
             verarbeite=verarbeite,
@@ -172,7 +195,9 @@ async def _krypto(
         await schliesse(prov)
 
 
-async def _gold(profil: Profil, verarbeite: Any) -> tuple[list[Any], dict[str, Any], str | None]:
+async def _gold(
+    profil: Profil, verarbeite: Any, lage: MacroLage | None
+) -> tuple[list[Any], dict[str, Any], str | None]:
     from trading_agent.data.providers.binance import BinancePublicDataProvider
 
     prov = BinancePublicDataProvider(market="spot")
@@ -181,7 +206,7 @@ async def _gold(profil: Profil, verarbeite: Any) -> tuple[list[Any], dict[str, A
             prov,
             GOLD,
             asset_class=AssetClass.GOLD,
-            bewerter=bewerte_chart,
+            bewerter=_bewerter_mit_makro(lage, "gold"),
             profil=profil,
             verarbeite=verarbeite,
         )
@@ -193,7 +218,7 @@ async def _gold(profil: Profil, verarbeite: Any) -> tuple[list[Any], dict[str, A
 
 
 async def _aktien(
-    profil: Profil, limit: int, verarbeite: Any
+    profil: Profil, limit: int, verarbeite: Any, lage: MacroLage | None
 ) -> tuple[list[Any], dict[str, Any], str | None]:
     from trading_agent.data.providers.yahoo_finance import YahooFinanceProvider
 
@@ -203,7 +228,7 @@ async def _aktien(
             prov,
             AKTIEN[:limit],
             asset_class=AssetClass.EQUITY,
-            bewerter=bewerte_chart,
+            bewerter=_bewerter_mit_makro(lage, "aktien"),
             zeitebenen=EBENEN_YAHOO,
             fenster={**FENSTER, **FENSTER_YAHOO},
             nebenlaeufig=5,
@@ -265,6 +290,7 @@ async def main() -> int:
         help="Notenschema. Standard: aggressiv (Ozans Vorgabe).",
     )
     ap.add_argument("--detail", type=int, default=60, help="fuer wie viele Werte Detaildateien")
+    ap.add_argument("--makro", default="web/macro.json", help="Makrolage aus fetch_macro.py")
     ap.add_argument("--ohne-aktien", action="store_true")
     args = ap.parse_args()
 
@@ -280,6 +306,18 @@ async def main() -> int:
     _, blockiert = _raeume(ordner, behalten=None)
     if blockiert:
         print(f"  ({blockiert} alte Detaildatei(en) nicht loeschbar — Dateisystem verbietet es)")
+
+    # Makrolage, falls vorhanden. Fehlt sie, laeuft alles wie bisher — nur ohne die
+    # Hinweise. Ein Scan darf nicht daran haengen, dass Yahoo gerade schweigt.
+    lage = None
+    mp = Path(args.makro)
+    if mp.exists():
+        try:
+            lage = MacroLage.from_dict(json.loads(mp.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            lage = None
+    if lage is not None:
+        print(f"Makrolage: {lage.regime.upper()} ({lage.punkte:+.2f}) — {lage.begruendung[0]}")
 
     muster_je: dict[str, list[Any]] = {}
     klasse_je: dict[str, str] = {}
@@ -323,7 +361,7 @@ async def main() -> int:
     universum: dict[str, Any] = {}
 
     print("— krypto —", flush=True)
-    chancen, info, err = await _krypto(profil, args.krypto, schreiber("krypto"))
+    chancen, info, err = await _krypto(profil, args.krypto, schreiber("krypto"), lage)
     klassen["krypto"] = chancen
     universum["krypto"] = info
     if err:
@@ -331,7 +369,7 @@ async def main() -> int:
         print(f"  ! {err}")
 
     print("— gold —", flush=True)
-    chancen, info, err = await _gold(profil, schreiber("gold"))
+    chancen, info, err = await _gold(profil, schreiber("gold"), lage)
     klassen["gold"] = chancen
     universum["gold"] = info
     if err:
@@ -340,7 +378,7 @@ async def main() -> int:
 
     if not args.ohne_aktien:
         print("— aktien —", flush=True)
-        chancen, info, err = await _aktien(profil, args.aktien, schreiber("aktien"))
+        chancen, info, err = await _aktien(profil, args.aktien, schreiber("aktien"), lage)
         klassen["aktien"] = chancen
         universum["aktien"] = info
         if err:
@@ -368,6 +406,7 @@ async def main() -> int:
         "anzahl": {k: len(v) for k, v in klassen.items()},
         "statistik": statistik,
         "detail_vorhanden": sorted(behalten),
+        "makro": lage.as_dict() if lage is not None else None,
         "klassen": {
             k: [
                 _kompakt(c, k, muster_je.get(c.instrument, []))

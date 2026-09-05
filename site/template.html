@@ -741,11 +741,37 @@ function zeichneStatus(){
       <div><div class="k">Scan</div><div class="v ${alter!=null&&alter<90?'gut':'mittel'}">${alter!=null?alter+'′':'—'}</div>
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
+    ${makroKasten()}
     ${fehler ? `<div class="note-box bad"><span class="nt">Eine Anlageklasse fehlt</span>
       <p>${Object.entries(S.fehler).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>')}</p>
       <p>Die Rangliste ist unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>` : ''}`;
   $('stempel').textContent = `${g.length} Instrumente · Scan ${zeit(S.erzeugt)}` +
     (alter != null ? ` (vor ${alter} Min.)` : '');
+}
+
+const REGIME_TEXT = {risk_on:'Risk-on', risk_off:'Risk-off', neutral:'neutral'};
+function makroKasten(){
+  const M = S && S.makro;
+  if (!M) return '';
+  const kl = M.regime === 'risk_off' ? 'bad' : M.regime === 'risk_on' ? '' : 'warn';
+  const termine = (M.termine||[]).filter(t=>{
+    const ts = Date.parse(t.zeitpunkt);
+    return t.wirkung === 'High' && ts > Date.now() && ts < Date.now() + 72*3600*1000;
+  }).slice(0,4);
+  return `<div class="note-box ${kl}">
+    <span class="nt">Makro · ${esc(REGIME_TEXT[M.regime]||M.regime)}</span>
+    <p>${(M.begruendung||[]).map(esc).join(' · ')}</p>
+    <div class="kpi">${(M.werte||[]).map(w=>
+      `<span>${esc(w.name.replace('Volatilitaetsindex ','').replace('10-jaehrige ',''))}
+        <b>${num(w.wert, w.wert>1000?0:2)}</b>${
+        w.aenderung_20t_pct!=null?` <span class="${w.aenderung_20t_pct>=0?'up':'dn'}">${pct(w.aenderung_20t_pct,1)}</span>`:''}</span>`
+      ).join('')}</div>
+    ${termine.length?`<p style="margin-top:8px">Wichtige Termine: ${termine.map(t=>
+      `${esc(t.titel)} (${esc(t.land)}, ${zeit(t.zeitpunkt)})`).join(' · ')}</p>`:''}
+    <p style="margin-top:8px;color:var(--ink-3)">Die Makrolage ist <strong>Kontext und
+      Risiko, kein Signal</strong>. Sie geht nicht in den Score ein — sie steht als
+      Warnung daneben, wo sie gegen ein Setup spricht.</p>
+  </div>`;
 }
 
 function zeichneFilter(){
@@ -1321,6 +1347,25 @@ function zeichneSystem(){
       angezeigten Kurs und den Ausstieg gar nicht. Stablecoins, Hebel-Token und
       verpackte Doppel (WBTC …) fliegen raus, weil sie keine eigene Wette sind.</p></div>`;
   }
+  const M = S?.makro;
+  if (M){
+    h += `<h2>Makro</h2><div class="karte">
+      <div class="rowx"><span class="lab">Lage</span><span class="val">${esc(REGIME_TEXT[M.regime]||M.regime)} (${M.punkte>=0?'+':''}${M.punkte.toFixed(2)})</span></div>
+      ${(M.werte||[]).map(w=>`<div class="rowx"><span class="lab">${esc(w.name)}</span>
+        <span class="val">${num(w.wert, w.wert>1000?0:2)}${w.aenderung_20t_pct!=null?` · 20T ${pct(w.aenderung_20t_pct,1)}`:''}</span></div>`).join('')}
+      <div class="rowx"><span class="lab">Termine im Kalender</span><span class="val">${(M.termine||[]).length}</span></div>
+    </div>
+    <div class="note-box"><span class="nt">Warum diese vier Größen</span>
+      <p><strong>VIX</strong> — der Preis der Absicherung. Steigt er schnell, wird alles
+      Riskante gleichzeitig verkauft, und Einzelanalysen zählen weniger als die Richtung
+      des Gesamtmarkts.<br>
+      <strong>Dollar-Index</strong> — ein starker Dollar zieht Gold und Krypto Liquidität ab.<br>
+      <strong>10-Jahres-Rendite</strong> — steigende Renditen sind Gegenwind für
+      Wachstumswerte und für Gold, das keine Zinsen zahlt.<br>
+      <strong>S&P 500</strong> — die Referenz für relative Stärke.</p>
+      <p>Das sind <em>Zusammenhänge, keine Gesetze</em>. Sie halten oft und brechen
+      manchmal. Die Bewertung ist gesetzt, nicht an historischen Ergebnissen optimiert.</p></div>`;
+  }
   h += `<h2>Live-Kurse</h2><div class="karte">
     <div class="rowx"><span class="lab">Verbindung</span><span class="val">${WS_OK?'offen':'getrennt'}</span></div>
     <div class="rowx"><span class="lab">Quelle</span><span class="val">Börsen-Websocket</span></div>
@@ -1336,7 +1381,6 @@ function zeichneSystem(){
     dazu, einen Stand von vor einer Stunde für den aktuellen Kurs zu halten.</p></div>`;
   h += `<h2>Was noch fehlt</h2><div class="karte">
     <div class="rowx"><span class="lab">Nachführung laufender Trades in Echtzeit</span><span class="val">offen</span></div>
-    <div class="rowx"><span class="lab">News und Makro im Score</span><span class="val">offen</span></div>
     <div class="rowx"><span class="lab">Fundamentaldaten bei Aktien</span><span class="val">offen</span></div>
     <div class="rowx"><span class="lab">Dauerlauf-Daemon auf einem Server</span><span class="val">offen</span></div>
   </div>`;
