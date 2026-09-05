@@ -230,3 +230,34 @@ def test_aufraeumen_begrenzt_die_abgeschlossenen() -> None:
         wache.zuletzt = T0.isoformat()
     assert w.aufraeumen(behalten=5) == 15
     assert len(w.wachen) == 5
+
+
+# ------------------------------------------------------------------ Pruef-Fenster
+
+
+def test_rueckblick_deckt_immer_mehrere_kerzen_ab() -> None:
+    """Bei neun Minuten Abstand liegt keine abgeschlossene M15-Kerze im Fenster.
+
+    Beim ersten CI-Lauf sah die Pruefung deshalb null Kurse fuer achtzehn Wachen.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    pfad = Path(__file__).resolve().parents[2] / "scripts" / "watch_levels.py"
+    spec = importlib.util.spec_from_file_location("watch_levels", pfad)
+    assert spec and spec.loader
+    modul = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modul)
+
+    jetzt = T0
+    # Letzte Pruefung vor neun Minuten -> Fenster wird trotzdem auf das Minimum geweitet.
+    frisch = modul._seit({"stand": (jetzt - timedelta(minutes=9)).isoformat()}, jetzt)
+    assert jetzt - frisch >= modul.RUECKBLICK_MIN
+
+    # Lange Pause -> gedeckelt, damit keine Lawine alter Meldungen kommt.
+    alt = modul._seit({"stand": (jetzt - timedelta(days=3)).isoformat()}, jetzt)
+    assert jetzt - alt <= modul.RUECKBLICK_MAX
+
+    # Dazwischen bleibt der echte Abstand erhalten.
+    mittel = modul._seit({"stand": (jetzt - timedelta(hours=2)).isoformat()}, jetzt)
+    assert abs((jetzt - mittel) - timedelta(hours=2)) < timedelta(seconds=1)

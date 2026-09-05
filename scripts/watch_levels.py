@@ -41,6 +41,15 @@ PROTOKOLL = "data/repository_real/live/alerts.jsonl"
 #: Wie weit zurueck Kerzen geholt werden, wenn kein letzter Stand bekannt ist.
 RUECKBLICK_MAX = timedelta(hours=6)
 
+#: Und mindestens so weit — auch wenn die letzte Pruefung gerade erst war.
+#:
+#: Der Grund ist unscheinbar und war beim ersten Lauf sofort da: bei einem Abstand von
+#: neun Minuten liegt keine abgeschlossene M15-Kerze im Fenster, und die Pruefung sah
+#: null Kurse fuer achtzehn Wachen. Ein Fenster von 45 Minuten deckt immer mehrere
+#: Kerzen ab. Doppelt hinzusehen kostet nichts: der Zustandsautomat meldet jeden
+#: Uebergang ohnehin nur einmal.
+RUECKBLICK_MIN = timedelta(minutes=45)
+
 
 def _laden(pfad: str) -> dict[str, Any] | None:
     p = Path(pfad)
@@ -111,7 +120,7 @@ def _seit(stand: dict[str, Any] | None, jetzt: datetime) -> datetime:
     if roh:
         try:
             t = datetime.fromisoformat(str(roh))
-            return max(t, jetzt - RUECKBLICK_MAX)
+            return min(max(t, jetzt - RUECKBLICK_MAX), jetzt - RUECKBLICK_MIN)
         except ValueError:
             pass
     return jetzt - RUECKBLICK_MAX
