@@ -160,10 +160,11 @@ def test_long_im_premium_wird_abgewertet() -> None:
     assert lage.punkte < MAX_PUNKTE["lage"] * 0.2
 
 
-def test_ziel_ist_die_naechste_unberuehrte_liquiditaet() -> None:
+def test_ziele_werden_als_tp1_tp2_tp3_gestaffelt() -> None:
     liq = (
         _Level(105.0, 0.3, _Pol("unswept"), _Pol("pdh")),
         _Level(120.0, 0.3, _Pol("unswept"), _Pol("swing_high")),
+        _Level(140.0, 0.3, _Pol("unswept"), _Pol("swing_high")),
         _Level(102.0, 0.3, _Pol("swept"), _Pol("swing_high")),  # erledigt, zaehlt nicht
         _Level(90.0, 0.3, _Pol("unswept"), _Pol("swing_low")),  # falsche Seite
     )
@@ -172,8 +173,37 @@ def test_ziel_ist_die_naechste_unberuehrte_liquiditaet() -> None:
         Timeframe.H4: _tfc_long(liquidity=liq),
     }
     c = bewerte_chart("TEST", _Mtf(per_tf), 100.0)
-    assert c.ziel == 105.0
+    assert (c.ziel, c.tp2, c.tp3) == (105.0, 120.0, 140.0)
     assert c.ziel_art == "pdh"
+
+
+def test_zu_nahe_ziele_werden_verworfen() -> None:
+    """Ein Ziel 0,1 % entfernt ist Rauschen — es erzeugte R:R unter 1 bei ALLEN Assets."""
+    liq = (
+        _Level(100.1, 0.3, _Pol("unswept"), _Pol("pdh")),  # 0,1 % — zu nah
+        _Level(130.0, 0.3, _Pol("unswept"), _Pol("swing_high")),
+    )
+    per_tf = {
+        Timeframe.D1: _tfc_long(liquidity=liq, atr=5.0),
+        Timeframe.H4: _tfc_long(liquidity=liq, atr=5.0),
+    }
+    c = bewerte_chart("TEST", _Mtf(per_tf), 100.0)
+    assert c.ziel == 130.0, "das zu nahe Ziel darf nicht TP1 sein"
+
+
+def test_rr_wird_gegen_tp2_gerechnet() -> None:
+    """TP1 ist Teilgewinn. Das Chance-Risiko-Verhaeltnis misst den Weg bis TP2."""
+    liq = (
+        _Level(110.0, 0.3, _Pol("unswept"), _Pol("pdh")),
+        _Level(130.0, 0.3, _Pol("unswept"), _Pol("swing_high")),
+    )
+    per_tf = {
+        Timeframe.D1: _tfc_long(liquidity=liq, atr=5.0, structure=_Struktur(_Swing(90.0))),
+        Timeframe.H4: _tfc_long(liquidity=liq, atr=5.0, structure=_Struktur(_Swing(90.0))),
+    }
+    c = bewerte_chart("TEST", _Mtf(per_tf), 100.0)
+    assert c.rr is not None
+    assert abs(c.rr - 3.0) < 0.01, "(130-100)/(100-90) = 3.0"
 
 
 def test_invalidierung_haelt_mindestabstand() -> None:

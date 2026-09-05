@@ -87,8 +87,10 @@ class ChartChance:
     score: float
     faktoren: tuple[ChartFaktor, ...]
     kurs: float
-    ziel: float | None  # naechstes Liquiditaetsziel in Richtung der Wette
+    ziel: float | None  # TP1 — erstes sinnvolles Liquiditaetsziel
     ziel_art: str | None
+    tp2: float | None
+    tp3: float | None
     invalidierung: float | None  # dahinter waere die Idee falsch
     bewegung_pct: float | None  # Weg bis zum Ziel
     bewegung_atr: float | None
@@ -104,6 +106,8 @@ class ChartChance:
             "kurs": self.kurs,
             "ziel": self.ziel,
             "ziel_art": self.ziel_art,
+            "tp2": self.tp2,
+            "tp3": self.tp3,
             "invalidierung": self.invalidierung,
             "bewegung_pct": round(self.bewegung_pct, 2) if self.bewegung_pct else None,
             "bewegung_atr": round(self.bewegung_atr, 2) if self.bewegung_atr else None,
@@ -167,16 +171,23 @@ def _atr(per_tf: dict[Timeframe, Any]) -> float:
     return 0.0
 
 
-def _naechstes_ziel(
-    per_tf: dict[Timeframe, Any], kurs: float, richtung: Direction
-) -> tuple[float | None, str | None, float | None]:
-    """Naechste unberuehrte Liquiditaet in Wettrichtung — das ist das realistische Ziel.
+def _ziele(
+    per_tf: dict[Timeframe, Any], kurs: float, richtung: Direction, atr: float
+) -> list[tuple[float, str]]:
+    """Bis zu drei Liquiditaetsziele in Wettrichtung — TP1, TP2, TP3.
 
     Nur D1/H4: auf M15 liegt in jeder Richtung binnen 0.2 % irgendein Swing-Punkt, das
-    waere kein Ziel, sondern Rauschen. Gesucht wird der naechste Level, der noch nicht
-    abgeholt wurde und eine nennenswerte Staerke hat.
+    waere kein Ziel, sondern Rauschen.
+
+    Wichtig ist die Mindestentfernung. Beim ersten Lauf wurde jeweils der NAECHSTE Level
+    genommen — bei LTC lag der 0.1 % entfernt, waehrend die Invalidierung strukturbedingt
+    mehrere Prozent weg war. Ergebnis: R:R unter 1 bei ausnahmslos allen 28 Instrumenten.
+    Das war kein Marktbefund, sondern eine falsch gestellte Frage. Ein Ziel, das naeher
+    liegt als eine halbe Tagesschwankung, ist keines.
     """
-    beste: tuple[float, float, str] | None = None
+    mindest = max(0.5 * atr, kurs * 0.002)
+    kand: list[tuple[float, float, str]] = []
+    gesehen: set[float] = set()
     for tf in (Timeframe.D1, Timeframe.H4):
         tfc = per_tf.get(tf)
         for lv in getattr(tfc, "liquidity", ()) or ():
@@ -186,14 +197,15 @@ def _naechstes_ziel(
                 continue
             p = float(lv.price)
             passt = p > kurs if richtung is Direction.LONG else p < kurs
-            if not passt:
+            if not passt or abs(p - kurs) < mindest:
                 continue
-            abstand = abs(p - kurs)
-            if beste is None or abstand < beste[0]:
-                beste = (abstand, p, getattr(lv.type, "value", "level"))
-    if beste is None:
-        return None, None, None
-    return beste[1], beste[2], beste[0]
+            # Level, die dicht beieinanderliegen, sind dasselbe Ziel.
+            if any(abs(p - g) < mindest for g in gesehen):
+                continue
+            gesehen.add(p)
+            kand.append((abs(p - kurs), p, getattr(lv.type, "value", "level")))
+    kand.sort()
+    return [(p, art) for _, p, art in kand[:3]]
 
 
 def _invalidierung(
@@ -266,16 +278,28 @@ def bewerte_chart(instrument: str, mtf: Any, kurs: float) -> ChartChance:
 
     # 3 — Wie weit koennte es laufen? Weg zum naechsten Ziel, gemessen in ATR.
     ziel = ziel_art = None
+    tp2 = tp3 = None
     weg = None
     punkte, detail = 0.0, "kein Ziel gefunden"
     if richtung is not None:
-        ziel, ziel_art, weg = _naechstes_ziel(per_tf, kurs, richtung)
+        gefunden = _ziele(per_tf, kurs, richtung, atr)
+        if gefunden:
+            ziel, ziel_art = gefunden[0]
+            tp2 = gefunden[1][0] if len(gefunden) > 1 else None
+            tp3 = gefunden[2][0] if len(gefunden) > 2 else None
+            weg = abs(ziel - kurs)
         if ziel is not None and weg is not None and atr > 0:
-            in_atr = weg / atr
+            # Bewertet wird der Weg bis TP2 — dorthin laeuft der Trade, wenn er laeuft.
+            fern = tp2 if tp2 is not None else ziel
+            in_atr = abs(fern - kurs) / atr
             # Unter 1 ATR lohnt der Weg nicht, ab 6 ATR ist die Skala ausgereizt.
             punkte = MAX_PUNKTE["bewegungsraum"] * min(1.0, max(0.0, (in_atr - 1.0) / 5.0))
-            detail = f"{weg / kurs * 100:.1f} % bis {ziel:,.2f} ({ziel_art}), {in_atr:.1f} ATR"
-            detail = detail.replace(",", " ")
+            detail = (
+                f"TP1 {ziel:,.2f} ({weg / kurs * 100:.1f} %)"
+                + (f" · TP2 {tp2:,.2f}" if tp2 else "")
+                + (f" · TP3 {tp3:,.2f}" if tp3 else "")
+                + f" — bis TP2 {in_atr:.1f} ATR"
+            ).replace(",", " ")
     f.append(ChartFaktor("bewegungsraum", punkte, MAX_PUNKTE["bewegungsraum"], detail))
 
     # 4 — Liegt eine offene Zone in Wettrichtung nah genug, um einzusteigen?
@@ -338,8 +362,9 @@ def bewerte_chart(instrument: str, mtf: Any, kurs: float) -> ChartChance:
     bew_pct = (abs(ziel - kurs) / kurs * 100) if ziel else None
     bew_atr = (abs(ziel - kurs) / atr) if ziel and atr > 0 else None
     rr = None
-    if ziel is not None and inval is not None and abs(kurs - inval) > 0:
-        rr = abs(ziel - kurs) / abs(kurs - inval)
+    rr_ziel = tp2 if tp2 is not None else ziel
+    if rr_ziel is not None and inval is not None and abs(kurs - inval) > 0:
+        rr = abs(rr_ziel - kurs) / abs(kurs - inval)
 
     # Urteil. Score allein reicht nicht: ein gut ausgerichteter Chart, dessen naechstes
     # Ziel naeher liegt als die Invalidierung, ist trotzdem kein Trade. Beide Bedingungen
@@ -372,6 +397,8 @@ def bewerte_chart(instrument: str, mtf: Any, kurs: float) -> ChartChance:
         kurs=kurs,
         ziel=ziel,
         ziel_art=ziel_art,
+        tp2=tp2,
+        tp3=tp3,
         invalidierung=inval,
         bewegung_pct=bew_pct,
         bewegung_atr=bew_atr,
