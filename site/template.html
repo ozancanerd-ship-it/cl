@@ -441,7 +441,10 @@ const chart = (()=>{
   function setze(kerzen, zeichnungTf, chance){
     B = (kerzen||[]).map(k=>({t:k[0], o:k[1], h:k[2], l:k[3], c:k[4], v:k[5]}));
     Z = zeichnungTf || null; C = chance || null;
-    anz = Math.min(140, Math.max(40, B.length));
+    // 90 Kerzen als Startbild. Mehr sieht auf dem Handy nach Strichcode aus, und bei
+    // H4 deckt das schon zwei Wochen ab — genug für einen Swing, ohne dass die
+    // Preisachse so weit wird, dass man die Struktur nicht mehr liest.
+    anz = Math.min(90, Math.max(40, B.length));
     i0 = Math.max(0, B.length - anz);
     letzterPreis = B.length ? B[B.length-1].c : null;
     zeichne();
@@ -819,6 +822,16 @@ function zeichneChartAnsicht(){
   if (!AKTIV){ $('chartansicht').innerHTML = `<p class="leer">Wähle oben im Markt einen Wert.</p>`; return; }
   const c = AKTIV.chance || {}, zg = AKTIV.zeichnung || {};
   const ebenen = Object.keys(zg);
+  if (!ebenen.length){
+    // Detaildateien gibt es nur für die vordersten Werte der Rangliste — alles darunter
+    // würde nie angetippt und wäre totes Gewicht auf der Seite.
+    $('chartansicht').innerHTML = `<div class="note-box"><span class="nt">Keine Detailansicht</span>
+      <p>Für <strong>${esc(name(AKTIV.instrument))}</strong> liegt keine gezeichnete Analyse
+      vor. Detailansichten werden nur für die vordersten Werte der Rangliste erzeugt;
+      weiter unten wäre es Ballast, den niemand öffnet.</p>
+      <p>Rückt der Wert nach oben, ist die Zeichnung beim nächsten Scan da.</p></div>`;
+    return;
+  }
   const live = L.get(AKTIV.instrument);
   const kurs = live ? live.p : c.kurs;
   const d = digits(kurs);
@@ -876,6 +889,13 @@ function aktualisiereChartKurs(){
 /* ============================================================ ANALYSE */
 function zeichneAnalyse(){
   if (!AKTIV){ $('analyse').innerHTML = `<p class="leer">Wähle oben im Markt einen Wert.</p>`; return; }
+  if (!(AKTIV.mtf||[]).length && !AKTIV.kommentar){
+    $('analyse').innerHTML = `<div class="note-box"><span class="nt">Keine Detailansicht</span>
+      <p>Für <strong>${esc(name(AKTIV.instrument))}</strong> liegt keine ausgearbeitete
+      Analyse vor — Detailansichten werden nur für die vordersten Werte der Rangliste
+      erzeugt. Die Kennzahlen aus der Rangliste stehen im Reiter <em>Markt</em>.</p></div>`;
+    return;
+  }
   const c = AKTIV.chance || {}, K = AKTIV.kommentar, M = AKTIV.muster || [];
   const live = L.get(AKTIV.instrument);
   const kurs = live ? live.p : c.kurs, d = digits(kurs);
