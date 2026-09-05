@@ -35,16 +35,27 @@ on:
     # (22:00 UTC), vor dem Tageswechsel. GitHub-Cron laeuft in UTC und kann sich bei Last
     # um einige Minuten verspaeten; egal, die Regel arbeitet auf Tagesschlusskursen.
     - cron: "10 23 * * *"
-    # :25 jede Stunde — der Marktscan. Das ist unser "24/7" ohne eigenen Server: kein
+    # :25 und :55 — der volle Marktscan, also alle 30 Minuten. Das ist unser "24/7" ohne eigenen Server: kein
     # dauerlaufender Prozess, sondern 24 Durchgaenge am Tag. Krypto laeuft durch, Aktien
     # bewegen sich nur waehrend der Boersenzeit — die stillen Laeufe kosten nichts und
     # melden nichts. Ein Alarm geht nur bei einer ECHTEN Aenderung raus.
-    - cron: "25 * * * *"
-    # Alle 15 Minuten der leichte Waechter: KEIN Scan, nur die Kurse der beobachteten
-    # Setups. Er meldet, wenn ein Einstieg, ein Ziel oder ein Stop tatsaechlich
-    # getroffen wurde — Ozans Vorgabe: "will nicht selber alarme erstellen".
-    - cron: "5,20,35,50 * * * *"
-  workflow_dispatch: {}   # Knopf zum Selbststarten, fuer Tests
+    - cron: "25,55 * * * *"
+    # Alle fuenf Minuten der leichte Waechter: KEIN Scan, nur die Kurse der
+    # beobachteten Setups. Er meldet, wenn ein Einstieg, ein Ziel oder ein Stop
+    # tatsaechlich getroffen wurde.
+    #
+    # Warum nicht jede Minute, wie Ozan gefragt hat: fuenf Minuten ist die kleinste
+    # Taktung, die GitHub fuer Zeitplaene zulaesst, und selbst die wird bei Last
+    # verzoegert. Wer wirklich sekundengenau reagieren will, braucht eine Maschine,
+    # die durchlaeuft. Die App rechnet dafuer im Browser live weiter — dort wandert
+    # ein Setup in dem Moment nach oben, in dem der Kurs seinen Einstieg trifft.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      telegram_ping:
+        description: "Testnachricht an Telegram schicken"
+        type: boolean
+        default: false
   push:
     branches: [main]      # nach einer Aenderung sofort neu bauen, statt bis 23:10 zu warten
     paths-ignore:
@@ -83,7 +94,7 @@ jobs:
       # Ende gezielt rot gemacht, damit der Ausfall sichtbar bleibt.
       - name: Forward-Zeile aufzeichnen
         id: forward
-        if: github.event.schedule != '25 * * * *' && github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '25,55 * * * *' && github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -91,7 +102,7 @@ jobs:
 
       - name: Tagesplan schicken
         id: report
-        if: github.event.schedule != '25 * * * *' && github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '25,55 * * * *' && github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -109,12 +120,30 @@ jobs:
 
       # Der Gesamtmarkt-Scan. continue-on-error, weil eine stumme Kursquelle die Seite
       # nicht verhindern darf — build_site zeigt dann keine Rangliste statt einer alten.
+      # Sagt bei JEDEM vollen Lauf, ob der Telegram-Kanal steht. "Der Bot funktioniert
+      # nicht" hat drei moegliche Ursachen (Schluessel fehlen, Token falsch, Chat-ID
+      # falsch oder Bot nie angeschrieben) — ohne diese Zeile raet man.
+      - name: Telegram pruefen
+        id: tg
+        if: github.event.schedule != '*/5 * * * *'
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ "${{ inputs.telegram_ping }}" = "true" ]; then
+            python scripts/telegram_check.py --ping
+          else
+            python scripts/telegram_check.py
+          fi
+
       # Makrolage und Wirtschaftskalender. Bewusst VOR dem Scan: die Hinweise gehen als
       # Warnung in jedes Setup ein. Faellt der Schritt aus, laeuft der Scan trotzdem —
       # nur ohne die Makro-Hinweise.
       - name: Makrolage holen
         id: makro
-        if: github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         timeout-minutes: 4
         env:
@@ -126,7 +155,7 @@ jobs:
       # MTF-Tabelle, Mustern und Kommentar.
       - name: Markt scannen
         id: scan
-        if: github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         timeout-minutes: 14
         env:
@@ -139,7 +168,7 @@ jobs:
       # bewusst KEINEN Wegbruch-Alarm.
       - name: Alarm bei Aenderung
         id: alarm
-        if: github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -151,7 +180,7 @@ jobs:
       # ob eine Marke getroffen wurde.
       - name: Wachliste fuehren
         id: wache_voll
-        if: github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -162,7 +191,7 @@ jobs:
       # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan. Dauert Sekunden.
       - name: Marken pruefen
         id: wache_licht
-        if: github.event.schedule == '5,20,35,50 * * * *'
+        if: github.event.schedule == '*/5 * * * *'
         env:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -170,13 +199,13 @@ jobs:
         run: python scripts/watch_levels.py --send
 
       - name: Web-App bauen
-        if: github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '*/5 * * * *'
         env:
           PYTHONPATH: src
         run: python scripts/build_site.py --out _site
 
       - name: Journal sichern
-        if: github.event.schedule != '5,20,35,50 * * * *' || steps.wache_licht.outputs.geaendert == '1'
+        if: github.event.schedule != '*/5 * * * *' || steps.wache_licht.outputs.geaendert == '1'
         run: |
           git config user.name  "trading-agent[bot]"
           git config user.email "trading-agent@users.noreply.github.com"
@@ -203,7 +232,7 @@ jobs:
           echo "::warning::Journalzeile konnte nicht gesichert werden — kommt beim naechsten Lauf mit"
 
       - uses: actions/upload-pages-artifact@v3
-        if: github.event.schedule != '5,20,35,50 * * * *'
+        if: github.event.schedule != '*/5 * * * *'
         with:
           path: _site
 
@@ -219,7 +248,7 @@ jobs:
 
   veroeffentlichen:
     needs: tagesplan
-    if: github.event.schedule != '5,20,35,50 * * * *'
+    if: github.event.schedule != '*/5 * * * *'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

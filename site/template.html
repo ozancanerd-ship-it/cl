@@ -414,6 +414,7 @@ function starteLive(){
     if (neu) planeAuffrischen();
   };
 }
+let _alarmZuletzt = 0;
 let _auf = 0;
 function planeAuffrischen(){
   if (_auf) return;
@@ -423,7 +424,10 @@ function frischeAuf(){
   aktualisiereRadarKurse();
   aktualisiereChartKurs();
   aktualisierePortfolioKurse();
-  if (!$('p5').hidden) zeichneAlarme();
+  if (!$('p5').hidden && Date.now() - _alarmZuletzt > 2500){
+    _alarmZuletzt = Date.now();
+    zeichneAlarme();
+  }
 }
 function abonniere(sym){ /* miniTicker liefert alle Symbole; nichts zu tun. */ }
 function livePreis(sym){ const e = L.get(sym); return e ? e.p : null; }
@@ -1215,110 +1219,188 @@ function zeichnePlan(){
 }
 
 /* ============================================================ ALARME */
-/* Was der Wächter live daraus macht. Die Marken kommen aus dem Scan, der Zustand
-   wird hier im Browser aus dem Livekurs gerechnet — parallel zum CI-Lauf, der die
-   Meldung verschickt. Zwei Wege zur selben Aussage; wenn sie auseinanderlaufen,
-   ist das ein Befund und kein Schönheitsfehler. */
-function wachzeile(w){
+/* ============================================================ ALARME
+   Zwei Wege zur selben Aussage, absichtlich getrennt:
+     · der CI-Waechter prueft alle 15 Minuten und verschickt (Telegram)
+     · diese Seite rechnet den Zustand LIVE aus dem Boersenkurs
+   Der zweite Weg braucht keine Schlüssel und aktualisiert sich im Sekundentakt.
+   Laufen sie auseinander, ist das ein Befund und kein Schönheitsfehler.
+   ============================================================ */
+const ZUSTAND_TEXT = {
+  'wartet_auf_einstieg':'wartet auf Einstieg', 'aktiv':'im Trade',
+  'ziel_erreicht':'Ziel erreicht', 'stop':'ausgestoppt', 'invalidiert':'ungültig',
+  'abgelaufen':'abgelaufen'
+};
+const OFFEN = ['wartet_auf_einstieg','aktiv'];
+const NOTE_RANG = {'A+':6,'A':5,'A−':4,'B+':3,'B':2,'WATCH':1,'—':0};
+
+/* Der Live-Zustand eines Setups: was gilt JETZT, bei diesem Kurs? */
+function lage(w){
   const live = L.get(w.instrument);
   const kurs = live ? live.p : null;
-  const d = digits(w.einstieg);
   const lang = w.richtung === 'long';
-  let zustand = w.zustand, lz = '';
-  if (kurs != null && zustand === 'wartet_auf_einstieg'){
-    const erreicht = lang ? kurs <= w.einstieg : kurs >= w.einstieg;
-    if (erreicht){ zustand = 'einstieg erreicht (live)'; lz = 'hot'; }
-  }
-  const weg = kurs != null ? (lang ? (w.einstieg/kurs - 1) : (kurs/w.einstieg - 1)) * 100 : null;
   const risiko = Math.abs(w.einstieg - w.stop);
-  const r = (kurs != null && risiko > 0)
-    ? ((lang ? kurs - (w.einstiegskurs ?? w.einstieg) : (w.einstiegskurs ?? w.einstieg) - kurs) / risiko)
-    : null;
-  const ZUSTAND = {
-    'wartet_auf_einstieg':'wartet auf Einstieg', 'aktiv':'aktiv',
-    'ziel_erreicht':'Ziel erreicht', 'stop':'Stop', 'invalidiert':'ungültig',
-    'abgelaufen':'abgelaufen'
-  };
-  return `<div class="alarm ${lz || (w.zustand==='aktiv'?'hot':'')}" data-sym="${esc(w.instrument)}">
-    <div class="ah"><span>${esc(name(w.instrument))} ${lang?'LONG':'SHORT'}</span>
-      <span class="d">${esc(ZUSTAND[zustand]||zustand)} · ${esc(w.note)}</span></div>
-    <p>Einstieg <strong>${num(w.einstieg,d)}</strong> <span style="color:var(--ink-3)">(${esc(w.einstieg_art)})</span>
+  const eingestiegen = w.zustand === 'aktiv';
+  let stufe = 'beobachten', abstand = null, r = null;
+
+  if (kurs != null){
+    abstand = (lang ? (kurs / w.einstieg - 1) : (w.einstieg / kurs - 1)) * 100;
+    const basis = w.einstiegskurs ?? w.einstieg;
+    if (risiko > 0) r = (lang ? kurs - basis : basis - kurs) / risiko;
+    const erreicht = lang ? kurs <= w.einstieg : kurs >= w.einstieg;
+    const raus = lang ? kurs <= w.stop : kurs >= w.stop;
+    if (eingestiegen && raus) stufe = 'stop';
+    else if (eingestiegen) stufe = 'im_trade';
+    else if (erreicht) stufe = 'jetzt';
+    else if (Math.abs(abstand) <= 1.5) stufe = 'bald';
+  } else if (eingestiegen) stufe = 'im_trade';
+
+  return {w, kurs, lang, risiko, abstand, r, stufe, live: !!live};
+}
+
+function alarmKarte(x, gross){
+  const w = x.w, d = digits(w.einstieg);
+  const seite = x.lang ? 'KAUFEN' : 'VERKAUFEN';
+  const farbe = x.lang ? 'var(--long)' : 'var(--bad)';
+  const kopf = {
+    jetzt: `<strong style="color:${farbe}">JETZT ${seite}</strong>`,
+    bald: `kurz davor`,
+    im_trade: `im Trade`,
+    stop: `<strong style="color:var(--bad)">Stop erreicht</strong>`,
+    beobachten: `beobachten`,
+  }[x.stufe];
+  const ziele = [w.tp1, w.tp2, w.tp3].filter(v=>v!=null).map(v=>num(v,d)).join(' / ');
+  return `<div class="alarm ${x.stufe==='jetzt'||x.stufe==='im_trade'?'hot':''}"
+      data-sym="${esc(w.instrument)}" style="${gross?'border-left-width:4px':''}">
+    <div class="ah">
+      <span>${esc(name(w.instrument))} ${x.lang?'LONG':'SHORT'}</span>
+      <span class="d">${esc(w.note)} · ${kopf}</span>
+    </div>
+    <p>Einstieg <strong>${num(w.einstieg,d)}</strong>
+      <span style="color:var(--ink-3)">(${esc(w.einstieg_art)})</span>
       · Stop <strong>${num(w.stop,d)}</strong>
-      ${w.tp1!=null?`· Ziel ${num(w.tp1,d)}`:''}${w.tp2!=null?` / ${num(w.tp2,d)}`:''}${w.tp3!=null?` / ${num(w.tp3,d)}`:''}</p>
-    ${kurs!=null?`<p>Kurs <strong>${num(kurs,d)}</strong>
-      ${weg!=null&&w.zustand==='wartet_auf_einstieg'?` · noch <strong>${Math.abs(weg).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}
-      ${r!=null&&w.zustand==='aktiv'?` · <strong class="${r>=0?'up':'dn'}">${r>=0?'+':''}${r.toFixed(2)}R</strong>`:''}
+      ${ziele?`· Ziele <strong>${ziele}</strong>`:''}</p>
+    ${x.kurs!=null?`<p>Kurs <strong>${num(x.kurs,d)}</strong>
+      ${x.live?'<span class="up" style="font-size:11px">live</span>':''}
+      ${x.stufe==='bald'||x.stufe==='beobachten'
+        ? ` · noch <strong>${Math.abs(x.abstand).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`
+        : ''}
+      ${x.r!=null&&(x.stufe==='im_trade'||x.stufe==='stop')
+        ? ` · <strong class="${x.r>=0?'up':'dn'}">${x.r>=0?'+':''}${x.r.toFixed(2)}R</strong>`:''}
       ${(w.erreicht||[]).length?` · erreicht: ${w.erreicht.join(', ')}`:''}</p>`:''}
+    ${gross&&x.stufe==='jetzt'?`<p style="color:var(--ink-2)">
+      Risiko je Einheit <strong>${num(x.risiko,d)}</strong> — bei 0,5 % Risiko auf
+      ${num(P?P.equity:1200,0)} € wären das rund
+      <strong>${Math.max(0,Math.round((P?P.equity:1200)*0.005/Math.max(x.risiko,1e-12)))}</strong>
+      Einheiten.</p>`:''}
   </div>`;
 }
 
-function zeichneAlarme(){
-  let h = '';
-  const wachen = ((WL && WL.wachen) || []).filter(w =>
-    !['stop','ziel_erreicht','invalidiert','abgelaufen'].includes(w.zustand));
-  const fertig = ((WL && WL.wachen) || []).filter(w =>
-    ['stop','ziel_erreicht','invalidiert','abgelaufen'].includes(w.zustand));
-  h += `<h2>Wachliste</h2>`;
-  if (wachen.length){
-    h += `<p class="lead">Diese Setups werden alle 15 Minuten gegen den echten Kurs geprüft.
-      Du bekommst eine Meldung, wenn der Einstieg, ein Ziel oder der Stop getroffen wird —
-      du musst nichts selbst einstellen.</p>`;
-    h += wachen.map(wachzeile).join('');
-  } else {
-    h += `<p class="leer">Keine offene Wache. Sobald der Scan ein handelbares Setup findet,
-      landet es automatisch hier.</p>`;
-  }
-  if (fertig.length){
-    h += `<h3>Abgeschlossen</h3>` + fertig.slice(0,8).map(wachzeile).join('');
-  }
+/* Lokale Benachrichtigung, wenn ein Setup live auf "jetzt" springt. Funktioniert,
+   solange die App offen ist — ohne Server, ohne Schlüssel. Kein Ersatz für Telegram,
+   aber sofort und ohne Abhängigkeit. */
+const GEMELDET = new Set();
+function benachrichtige(x){
+  const key = x.w.instrument + ':' + x.w.aufgenommen;
+  if (GEMELDET.has(key)) return;
+  GEMELDET.add(key);
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const d = digits(x.w.einstieg);
+    new Notification(`${x.lang?'KAUFEN':'VERKAUFEN'} ${name(x.w.instrument)} · ${x.w.note}`, {
+      body: `Einstieg ${num(x.w.einstieg,d)} erreicht\nStop ${num(x.w.stop,d)}` +
+            (x.w.tp1!=null?` · Ziel ${num(x.w.tp1,d)}`:''),
+      tag: key,
+    });
+  } catch(e){}
+}
 
-  const kand = (S?.gesamt||[]).filter(o=>o.handelbar);
-  h += `<h2>Aktive Setups</h2>`;
-  if (kand.length){
-    h += kand.slice(0,12).map(o=>{
-      const d = digits(o.kurs);
-      return `<div class="alarm ${o.urteil==='A_PLUS'||o.urteil==='A'?'hot':''}" data-sym="${esc(o.instrument)}">
-        <div class="ah"><span>${esc(name(o.instrument))} ${o.richtung?o.richtung.toUpperCase():''}</span>
-          <span class="d">${esc(o.note)} · ${(o.score||0).toFixed(0)}/100</span></div>
-        <p>Kurs <strong>${num(o.kurs,d)}</strong> · Ziel <strong>${num(o.ziel,d)}</strong>${
-          o.tp2!=null?' / '+num(o.tp2,d):''}${o.tp3!=null?' / '+num(o.tp3,d):''} ·
-          falsch ab <strong>${num(o.invalidierung,d)}</strong>${o.rr?' · CRV 1:'+o.rr.toFixed(2):''}${
-          o.erwartete_bewegung_pct!=null?' · erwartet '+pct(o.erwartete_bewegung_pct,1):''}</p>
-        <p style="color:var(--ink-3)">${esc(o.headline||'')}</p>
-      </div>`;
-    }).join('');
-  } else {
-    h += `<div class="alarm"><div class="ah"><span>Kein handelbares Setup</span></div>
-      <p>Im letzten Scan hat kein Wert Score, Chance-Risiko-Verhältnis und erwartete
-      Bewegung gleichzeitig erreicht. Das ist ein Ergebnis, kein Ausfall.</p></div>`;
+function zeichneAlarme(){
+  const alle = ((WL && WL.wachen) || []);
+  const offen = alle.filter(w=>OFFEN.includes(w.zustand)).map(lage);
+  const fertig = alle.filter(w=>!OFFEN.includes(w.zustand));
+  const rang = a => [-(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
+  const sortiert = arr => arr.sort((a,b)=>{
+    const [ra,da]=rang(a), [rb,db]=rang(b);
+    return ra!==rb ? ra-rb : da-db;
+  });
+
+  const jetzt = sortiert(offen.filter(x=>x.stufe==='jetzt'));
+  const imTrade = sortiert(offen.filter(x=>x.stufe==='im_trade'||x.stufe==='stop'));
+  const bald = sortiert(offen.filter(x=>x.stufe==='bald'));
+  const rest = sortiert(offen.filter(x=>x.stufe==='beobachten'));
+  jetzt.forEach(benachrichtige);
+
+  let h = '';
+
+  const erlaubt = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  h += `<div class="note-box ${erlaubt?'':'warn'}">
+    <span class="nt">Wie du die Signale bekommst</span>
+    <p><strong>In dieser App:</strong> die Liste unten rechnet sich aus dem Börsenkurs
+      live neu — solange die App offen ist, wandert ein Setup von selbst nach oben,
+      sobald der Einstieg erreicht ist.</p>
+    <p><strong>Auf dem Handy, auch wenn die App zu ist:</strong> dafür braucht es
+      Telegram. ${erlaubt?'':'Zusätzlich kann dieser Browser dich benachrichtigen, solange die App offen ist — '}
+      ${erlaubt?'Browser-Benachrichtigungen sind aktiv.':'<button class="link" id="pushan">Benachrichtigungen erlauben</button>'}</p>
+  </div>`;
+
+  h += `<h2>Jetzt handeln</h2>`;
+  h += jetzt.length
+    ? jetzt.map(x=>alarmKarte(x,true)).join('')
+    : `<div class="alarm"><div class="ah"><span>Gerade kein Einstieg erreicht</span></div>
+       <p>${offen.length} Setup(s) werden beobachtet. Sobald ein Kurs seinen Einstieg
+       trifft, steht er hier oben — und zwar in dem Moment, nicht erst beim nächsten Scan.</p></div>`;
+
+  if (imTrade.length){
+    h += `<h2>Laufende Trades</h2>` + imTrade.map(x=>alarmKarte(x,false)).join('');
+  }
+  if (bald.length){
+    h += `<h2>Kurz davor <span class="mono" style="font-size:12px;color:var(--ink-3)">unter 1,5 % vom Einstieg</span></h2>`;
+    h += bald.map(x=>alarmKarte(x,false)).join('');
+  }
+  if (rest.length){
+    h += `<h2>Wachliste <span class="mono" style="font-size:12px;color:var(--ink-3)">${rest.length} weitere</span></h2>`;
+    h += rest.slice(0,25).map(x=>alarmKarte(x,false)).join('');
+  }
+  if (!offen.length){
+    h += `<p class="leer">Keine offene Wache. Sobald der Scan ein handelbares Setup
+      findet, landet es automatisch hier — du musst nichts einstellen.</p>`;
   }
 
   const A = D.alarme || [];
-  h += `<h2>Zuletzt verschickt</h2>`;
-  h += A.length ? A.map(a=>`<div class="alarm ${a.severity==='CRITICAL'?'hot':''}">
+  h += `<h2>Verlauf</h2>`;
+  h += fertig.length ? fertig.slice(0,6).map(w=>{
+      const d = digits(w.einstieg);
+      return `<div class="alarm"><div class="ah"><span>${esc(name(w.instrument))}</span>
+        <span class="d">${esc(ZUSTAND_TEXT[w.zustand]||w.zustand)}</span></div>
+        <p>Einstieg ${num(w.einstieg,d)} · Stop ${num(w.stop,d)}
+        ${(w.erreicht||[]).length?`· erreicht: ${w.erreicht.join(', ')}`:''}
+        ${w.bestes_r?`· bestes ${w.bestes_r>0?'+':''}${w.bestes_r}R`:''}</p></div>`;
+    }).join('') : '';
+  h += A.length ? A.slice(0,6).map(a=>`<div class="alarm ${a.severity==='CRITICAL'?'hot':''}">
       <div class="ah"><span>${esc(a.title||'')}</span><span class="d">${zeit(a.ts)}</span></div>
       ${a.body?`<p style="white-space:pre-wrap">${esc(a.body)}</p>`:''}
     </div>`).join('')
-    : `<div class="alarm"><div class="ah"><span>Noch nichts verschickt</span></div>
-       <p>Entweder hat sich nichts geändert, das eine Meldung wert war — oder Telegram ist
-       noch nicht eingerichtet. Bleibt der Verlauf tagelang leer, während oben Setups
-       stehen, fehlen die beiden Telegram-Schlüssel.</p></div>`;
+    : (fertig.length ? '' : `<div class="alarm"><div class="ah"><span>Noch nichts verschickt</span></div>
+       <p>Entweder hat sich nichts geändert, das eine Meldung wert war — oder Telegram
+       ist noch nicht eingerichtet.</p></div>`);
 
   h += `<div class="note-box warn" style="margin-top:22px"><span class="nt">Was aufs Handy geht — und was nicht</span>
     <p><strong>Immer:</strong> Einstieg erreicht, Ziel erreicht, Stop berührt, Setup
-    ungültig. Sobald es um einen laufenden Trade geht, bekommst du es — unabhängig von
-    der Note.</p>
-    <p><strong>Neue Setups nur ab A−.</strong> B und B+ stehen hier und in der
-    Rangliste, klingeln aber nicht. Jede Stunde ein paar B-Setups zu melden wäre genau
-    der Spam, den wir nicht wollen.</p>
+    ungültig. Sobald es um einen laufenden Trade geht, unabhängig von der Note.</p>
+    <p><strong>Neue Setups nur ab A−.</strong> B und B+ stehen hier, klingeln aber nicht.
+    Jede Stunde ein paar B-Setups zu melden wäre Spam.</p>
     <p>Der Marktscan läuft <strong>stündlich</strong>, der Wächter <strong>alle 15
-    Minuten</strong>. Dieselbe Meldung frühestens nach zwölf Stunden wieder.</p>
-    <p>Fällt eine Anlageklasse aus, gelten ihre Werte als <em>unbekannt</em>, nicht als
-    verschwunden — sonst meldet das System „Setup entfallen", obwohl nur die Kursquelle
-    geschwiegen hat.</p></div>`;
+    Minuten</strong>. Diese Seite rechnet dazwischen live weiter.</p></div>`;
+
   $('alarme').innerHTML = h;
   $('alarme').querySelectorAll('[data-sym]').forEach(el=>
     el.addEventListener('click',()=>waehle(el.dataset.sym)));
+  const knopf = $('pushan');
+  if (knopf) knopf.addEventListener('click', async ()=>{
+    try { await Notification.requestPermission(); } catch(e){}
+    zeichneAlarme();
+  });
 }
 
 /* ============================================================ SYSTEM */
