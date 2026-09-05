@@ -1315,9 +1315,17 @@ function signalKarte(x){
   else urteil = `${seite} ab <strong>${num(w.einstieg,d)}</strong>${
     x.abstand!=null?` <span style="color:var(--ink-3)">(noch ${Math.abs(x.abstand).toFixed(2).replace('.',',')} %)</span>`:''}`;
 
+  /* Positionsgröße: 0,5 % Risiko — aber gedeckelt durch das Kapital.
+     Ohne Deckel kam bei einem Wert mit 0,06 % Stopabstand "9999 Stück ≈ 9.992 €"
+     heraus, bei 1.200 € Kapital. Rechnerisch richtig, praktisch Unsinn: was man
+     nicht kaufen kann, ist keine Positionsgröße. */
   const equity = P ? P.equity : 1200;
-  const stueck = x.risiko > 0 ? Math.floor(equity * 0.005 / x.risiko) : 0;
-  const euro = x.risiko > 0 ? Math.round(stueck * w.einstieg) : 0;
+  const MAX_ANTEIL = 0.25;
+  const ausRisiko = x.risiko > 0 ? equity * 0.005 / x.risiko : 0;
+  const ausKapital = w.einstieg > 0 ? equity * MAX_ANTEIL / w.einstieg : 0;
+  const gedeckelt = ausRisiko > ausKapital;
+  const stueck = Math.floor(Math.min(ausRisiko, ausKapital));
+  const euro = Math.round(stueck * w.einstieg);
   const ziele = [w.tp1, w.tp2, w.tp3].filter(v=>v!=null);
 
   return `<div class="alarm ${klasse}" data-sym="${esc(w.instrument)}">
@@ -1342,7 +1350,10 @@ function signalKarte(x){
     </div>
     ${stueck>0?`<p style="color:var(--ink-2);font-size:12.5px">Bei 0,5 % Risiko auf
       ${num(equity,0)} €: rund <strong>${stueck}</strong> Stück ≈ ${num(euro,0)} € Einsatz,
-      Verlust bei Stop rund ${num(Math.round(stueck*x.risiko),0)} €.</p>`:''}
+      Verlust bei Stop rund ${num(Math.round(stueck*x.risiko),0)} €.${
+      gedeckelt?` <span style="color:var(--warn)">Auf ${Math.round(MAX_ANTEIL*100)} % vom
+      Kapital begrenzt — der Stop liegt so eng, dass 0,5 % Risiko mehr Geld bräuchte,
+      als du hast.</span>`:''}</p>`:''}
     ${o.headline?`<p style="color:var(--ink-3);font-size:12.5px">${esc(o.headline)}</p>`:''}
     ${(o.warnungen||[]).length?`<p class="warnz">⚠ ${o.warnungen.map(esc).join(' · ')}</p>`:''}
   </div>`;

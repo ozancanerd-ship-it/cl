@@ -43,6 +43,13 @@ from typing import Any
 #: vor zwei Wochen beschreibt den Markt nicht mehr.
 HALTBARKEIT = timedelta(days=10)
 
+#: Ein Setup, dessen Stop naeher als das am Einstieg liegt, kommt gar nicht erst auf
+#: die Liste. Der Grund sind die Kosten: rund 0,2 % Gebuehren hin und zurueck plus
+#: Spread. Bei UUSDT lag der Stop 0,06 % entfernt — auf dem Papier ein
+#: Chance-Risiko-Verhaeltnis von 1:25, in Wirklichkeit ein sicherer Verlust, und in
+#: der App kam als Positionsgroesse "9.992 EUR Einsatz" bei 1.200 EUR Kapital heraus.
+MIN_STOP_ANTEIL = 0.003  # 0,3 %
+
 
 class Zustand(StrEnum):
     WARTET = "wartet_auf_einstieg"
@@ -236,6 +243,8 @@ class Wachliste:
             )
             if w.risiko <= 0 or w.richtung not in ("long", "short"):
                 continue
+            if w.einstieg > 0 and w.risiko / w.einstieg < MIN_STOP_ANTEIL:
+                continue
             self.wachen[name] = w
             sofort = w.einstieg_art == "sofort"
             neu.append(
@@ -423,6 +432,7 @@ class Wachliste:
 __all__ = [
     "ENDZUSTAENDE",
     "HALTBARKEIT",
+    "MIN_STOP_ANTEIL",
     "Ereignis",
     "Wache",
     "Wachliste",

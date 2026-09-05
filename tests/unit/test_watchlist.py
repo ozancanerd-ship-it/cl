@@ -261,3 +261,21 @@ def test_rueckblick_deckt_immer_mehrere_kerzen_ab() -> None:
     # Dazwischen bleibt der echte Abstand erhalten.
     mittel = modul._seit({"stand": (jetzt - timedelta(hours=2)).isoformat()}, jetzt)
     assert abs((jetzt - mittel) - timedelta(hours=2)) < timedelta(seconds=1)
+
+
+def test_zu_enger_stop_kommt_nicht_auf_die_liste() -> None:
+    """UUSDT stand mit 0,06 % Stopabstand auf der Liste — auf dem Papier CRV 1:25.
+
+    In der App kam als Positionsgroesse "9.992 EUR Einsatz" bei 1.200 EUR Kapital
+    heraus, und allein Hin- und Rueckweg kosten rund 0,2 %.
+    """
+    w = Wachliste()
+    eng = _zeile(
+        "UUSDT", einstieg=0.9993, stop=0.9999, tp1=0.984, tp2=None, tp3=None, richtung="short"
+    )
+    assert w.aufnehmen([eng], jetzt=T0) == []
+    assert w.wachen == {}
+
+    # Derselbe Wert mit vernuenftigem Abstand geht durch.
+    weit = _zeile("UUSDT", einstieg=1.0, stop=1.02, tp1=0.95, tp2=None, tp3=None, richtung="short")
+    assert len(w.aufnehmen([weit], jetzt=T0)) == 1
