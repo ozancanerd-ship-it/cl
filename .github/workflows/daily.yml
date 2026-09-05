@@ -88,6 +88,16 @@ jobs:
             python scripts/daily_report.py --send
           fi
 
+      # Der Gesamtmarkt-Scan. continue-on-error, weil eine stumme Kursquelle die Seite
+      # nicht verhindern darf — build_site zeigt dann keine Rangliste statt einer alten.
+      - name: Markt scannen
+        id: scan
+        continue-on-error: true
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: src
+        run: python scripts/build_scan_data.py --out web/scan.json
+
       - name: Web-App bauen
         env:
           PYTHONPATH: src

@@ -186,6 +186,35 @@ tr.key td{background:var(--long-bg)}
 .alarm .ah .d{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px;
   color:var(--ink-3)}
 .alarm p{margin:5px 0 0; font-size:13.5px}
+.opp{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
+  border-radius:4px; margin-bottom:8px; overflow:hidden}
+.opp.aplus{border-left-color:var(--long)}
+.opp.a{border-left-color:var(--long); opacity:.95}
+.opp.watch{border-left-color:var(--warn)}
+.opp-h{display:flex; align-items:baseline; gap:9px; padding:12px 14px 8px}
+.opp-h .nm{font-weight:600; font-size:15.5px}
+.opp-h .dir{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
+  padding:2px 6px; border-radius:3px; background:var(--surface-2); color:var(--ink-3)}
+.opp-h .dir.long{background:var(--long-bg); color:var(--long)}
+.opp-h .dir.short{background:var(--bad-bg); color:var(--bad)}
+.opp-h .sc{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:19px;
+  font-weight:600; font-variant-numeric:tabular-nums}
+.opp-h .ur{font-family:"IBM Plex Mono",monospace; font-size:10.5px; padding:2px 7px;
+  border-radius:100px; background:var(--surface-2); color:var(--ink-3)}
+.opp-h .ur.aplus,.opp-h .ur.a{background:var(--long-bg); color:var(--long)}
+.opp-h .ur.watch{background:var(--warn-bg); color:var(--warn)}
+.opp-b{padding:0 14px 12px}
+.fak{display:grid; grid-template-columns:8.5em 3.5em 1fr; gap:4px 8px; align-items:start;
+  font-size:12.5px; margin-top:5px}
+.fak .fb{margin-top:4px}
+.fak .fn{color:var(--ink-2); font-size:12px}
+.fak .fb{height:6px; background:var(--sunk); border-radius:2px; overflow:hidden}
+.fak .fb i{display:block; height:100%; background:var(--accent)}
+.fak .fd{color:var(--ink-3); font-size:11.5px; font-family:"IBM Plex Mono",monospace;
+  line-height:1.35; word-break:break-word}
+.zt{display:flex; gap:14px; flex-wrap:wrap; margin-top:9px; padding-top:9px;
+  border-top:1px solid var(--rule); font-family:"IBM Plex Mono",monospace; font-size:12px}
+.zt b{color:var(--ink); font-weight:600}
 .foot{margin-top:36px; padding-top:16px; border-top:1px solid var(--rule);
   font-size:12.5px; color:var(--ink-3)}
 .foot p{font-size:12.5px; color:var(--ink-3)}
@@ -219,6 +248,7 @@ tr.key td{background:var(--long-bg)}
     </div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" aria-selected="true"  aria-controls="p1" id="t1">Heute</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">Chancen</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2">Analyse</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Alarme</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Erwartung</button>
@@ -233,6 +263,12 @@ tr.key td{background:var(--long-bg)}
   <div id="acts"></div>
   <div id="waiting"></div>
   <div id="noAccount"></div>
+</section>
+
+<section class="panel" id="p6" role="tabpanel" aria-labelledby="t6" hidden>
+  <p class="lead">Der ganze verfügbare Markt, nach Chartzustand sortiert. Nicht jeden Tag
+    dieselbe Liste — was oben steht, ändert sich mit dem Markt.</p>
+  <div id="chancen"></div>
 </section>
 
 <section class="panel" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
@@ -539,6 +575,79 @@ document.getElementById('analyse').innerHTML = D.signals.slice()
     </div>
   </div>`;
 }).join('');
+
+
+/* ---------- Chancen: der Gesamtmarkt-Scan ---------- */
+(function(){
+  const el = document.getElementById('chancen');
+  const S = D.scan || {};
+  const alle = S.gesamt || [];
+  if (!alle.length) {
+    el.innerHTML = `<div class="note warn"><span class="nt">Kein Scan vorhanden</span>
+      <p>Der Marktscan lief beim letzten Bau nicht. Es wird bewusst keine alte Rangliste
+        gezeigt — ein veralteter Scan wäre schlimmer als keiner.</p></div>`;
+    return;
+  }
+  const fehler = Object.entries(S.fehler || {});
+  const anz = S.anzahl || {};
+  const kand = alle.filter(o => o.urteil === 'A_PLUS' || o.urteil === 'A');
+  const nice = {krypto:'Krypto', aktien:'Aktien', gold:'Gold'};
+
+  let h = `<div class="note"><span class="nt">${alle.length} Instrumente gescannt</span>
+    <p>${Object.entries(anz).map(([k,v]) => `${nice[k]||k} ${v}`).join(' · ')}
+    — ${kand.length ? `<strong>${kand.length} Kandidat(en)</strong> mit Score und
+    Chance-Risiko-Verhältnis gleichzeitig gut.` : 'kein Kandidat: nirgends liegt das Ziel weiter weg als der Stop.'}</p></div>`;
+
+  if (fehler.length) {
+    h += `<div class="note bad"><span class="nt">Eine Anlageklasse fehlt</span>
+      <p>${fehler.map(([k,v]) => `${nice[k]||k}: ${esc(v)}`).join('<br>')}</p>
+      <p>Die Rangliste ist dadurch unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>`;
+  }
+
+  h += alle.slice(0, 25).map(o => {
+    const kl = o.urteil === 'A_PLUS' ? 'aplus' : o.urteil === 'A' ? 'a'
+             : o.urteil === 'WATCH' ? 'watch' : '';
+    const ul = {A_PLUS:'A+', A:'A', WATCH:'WATCH', NO_TRADE:'—'}[o.urteil] || '—';
+    const dir = o.richtung === 'long' ? 'long' : o.richtung === 'short' ? 'short' : '';
+    const d = o.kurs >= 1000 ? 0 : o.kurs >= 10 ? 2 : 4;
+    const num = v => v == null ? '—' : Number(v).toLocaleString('de-DE',
+      {minimumFractionDigits:d, maximumFractionDigits:d});
+    return `<div class="opp ${kl}">
+      <div class="opp-h">
+        <span class="nm">${esc(D.names[o.instrument] || o.instrument)}</span>
+        ${dir ? `<span class="dir ${dir}">${dir.toUpperCase()}</span>` : ''}
+        <span class="ur ${kl}">${ul}</span>
+        <span class="sc">${o.score.toFixed(0)}</span>
+      </div>
+      <div class="opp-b">
+        ${(o.faktoren||[]).map(f => `<div class="fak">
+          <span class="fn">${esc(f.name.replace(/_/g,' '))}</span>
+          <span class="fb"><i style="width:${(f.punkte/f.max*100).toFixed(0)}%"></i></span>
+          <span class="fd">${esc(f.detail)}</span>
+        </div>`).join('')}
+        ${o.ziel ? `<div class="zt">
+          <span>Kurs <b>${num(o.kurs)}</b></span>
+          <span>TP1 <b>${num(o.ziel)}</b></span>
+          ${o.tp2 ? `<span>TP2 <b>${num(o.tp2)}</b></span>` : ''}
+          ${o.tp3 ? `<span>TP3 <b>${num(o.tp3)}</b></span>` : ''}
+          <span>Stop <b>${num(o.invalidierung)}</b></span>
+          ${o.rr ? `<span>R:R <b>1:${o.rr.toFixed(1)}</b></span>` : ''}
+        </div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  h += `<div class="note warn" style="margin-top:22px">
+    <span class="nt">Was der Score ist — und was nicht</span>
+    <p>Er beschreibt, was am Chart gerade zusammenpasst: Ausrichtung der Zeitebenen,
+      frischer Strukturbruch, Weg zum nächsten Liquiditätsziel, offene Zonen, Momentum,
+      Lage in der Spanne.</p>
+    <p><strong>Er ist kein belegter Gewinnhinweis.</strong> Die Gewichte sind gesetzt, nicht
+      an historische Ergebnisse angepasst — das wäre genau das Overfitting, das wir
+      vermeiden. Ob ein hoher Score Geld bringt, ist eine eigene Frage.</p>
+  </div>`;
+  el.innerHTML = h;
+})();
 
 /* ---------- Alarme ---------- */
 /* Bewusst streng: TSMOM ist eine Allokationsregel, keine Einstiegs-Timing-Regel.

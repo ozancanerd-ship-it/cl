@@ -98,6 +98,18 @@ def _series(repo: Path, bars: int = 200) -> dict[str, list[float]]:
     return out
 
 
+def _scan_json(repo: Path) -> dict:
+    """Der Gesamtmarkt-Scan, falls vorhanden. Fehlt er, bleibt die Seite ohne Rangliste
+    statt mit einer alten — ein veralteter Scan waere schlimmer als keiner."""
+    f = repo / "web" / "scan.json"
+    if not f.exists():
+        return {}
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
 def _plan_json(repo: Path) -> dict:
     """daily_report.py als Unterprozess — eine Quelle fuer die Zahlen, nicht zwei."""
     out = subprocess.run(
@@ -178,6 +190,7 @@ def main() -> int:
     d = _plan_json(repo)
     plan = d["plan"]
     series = _series(repo)
+    scan = _scan_json(repo)
     payload = {
         "plan": plan,
         "diff": d["diff"],
@@ -186,6 +199,7 @@ def main() -> int:
         "expect": d["expect"],
         "buckets": BUCKETS,
         "series": series,
+        "scan": scan,
         "rules": _rules(repo),
         "names": NAMES,
         "klasse": KLASSE,
