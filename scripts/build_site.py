@@ -98,11 +98,12 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
     import shutil
 
     quelle = repo / "web"
-    stat = {"scan": 0, "assets": 0}
-    f = quelle / "scan.json"
-    if f.exists():
-        shutil.copy2(f, out / "scan.json")
-        stat["scan"] = 1
+    stat = {"scan": 0, "wachliste": 0, "assets": 0}
+    for name, schluessel in (("scan.json", "scan"), ("watchlist.json", "wachliste")):
+        f = quelle / name
+        if f.exists():
+            shutil.copy2(f, out / name)
+            stat[schluessel] = 1
     ordner = quelle / "asset"
     if ordner.is_dir():
         ziel = out / "asset"

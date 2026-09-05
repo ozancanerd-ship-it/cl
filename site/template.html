@@ -281,6 +281,7 @@ button.link{appearance:none; background:none; border:0; font:inherit; font-size:
 const D = JSON.parse(document.getElementById('payload').textContent);
 const P = D.plan;
 let S = null;                 // scan.json
+let WL = null;                // watchlist.json — die beobachteten Setups
 let AKTIV = null;             // gewähltes Instrument (Detailobjekt)
 let AKTIV_TF = 'H4';
 const DETAIL = new Map();     // Instrument -> Detaildaten
@@ -334,7 +335,11 @@ async function ladeScan(){
       Scan wäre schlimmer als keiner.</p></div>`;
     return;
   }
-  zeichneStatus(); zeichneFilter(); zeichneRadar(); zeichneSystem();
+  try {
+    const rw = await fetch('watchlist.json?v=' + Date.now(), {cache:'no-store'});
+    WL = rw.ok ? await rw.json() : null;
+  } catch(e){ WL = null; }
+  zeichneStatus(); zeichneFilter(); zeichneRadar(); zeichneSystem(); zeichneAlarme();
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
   if (start && !AKTIV) waehle(start.instrument, false);
   starteLive();
@@ -418,6 +423,7 @@ function frischeAuf(){
   aktualisiereRadarKurse();
   aktualisiereChartKurs();
   aktualisierePortfolioKurse();
+  if (!$('p5').hidden) zeichneAlarme();
 }
 function abonniere(sym){ /* miniTicker liefert alle Symbole; nichts zu tun. */ }
 function livePreis(sym){ const e = L.get(sym); return e ? e.p : null; }
@@ -1183,8 +1189,63 @@ function zeichnePlan(){
 }
 
 /* ============================================================ ALARME */
+/* Was der Wächter live daraus macht. Die Marken kommen aus dem Scan, der Zustand
+   wird hier im Browser aus dem Livekurs gerechnet — parallel zum CI-Lauf, der die
+   Meldung verschickt. Zwei Wege zur selben Aussage; wenn sie auseinanderlaufen,
+   ist das ein Befund und kein Schönheitsfehler. */
+function wachzeile(w){
+  const live = L.get(w.instrument);
+  const kurs = live ? live.p : null;
+  const d = digits(w.einstieg);
+  const lang = w.richtung === 'long';
+  let zustand = w.zustand, lz = '';
+  if (kurs != null && zustand === 'wartet_auf_einstieg'){
+    const erreicht = lang ? kurs <= w.einstieg : kurs >= w.einstieg;
+    if (erreicht){ zustand = 'einstieg erreicht (live)'; lz = 'hot'; }
+  }
+  const weg = kurs != null ? (lang ? (w.einstieg/kurs - 1) : (kurs/w.einstieg - 1)) * 100 : null;
+  const risiko = Math.abs(w.einstieg - w.stop);
+  const r = (kurs != null && risiko > 0)
+    ? ((lang ? kurs - (w.einstiegskurs ?? w.einstieg) : (w.einstiegskurs ?? w.einstieg) - kurs) / risiko)
+    : null;
+  const ZUSTAND = {
+    'wartet_auf_einstieg':'wartet auf Einstieg', 'aktiv':'aktiv',
+    'ziel_erreicht':'Ziel erreicht', 'stop':'Stop', 'invalidiert':'ungültig',
+    'abgelaufen':'abgelaufen'
+  };
+  return `<div class="alarm ${lz || (w.zustand==='aktiv'?'hot':'')}" data-sym="${esc(w.instrument)}">
+    <div class="ah"><span>${esc(name(w.instrument))} ${lang?'LONG':'SHORT'}</span>
+      <span class="d">${esc(ZUSTAND[zustand]||zustand)} · ${esc(w.note)}</span></div>
+    <p>Einstieg <strong>${num(w.einstieg,d)}</strong> <span style="color:var(--ink-3)">(${esc(w.einstieg_art)})</span>
+      · Stop <strong>${num(w.stop,d)}</strong>
+      ${w.tp1!=null?`· Ziel ${num(w.tp1,d)}`:''}${w.tp2!=null?` / ${num(w.tp2,d)}`:''}${w.tp3!=null?` / ${num(w.tp3,d)}`:''}</p>
+    ${kurs!=null?`<p>Kurs <strong>${num(kurs,d)}</strong>
+      ${weg!=null&&w.zustand==='wartet_auf_einstieg'?` · noch <strong>${Math.abs(weg).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}
+      ${r!=null&&w.zustand==='aktiv'?` · <strong class="${r>=0?'up':'dn'}">${r>=0?'+':''}${r.toFixed(2)}R</strong>`:''}
+      ${(w.erreicht||[]).length?` · erreicht: ${w.erreicht.join(', ')}`:''}</p>`:''}
+  </div>`;
+}
+
 function zeichneAlarme(){
   let h = '';
+  const wachen = ((WL && WL.wachen) || []).filter(w =>
+    !['stop','ziel_erreicht','invalidiert','abgelaufen'].includes(w.zustand));
+  const fertig = ((WL && WL.wachen) || []).filter(w =>
+    ['stop','ziel_erreicht','invalidiert','abgelaufen'].includes(w.zustand));
+  h += `<h2>Wachliste</h2>`;
+  if (wachen.length){
+    h += `<p class="lead">Diese Setups werden alle 15 Minuten gegen den echten Kurs geprüft.
+      Du bekommst eine Meldung, wenn der Einstieg, ein Ziel oder der Stop getroffen wird —
+      du musst nichts selbst einstellen.</p>`;
+    h += wachen.map(wachzeile).join('');
+  } else {
+    h += `<p class="leer">Keine offene Wache. Sobald der Scan ein handelbares Setup findet,
+      landet es automatisch hier.</p>`;
+  }
+  if (fertig.length){
+    h += `<h3>Abgeschlossen</h3>` + fertig.slice(0,8).map(wachzeile).join('');
+  }
+
   const kand = (S?.gesamt||[]).filter(o=>o.handelbar);
   h += `<h2>Aktive Setups</h2>`;
   if (kand.length){

@@ -13,8 +13,43 @@ Es gibt **keinen dauerlaufenden Prozess**. Es gibt einen Zeitplan:
 
 | Wann | Was |
 |---|---|
-| stündlich, :25 UTC | voller Marktscan (Krypto, Aktien, Gold) → Alarm **nur bei Änderung** → Seite neu bauen |
+| alle 15 Min (:05 :20 :35 :50) | **Wächter**: kein Scan, nur die Kurse der beobachteten Setups. Meldet, wenn Einstieg, Ziel oder Stop tatsächlich getroffen wurde |
+| stündlich, :25 UTC | voller Marktscan (Krypto, Aktien, Gold) → neue Setups auf die Wachliste → Alarm bei Änderung → Seite neu bauen |
 | täglich, 23:10 UTC | zusätzlich Forward-Journalzeile + Tagesplan per Telegram |
+
+## Die Wachliste
+
+Jedes handelbare Setup wandert automatisch drauf. Ozans Vorgabe: „will nicht selber
+alarme erstellen."
+
+```
+WARTET_AUF_EINSTIEG ──► AKTIV ──► TP1 ──► TP2 ──► TP3 ──► ZIEL_ERREICHT
+        │                 │
+        ▼                 ▼
+   ABGELAUFEN           STOP / INVALIDIERT
+```
+
+Geprüft wird gegen **Hoch und Tief seit der letzten Prüfung**, nicht gegen den
+Schlusskurs — sonst rutscht ein Treffer um 14:23 durch, weil der Kurs um 14:30 wieder
+darunter steht. Jeder Übergang wird genau einmal gemeldet; der Zustand liegt in
+`data/repository_real/live/watchlist.json` und wird mitcommittet.
+
+**Zwei ehrliche Einschränkungen:**
+
+1. Sind im selben Fenster Ziel **und** Stop berührt worden, sagt ein Hoch/Tief nicht,
+   was zuerst kam. Die Wachliste nimmt dann den **Stop** an. Eine Statistik, die sich
+   im Zweifel den Gewinn gutschreibt, wäre geschönt.
+2. Der Takt ist 15 Minuten, nicht Echtzeit. Für Swing-Trades über Tage kein
+   Unterschied; für Scalping wäre es einer.
+
+**Wer meldet was** — damit dieselbe Nachricht nicht zweimal kommt:
+
+| Meldung | Skript |
+|---|---|
+| Neues Setup mit Einstieg, Stop, Zielen, CRV | `watch_levels.py --vollstaendig` |
+| Einstieg / TP1 / TP2 / TP3 / Stop erreicht | `watch_levels.py` |
+| Setup abgelaufen, Richtung gedreht | `watch_levels.py` |
+| Setup weggebrochen, neue Nummer 1, Chart zieht an | `scan_alert.py --ohne-setups` |
 
 Der echte Dauerlauf-Daemon (`scripts/run_live_daemon.py`) existiert und ist fertig
 verdrahtet: WebSocket-Stream → MarketContext → MTF → Strategie → Entscheidung →
@@ -158,6 +193,7 @@ ein Plan wird, greifen drei Filter — in dieser Reihenfolge:
 | Gesamtmarkt-Scan (Rangliste) | `web/scan.json` — bei jedem Lauf neu |
 | Detailansicht je Wert | `web/asset/<SYM>.json` — Zeichnung, MTF, Muster, Kommentar |
 | Alarm-Stand (wogegen verglichen wird) | `data/repository_real/live/scan_alert_state.json` — **muss mitcommittet werden** |
+| Wachliste (Zustand je Setup) | `data/repository_real/live/watchlist.json` — **muss mitcommittet werden** |
 | Alarm-Verlauf (was rausging) | `data/repository_real/live/alerts.jsonl` |
 
 ## Von Hand nachsehen
@@ -174,6 +210,8 @@ python3 scripts/build_scan_data.py --out web --profil konservativ   # strengere 
 python3 scripts/opportunity_scan.py --symbols BTCUSDT --top 5       # einzeln
 python3 scripts/scan_alert.py --dry-run    # zeigen, was gemeldet würde — Stand bleibt
 python3 scripts/trader_analysis.py BTCUSDT # Struktur, Liquidität, Zonen im Detail
+python3 scripts/watch_levels.py --dry-run  # zeigen, was gemeldet würde
+python3 scripts/watch_levels.py --vollstaendig --dry-run   # inkl. neuer Setups
 ```
 
 ## Alternative ohne GitHub

@@ -50,6 +50,15 @@ def main() -> int:
         default="warning",
         help="ab welcher Stufe aufs Telefon. Standard: warning (A+/A-Setups, Wegbrueche).",
     )
+    ap.add_argument(
+        "--ohne-setups",
+        action="store_true",
+        help=(
+            "Neue Setups NICHT melden. Das uebernimmt watch_levels.py mit dem vollen "
+            "Plan (Einstieg, Stop, Ziele, CRV) — beides zu schicken waere dieselbe "
+            "Nachricht zweimal, einmal davon ohne die Zahlen, auf die es ankommt."
+        ),
+    )
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
     args = ap.parse_args()
 
@@ -67,6 +76,8 @@ def main() -> int:
 
     jetzt = datetime.now(UTC)
     alarme, neuer_stand = ScanWaechter().pruefen(doc, _laden(args.stand), jetzt=jetzt)
+    if args.ohne_setups:
+        alarme = [a for a in alarme if a.art != "NEUES_SETUP"]
 
     print(f"Scan vom {doc.get('erzeugt')} · {len(doc.get('gesamt', []))} Instrumente")
     print(f"{len(alarme)} Aenderung(en)\n")

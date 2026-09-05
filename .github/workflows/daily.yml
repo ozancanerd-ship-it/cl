@@ -40,6 +40,10 @@ on:
     # bewegen sich nur waehrend der Boersenzeit — die stillen Laeufe kosten nichts und
     # melden nichts. Ein Alarm geht nur bei einer ECHTEN Aenderung raus.
     - cron: "25 * * * *"
+    # Alle 15 Minuten der leichte Waechter: KEIN Scan, nur die Kurse der beobachteten
+    # Setups. Er meldet, wenn ein Einstieg, ein Ziel oder ein Stop tatsaechlich
+    # getroffen wurde — Ozans Vorgabe: "will nicht selber alarme erstellen".
+    - cron: "5,20,35,50 * * * *"
   workflow_dispatch: {}   # Knopf zum Selbststarten, fuer Tests
   push:
     branches: [main]      # nach einer Aenderung sofort neu bauen, statt bis 23:10 zu warten
@@ -79,7 +83,7 @@ jobs:
       # Ende gezielt rot gemacht, damit der Ausfall sichtbar bleibt.
       - name: Forward-Zeile aufzeichnen
         id: forward
-        if: github.event.schedule != '25 * * * *'
+        if: github.event.schedule != '25 * * * *' && github.event.schedule != '5,20,35,50 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -87,7 +91,7 @@ jobs:
 
       - name: Tagesplan schicken
         id: report
-        if: github.event.schedule != '25 * * * *'
+        if: github.event.schedule != '25 * * * *' && github.event.schedule != '5,20,35,50 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -110,31 +114,57 @@ jobs:
       # MTF-Tabelle, Mustern und Kommentar.
       - name: Markt scannen
         id: scan
+        if: github.event.schedule != '5,20,35,50 * * * *'
         continue-on-error: true
         timeout-minutes: 14
         env:
           PYTHONPATH: src
         run: python scripts/build_scan_data.py --out web --krypto 110 --aktien 40 --detail 60
 
-      # Der eigentliche Grund fuer den Stundentakt. Verglichen wird gegen den letzten Stand,
-      # geschickt wird nur die Aenderung: neues A+/A-Setup, weggebrochenes Setup, neue
-      # Nummer 1. Kein Alarm ist hier das normale Ergebnis — "nicht 200 mal am Tag".
-      # Eine stumme Anlageklasse erzeugt bewusst KEINEN Wegbruch-Alarm.
+      # Marktweite Aenderungen: weggebrochenes Setup, neue Nummer 1, ein Chart der
+      # anzieht. Neue Setups meldet dieser Schritt bewusst NICHT — das macht der
+      # Waechter darunter mit dem vollen Plan. Eine stumme Anlageklasse erzeugt
+      # bewusst KEINEN Wegbruch-Alarm.
       - name: Alarm bei Aenderung
         id: alarm
+        if: github.event.schedule != '5,20,35,50 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/scan_alert.py --scan web/scan.json --send
+        run: python scripts/scan_alert.py --scan web/scan.json --send --ohne-setups
+
+      # Nach dem Scan: neue Setups auf die Wachliste, ueberholte verwerfen, und pruefen,
+      # ob eine Marke getroffen wurde.
+      - name: Wachliste fuehren
+        id: wache_voll
+        if: github.event.schedule != '5,20,35,50 * * * *'
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/watch_levels.py --send --vollstaendig
+
+      # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan. Dauert Sekunden.
+      - name: Marken pruefen
+        id: wache_licht
+        if: github.event.schedule == '5,20,35,50 * * * *'
+        env:
+          PYTHONPATH: src
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/watch_levels.py --send
 
       - name: Web-App bauen
+        if: github.event.schedule != '5,20,35,50 * * * *'
         env:
           PYTHONPATH: src
         run: python scripts/build_site.py --out _site
 
       - name: Journal sichern
+        if: github.event.schedule != '5,20,35,50 * * * *' || steps.wache_licht.outputs.geaendert == '1'
         run: |
           git config user.name  "trading-agent[bot]"
           git config user.email "trading-agent@users.noreply.github.com"
@@ -142,7 +172,8 @@ jobs:
           # alles neu — genau der Spam, den wir nicht wollen.
           git add -f data/repository_real/live/tsmom_forward.jsonl \
                      data/repository_real/live/tsmom_forward_corrections.jsonl \
-                     data/repository_real/live/scan_alert_state.json || true
+                     data/repository_real/live/scan_alert_state.json \
+                     data/repository_real/live/watchlist.json || true
           if git diff --cached --quiet; then
             echo "kein neuer Stand — nichts zu sichern"
             exit 0
@@ -160,6 +191,7 @@ jobs:
           echo "::warning::Journalzeile konnte nicht gesichert werden — kommt beim naechsten Lauf mit"
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.event.schedule != '5,20,35,50 * * * *'
         with:
           path: _site
 
@@ -168,12 +200,14 @@ jobs:
         if: >-
           steps.forward.outcome == 'failure' || steps.report.outcome == 'failure'
           || steps.scan.outcome == 'failure' || steps.alarm.outcome == 'failure'
+          || steps.wache_voll.outcome == 'failure'
         run: |
           echo "::error::Der Lauf war unvollstaendig — siehe die Schritte oben."
           exit 1
 
   veroeffentlichen:
     needs: tagesplan
+    if: github.event.schedule != '5,20,35,50 * * * *'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

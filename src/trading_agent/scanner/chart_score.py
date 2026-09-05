@@ -117,6 +117,11 @@ class ChartChance:
     warnungen: tuple[str, ...] = ()
     #: Kennzahlen von aussen (Umsatz, 24h-Bewegung) — Kontext, kein Score-Bestandteil.
     zusatz: dict[str, Any] = field(default_factory=dict)
+    #: Wo eingestiegen wird. Entweder sofort zum Kurs oder beim Ruecklauf in eine
+    #: offene Zone — das ist der Unterschied zwischen "kauf jetzt" und "warte auf X".
+    einstieg: float | None = None
+    einstieg_art: str = "sofort"
+    einstieg_zone: tuple[float, float] | None = None
 
     @property
     def note_kurz(self) -> str:
@@ -149,6 +154,9 @@ class ChartChance:
                 if self.erwartete_bewegung_pct is not None
                 else None
             ),
+            "einstieg": self.einstieg,
+            "einstieg_art": self.einstieg_art,
+            "einstieg_zone": list(self.einstieg_zone) if self.einstieg_zone else None,
             "confidence": self.confidence,
             "profil": self.profil,
             "begruendung": self.begruendung,
@@ -359,8 +367,12 @@ def bewerte_chart(
 
     # 4 — Liegt eine offene Zone in Wettrichtung nah genug, um einzusteigen?
     punkte, detail = 0.0, "keine offene Zone in der Naehe"
+    einstieg: float | None = None
+    einstieg_art = "sofort"
+    einstieg_zone: tuple[float, float] | None = None
     if richtung is not None and atr > 0:
         nah: list[tuple[float, str]] = []
+        kandidat: list[tuple[float, float, float, float, str]] = []
         for tf in (Timeframe.H4, Timeframe.H1, Timeframe.M15):
             tfc = per_tf.get(tf)
             for zone, art in (
@@ -379,10 +391,36 @@ def bewerte_chart(
                     d_atr = abs(mitte - kurs) / atr
                     if d_atr <= 3.0:
                         nah.append((d_atr, f"{art} {tf.value} bei {mitte:,.2f}".replace(",", " ")))
+                    # Als Einstiegszone taugt nur, was in Gegenrichtung zum Kurs liegt:
+                    # bei einem Long also DARUNTER. Eine Zone ueber dem Kurs waere kein
+                    # Ruecklauf, sondern ein Nachlaufen.
+                    zurueck = (
+                        float(z.zone_high) < kurs
+                        if richtung is Direction.LONG
+                        else float(z.zone_low) > kurs
+                    )
+                    if zurueck and d_atr <= 2.5:
+                        kandidat.append(
+                            (
+                                d_atr,
+                                float(z.zone_low),
+                                float(z.zone_high),
+                                mitte,
+                                f"{art} {tf.value}",
+                            )
+                        )
         if nah:
             nah.sort()
             punkte = MAX_PUNKTE["zonen"] * min(1.0, len(nah) / 3.0)
             detail = f"{len(nah)} offene Zone(n), naechste {nah[0][1]}"
+        if kandidat:
+            kandidat.sort()
+            _, zlo, zhi, _, zart = kandidat[0]
+            # Einstieg an der dem Kurs zugewandten Kante: dort wird die Zone zuerst
+            # beruehrt. Die Mitte waere ein Wunsch, keine Marke.
+            einstieg = zhi if richtung is Direction.LONG else zlo
+            einstieg_zone = (zlo, zhi)
+            einstieg_art = f"Ruecklauf in {zart}"
     f.append(ChartFaktor("zonen", punkte, MAX_PUNKTE["zonen"], detail))
 
     # 5 — Hat die Bewegung Kraft? Displacement ist der messbare Teil davon.
@@ -416,14 +454,32 @@ def bewerte_chart(
     inval = _invalidierung(per_tf, kurs, richtung, atr) if richtung else None
     bew_pct = (abs(ziel - kurs) / kurs * 100) if ziel else None
     bew_atr = (abs(ziel - kurs) / atr) if ziel and atr > 0 else None
+
+    # Einstieg festzurren. Eine Zone taugt nur, wenn zwischen ihr und der
+    # Invalidierung noch Luft ist — sonst waere der Stop schon beim Einstieg
+    # erreicht, und das schoene Chance-Risiko-Verhaeltnis waere gerechnet, nicht real.
+    if einstieg is not None and inval is not None and richtung is not None:
+        zu_tief = (
+            einstieg <= inval + 0.3 * atr
+            if richtung is Direction.LONG
+            else einstieg >= inval - 0.3 * atr
+        )
+        if zu_tief:
+            einstieg, einstieg_art, einstieg_zone = kurs, "sofort", None
+    if einstieg is None and richtung is not None:
+        einstieg = kurs
+
+    # Chance-Risiko-Verhaeltnis und erwartete Bewegung zaehlen AB DEM EINSTIEG, nicht
+    # ab dem jetzigen Kurs. Genau darin liegt der Wert eines Ruecklaufs: derselbe Trade
+    # mit kuerzerem Weg zum Stop und laengerem zum Ziel.
+    bezug = einstieg if einstieg is not None else kurs
     rr = None
     rr_ziel = tp2 if tp2 is not None else ziel
-    if rr_ziel is not None and inval is not None and abs(kurs - inval) > 0:
-        rr = abs(rr_ziel - kurs) / abs(kurs - inval)
+    if rr_ziel is not None and inval is not None and abs(bezug - inval) > 0:
+        rr = abs(rr_ziel - bezug) / abs(bezug - inval)
 
-    # Die erwartete Bewegung bis TP2 — die Groesse, an der ein Swing-Trade haengt.
     swing_ziel = tp2 if tp2 is not None else ziel
-    erwartet = (abs(swing_ziel - kurs) / kurs * 100.0) if swing_ziel else None
+    erwartet = (abs(swing_ziel - bezug) / bezug * 100.0) if swing_ziel and bezug else None
 
     warnungen = _warnungen(zusatz, per_tf, richtung, score)
 
@@ -489,6 +545,9 @@ def bewerte_chart(
         bremse=urteilung.bremse,
         warnungen=tuple(warnungen),
         zusatz=zusatz,
+        einstieg=einstieg if einstieg is not None else (kurs if richtung is not None else None),
+        einstieg_art=einstieg_art,
+        einstieg_zone=einstieg_zone,
     )
 
 
