@@ -279,3 +279,35 @@ def test_zu_enger_stop_kommt_nicht_auf_die_liste() -> None:
     # Derselbe Wert mit vernuenftigem Abstand geht durch.
     weit = _zeile("UUSDT", einstieg=1.0, stop=1.02, tp1=0.95, tp2=None, tp3=None, richtung="short")
     assert len(w.aufnehmen([weit], jetzt=T0)) == 1
+
+
+def test_veralteter_plan_wird_ersetzt_solange_nicht_eingestiegen() -> None:
+    """Ozan: "wenn da einfach nur ein Wert liegt, der dann so krass gesunken ist,
+    dass der Wert auf einmal gar keinen Sinn ergibt"."""
+    w = Wachliste()
+    w.aufnehmen([_zeile(einstieg=100.0, stop=90.0)], jetzt=T0)
+    ev = w.aufnehmen([_zeile(einstieg=80.0, stop=72.0)], jetzt=T0 + timedelta(hours=2))
+    assert [e.art for e in ev] == ["PLAN_AKTUALISIERT"]
+    assert w.wachen["BTCUSDT"].einstieg == 80.0
+    assert w.wachen["BTCUSDT"].stop == 72.0
+    assert "wandert" in ev[0].text
+
+
+def test_kleine_abweichung_laesst_den_plan_stehen() -> None:
+    w = Wachliste()
+    w.aufnehmen([_zeile(einstieg=100.0)], jetzt=T0)
+    ev = w.aufnehmen([_zeile(einstieg=100.5)], jetzt=T0 + timedelta(hours=2))
+    assert ev == []
+    assert w.wachen["BTCUSDT"].einstieg == 100.0
+
+
+def test_laufender_trade_behaelt_seinen_plan() -> None:
+    """Ab dem Einstieg ist der Plan ein Vertrag — sonst ist kein Ergebnis messbar."""
+    w = Wachliste()
+    w.aufnehmen([_zeile(einstieg=100.0, stop=90.0)], jetzt=T0)
+    w.pruefen(_kurs(hoch=101.0, tief=99.0), jetzt=T0 + timedelta(minutes=15))
+    assert w.wachen["BTCUSDT"].zustand == Zustand.AKTIV.value
+    ev = w.aufnehmen([_zeile(einstieg=70.0, stop=60.0)], jetzt=T0 + timedelta(hours=2))
+    assert ev == []
+    assert w.wachen["BTCUSDT"].einstieg == 100.0
+    assert w.wachen["BTCUSDT"].stop == 90.0

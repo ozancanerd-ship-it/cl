@@ -1395,18 +1395,26 @@ function ausRanking(){
   const rows = (S?.gesamt||[]).filter(o=>o.handelbar && o.einstieg!=null && o.invalidierung!=null);
   return rows.map(o=>{
     const w = wachen.get(o.instrument);
-    // Die Wachliste gewinnt, wo sie etwas weiss (sie haelt den Zustand seit der
-    // Aufnahme); der Scan liefert die aktuellen Zahlen fuer alles Neue.
+    /* Vor dem Einstieg ist der Plan ein VORSCHLAG und muss aktuell sein: es gelten die
+       Zahlen des letzten Scans. Ab dem Einstieg ist er ein VERTRAG und bleibt fest —
+       sonst wandert der Stop mit jedem Scan, und hinterher weiss niemand, gegen welchen
+       Plan das Ergebnis gemessen wurde.
+       Genau das war Ozans Einwand: ein Einstieg, der vor Stunden gesetzt wurde und an
+       dem der Markt laengst vorbeigelaufen ist, ergibt keinen Sinn mehr. */
+    const imTrade = w && w.zustand === 'aktiv';
     const basis = {
       instrument: o.instrument, klasse: o.klasse, richtung: o.richtung, note: o.note,
-      einstieg: w ? w.einstieg : o.einstieg,
-      einstieg_art: w ? w.einstieg_art : (o.einstieg_art || 'sofort'),
-      stop: w ? w.stop : o.invalidierung,
-      tp1: w ? w.tp1 : o.ziel, tp2: w ? w.tp2 : o.tp2, tp3: w ? w.tp3 : o.tp3,
+      einstieg: imTrade ? w.einstieg : o.einstieg,
+      einstieg_art: imTrade ? w.einstieg_art : (o.einstieg_art || 'sofort'),
+      stop: imTrade ? w.stop : o.invalidierung,
+      tp1: imTrade ? w.tp1 : o.ziel,
+      tp2: imTrade ? w.tp2 : o.tp2,
+      tp3: imTrade ? w.tp3 : o.tp3,
       zustand: w ? w.zustand : 'wartet_auf_einstieg',
       erreicht: w ? (w.erreicht||[]) : [],
       einstiegskurs: w ? w.einstiegskurs : null,
       aufgenommen: w ? w.aufgenommen : (S?.erzeugt || ''),
+      frisch: !imTrade,
     };
     return {...lage(basis), o};
   }).filter(x=>OFFEN.includes(x.w.zustand));
@@ -1446,7 +1454,7 @@ function signalKarte(x){
     </div>
     <p style="font-size:14.5px;margin-top:6px">${urteil}</p>
     <div class="kpi">
-      <span>Einstieg <b>${num(w.einstieg,d)}</b> <span style="color:var(--ink-3)">${esc(w.einstieg_art)}</span></span>
+      <span>Einstieg <b>${num(w.einstieg,d)}</b> <span style="color:var(--ink-3)">${esc(w.einstieg_art)}${w.frisch?' · aus dem letzten Scan':' · fest seit Einstieg'}</span></span>
       <span>Stop <b>${num(w.stop,d)}</b></span>
       ${ziele.length?`<span>Ziele <b>${ziele.map(v=>num(v,d)).join(' / ')}</b></span>`:''}
     </div>

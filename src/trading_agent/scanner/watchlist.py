@@ -50,6 +50,16 @@ HALTBARKEIT = timedelta(days=10)
 #: der App kam als Positionsgroesse "9.992 EUR Einsatz" bei 1.200 EUR Kapital heraus.
 MIN_STOP_ANTEIL = 0.003  # 0,3 %
 
+#: Ab dieser Abweichung gilt der Einstiegsplan als ueberholt und wird durch den
+#: frischen ersetzt (in Prozent des Einstiegs).
+#:
+#: Ozans Einwand, woertlich: „wenn da einfach nur ein Wert liegt, der dann so krass
+#: gesunken ist, dass der Wert auf einmal gar keinen Sinn ergibt". Genau so war es
+#: gebaut — eine aufgenommene Wache behielt ihre Zahlen fuer immer. Vor dem Einstieg
+#: ist der Plan aber ein Vorschlag und gehoert aktualisiert; erst ab dem Einstieg ist
+#: er ein Vertrag und muss fest bleiben, sonst ist kein Ergebnis mehr messbar.
+PLAN_VERALTET_PCT = 1.5
+
 
 class Zustand(StrEnum):
     WARTET = "wartet_auf_einstieg"
@@ -213,13 +223,27 @@ class Wachliste:
         gegen welchen Plan das Ergebnis gemessen wurde.
         """
         neu: list[Ereignis] = []
+        alt_einstieg = {
+            k: v.einstieg for k, v in self.wachen.items() if v.zustand == Zustand.WARTET.value
+        }
         for z in zeilen:
             name = str(z.get("instrument") or "")
             if not name or not z.get("handelbar"):
                 continue
             vorhanden = self.wachen.get(name)
             if vorhanden is not None and vorhanden.zustand not in ENDZUSTAENDE:
-                continue
+                # Laufender Trade: Plan bleibt, wie er war.
+                if vorhanden.zustand != Zustand.WARTET.value:
+                    continue
+                neuer_einstieg = z.get("einstieg")
+                if neuer_einstieg is None or vorhanden.einstieg <= 0:
+                    continue
+                abweichung = abs(float(neuer_einstieg) - vorhanden.einstieg) / vorhanden.einstieg
+                if abweichung * 100.0 < PLAN_VERALTET_PCT:
+                    continue
+                # Der Plan ist ueberholt — er wird unten neu gebaut.
+                del self.wachen[name]
+                vorhanden = None
             einstieg = z.get("einstieg")
             stop = z.get("invalidierung")
             if einstieg is None or stop is None:
@@ -245,21 +269,39 @@ class Wachliste:
                 continue
             if w.einstieg > 0 and w.risiko / w.einstieg < MIN_STOP_ANTEIL:
                 continue
+            ersetzt = alt_einstieg.get(name)
             self.wachen[name] = w
             sofort = w.einstieg_art == "sofort"
             neu.append(
                 Ereignis(
-                    art="NEUES_SETUP",
+                    art="PLAN_AKTUALISIERT" if ersetzt is not None else "NEUES_SETUP",
                     instrument=name,
                     dringend=w.note in ("A+", "A", "A_PLUS", "A_MINUS", "A−"),
-                    titel=f"{w.note} {'BUY' if w.long else 'SELL'}  {name}",
-                    text=_plan_text(w)
-                    + (
-                        "\n\nEinstieg liegt beim aktuellen Kurs."
-                        if sofort
-                        else f"\n\nNoch nicht einsteigen — warten, bis {_fmt(w.einstieg)} erreicht ist."
+                    titel=(
+                        f"Plan angepasst  {name}"
+                        if ersetzt is not None
+                        else f"{w.note} {'BUY' if w.long else 'SELL'}  {name}"
                     ),
-                    dedup_key=f"setup:{name}:{w.note}:{w.richtung}",
+                    text=(
+                        (
+                            f"Der Einstieg wandert von {_fmt(ersetzt)} auf "
+                            f"{_fmt(w.einstieg)} — der Markt ist weitergelaufen, der alte "
+                            "Wert passt nicht mehr.\n\n"
+                            if ersetzt is not None
+                            else ""
+                        )
+                        + _plan_text(w)
+                        + (
+                            "\n\nEinstieg liegt beim aktuellen Kurs."
+                            if sofort
+                            else f"\n\nNoch nicht einsteigen — warten, bis {_fmt(w.einstieg)} erreicht ist."
+                        )
+                    ),
+                    dedup_key=(
+                        f"plan:{name}:{w.einstieg:.8g}"
+                        if ersetzt is not None
+                        else f"setup:{name}:{w.note}:{w.richtung}"
+                    ),
                 )
             )
         return neu
@@ -433,6 +475,7 @@ __all__ = [
     "ENDZUSTAENDE",
     "HALTBARKEIT",
     "MIN_STOP_ANTEIL",
+    "PLAN_VERALTET_PCT",
     "Ereignis",
     "Wache",
     "Wachliste",
