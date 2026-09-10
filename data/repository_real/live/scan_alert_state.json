@@ -17,7 +17,6 @@
     "setup:AMD:A_MINUS:short": "2026-09-09T15:39:34.023330+00:00",
     "setup:AMD:B:short": "2026-09-08T14:39:26.909891+00:00",
     "setup:AMD:B_PLUS:short": "2026-09-08T15:40:36.020943+00:00",
-    "setup:APTUSDT:A_MINUS:long": "2026-09-08T04:03:17.086981+00:00",
     "setup:ARM:A_MINUS:short": "2026-09-09T15:03:19.815500+00:00",
     "setup:ARM:B_PLUS:short": "2026-09-09T13:39:38.893429+00:00",
     "setup:ATOMUSDT:A:long": "2026-09-08T21:34:41.130389+00:00",
@@ -84,7 +83,6 @@
     "setup:KAITOUSDT:B:long": "2026-09-08T16:40:13.158328+00:00",
     "setup:KO:B_PLUS:short": "2026-09-08T19:03:48.660092+00:00",
     "setup:LIN:A_MINUS:short": "2026-09-09T16:39:49.086516+00:00",
-    "setup:LINKUSDT:A:long": "2026-09-08T04:38:50.511043+00:00",
     "setup:LINKUSDT:A_MINUS:long": "2026-09-09T01:04:31.443502+00:00",
     "setup:LINKUSDT:B_PLUS:long": "2026-09-08T12:44:24.536123+00:00",
     "setup:LTCUSDT:A_MINUS:long": "2026-09-08T22:36:45.386234+00:00",
@@ -127,6 +125,8 @@
     "setup:RAYUSDT:B:long": "2026-09-09T10:39:00.856893+00:00",
     "setup:RAYUSDT:B_PLUS:long": "2026-09-09T17:37:44.243142+00:00",
     "setup:RENDERUSDT:B:long": "2026-09-09T02:38:18.467799+00:00",
+    "setup:SAHARAUSDT:A_MINUS:long": "2026-09-10T04:39:13.241856+00:00",
+    "setup:SANDUSDT:A_MINUS:short": "2026-09-10T04:39:13.241856+00:00",
     "setup:SEIUSDT:A_MINUS:long": "2026-09-09T03:03:47.183742+00:00",
     "setup:SEIUSDT:B:long": "2026-09-09T15:39:34.023330+00:00",
     "setup:SEIUSDT:B_PLUS:long": "2026-09-09T14:03:08.221382+00:00",
@@ -174,7 +174,6 @@
     "weg:ALGOUSDT:A_MINUS": "2026-09-09T07:38:34.474817+00:00",
     "weg:AMD:A_MINUS": "2026-09-08T13:39:19.747396+00:00",
     "weg:AMD:B_PLUS": "2026-09-08T19:03:48.660092+00:00",
-    "weg:APTUSDT:A_MINUS": "2026-09-08T04:38:50.511043+00:00",
     "weg:ARM:B_PLUS": "2026-09-09T14:03:08.221382+00:00",
     "weg:ATOMUSDT:A": "2026-09-09T03:03:47.183742+00:00",
     "weg:ATOMUSDT:A_MINUS": "2026-09-08T21:03:11.242010+00:00",
@@ -186,10 +185,10 @@
     "weg:BNBUSDT:A_MINUS": "2026-09-10T00:42:37.875304+00:00",
     "weg:BNBUSDT:A_PLUS": "2026-09-08T19:03:48.660092+00:00",
     "weg:BTCUSDT:A_MINUS": "2026-09-09T12:43:50.700115+00:00",
+    "weg:BTCUSDT:B": "2026-09-10T04:39:13.241856+00:00",
     "weg:BTCUSDT:B_PLUS": "2026-09-09T14:03:08.221382+00:00",
     "weg:CAKEUSDT:A_MINUS": "2026-09-09T22:36:35.483273+00:00",
     "weg:CAKEUSDT:B": "2026-09-08T18:03:23.715539+00:00",
-    "weg:CAKEUSDT:B_PLUS": "2026-09-08T04:38:50.511043+00:00",
     "weg:CAT:A_PLUS": "2026-09-09T18:03:01.655895+00:00",
     "weg:CAT:B": "2026-09-09T16:03:17.778395+00:00",
     "weg:CFGUSDT:B": "2026-09-09T06:03:39.056814+00:00",
@@ -197,6 +196,7 @@
     "weg:CHIPUSDT:B_PLUS": "2026-09-09T04:38:49.711710+00:00",
     "weg:COIN:A_MINUS": "2026-09-09T17:37:44.243142+00:00",
     "weg:COTIUSDT:B": "2026-09-09T14:39:28.884311+00:00",
+    "weg:CRVUSDT:B_PLUS": "2026-09-10T04:39:13.241856+00:00",
     "weg:CRWD:B": "2026-09-08T14:39:26.909891+00:00",
     "weg:DASHUSDT:B_PLUS": "2026-09-09T04:38:49.711710+00:00",
     "weg:DIS:A": "2026-09-09T13:39:38.893429+00:00",
@@ -234,7 +234,6 @@
     "weg:LINKUSDT:A_MINUS": "2026-09-09T02:03:53.081160+00:00",
     "weg:LINKUSDT:B_PLUS": "2026-09-09T00:46:21.661127+00:00",
     "weg:LLY:A_MINUS": "2026-09-08T14:04:35.491821+00:00",
-    "weg:LTCUSDT:A": "2026-09-08T04:38:50.511043+00:00",
     "weg:LTCUSDT:A_MINUS": "2026-09-08T19:35:45.226246+00:00",
     "weg:LTCUSDT:B_PLUS": "2026-09-09T00:46:21.661127+00:00",
     "weg:MA:A_MINUS": "2026-09-08T13:39:19.747396+00:00",
@@ -272,7 +271,7 @@
     "weg:SOLVUSDT:A_MINUS": "2026-09-08T10:38:47.990709+00:00",
     "weg:STRKUSDT:A_MINUS": "2026-09-09T21:36:29.144086+00:00",
     "weg:SUIUSDT:A_MINUS": "2026-09-08T15:40:36.020943+00:00",
-    "weg:TAOUSDT:A_MINUS": "2026-09-08T13:39:19.747396+00:00",
+    "weg:TAOUSDT:A_MINUS": "2026-09-10T04:39:13.241856+00:00",
     "weg:TAOUSDT:A_PLUS": "2026-09-10T02:38:08.890152+00:00",
     "weg:TRXUSDT:B": "2026-09-09T12:43:50.700115+00:00",
     "weg:TUTUSDT:A_MINUS": "2026-09-09T00:46:21.661127+00:00",
@@ -301,7 +300,7 @@
     },
     "AAVEUSDT": {
       "richtung": null,
-      "score": 4.5,
+      "score": 3.6,
       "urteil": "NO_TRADE"
     },
     "ACEUSDT": {
@@ -311,12 +310,12 @@
     },
     "ADAUSDT": {
       "richtung": null,
-      "score": 2.7,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "ALGOUSDT": {
       "richtung": null,
-      "score": 3.7,
+      "score": 4.6,
       "urteil": "NO_TRADE"
     },
     "AMD": {
@@ -340,8 +339,8 @@
       "urteil": "NO_TRADE"
     },
     "ARBUSDT": {
-      "richtung": null,
-      "score": 2.4,
+      "richtung": "short",
+      "score": 20.8,
       "urteil": "NO_TRADE"
     },
     "ARM": {
@@ -350,18 +349,18 @@
       "urteil": "A_MINUS"
     },
     "ASTERUSDT": {
-      "richtung": "short",
-      "score": 30.0,
+      "richtung": null,
+      "score": 2.0,
       "urteil": "NO_TRADE"
     },
     "ATOMUSDT": {
       "richtung": "long",
-      "score": 47.2,
+      "score": 44.2,
       "urteil": "WATCH"
     },
     "AVAXUSDT": {
       "richtung": null,
-      "score": 5.9,
+      "score": 2.7,
       "urteil": "NO_TRADE"
     },
     "AVGO": {
@@ -376,32 +375,32 @@
     },
     "BANKUSDT": {
       "richtung": "short",
-      "score": 38.8,
+      "score": 37.8,
       "urteil": "B"
     },
     "BCHUSDT": {
       "richtung": null,
-      "score": 7.9,
+      "score": 6.2,
       "urteil": "NO_TRADE"
     },
     "BMTUSDT": {
       "richtung": null,
-      "score": 10.0,
+      "score": 8.8,
       "urteil": "NO_TRADE"
     },
     "BNBUSDT": {
       "richtung": "long",
-      "score": 59.2,
+      "score": 59.4,
       "urteil": "WATCH"
     },
     "BTCUSDT": {
       "richtung": "long",
-      "score": 38.7,
-      "urteil": "B"
+      "score": 38.9,
+      "urteil": "WATCH"
     },
     "CAKEUSDT": {
       "richtung": "long",
-      "score": 57.2,
+      "score": 57.8,
       "urteil": "WATCH"
     },
     "CAT": {
@@ -411,12 +410,12 @@
     },
     "CFGUSDT": {
       "richtung": "short",
-      "score": 39.6,
+      "score": 41.5,
       "urteil": "WATCH"
     },
     "CHIPUSDT": {
       "richtung": "long",
-      "score": 49.3,
+      "score": 49.4,
       "urteil": "A_MINUS"
     },
     "COIN": {
@@ -426,8 +425,8 @@
     },
     "COTIUSDT": {
       "richtung": "long",
-      "score": 36.3,
-      "urteil": "WATCH"
+      "score": 34.1,
+      "urteil": "NO_TRADE"
     },
     "CRM": {
       "richtung": "long",
@@ -436,8 +435,8 @@
     },
     "CRVUSDT": {
       "richtung": "long",
-      "score": 45.9,
-      "urteil": "B_PLUS"
+      "score": 42.4,
+      "urteil": "WATCH"
     },
     "CRWD": {
       "richtung": "long",
@@ -451,13 +450,13 @@
     },
     "DASHUSDT": {
       "richtung": null,
-      "score": 10.0,
+      "score": 3.0,
       "urteil": "NO_TRADE"
     },
     "DEXEUSDT": {
-      "richtung": null,
-      "score": 1.4,
-      "urteil": "NO_TRADE"
+      "richtung": "short",
+      "score": 30.7,
+      "urteil": "WATCH"
     },
     "DIS": {
       "richtung": "short",
@@ -466,57 +465,57 @@
     },
     "DOGEUSDT": {
       "richtung": null,
-      "score": 7.4,
+      "score": 2.4,
       "urteil": "NO_TRADE"
     },
     "DOTUSDT": {
       "richtung": "long",
-      "score": 51.2,
-      "urteil": "B_PLUS"
+      "score": 50.2,
+      "urteil": "B"
     },
     "ENAUSDT": {
       "richtung": null,
-      "score": 2.4,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "ETCUSDT": {
       "richtung": "long",
-      "score": 44.6,
-      "urteil": "B_PLUS"
+      "score": 45.5,
+      "urteil": "B"
     },
     "ETHFIUSDT": {
       "richtung": null,
-      "score": 7.8,
+      "score": 8.5,
       "urteil": "NO_TRADE"
     },
     "ETHUSDT": {
       "richtung": null,
-      "score": 9.0,
+      "score": 7.4,
       "urteil": "NO_TRADE"
     },
     "FETUSDT": {
       "richtung": "long",
-      "score": 38.6,
+      "score": 44.1,
       "urteil": "WATCH"
     },
     "FFUSDT": {
       "richtung": "long",
-      "score": 47.4,
-      "urteil": "WATCH"
+      "score": 47.7,
+      "urteil": "B"
     },
     "FILUSDT": {
       "richtung": null,
-      "score": 4.8,
+      "score": 5.3,
       "urteil": "NO_TRADE"
     },
     "FORMUSDT": {
       "richtung": null,
-      "score": 3.3,
+      "score": 2.2,
       "urteil": "NO_TRADE"
     },
     "GIGGLEUSDT": {
       "richtung": null,
-      "score": 3.3,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "GOOGL": {
@@ -526,22 +525,22 @@
     },
     "GRAMUSDT": {
       "richtung": null,
-      "score": 5.6,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "HBARUSDT": {
       "richtung": "short",
-      "score": 24.4,
-      "urteil": "WATCH"
+      "score": 24.7,
+      "urteil": "NO_TRADE"
     },
     "HEMIUSDT": {
       "richtung": "long",
-      "score": 34.0,
+      "score": 34.7,
       "urteil": "NO_TRADE"
     },
     "HOLOUSDT": {
       "richtung": "long",
-      "score": 23.9,
+      "score": 23.4,
       "urteil": "NO_TRADE"
     },
     "HON": {
@@ -551,17 +550,17 @@
     },
     "ICPUSDT": {
       "richtung": "long",
-      "score": 41.2,
+      "score": 40.5,
       "urteil": "WATCH"
     },
     "INJUSDT": {
       "richtung": null,
-      "score": 8.2,
+      "score": 7.0,
       "urteil": "NO_TRADE"
     },
     "IOSTUSDT": {
       "richtung": "long",
-      "score": 27.0,
+      "score": 29.1,
       "urteil": "NO_TRADE"
     },
     "JNJ": {
@@ -576,7 +575,7 @@
     },
     "KATUSDT": {
       "richtung": null,
-      "score": 6.4,
+      "score": 6.9,
       "urteil": "NO_TRADE"
     },
     "KO": {
@@ -586,7 +585,7 @@
     },
     "LDOUSDT": {
       "richtung": null,
-      "score": 0.5,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "LIN": {
@@ -606,7 +605,7 @@
     },
     "LTCUSDT": {
       "richtung": "long",
-      "score": 53.0,
+      "score": 51.0,
       "urteil": "WATCH"
     },
     "MA": {
@@ -620,9 +619,9 @@
       "urteil": "NO_TRADE"
     },
     "MEGAUSDT": {
-      "richtung": "long",
-      "score": 39.9,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 3.3,
+      "urteil": "NO_TRADE"
     },
     "META": {
       "richtung": "long",
@@ -630,18 +629,18 @@
       "urteil": "WATCH"
     },
     "MINAUSDT": {
-      "richtung": null,
-      "score": 10.0,
+      "richtung": "long",
+      "score": 25.6,
       "urteil": "NO_TRADE"
     },
     "MITOUSDT": {
       "richtung": "short",
-      "score": 25.5,
+      "score": 25.0,
       "urteil": "NO_TRADE"
     },
     "MORPHOUSDT": {
       "richtung": null,
-      "score": 1.2,
+      "score": 0.9,
       "urteil": "NO_TRADE"
     },
     "MSFT": {
@@ -661,8 +660,8 @@
     },
     "NEARUSDT": {
       "richtung": "long",
-      "score": 55.5,
-      "urteil": "A_MINUS"
+      "score": 51.1,
+      "urteil": "B_PLUS"
     },
     "NEE": {
       "richtung": "short",
@@ -686,7 +685,7 @@
     },
     "ONDOUSDT": {
       "richtung": null,
-      "score": 4.8,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "OPUSDT": {
@@ -696,13 +695,13 @@
     },
     "ORCAUSDT": {
       "richtung": null,
-      "score": 3.2,
+      "score": 6.9,
       "urteil": "NO_TRADE"
     },
     "ORDIUSDT": {
       "richtung": "long",
-      "score": 35.2,
-      "urteil": "WATCH"
+      "score": 34.1,
+      "urteil": "NO_TRADE"
     },
     "PAXGUSDT": {
       "richtung": "long",
@@ -711,12 +710,12 @@
     },
     "PENDLEUSDT": {
       "richtung": "long",
-      "score": 42.1,
+      "score": 42.0,
       "urteil": "WATCH"
     },
     "PENGUUSDT": {
       "richtung": null,
-      "score": 1.8,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "PG": {
@@ -726,7 +725,7 @@
     },
     "PHAUSDT": {
       "richtung": null,
-      "score": 8.0,
+      "score": 10.0,
       "urteil": "NO_TRADE"
     },
     "PLTR": {
@@ -736,37 +735,37 @@
     },
     "POLUSDT": {
       "richtung": null,
-      "score": 10.0,
+      "score": 3.9,
       "urteil": "NO_TRADE"
     },
     "PORTALUSDT": {
       "richtung": null,
-      "score": 6.2,
+      "score": 7.4,
       "urteil": "NO_TRADE"
     },
     "PROMUSDT": {
       "richtung": "long",
-      "score": 48.5,
+      "score": 50.0,
       "urteil": "WATCH"
     },
     "PUMPUSDT": {
       "richtung": null,
-      "score": 9.2,
+      "score": 9.7,
       "urteil": "NO_TRADE"
     },
     "PYTHUSDT": {
       "richtung": null,
-      "score": 9.8,
+      "score": 10.0,
       "urteil": "NO_TRADE"
     },
     "RAYUSDT": {
       "richtung": "long",
-      "score": 42.4,
+      "score": 45.5,
       "urteil": "WATCH"
     },
     "RENDERUSDT": {
       "richtung": null,
-      "score": 8.5,
+      "score": 4.5,
       "urteil": "NO_TRADE"
     },
     "REUSDT": {
@@ -776,18 +775,18 @@
     },
     "RLUSDUSDT": {
       "richtung": null,
-      "score": 4.0,
+      "score": 3.0,
       "urteil": "NO_TRADE"
     },
     "SAHARAUSDT": {
-      "richtung": null,
-      "score": 5.5,
-      "urteil": "NO_TRADE"
+      "richtung": "long",
+      "score": 42.5,
+      "urteil": "A_MINUS"
     },
     "SANDUSDT": {
-      "richtung": "long",
-      "score": 40.8,
-      "urteil": "WATCH"
+      "richtung": "short",
+      "score": 38.5,
+      "urteil": "A_MINUS"
     },
     "SCUSDT": {
       "richtung": null,
@@ -796,7 +795,7 @@
     },
     "SEIUSDT": {
       "richtung": null,
-      "score": 5.5,
+      "score": 3.1,
       "urteil": "NO_TRADE"
     },
     "SHOP": {
@@ -811,28 +810,28 @@
     },
     "SOLUSDT": {
       "richtung": null,
-      "score": 8.1,
+      "score": 3.9,
       "urteil": "NO_TRADE"
     },
     "SOPHUSDT": {
       "richtung": null,
-      "score": 0.2,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "STRKUSDT": {
       "richtung": null,
-      "score": 8.6,
+      "score": 7.3,
       "urteil": "NO_TRADE"
     },
     "SUIUSDT": {
       "richtung": null,
-      "score": 4.5,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "TAOUSDT": {
-      "richtung": "long",
-      "score": 57.8,
-      "urteil": "A_MINUS"
+      "richtung": null,
+      "score": 2.5,
+      "urteil": "NO_TRADE"
     },
     "TIAUSDT": {
       "richtung": null,
@@ -841,13 +840,13 @@
     },
     "TRUMPUSDT": {
       "richtung": null,
-      "score": 3.3,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "TRXUSDT": {
-      "richtung": "long",
-      "score": 36.4,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 2.8,
+      "urteil": "NO_TRADE"
     },
     "TSLA": {
       "richtung": "long",
@@ -856,7 +855,7 @@
     },
     "TUTUSDT": {
       "richtung": "short",
-      "score": 20.3,
+      "score": 22.5,
       "urteil": "NO_TRADE"
     },
     "UBER": {
@@ -871,12 +870,12 @@
     },
     "UNIUSDT": {
       "richtung": "short",
-      "score": 27.4,
-      "urteil": "NO_TRADE"
+      "score": 27.6,
+      "urteil": "WATCH"
     },
     "UUSDT": {
       "richtung": "short",
-      "score": 55.0,
+      "score": 57.5,
       "urteil": "B"
     },
     "V": {
@@ -886,27 +885,27 @@
     },
     "VETUSDT": {
       "richtung": "long",
-      "score": 47.8,
+      "score": 48.8,
       "urteil": "WATCH"
     },
     "VIRTUALUSDT": {
       "richtung": null,
-      "score": 4.6,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "VTHOUSDT": {
       "richtung": "long",
-      "score": 41.7,
-      "urteil": "WATCH"
+      "score": 41.6,
+      "urteil": "B"
     },
     "WLDUSDT": {
       "richtung": null,
-      "score": 5.1,
+      "score": 3.9,
       "urteil": "NO_TRADE"
     },
     "WLFIUSDT": {
       "richtung": null,
-      "score": 1.9,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "WMT": {
@@ -920,8 +919,8 @@
       "urteil": "WATCH"
     },
     "XLMUSDT": {
-      "richtung": null,
-      "score": 3.2,
+      "richtung": "short",
+      "score": 3.9,
       "urteil": "NO_TRADE"
     },
     "XOM": {
@@ -931,27 +930,27 @@
     },
     "XPLUSDT": {
       "richtung": null,
-      "score": 6.8,
+      "score": 6.7,
       "urteil": "NO_TRADE"
     },
     "XRPUSDT": {
       "richtung": null,
-      "score": 4.2,
+      "score": 1.7,
       "urteil": "NO_TRADE"
     },
     "XTZUSDT": {
-      "richtung": "long",
-      "score": 32.7,
+      "richtung": null,
+      "score": 10.0,
       "urteil": "NO_TRADE"
     },
     "ZAMAUSDT": {
       "richtung": null,
-      "score": 3.7,
+      "score": 4.6,
       "urteil": "NO_TRADE"
     },
     "ZECUSDT": {
       "richtung": "long",
-      "score": 57.5,
+      "score": 55.0,
       "urteil": "NO_TRADE"
     },
     "ZENUSDT": {
@@ -961,17 +960,17 @@
     },
     "ZKPUSDT": {
       "richtung": null,
-      "score": 4.1,
+      "score": 0.0,
       "urteil": "NO_TRADE"
     },
     "ZROUSDT": {
       "richtung": null,
-      "score": 4.7,
+      "score": 7.2,
       "urteil": "NO_TRADE"
     },
     "币安人生USDT": {
       "richtung": null,
-      "score": 5.1,
+      "score": 3.3,
       "urteil": "NO_TRADE"
     }
   },
@@ -1164,7 +1163,7 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "MSTR",
-  "stand": "2026-09-10T04:03:06.971063+00:00",
+  "stand": "2026-09-10T04:39:13.241856+00:00",
   "stumme_klassen": [
     "gold"
   ]
