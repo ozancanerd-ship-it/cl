@@ -111,7 +111,13 @@ class BinancePublicDataProvider(
         self._transport = transport
         self._injiziert = client is not None
         self._client = client or HttpClient(
-            self._bases[0], name=f"{self.name}_{market}", rate_per_sec=10.0, transport=transport
+            self._bases[0],
+            name=f"{self.name}_{market}",
+            # Binance erlaubt 6.000 Gewicht je Minute; eine Kerzenabfrage kostet 2.
+            # Zwanzig Anfragen je Sekunde sind damit rund ein Drittel des Erlaubten —
+            # genug Luft, und der Scan haengt nicht mehr am eigenen Bremsklotz.
+            rate_per_sec=20.0,
+            transport=transport,
         )
         self._health = HealthTracker(self.name, clock=self._clock)
 
@@ -134,7 +140,7 @@ class BinancePublicDataProvider(
                 self._client = HttpClient(
                     base,
                     name=f"{self.name}_{self.market}",
-                    rate_per_sec=10.0,
+                    rate_per_sec=20.0,
                     transport=self._transport,
                 )
             try:

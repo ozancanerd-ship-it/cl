@@ -122,6 +122,8 @@ class ChartChance:
     begruendung: str = ""
     #: Was die Note nach oben begrenzt hat.
     bremse: str | None = None
+    #: Wodurch die Note gedeckelt wurde (uneinige Zeitebenen, Gegenwind) — oder None.
+    deckel: str | None = None
     #: Dinge, die gegen den Trade sprechen, ohne ihn auszuschliessen.
     warnungen: tuple[str, ...] = ()
     #: Kennzahlen von aussen (Umsatz, 24h-Bewegung) — Kontext, kein Score-Bestandteil.
@@ -170,6 +172,7 @@ class ChartChance:
             "profil": self.profil,
             "begruendung": self.begruendung,
             "bremse": self.bremse,
+            "deckel": self.deckel,
             "warnungen": list(self.warnungen),
             "zusatz": dict(self.zusatz),
             "faktoren": [
@@ -492,6 +495,8 @@ def bewerte_chart(
     erwartet = (abs(swing_ziel - bezug) / bezug * 100.0) if swing_ziel and bezug else None
 
     warnungen = _warnungen(zusatz, per_tf, richtung, score)
+    gegenwind = _gegenwind(per_tf, richtung)
+    warnungen = list(gegenwind) + [w for w in warnungen if w not in gegenwind]
 
     urteilung = benote(
         score=score,
@@ -499,6 +504,8 @@ def bewerte_chart(
         move_pct=erwartet,
         hat_invalidierung=inval is not None and richtung is not None,
         profil=profil,
+        einigkeit=einigkeit if richtung is not None else None,
+        gegenwind=gegenwind,
     )
 
     daten_ok = all(
@@ -553,12 +560,59 @@ def bewerte_chart(
         profil=str(urteilung.profil.value),
         begruendung=urteilung.begruendung,
         bremse=urteilung.bremse,
+        deckel=urteilung.deckel,
         warnungen=tuple(warnungen),
         zusatz=zusatz,
         einstieg=einstieg if einstieg is not None else (kurs if richtung is not None else None),
         einstieg_art=einstieg_art,
         einstieg_zone=einstieg_zone,
     )
+
+
+def _gegenwind(per_tf: dict[Timeframe, Any], richtung: Direction | None) -> list[str]:
+    """Harte Gegenargumente — sie deckeln die Note, statt nur danebenzustehen.
+
+    Der Unterschied zu einer Warnung: hier steht etwas Grundsaetzliches gegen den
+    Trade. Long unter dem Jahresdurchschnitt ist ein Trade gegen die uebergeordnete
+    Richtung; er kann aufgehen, aber er ist kein A-Setup. Dasselbe gilt fuer einen
+    RSI im Extrem und fuer einen Tagestrend, der andersherum laeuft.
+
+    Genau daran hat es den ersten Alarmen gefehlt: hoher Score, gutes
+    Chance-Risiko-Verhaeltnis — und trotzdem gegen den Wind gekauft.
+    """
+    if richtung is None:
+        return []
+    from trading_agent.analysis.indicators import EMA_LANG, berechne
+
+    aus: list[str] = []
+    lang = richtung is Direction.LONG
+
+    d1 = per_tf.get(Timeframe.D1)
+    d1_bars = list(getattr(d1, "bars", ()) or ()) if d1 is not None else []
+    if len(d1_bars) >= EMA_LANG:
+        ind = berechne(d1_bars)
+        if ind.ueber_ema_lang is not None and ind.ueber_ema_lang is not lang:
+            wo = "unter" if lang else "ueber"
+            aus.append(
+                f"Tageskurs {wo} dem EMA{EMA_LANG} — der Trade laeuft gegen die "
+                "uebergeordnete Richtung"
+            )
+
+    h4 = per_tf.get(Timeframe.H4)
+    h4_bars = list(getattr(h4, "bars", ()) or ()) if h4 is not None else []
+    if len(h4_bars) >= 60:
+        ind4 = berechne(h4_bars)
+        if ind4.rsi is not None:
+            if lang and ind4.rsi >= 80:
+                aus.append(f"H4-RSI {ind4.rsi:.0f} — die Bewegung ist bereits ueberdehnt")
+            elif not lang and ind4.rsi <= 20:
+                aus.append(f"H4-RSI {ind4.rsi:.0f} — nach unten ueberdehnt")
+
+    soll = "trend_up" if lang else "trend_down"
+    d1_regime = _v_enum(getattr(getattr(d1, "regime", None), "directional", None))
+    if d1 is not None and d1_regime in ("trend_up", "trend_down") and d1_regime != soll:
+        aus.append("Tagestrend zeigt in die Gegenrichtung")
+    return aus
 
 
 def _warnungen(
@@ -591,6 +645,20 @@ def _warnungen(
     if umsatz is not None and float(umsatz) < 5_000_000:
         w.append(f"nur {float(umsatz) / 1e6:.1f} Mio USDT Umsatz — duenn fuer schnelle Ausstiege")
 
+    # Klassische Indikatoren auf der Swing-Ebene: ueberdehnter RSI, Divergenz,
+    # duennes Volumen, Kurs gegen den uebergeordneten Durchschnitt.
+    if richtung is not None:
+        from trading_agent.analysis.indicators import berechne, warnungen
+
+        for tf in (Timeframe.H4, Timeframe.D1):
+            tfc = per_tf.get(tf)
+            bars = list(getattr(tfc, "bars", ()) or ()) if tfc is not None else []
+            if len(bars) < 60:
+                continue
+            for satz in warnungen(berechne(bars), richtung.value):
+                w.append(f"{tf.value}: {satz}")
+            break
+
     for tf in (Timeframe.D1, Timeframe.H4):
         tfc = per_tf.get(tf)
         if tfc is not None and getattr(tfc, "blocks_trading", False):
@@ -599,13 +667,6 @@ def _warnungen(
                 "Boersenzeit normal, bei Krypto ein echter Ausfall"
             )
             break
-
-    if richtung is not None:
-        soll = "trend_up" if richtung is Direction.LONG else "trend_down"
-        d1 = per_tf.get(Timeframe.D1)
-        d1_richtung = getattr(getattr(d1, "regime", None), "directional", None)
-        if d1 is not None and _v_enum(d1_richtung) not in (soll, "range", "unclear", ""):
-            w.append("Tagestrend zeigt in die Gegenrichtung — das ist ein Trade gegen D1")
 
     return w
 

@@ -31,6 +31,7 @@ gibt es keine Note ausser NO_TRADE.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -139,6 +140,26 @@ SCHEMA: dict[Profil, Notenschema] = {
 STANDARD = Profil.AGGRESSIV
 
 
+#: Wie einig sich die Zeitebenen mindestens sein muessen, damit eine Note vergeben wird.
+#:
+#: Das ist die Lehre aus den ersten Alarmen. MSFT bekam A+ mit ``D1↑ H4· H1· M15·`` —
+#: eine einzige Zeitebene zeigte in die Richtung, die anderen drei sagten "unklar". Der
+#: hohe Score kam aus Bewegungsraum und Zonen, das Chance-Risiko-Verhaeltnis war gut,
+#: und trotzdem war es kein A+-Setup: ohne Bestaetigung auf der Ausfuehrungsebene kauft
+#: man eine Idee, keinen Aufbau.
+#:
+#: Die Werte sind gesetzt, nicht an Ergebnissen angepasst. Die Begruendung ist
+#: inhaltlich: fuer die Spitzennote sollen mindestens zwei der vier Ebenen mitziehen,
+#: gewichtet mindestens 0,6 (D1 allein sind 0,40, D1+H4 sind 0,70).
+MIN_EINIGKEIT: dict[str, float] = {
+    "A_PLUS": 0.60,
+    "A": 0.50,
+    "A_MINUS": 0.40,
+    "B_PLUS": 0.0,
+    "B": 0.0,
+}
+
+
 @dataclass(frozen=True, slots=True)
 class Bewertung:
     note: str
@@ -146,6 +167,8 @@ class Bewertung:
     begruendung: str
     #: Was die Note verhindert hat, falls sie nicht die hoechste ist — die konkrete Groesse.
     bremse: str | None
+    #: Wodurch die Note nach oben begrenzt wurde (Zeitebenen uneinig, Gegenwind …).
+    deckel: str | None = None
 
 
 def _hoehere(a: str, b: str) -> str:
@@ -159,12 +182,20 @@ def benote(
     move_pct: float | None,
     hat_invalidierung: bool,
     profil: Profil | str = STANDARD,
+    einigkeit: float | None = None,
+    gegenwind: Sequence[str] = (),
 ) -> Bewertung:
     """Note aus Score, Chance-Risiko-Verhaeltnis und erwarteter Bewegung.
 
     Ohne Invalidierung gibt es nie eine handelbare Note. Das ist der eine Punkt, den
     auch das aggressivste Profil nicht aufweicht: mehr Risiko heisst groessere Position
     oder weiterer Stop — nicht kein Stop.
+
+    ``einigkeit`` (0..1) ist die gewichtete Uebereinstimmung der Zeitebenen. Sie deckelt
+    die Note: die Spitzennoten setzen voraus, dass mehr als eine Ebene mitzieht.
+    ``gegenwind`` sind harte Gegenargumente (Kurs gegen den Jahresdurchschnitt, RSI im
+    Extrem). Jedes davon deckelt ebenfalls — der Trade bleibt moeglich, aber er ist kein
+    A-Setup mehr.
     """
     p = Profil(profil)
     schema = SCHEMA[p]
@@ -205,6 +236,31 @@ def benote(
         note = "WATCH"
         bremse = f"Bewegung nur {m:.1f} % — zu wenig fuer einen Swing"
 
+    # --- Deckel: was die Note nach oben begrenzt, unabhaengig von den drei Groessen.
+    deckel: str | None = None
+
+    def begrenzen(hoechstens: str, grund: str) -> None:
+        nonlocal note, deckel
+        if NOTEN.index(note) < NOTEN.index(hoechstens):
+            note = hoechstens
+            deckel = grund
+
+    if einigkeit is not None:
+        for stufe_note, mindest in MIN_EINIGKEIT.items():
+            if mindest <= 0 or einigkeit >= mindest:
+                continue
+            if NOTEN.index(note) <= NOTEN.index(stufe_note):
+                tiefer = NOTEN[NOTEN.index(stufe_note) + 1]
+                begrenzen(
+                    tiefer,
+                    f"nur {einigkeit * 100:.0f} % der Zeitebenen zeigen in die Richtung — "
+                    f"fuer {NOTE_KURZ[stufe_note]} braucht es {mindest * 100:.0f} %",
+                )
+                break
+
+    for grund in gegenwind:
+        begrenzen("B_PLUS", grund)
+
     # Nicht handelbar, aber beobachtenswert: Score da, CRV noch nicht.
     if note == "NO_TRADE" and (score >= 35.0 or rr >= 1.5):
         note = "WATCH"
@@ -214,14 +270,16 @@ def benote(
             f"Score {score:.0f}, CRV 1:{rr:.2f}, erwartete Bewegung {m:.1f} % "
             f"— reicht fuer {NOTE_KURZ[note]} im Profil {p.value}"
         )
-        if note != "A_PLUS":
-            begruendung += f". Fuer mehr fehlt: {bremse}" if bremse else ""
+        if deckel:
+            begruendung += f". Nach oben begrenzt: {deckel}"
+        elif note != "A_PLUS" and bremse:
+            begruendung += f". Fuer mehr fehlt: {bremse}"
     elif note == "WATCH":
-        begruendung = f"beobachten — {bremse or 'noch keine handelbare Kombination'}"
+        begruendung = f"beobachten — {deckel or bremse or 'noch keine handelbare Kombination'}"
     else:
-        begruendung = bremse or "nichts, was zusammenpasst"
+        begruendung = deckel or bremse or "nichts, was zusammenpasst"
 
-    return Bewertung(note=note, profil=p, begruendung=begruendung, bremse=bremse)
+    return Bewertung(note=note, profil=p, begruendung=begruendung, bremse=bremse, deckel=deckel)
 
 
 def confidence(
@@ -258,6 +316,7 @@ def confidence(
 
 __all__ = [
     "HANDELBAR",
+    "MIN_EINIGKEIT",
     "NOTEN",
     "NOTE_KURZ",
     "SCHEMA",

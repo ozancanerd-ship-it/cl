@@ -35,20 +35,19 @@ on:
     # (22:00 UTC), vor dem Tageswechsel. GitHub-Cron laeuft in UTC und kann sich bei Last
     # um einige Minuten verspaeten; egal, die Regel arbeitet auf Tagesschlusskursen.
     - cron: "10 23 * * *"
-    # :25 und :55 — der volle Marktscan, also alle 30 Minuten. Das ist unser "24/7" ohne eigenen Server: kein
-    # dauerlaufender Prozess, sondern 24 Durchgaenge am Tag. Krypto laeuft durch, Aktien
-    # bewegen sich nur waehrend der Boersenzeit — die stillen Laeufe kosten nichts und
-    # melden nichts. Ein Alarm geht nur bei einer ECHTEN Aenderung raus.
+    # :25 und :55 — der VOLLE Scan inklusive Aktien, zweimal je Stunde.
     - cron: "25,55 * * * *"
-    # Alle fuenf Minuten der leichte Waechter: KEIN Scan, nur die Kurse der
-    # beobachteten Setups. Er meldet, wenn ein Einstieg, ein Ziel oder ein Stop
-    # tatsaechlich getroffen wurde.
+    # Alle zehn Minuten der KRYPTO-Scan (rund 15 Sekunden) mit anschliessender
+    # Veroeffentlichung. Aktien bleiben beim Halbstundentakt: sie bewegen sich nur zu
+    # Boersenzeiten, und der Yahoo-Abruf ist der langsame Teil.
     #
-    # Warum nicht jede Minute, wie Ozan gefragt hat: fuenf Minuten ist die kleinste
-    # Taktung, die GitHub fuer Zeitplaene zulaesst, und selbst die wird bei Last
-    # verzoegert. Wer wirklich sekundengenau reagieren will, braucht eine Maschine,
-    # die durchlaeuft. Die App rechnet dafuer im Browser live weiter — dort wandert
-    # ein Setup in dem Moment nach oben, in dem der Kurs seinen Einstieg trifft.
+    # Warum nicht alle fuenf Minuten, wie Ozan gefragt hat: GitHub Pages laesst rund
+    # zehn Veroeffentlichungen je Stunde zu. Sechs Krypto-Scans plus zwei volle Laeufe
+    # bleiben sicher darunter; alle fuenf Minuten zu veroeffentlichen ginge sich nicht aus.
+    - cron: "2,12,22,32,42,52 * * * *"
+    # Dazwischen, alle fuenf Minuten, der leichte Waechter: KEIN Scan, keine
+    # Veroeffentlichung, nur die Kurse der beobachteten Marken. Das ist der Teil, der
+    # meldet, wenn ein Einstieg, ein Ziel oder ein Stop tatsaechlich getroffen wurde.
     - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
@@ -94,7 +93,7 @@ jobs:
       # Ende gezielt rot gemacht, damit der Ausfall sichtbar bleibt.
       - name: Forward-Zeile aufzeichnen
         id: forward
-        if: github.event.schedule != '25,55 * * * *' && github.event.schedule != '*/5 * * * *'
+        if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -102,7 +101,7 @@ jobs:
 
       - name: Tagesplan schicken
         id: report
-        if: github.event.schedule != '25,55 * * * *' && github.event.schedule != '*/5 * * * *'
+        if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -125,7 +124,7 @@ jobs:
       # falsch oder Bot nie angeschrieben) — ohne diese Zeile raet man.
       - name: Telegram pruefen
         id: tg
-        if: github.event.schedule != '*/5 * * * *'
+        if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         env:
           PYTHONPATH: src
@@ -143,7 +142,7 @@ jobs:
       # nur ohne die Makro-Hinweise.
       - name: Makrolage holen
         id: makro
-        if: github.event.schedule != '*/5 * * * *'
+        if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
         continue-on-error: true
         timeout-minutes: 4
         env:
@@ -160,7 +159,12 @@ jobs:
         timeout-minutes: 14
         env:
           PYTHONPATH: src
-        run: python scripts/build_scan_data.py --out web --krypto 110 --aktien 40 --detail 60
+        run: |
+          if [ "${{ github.event.schedule }}" = "2,12,22,32,42,52 * * * *" ]; then
+            python scripts/build_scan_data.py --out web --krypto 110 --detail 60 --nur krypto,gold
+          else
+            python scripts/build_scan_data.py --out web --krypto 110 --aktien 40 --detail 60
+          fi
 
       # Marktweite Aenderungen: weggebrochenes Setup, neue Nummer 1, ein Chart der
       # anzieht. Neue Setups meldet dieser Schritt bewusst NICHT — das macht der
@@ -188,7 +192,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scripts/watch_levels.py --send --vollstaendig
 
-      # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan. Dauert Sekunden.
+      # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan, keine
+      # Veroeffentlichung. Dauert Sekunden und darf deshalb alle fuenf Minuten laufen.
       - name: Marken pruefen
         id: wache_licht
         if: github.event.schedule == '*/5 * * * *'

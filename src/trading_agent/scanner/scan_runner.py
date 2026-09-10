@@ -42,8 +42,9 @@ FENSTER: dict[Timeframe, timedelta] = {
 }
 
 #: Wie viele Instrumente gleichzeitig. Der Ratenbegrenzer im HTTP-Client bleibt die
-#: eigentliche Bremse; hoehere Werte bringen nichts und riskieren nur einen Bann.
-NEBENLAEUFIG = 8
+#: eigentliche Bremse — deshalb sind beide zusammen angehoben worden, als der Scan
+#: alle fuenf Minuten laufen sollte. Mehr als das bringt nichts und riskiert einen Bann.
+NEBENLAEUFIG = 16
 
 
 @dataclass(slots=True)

@@ -292,6 +292,16 @@ async def main() -> int:
     ap.add_argument("--detail", type=int, default=60, help="fuer wie viele Werte Detaildateien")
     ap.add_argument("--makro", default="web/macro.json", help="Makrolage aus fetch_macro.py")
     ap.add_argument("--ohne-aktien", action="store_true")
+    ap.add_argument(
+        "--nur",
+        default="",
+        help=(
+            "Nur diese Klassen scannen (krypto,gold,aktien). Die uebrigen werden aus der "
+            "vorhandenen scan.json uebernommen. Damit kann Krypto alle fuenf Minuten "
+            "laufen, waehrend Aktien seltener geholt werden — sie bewegen sich ohnehin "
+            "nur zu Boersenzeiten."
+        ),
+    )
     args = ap.parse_args()
 
     from trading_agent.utils.logging import configure_logging
@@ -356,46 +366,83 @@ async def main() -> int:
 
         return schreibe
 
+    nur = {t.strip() for t in args.nur.split(",") if t.strip()}
+    alt_doc: dict[str, Any] = {}
+    if nur:
+        alt = out / "scan.json"
+        if alt.exists():
+            try:
+                alt_doc = json.loads(alt.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                alt_doc = {}
+        if not alt_doc:
+            print("  (kein alter Scan zum Ergaenzen — es wird alles gescannt)")
+            nur = set()
+
     klassen: dict[str, list[Any]] = {}
     fehler: dict[str, str] = {}
     universum: dict[str, Any] = {}
+    uebernommen: dict[str, list[dict[str, Any]]] = {}
+
+    def ueberspringen(name: str) -> bool:
+        if not nur or name in nur:
+            return False
+        reihen = (alt_doc.get("klassen") or {}).get(name) or []
+        uebernommen[name] = reihen
+        universum[name] = ((alt_doc.get("universum") or {}).get(name)) or {}
+        if reihen:
+            print(f"— {name} — aus dem letzten Scan uebernommen ({len(reihen)})")
+        return True
 
     print("— krypto —", flush=True)
-    chancen, info, err = await _krypto(profil, args.krypto, schreiber("krypto"), lage)
-    klassen["krypto"] = chancen
-    universum["krypto"] = info
-    if err:
-        fehler["krypto"] = err
-        print(f"  ! {err}")
+    if not ueberspringen("krypto"):
+        chancen, info, err = await _krypto(profil, args.krypto, schreiber("krypto"), lage)
+        klassen["krypto"] = chancen
+        universum["krypto"] = info
+        if err:
+            fehler["krypto"] = err
+            print(f"  ! {err}")
 
     print("— gold —", flush=True)
-    chancen, info, err = await _gold(profil, schreiber("gold"), lage)
-    klassen["gold"] = chancen
-    universum["gold"] = info
-    if err:
-        fehler["gold"] = err
-        print(f"  ! {err}")
+    if not ueberspringen("gold"):
+        chancen, info, err = await _gold(profil, schreiber("gold"), lage)
+        klassen["gold"] = chancen
+        universum["gold"] = info
+        if err:
+            fehler["gold"] = err
+            print(f"  ! {err}")
 
     if not args.ohne_aktien:
         print("— aktien —", flush=True)
-        chancen, info, err = await _aktien(profil, args.aktien, schreiber("aktien"), lage)
-        klassen["aktien"] = chancen
-        universum["aktien"] = info
-        if err:
-            fehler["aktien"] = err
-            print(f"  ! {err}")
+        if not ueberspringen("aktien"):
+            chancen, info, err = await _aktien(profil, args.aktien, schreiber("aktien"), lage)
+            klassen["aktien"] = chancen
+            universum["aktien"] = info
+            if err:
+                fehler["aktien"] = err
+                print(f"  ! {err}")
 
     alle: list[Any] = [c for liste in klassen.values() for c in liste]
     alle.sort(key=lambda c: -c.score)
 
     # Detaildateien nur fuer die besten N behalten — der Rest waere totes Gewicht auf
     # der Seite und wird nie angeklickt.
+    kompakt_alt_frueh = [r for reihen in uebernommen.values() for r in reihen]
     behalten = {c.instrument for c in alle[: args.detail]}
+    # Detaildateien der uebernommenen Klassen bleiben — sie sind nicht neu gebaut
+    # worden, waeren aber sonst weg, und die App zeigte fuer diese Werte nichts mehr.
+    behalten |= {str(r.get("instrument")) for r in kompakt_alt_frueh if r.get("instrument")}
     _raeume(ordner, behalten=behalten)
 
+    kompakt_neu = [
+        _kompakt(c, klasse_je.get(c.instrument, ""), muster_je.get(c.instrument, [])) for c in alle
+    ]
+    kompakt_alt = [r for reihen in uebernommen.values() for r in reihen]
+    kompakt_alle = sorted(kompakt_neu + kompakt_alt, key=lambda r: -float(r.get("score") or 0.0))
+
     statistik = dict.fromkeys(NOTEN, 0)
-    for c in alle:
-        statistik[c.urteil] = statistik.get(c.urteil, 0) + 1
+    for r in kompakt_alle:
+        statistik[str(r.get("urteil"))] = statistik.get(str(r.get("urteil")), 0) + 1
 
     doc = {
         "erzeugt": datetime.now(UTC).isoformat(),
@@ -403,7 +450,11 @@ async def main() -> int:
         "dauer_s": round((datetime.now(UTC) - t0).total_seconds(), 1),
         "fehler": fehler,
         "universum": universum,
-        "anzahl": {k: len(v) for k, v in klassen.items()},
+        "anzahl": {
+            **{k: len(v) for k, v in klassen.items()},
+            **{k: len(v) for k, v in uebernommen.items()},
+        },
+        "uebernommen": sorted(uebernommen),
         "statistik": statistik,
         "detail_vorhanden": sorted(behalten),
         "makro": lage.as_dict() if lage is not None else None,

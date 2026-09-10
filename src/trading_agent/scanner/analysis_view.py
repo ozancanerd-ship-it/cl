@@ -24,6 +24,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from trading_agent.analysis.indicators import berechne as indikatoren_berechnen
 from trading_agent.core.enums import Direction, Timeframe
 
 #: Reihenfolge, in der die Zeitebenen ueberall auftauchen: gross nach klein.
@@ -186,8 +187,28 @@ def zeichnung(
             "zonen": _zonen(tfc),
             "pd": _pd(tfc),
             "atr": round(float(getattr(tfc, "atr", 0.0) or 0.0), 8),
+            "rsi": _rsi_reihe(tfc, kerzen),
         }
     return out
+
+
+def _rsi_reihe(tfc: Any, grenze: int) -> list[float | None]:
+    """RSI parallel zu den gezeigten Kerzen — damit die App ihn darunter zeichnen kann.
+
+    Berechnet wird ueber die volle Reihe und dann auf das Fenster zugeschnitten; sonst
+    faengt der RSI am linken Rand bei einem Wert an, den es so nie gab.
+    """
+    from trading_agent.analysis.indicators import rsi as _rsi
+
+    bars = list(getattr(tfc, "bars", ()) or ())
+    if len(bars) < 20:
+        return []
+    schluss = [float(b.close) for b in bars]
+    aus: list[float | None] = []
+    for i in range(len(schluss) - min(grenze, len(schluss)), len(schluss)):
+        v = _rsi(schluss[: i + 1])
+        aus.append(round(v, 2) if v is not None else None)
+    return aus
 
 
 # --------------------------------------------------------------------------- MTF-Tabelle
@@ -215,6 +236,7 @@ def mtf_tabelle(
         tfc = per_tf.get(tf)
         if tfc is None:
             continue
+        ind = indikatoren_berechnen(list(getattr(tfc, "bars", ()) or ()))
         reg = getattr(tfc, "regime", None)
         richtung = _v(getattr(reg, "directional", None), "unclear")
         brueche = list(getattr(tfc, "structure_breaks", ()) or ())
@@ -246,7 +268,8 @@ def mtf_tabelle(
                 "pd": pd,
                 "atr": round(float(getattr(tfc, "atr", 0.0) or 0.0), 8),
                 "datenguete": round(float(getattr(tfc, "data_confidence", 0.0) or 0.0), 2),
-                "satz": satz,
+                "indikatoren": ind.as_dict(),
+                "satz": satz + " " + ind.satz() + ".",
             }
         )
     return zeilen
@@ -310,6 +333,14 @@ def kommentar(
     kurs = float(getattr(chance, "kurs", 0.0) or 0.0)
 
     was_ich_sehe = [zeile["satz"] for zeile in zeilen]
+    for zeile in zeilen:
+        ind = zeile.get("indikatoren") or {}
+        if ind.get("rsi_divergenz"):
+            richtung_txt = "nach unten" if ind["rsi_divergenz"] == "baerisch" else "nach oben"
+            was_ich_sehe.append(
+                f"{zeile['tf']}: RSI-Divergenz {richtung_txt} — der Kurs laeuft weiter "
+                "als die Kraft dahinter."
+            )
     for m in list(muster)[:3]:
         was_ich_sehe.append(f"{m.zeitebene}: {m.name} — {m.beschreibung}")
 

@@ -154,8 +154,8 @@ h3{font-size:14px; font-weight:600; margin:20px 0 8px; letter-spacing:.01em}
 .lb{appearance:none; border:1px solid var(--rule); background:var(--surface); font:inherit;
   font-size:10.5px; color:var(--ink-3); padding:3px 8px; border-radius:100px; cursor:pointer}
 .lb[aria-pressed="true"]{background:var(--surface-2); color:var(--ink); border-color:var(--rule-strong)}
-#cv{display:block; width:100%; height:420px; touch-action:none; cursor:crosshair}
-@media (max-width:520px){#cv{height:330px}}
+#cv{display:block; width:100%; height:480px; touch-action:none; cursor:crosshair}
+@media (max-width:520px){#cv{height:390px}}
 .legende{display:flex; gap:12px; flex-wrap:wrap; padding:8px 12px; border-top:1px solid var(--rule);
   font-size:10.5px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
 .legende span{display:flex; align-items:center; gap:4px}
@@ -420,7 +420,12 @@ function planeAuffrischen(){
   if (_auf) return;
   _auf = setTimeout(()=>{ _auf = 0; frischeAuf(); }, 900);
 }
+let _marktZuletzt = 0;
 function frischeAuf(){
+  if (!$('p0').hidden && Date.now() - _marktZuletzt > 4000){
+    _marktZuletzt = Date.now();
+    zeichneStatus();
+  }
   aktualisiereRadarKurse();
   aktualisiereChartKurs();
   aktualisierePortfolioKurse();
@@ -443,8 +448,11 @@ const chart = (()=>{
   let cv = null, ctx = null, B = [], Z = null, C = null;
   let i0 = 0, anz = 120, hoverX = null, hoverY = null;
   let ziehen = null, letzterPreis = null;
-  const EBENEN = {swings:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true};
+  const EBENEN = {swings:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true, rsi:true};
   const M = {l: 6, r: 62, t: 10, b: 22};
+  /* Höhe des RSI-Streifens unter den Kerzen. 0 = aus. Der RSI teilt sich die
+     Zeitachse mit dem Chart — sonst vergleicht man zwei verschiedene Ausschnitte. */
+  let RSI_H = 62;
 
   function farbe(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
@@ -523,7 +531,9 @@ const chart = (()=>{
     ctx.clearRect(0,0,W,H);
     const v = sicht(); if (!v.length) return;
     const {hi, lo} = spanne(v);
-    const px = W - M.l - M.r, py = H - M.t - M.b;
+    const rsiAn = EBENEN.rsi && Z && (Z.rsi||[]).length;
+    const rsiH = rsiAn ? RSI_H : 0;
+    const px = W - M.l - M.r, py = H - M.t - M.b - rsiH;
     const X = i => M.l + (i + 0.5) * (px / v.length);
     const Y = p => M.t + (hi - p) / (hi - lo) * py;
     const bw = Math.max(1.2, Math.min(11, px / v.length * 0.68));
@@ -660,6 +670,41 @@ const chart = (()=>{
       }
     }
 
+    // RSI-Streifen unter den Kerzen
+    if (rsiAn){
+      const alle = Z.rsi || [];
+      // Die RSI-Reihe ist so lang wie die gezeigten Kerzen; dasselbe Fenster ausschneiden.
+      const off = Math.max(0, B.length - alle.length);
+      const von = Math.max(0, i0 - off);
+      const werte = alle.slice(von, von + v.length);
+      const yTop = M.t + py + 10, yH = rsiH - 14;
+      const RY = r => yTop + (100 - r) / 100 * yH;
+      ctx.strokeStyle = cRule; ctx.lineWidth = 1;
+      for (const lvl of [30, 50, 70]){
+        const y = Math.round(RY(lvl)) + 0.5;
+        ctx.setLineDash(lvl === 50 ? [1,3] : [3,3]);
+        ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(W-M.r, y); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.fillStyle = cInk3; ctx.font = '9px "IBM Plex Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillText('70', W-M.r+5, RY(70)); ctx.fillText('30', W-M.r+5, RY(30));
+      ctx.strokeStyle = cAcc; ctx.lineWidth = 1.4; ctx.beginPath();
+      let begonnen = false;
+      for (let i=0;i<werte.length;i++){
+        const r = werte[i];
+        if (r == null){ begonnen = false; continue; }
+        const x = X(i), y = RY(r);
+        if (!begonnen){ ctx.moveTo(x,y); begonnen = true; } else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      const letzterR = werte.filter(r=>r!=null).slice(-1)[0];
+      if (letzterR != null){
+        ctx.fillStyle = letzterR >= 70 ? cBad : letzterR <= 30 ? cLong : cInk3;
+        ctx.textAlign = 'left'; ctx.font = '10px "IBM Plex Mono",monospace';
+        ctx.fillText(`RSI ${letzterR.toFixed(0)}`, M.l+3, yTop - 1);
+      }
+    }
+
     // Zeitachse
     ctx.fillStyle = cInk3; ctx.font = '9.5px "IBM Plex Mono",monospace'; ctx.textAlign = 'center';
     const schritt = Math.max(1, Math.floor(v.length/5));
@@ -745,12 +790,55 @@ function zeichneStatus(){
       <div><div class="k">Scan</div><div class="v ${alter!=null&&alter<90?'gut':'mittel'}">${alter!=null?alter+'′':'—'}</div>
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
+    ${topSignal()}
     ${makroKasten()}
     ${fehler ? `<div class="note-box bad"><span class="nt">Eine Anlageklasse fehlt</span>
       <p>${Object.entries(S.fehler).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>')}</p>
       <p>Die Rangliste ist unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>` : ''}`;
+  const top = $('topsignal');
+  if (top) top.addEventListener('click', ()=>waehle(top.dataset.sym));
   $('stempel').textContent = `${g.length} Instrumente · Scan ${zeit(S.erzeugt)}` +
     (alter != null ? ` (vor ${alter} Min.)` : '');
+}
+
+/* Das beste Setup ganz oben, sobald man die App oeffnet. Ozans Endbild aus dem
+   Masterplan: "TOP OPPORTUNITY — Entry, SL, TP1/2/3, R:R, Score, Confidence".
+   Es kommt aus derselben Rangliste wie der Alarme-Tab, damit nirgends zwei
+   verschiedene "beste Chancen" stehen. */
+function topSignal(){
+  const kand = ausRanking();
+  if (!kand.length) return '';
+  const rang = a => [-(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
+  kand.sort((a,b)=>{ const [ra,da]=rang(a), [rb,db]=rang(b); return ra!==rb ? ra-rb : da-db; });
+  const x = kand[0], w = x.w, o = x.o || {}, d = digits(w.einstieg);
+  const seite = x.lang ? 'KAUFEN' : 'VERKAUFEN';
+  const farbe = x.lang ? 'var(--long)' : 'var(--bad)';
+  const jetzt = x.stufe === 'jetzt' || x.stufe === 'im_trade';
+  const ziele = [w.tp1, w.tp2, w.tp3].filter(v=>v!=null);
+  return `<div class="karte ${jetzt?'gut':''}" style="margin-top:14px;border-left:4px solid ${farbe}"
+      data-sym="${esc(w.instrument)}" id="topsignal">
+    <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+      <span class="mono" style="font-size:9.5px;letter-spacing:.12em;color:var(--ink-3)">BESTE CHANCE</span>
+      <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
+      <span style="margin-left:auto" class="mono" style="font-size:12px;color:var(--ink-3)">
+        ${o.score!=null?`${o.score.toFixed(0)}/100`:''}${o.confidence?` · ${Math.round(o.confidence*100)} %`:''}</span>
+    </div>
+    <h3 style="margin:6px 0 2px;font-size:19px">${esc(name(w.instrument))}
+      <span style="color:${farbe}">${jetzt?`${seite} — JETZT`:`${seite} ab ${num(w.einstieg,d)}`}</span></h3>
+    ${x.kurs!=null?`<p style="margin:2px 0 8px;font-size:13px;color:var(--ink-2)">
+      Kurs <strong>${num(x.kurs,d)}</strong>${x.live?' <span class="up" style="font-size:11px">live</span>':''}
+      ${!jetzt&&x.abstand!=null?` · noch <strong>${Math.abs(x.abstand).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}</p>`:''}
+    <div class="zt" style="border-top:0;padding-top:0">
+      <span>Einstieg <b>${num(w.einstieg,d)}</b></span>
+      <span>Stop <b>${num(w.stop,d)}</b></span>
+      ${ziele.map((v,i)=>`<span>TP${i+1} <b>${num(v,d)}</b></span>`).join('')}
+      ${o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:''}
+      ${o.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${o.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(o.erwartete_bewegung_pct,1)}</b></span>`:''}
+    </div>
+    ${o.headline?`<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">${esc(o.headline)}</p>`:''}
+    ${(o.warnungen||[]).length?`<p class="warnz">⚠ ${o.warnungen.slice(0,2).map(esc).join(' · ')}</p>`:''}
+    <p style="margin:8px 0 0"><button class="link">Analyse ansehen →</button></p>
+  </div>`;
 }
 
 const REGIME_TEXT = {risk_on:'Risk-on', risk_off:'Risk-off', neutral:'neutral'};
@@ -873,7 +961,8 @@ function zeichneChartAnsicht(){
   const d = digits(kurs);
   const E = chart.ebenen();
   const lagen = [['swings','Swings'],['brueche','BOS/CHoCH'],['liq','Liquidität'],
-                 ['zonen','FVG/OB'],['pd','Premium/Discount'],['ziele','Entry/SL/TP']];
+                 ['zonen','FVG/OB'],['pd','Premium/Discount'],['ziele','Entry/SL/TP'],
+                 ['rsi','RSI']];
   $('chartansicht').innerHTML = `
     <div class="chartbox">
       <div class="chart-h">
@@ -960,14 +1049,19 @@ function zeichneAnalyse(){
       <ul class="satzliste">${c.warnungen.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
 
   h += `<h2>Was die Zeitebenen sagen</h2><div class="tw"><table class="mtf">
-    <thead><tr><th>TF</th><th>Regime</th><th>Letzter Bruch</th><th>Lage</th><th>Liquidität</th></tr></thead>
+    <thead><tr><th>TF</th><th>Regime</th><th>RSI</th><th>Letzter Bruch</th><th>Lage</th><th>Liquidität</th></tr></thead>
     <tbody>${(AKTIV.mtf||[]).map(z=>{
       const kl = z.regime_roh==='trend_up'?'up':z.regime_roh==='trend_down'?'dn':'nu';
       const br = z.letzter_bruch;
+      const I = z.indikatoren || {};
+      const rk = I.rsi == null ? 'nu' : I.rsi >= 70 ? 'dn' : I.rsi <= 30 ? 'up' : '';
       return `<tr>
         <td class="tf">${esc(z.tf)}</td>
         <td class="${kl}">${esc(z.regime)}${z.staerke?` <span class="nu">${z.staerke.toFixed(2)}</span>`:''}<br>
           <span class="nu" style="font-size:11px">${esc(z.volatilitaet)} · ${esc(z.phase)}</span></td>
+        <td class="${rk}">${I.rsi!=null?`${I.rsi.toFixed(0)}`:'<span class="nu">—</span>'}
+          ${I.rsi_divergenz?`<br><span class="nu" style="font-size:11px">Div. ${I.rsi_divergenz==='baerisch'?'↓':'↑'}</span>`:''}
+          ${I.volumen_x!=null?`<br><span class="nu" style="font-size:11px">Vol ${I.volumen_x.toFixed(1)}×</span>`:''}</td>
         <td>${br?`${esc(br.art)} <span class="${br.richtung==='bullish'?'up':'dn'}">${br.richtung==='bullish'?'↑':'↓'}</span><br>
           <span class="nu" style="font-size:11px">${num(br.preis,d)}</span>`:'<span class="nu">—</span>'}</td>
         <td>${z.pd?`${esc({premium:'teuer',discount:'günstig',equilibrium:'Mitte'}[z.pd.zone]||z.pd.zone)}<br>
@@ -977,6 +1071,21 @@ function zeichneAnalyse(){
           ${z.liquiditaet_unten!=null?'<br>↓ '+num(z.liquiditaet_unten,d):''}</span></td>
       </tr>`;
     }).join('')}</tbody></table></div>`;
+
+  const mitInd = (AKTIV.mtf||[]).filter(z=>(z.indikatoren||{}).rsi != null);
+  if (mitInd.length){
+    h += `<h2>Indikatoren</h2>`;
+    h += mitInd.map(z=>`<div class="rowx"><span class="lab mono">${esc(z.tf)}</span>
+      <span class="val" style="font-family:inherit;font-weight:400;text-align:right">${esc((z.indikatoren||{}).satz||'')}</span></div>`).join('');
+    h += `<div class="note-box"><span class="nt">Was der RSI hier ist — und was nicht</span>
+      <p>Ein RSI von 78 heißt <strong>nicht</strong> „verkaufen". In einem starken Trend
+      bleibt er wochenlang oben, und wer dort short geht, steht gegen die Bewegung. Er
+      geht hier als Kontext ein und erzeugt höchstens eine Warnung — wie alles andere
+      auch: <em>gesetzt, nicht an Ergebnissen optimiert.</em></p>
+      <p>Die einzige RSI-Aussage, die mehr ist als „hoch" oder „tief", ist die
+      <strong>Divergenz</strong>: der Kurs macht ein neues Extrem, die Kraft dahinter
+      nicht mit. Die steht in der Tabelle oben als „Div. ↑/↓".</p></div>`;
+  }
 
   if (M.length){
     h += `<h2>Erkannte Muster</h2>`;
