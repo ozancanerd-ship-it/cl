@@ -1326,7 +1326,7 @@ function oppZeile(o, rang){
         st?` <span style="font-weight:400;font-size:11px;color:var(--ink-3)">${esc(st.qualitaet)}</span>`:''}</div>
       ${st?`<div style="font-size:12.5px;color:var(--ink-2);line-height:1.45">${esc(st.these)}</div>`:''}
       <div class="kpi">
-        <span data-px="${esc(o.instrument)}">Kurs <b>${num(kurs,d)}</b>${
+        <span data-px="${esc(o.instrument)}">Kurs <b>${preis(o,'kurs',kurs,d)}</b>${
           live?` <span class="${live.pct>=0?'up':'dn'}">${pct(live.pct,2)}</span>`:''}</span>
         ${pl?`<span>CRV <b>1:${pl.crv.toFixed(1)}</b></span>`:(o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:'')}
         ${pl?`<span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`:''}
@@ -1334,12 +1334,19 @@ function oppZeile(o, rang){
         ${o.confidence?`<span>Klarheit <b>${Math.round(o.confidence*100)} %</b></span>`:''}
       </div>
       <div class="kpi">
-        ${o.einstieg!=null?`<span>Einstieg <b>${num(o.einstieg,d)}</b></span>`:''}
-        ${(pl?pl.stop:o.invalidierung)!=null?`<span>Stop <b>${num(pl?pl.stop:o.invalidierung,d)}</b></span>`:''}
-        ${(pl?pl.tp1:o.ziel)!=null?`<span>Ziel 1 <b>${num(pl?pl.tp1:o.ziel,d)}</b></span>`:''}
-        ${(pl?pl.tp2:o.tp2)!=null?`<span>Ziel 2 <b>${num(pl?pl.tp2:o.tp2,d)}</b></span>`:''}
-        ${(pl?pl.tp3:o.tp3)!=null?`<span>Ziel 3 <b>${num(pl?pl.tp3:o.tp3,d)}</b></span>`:''}
+        ${o.einstieg!=null?`<span>Einstieg <b>${preis(o,'einstieg',o.einstieg,d)}</b></span>`:''}
+        ${(pl?pl.stop:o.invalidierung)!=null?`<span>Stop <b>${preis(o,'stop',pl?pl.stop:o.invalidierung,d)}</b></span>`:''}
+        ${(pl?pl.tp1:o.ziel)!=null?`<span>Ziel 1 <b>${preis(o,'tp1',pl?pl.tp1:o.ziel,d)}</b></span>`:''}
+        ${(pl?pl.tp2:o.tp2)!=null?`<span>Ziel 2 <b>${preis(o,'tp2',pl?pl.tp2:o.tp2,d)}</b></span>`:''}
+        ${(pl?pl.tp3:o.tp3)!=null?`<span>Ziel 3 <b>${preis(o,'tp3',pl?pl.tp3:o.tp3,d)}</b></span>`:''}
       </div>
+      ${o.broker?`<div class="muz" style="margin-top:6px">Kaufen bei <strong>${esc(o.broker)}</strong>${
+        o.waehrung?` · ${esc(o.waehrung)}`:''}${
+        istAktie(o)&&!eurWert(o,'kurs')?' · <span style="color:var(--warn)">Eurokurs fehlt, Preise in Dollar</span>':''}</div>`:''}
+      ${o.erwartung&&o.erwartung.quote?`<div class="muz" style="margin-top:5px">
+        ${o.erwartung.bis_tp1_pct!=null?`bis Ziel 1 <strong>${pct(o.erwartung.bis_tp1_pct,1)}</strong> · `:''}
+        vergleichbare Signale trafen bisher <strong>${Math.round(o.erwartung.quote.tp1*100)} %</strong>
+        <span style="color:var(--ink-3)">(${o.erwartung.quote.n} Fälle, Vergangenheit)</span></div>`:''}
       ${st&&st.trigger?`<div class="muz" style="margin-top:7px"><span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</div>`:''}
       ${(o.muster||[]).length?`<div class="muz">Muster: ${o.muster.map(m=>esc(m.name)+' ('+m.zeitebene+')').join(' · ')}</div>`:''}
       ${(o.warnungen||[]).length?`<div class="warnz">${o.warnungen.slice(0,3).map(esc).join('<br>')}</div>`:''}
