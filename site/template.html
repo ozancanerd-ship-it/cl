@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Trading Desk</title>
 <meta name="description" content="Live AI Trading Desk — Gesamtmarkt-Scan, eingezeichnete Chartanalyse, Portfolio. Paper, kein Echtgeld.">
-<meta name="theme-color" content="#F3F5F4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0C1214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#05070D">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Desk">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,193 +14,491 @@
 <link rel="icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <style>
+/* ===================================================================
+   AI TRADING DESK — Oberflaeche
+   -------------------------------------------------------------------
+   Dunkel als Grundzustand, nicht als Variante. Ein Handelsplatz wird in
+   der Regel stundenlang angeschaut; helle Flaechen ermueden dabei, und
+   auf Schwarz traegt Farbe Bedeutung: gruen laeuft, rot ist raus, cyan
+   ist das System selbst. Alles Uebrige bleibt grau, damit die drei
+   Farben etwas heissen.
+
+   Aufbau: Tiefe entsteht durch Ebenen (Grundflaeche, Glasplatte,
+   Leuchtkante), nicht durch Schatten. Zahlen stehen immer in Mono mit
+   Tabellenziffern, damit Kurse untereinander stehen und nicht springen.
+   =================================================================== */
 :root{
-  --paper:#F3F5F4; --surface:#FFFFFF; --surface-2:#EAEFEE; --sunk:#E2E8E7;
-  --ink:#101718; --ink-2:#46585B; --ink-3:#7A8B8D;
-  --rule:#DCE3E2; --rule-strong:#C3CFCD;
-  --accent:#1D5C57; --accent-soft:#E2EDEB;
-  --long:#2C6E49; --long-bg:#E4EFE8;
-  --flat:#7A8B8D; --flat-bg:#E8ECEB;
-  --warn:#A8720E; --warn-bg:#F7EDDA;
-  --bad:#9E2B2B; --bad-bg:#F6E4E4;
-  --grid:#E7ECEB; --wick:#8C9B9D;
+  color-scheme:dark;
+  /* Grundflaechen */
+  --bg:#05070D;
+  --bg-2:#080C15;
+  --glass:rgba(255,255,255,.035);
+  --glass-2:rgba(255,255,255,.06);
+  --sunk:rgba(0,0,0,.32);
+  /* Linien */
+  --rule:rgba(125,180,255,.11);
+  --rule-strong:rgba(125,180,255,.22);
+  /* Schrift */
+  --ink:#E8F0FF;
+  --ink-2:#9FB2CE;
+  --ink-3:#63748F;
+  /* Bedeutungstraeger */
+  --accent:#3DF0D0;
+  --accent-2:#4C8DFF;
+  --accent-soft:rgba(61,240,208,.10);
+  --long:#2BE8A5;  --long-bg:rgba(43,232,165,.11);
+  --bad:#FF5C7A;   --bad-bg:rgba(255,92,122,.11);
+  --warn:#FFB648;  --warn-bg:rgba(255,182,72,.11);
+  --flat:#63748F;  --flat-bg:rgba(99,116,143,.13);
+  /* Chart */
+  --grid:rgba(125,180,255,.07);
+  --wick:#5A6C88;
+  --surface:var(--glass);
+  --surface-2:var(--glass-2);
+  --paper:var(--bg);
+  --radius:14px;
+  /* Tiefe. Drei gestaffelte Schatten statt eines harten: der erste setzt die Kante ab,
+     der zweite gibt Hoehe, der dritte legt das Element in den Raum. Ein einzelner
+     Schatten sieht immer aufgeklebt aus. */
+  --tiefe:0 1px 0 rgba(255,255,255,.05) inset, 0 8px 26px rgba(0,0,0,.44), 0 2px 6px rgba(0,0,0,.30);
+  --tiefe-hoch:0 1px 0 rgba(255,255,255,.07) inset, 0 18px 48px rgba(0,0,0,.52), 0 4px 12px rgba(0,0,0,.34);
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --paper:#0C1214; --surface:#131B1D; --surface-2:#1A2426; --sunk:#0F1719;
-  --ink:#E3EBEA; --ink-2:#9DB0B2; --ink-3:#6D8082;
-  --rule:#222F31; --rule-strong:#33474A;
-  --accent:#4FA69E; --accent-soft:#16302E;
-  --long:#5FAE81; --long-bg:#152A20;
-  --flat:#6D8082; --flat-bg:#1A2426;
-  --warn:#D9A441; --warn-bg:#2C2415;
-  --bad:#D97878; --bad-bg:#2C1A1A;
-  --grid:#1C2628; --wick:#5C6E70;
-}}
-:root[data-theme="dark"]{
-  --paper:#0C1214; --surface:#131B1D; --surface-2:#1A2426; --sunk:#0F1719;
-  --ink:#E3EBEA; --ink-2:#9DB0B2; --ink-3:#6D8082;
-  --rule:#222F31; --rule-strong:#33474A;
-  --accent:#4FA69E; --accent-soft:#16302E;
-  --long:#5FAE81; --long-bg:#152A20;
-  --flat:#6D8082; --flat-bg:#1A2426;
-  --warn:#D9A441; --warn-bg:#2C2415;
-  --bad:#D97878; --bad-bg:#2C1A1A;
-  --grid:#1C2628; --wick:#5C6E70;
+/* Helle Variante — bewusst schlicht gehalten. Wer sie waehlt, will lesen,
+   nicht bewundern. */
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#F2F5FA; --bg-2:#E9EEF7;
+  --glass:#FFFFFF; --glass-2:#F4F7FC; --sunk:#E4EAF3;
+  --rule:#DBE3EF; --rule-strong:#BFCBDD;
+  --ink:#0D1526; --ink-2:#42536E; --ink-3:#76859C;
+  --accent:#0E9E86; --accent-2:#2563EB; --accent-soft:rgba(14,158,134,.10);
+  --long:#0E9E62; --long-bg:rgba(14,158,98,.10);
+  --bad:#D0344F; --bad-bg:rgba(208,52,79,.10);
+  --warn:#B57A0B; --warn-bg:rgba(181,122,11,.12);
+  --flat:#76859C; --flat-bg:rgba(118,133,156,.12);
+  --grid:rgba(20,40,80,.07); --wick:#8A99AE;
+  --tiefe:0 1px 0 rgba(255,255,255,.8) inset, 0 6px 18px rgba(20,40,80,.10), 0 1px 3px rgba(20,40,80,.08);
+  --tiefe-hoch:0 1px 0 rgba(255,255,255,.9) inset, 0 14px 34px rgba(20,40,80,.14), 0 3px 8px rgba(20,40,80,.10);
+  --surface:var(--glass); --surface-2:var(--glass-2); --paper:var(--bg);
 }
+
 *{box-sizing:border-box}
-body{margin:0; background:var(--paper); color:var(--ink);
-  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
-  padding-top:env(safe-area-inset-top)}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; color:var(--ink); background:var(--bg);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15.5px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  padding-top:env(safe-area-inset-top);
+  /* Zwei weiche Lichtquellen oben und ein feines Raster darunter. Das Raster
+     ist so schwach, dass man es nicht sieht — man merkt nur, dass die
+     Flaeche nicht tot ist. */
+  background-image:
+    radial-gradient(1100px 460px at 12% -10%, rgba(76,141,255,.16), transparent 62%),
+    radial-gradient(900px 420px at 92% -6%, rgba(61,240,208,.11), transparent 60%),
+    linear-gradient(rgba(125,180,255,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125,180,255,.028) 1px, transparent 1px);
+  background-size:auto,auto,44px 44px,44px 44px;
+  background-attachment:fixed;
+}
+:root[data-theme="light"] body{background-image:
+  radial-gradient(1000px 420px at 12% -10%, rgba(37,99,235,.10), transparent 62%),
+  radial-gradient(800px 380px at 92% -6%, rgba(14,158,134,.08), transparent 60%)}
 img{max-width:100%}
-.wrap{max-width:760px; margin:0 auto; padding:0 16px 90px}
-.mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
-header{background:var(--surface); border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:40}
-.hd{max-width:760px; margin:0 auto; padding:18px 16px 0}
-.crumb{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.14em;
-  text-transform:uppercase; color:var(--ink-3); display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-h1{font-family:Newsreader,Georgia,serif; font-weight:500; font-size:26px;
-  line-height:1.1; letter-spacing:-.015em; margin:7px 0 0}
-h2{font-family:Newsreader,Georgia,serif; font-weight:500; font-size:21px; letter-spacing:-.01em;
-  margin:30px 0 10px}
-h3{font-size:14px; font-weight:600; margin:20px 0 8px; letter-spacing:.01em}
-.stamp{font-size:12.5px; color:var(--ink-3); margin-top:4px}
-.chip{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10px;
-  font-weight:500; letter-spacing:.07em; text-transform:uppercase; padding:3px 8px; border-radius:100px}
-.chip.paper{background:var(--warn-bg); color:var(--warn)}
-.chip.live{background:var(--long-bg); color:var(--long)}
-.chip.tot{background:var(--flat-bg); color:var(--flat)}
-.dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--long);
-  margin-right:5px; vertical-align:middle}
-.dot.aus{background:var(--flat)}
-.puls{animation:puls 2s ease-in-out infinite}
-@keyframes puls{0%,100%{opacity:1}50%{opacity:.28}}
-.tabs{display:flex; gap:2px; margin-top:16px; overflow-x:auto; scrollbar-width:none}
+.wrap{max-width:900px; margin:0 auto; padding:0 18px 110px}
+.mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace;
+  font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1,"ss01" 1}
+
+/* ---------- Kopf ---------- */
+header{
+  position:sticky; top:0; z-index:40;
+  background:linear-gradient(180deg, rgba(5,7,13,.94), rgba(5,7,13,.80));
+  backdrop-filter:blur(18px) saturate(150%);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  border-bottom:1px solid var(--rule);
+}
+:root[data-theme="light"] header{background:linear-gradient(180deg,rgba(242,245,250,.96),rgba(242,245,250,.86))}
+/* Die Leuchtkante unter dem Kopf. Ein Pixel, aber sie macht den Unterschied
+   zwischen „Seite" und „Geraet". */
+header::after{content:""; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),var(--accent-2),transparent);
+  opacity:.55}
+.hd{max-width:900px; margin:0 auto; padding:16px 18px 0}
+.crumb{font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--ink-3); display:flex; gap:9px; align-items:center; flex-wrap:wrap}
+.crumb>span:first-child{color:var(--ink-2); font-weight:600;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent}
+h1{font-family:"Space Grotesk",Inter,sans-serif; font-weight:600; font-size:29px;
+  line-height:1.05; letter-spacing:-.03em; margin:8px 0 0}
+h2{font-family:"Space Grotesk",Inter,sans-serif; font-weight:600; font-size:15px;
+  letter-spacing:.02em; margin:30px 0 11px; color:var(--ink);
+  display:flex; align-items:center; gap:10px}
+/* Die Linie hinter jeder Ueberschrift laeuft bis zum Rand — Konsolen-Anmutung
+   ohne dass es laut wird. */
+h2::after{content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--rule),transparent)}
+h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; color:var(--ink)}
+.stamp{font-size:12px; color:var(--ink-3); margin-top:5px; font-family:"JetBrains Mono",monospace}
+.chip{display:inline-flex; align-items:center; gap:5px; font-family:"JetBrains Mono",monospace;
+  font-size:9.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+  padding:4px 9px; border-radius:100px; border:1px solid transparent}
+.chip.paper{background:var(--warn-bg); color:var(--warn); border-color:rgba(255,182,72,.28)}
+.chip.live{background:var(--long-bg); color:var(--long); border-color:rgba(43,232,165,.30)}
+.chip.tot{background:var(--flat-bg); color:var(--flat); border-color:var(--rule)}
+.dot{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--long);
+  box-shadow:0 0 0 3px rgba(43,232,165,.18); vertical-align:middle}
+.dot.aus{background:var(--flat); box-shadow:none}
+.puls{animation:puls 2.4s ease-in-out infinite}
+@keyframes puls{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.puls,.scan,.glowline{animation:none!important}}
+
+/* ---------- Reiter ---------- */
+.tabs{display:flex; gap:4px; margin-top:16px; overflow-x:auto; scrollbar-width:none;
+  padding-bottom:2px}
 .tabs::-webkit-scrollbar{display:none}
-.tab{appearance:none; background:none; border:0; border-bottom:2px solid transparent;
-  font:inherit; font-size:13.5px; font-weight:500; color:var(--ink-3);
-  padding:9px 12px; cursor:pointer; white-space:nowrap}
-.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
-.panel{padding-top:18px}
-.lead{font-size:14px; color:var(--ink-2); margin:0 0 16px}
+.tab{appearance:none; background:none; border:0; position:relative;
+  font:inherit; font-size:13px; font-weight:500; color:var(--ink-3);
+  padding:10px 13px 12px; cursor:pointer; white-space:nowrap; letter-spacing:.01em;
+  transition:color .16s}
+.tab:hover{color:var(--ink-2)}
+.tab[aria-selected="true"]{color:var(--ink); font-weight:600}
+.tab[aria-selected="true"]::after{content:""; position:absolute; left:11px; right:11px; bottom:0;
+  height:2px; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 12px rgba(61,240,208,.55)}
+.panel{padding-top:20px; animation:auf .28s cubic-bezier(.2,.7,.3,1)}
+@keyframes auf{from{opacity:0; transform:translateY(7px)}to{opacity:1; transform:none}}
+@media (prefers-reduced-motion:reduce){.panel{animation:none}}
+.lead{font-size:13.5px; color:var(--ink-2); margin:0 0 16px}
 
-/* ---------- Statuszeile ---------- */
-.status{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin-top:14px;
-  background:var(--rule); border:1px solid var(--rule); border-radius:4px; overflow:hidden}
-.status div{background:var(--surface); padding:10px 11px}
-.status .k{font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.1em;
-  text-transform:uppercase; color:var(--ink-3); margin-bottom:3px}
-.status .v{font-family:Newsreader,Georgia,serif; font-size:21px; line-height:1;
-  font-variant-numeric:tabular-nums; letter-spacing:-.02em}
-.status .v.gut{color:var(--long)} .status .v.mittel{color:var(--warn)} .status .v.aus{color:var(--ink-3)}
-@media (max-width:520px){.status{grid-template-columns:repeat(2,1fr)}}
+/* ---------- Statuskacheln ---------- */
+.status{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:16px}
+.status div{
+  position:relative; overflow:hidden; padding:13px 14px 14px;
+  background:linear-gradient(165deg, var(--glass-2), var(--glass));
+  border:1px solid var(--rule); border-radius:var(--radius);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:var(--tiefe);
+  transition:transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s;
+}
+.status div:hover{transform:translateY(-2px); box-shadow:var(--tiefe-hoch)}
+.status div::before{content:""; position:absolute; inset:0 0 auto 0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--rule-strong),transparent)}
+.status .k{font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:6px}
+.status .v{font-family:"Space Grotesk",Inter,sans-serif; font-size:25px; line-height:1;
+  font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.03em}
+.status .v.gut{color:var(--long); text-shadow:0 0 22px rgba(43,232,165,.35)}
+.status .v.mittel{color:var(--warn)} .status .v.aus{color:var(--ink-3)}
+@media (max-width:640px){.status{grid-template-columns:repeat(2,1fr); gap:8px}}
 
-/* ---------- Radar-Zeilen ---------- */
-.filter{display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 4px}
-.fb{appearance:none; border:1px solid var(--rule-strong); background:var(--surface);
-  color:var(--ink-2); font:inherit; font-size:11.5px; font-weight:500; padding:5px 11px;
-  border-radius:100px; cursor:pointer}
-.fb[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
-.opp{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
-  border-radius:4px; margin-bottom:8px; cursor:pointer; transition:border-color .12s}
-.opp:hover{border-color:var(--rule-strong)}
-.opp.n-A_PLUS{border-left-color:var(--long)} .opp.n-A{border-left-color:var(--long)}
-.opp.n-A_MINUS{border-left-color:var(--accent)} .opp.n-B_PLUS{border-left-color:var(--accent)}
-.opp.n-B{border-left-color:var(--warn)} .opp.n-WATCH{border-left-color:var(--rule-strong)}
-.opp-h{display:flex; align-items:baseline; gap:8px; padding:11px 13px 6px; flex-wrap:wrap}
-.opp-h .rk{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); min-width:22px}
-.opp-h .nm{font-weight:600; font-size:15px}
-.opp-h .kl{font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.08em;
+/* ---------- Filterknoepfe ---------- */
+.filter{display:flex; gap:7px; flex-wrap:wrap; margin:18px 0 6px}
+.fb{appearance:none; border:1px solid var(--rule); background:var(--glass);
+  color:var(--ink-2); font:inherit; font-size:11.5px; font-weight:500; padding:6px 13px;
+  border-radius:100px; cursor:pointer; transition:all .16s; letter-spacing:.01em}
+.fb:hover{border-color:var(--rule-strong); color:var(--ink)}
+.fb[aria-pressed="true"]{background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  border-color:transparent; color:#03121A; font-weight:600;
+  box-shadow:0 3px 18px rgba(61,240,208,.28)}
+
+/* ---------- Chancen-Zeilen ---------- */
+.opp{
+  position:relative; background:var(--glass); border:1px solid var(--rule);
+  border-radius:var(--radius); margin-bottom:9px; cursor:pointer; overflow:hidden;
+  transition:transform .16s cubic-bezier(.2,.7,.3,1), border-color .16s, background .16s;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+}
+.opp{box-shadow:var(--tiefe)}
+.opp:hover{transform:translateY(-2px); border-color:var(--rule-strong);
+  background:var(--glass-2); box-shadow:var(--tiefe-hoch)}
+.opp:active{transform:translateY(0)}
+/* Der Farbstreifen links ist die Note. Er ist das Erste, was auffaellt, und
+   das Einzige, was aus der Entfernung lesbar sein muss. */
+.opp::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:var(--rule-strong)}
+.opp.n-A_PLUS::before{background:linear-gradient(180deg,var(--accent),var(--long));
+  box-shadow:0 0 20px rgba(43,232,165,.55)}
+.opp.n-A::before{background:var(--long); box-shadow:0 0 14px rgba(43,232,165,.35)}
+.opp.n-A_MINUS::before{background:var(--accent)}
+.opp.n-B_PLUS::before{background:var(--accent-2)}
+.opp.n-B::before{background:var(--warn)}
+.opp.n-WATCH::before{background:var(--flat)}
+.opp.n-A_PLUS{border-color:rgba(43,232,165,.30)}
+.opp-h{display:flex; align-items:baseline; gap:9px; padding:13px 15px 7px 17px; flex-wrap:wrap}
+.opp-h .rk{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink-3); min-width:22px}
+.opp-h .nm{font-weight:650; font-size:15.5px; letter-spacing:-.01em;
+  font-family:"Space Grotesk",Inter,sans-serif}
+.opp-h .kl{font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--ink-3)}
-.opp-h .dir{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.08em;
-  padding:2px 6px; border-radius:3px}
+.opp-h .dir{font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.12em;
+  font-weight:600; padding:3px 7px; border-radius:5px}
 .opp-h .dir.long{background:var(--long-bg); color:var(--long)}
 .opp-h .dir.short{background:var(--bad-bg); color:var(--bad)}
-.opp-h .note{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
-  padding:2px 7px; border-radius:3px; background:var(--surface-2); color:var(--ink-2)}
-.opp-h .note.gut{background:var(--long-bg); color:var(--long)}
-.opp-h .note.mittel{background:var(--accent-soft); color:var(--accent)}
-.opp-h .sc{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:18px;
-  font-weight:600; font-variant-numeric:tabular-nums}
-.opp-b{padding:0 13px 11px; font-size:12.5px; color:var(--ink-2)}
-.kpi{display:flex; gap:14px; flex-wrap:wrap; font-family:"IBM Plex Mono",monospace;
-  font-size:11.5px; color:var(--ink-2); margin-top:5px}
+.opp-h .note{font-family:"JetBrains Mono",monospace; font-size:11px; font-weight:700;
+  padding:3px 8px; border-radius:5px; background:var(--flat-bg); color:var(--ink-2);
+  border:1px solid var(--rule)}
+.opp-h .note.gut{background:var(--long-bg); color:var(--long); border-color:rgba(43,232,165,.32)}
+.opp-h .note.mittel{background:var(--accent-soft); color:var(--accent); border-color:rgba(61,240,208,.28)}
+.opp-h .sc{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:17px;
+  font-weight:600; font-variant-numeric:tabular-nums; color:var(--ink-2)}
+.opp-b{padding:0 15px 13px 17px; font-size:12.5px; color:var(--ink-2)}
+.kpi{display:flex; gap:7px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace;
+  font-size:11px; color:var(--ink-2); margin-top:8px}
+/* Jede Kennzahl in einer eigenen Kapsel — nebeneinander gesetzte Zahlen ohne
+   Rahmen verschwimmen auf dem Handy zu einer Zeile Zahlensalat. */
+.kpi>span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px;
+  padding:3px 8px; white-space:nowrap}
 .kpi b{color:var(--ink); font-weight:600}
 .kpi .up{color:var(--long)} .kpi .dn{color:var(--bad)}
-.warnz{margin-top:6px; font-size:11.5px; color:var(--warn)}
-.muz{margin-top:5px; font-size:11.5px; color:var(--ink-3)}
-.fak{display:grid; grid-template-columns:8.5em 3.2em 1fr; gap:3px 8px; align-items:center;
-  font-size:11.5px; color:var(--ink-3); margin-top:3px}
-.fak .fn{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase}
-.fak .fb2{height:5px; background:var(--sunk); border-radius:3px; overflow:hidden}
-.fak .fb2 i{display:block; height:100%; background:var(--accent)}
+.warnz{margin-top:8px; font-size:11.5px; color:var(--warn); line-height:1.45;
+  border-left:2px solid rgba(255,182,72,.35); padding-left:9px}
+.muz{margin-top:7px; font-size:11.5px; color:var(--ink-3)}
+.fak{display:grid; grid-template-columns:8.5em 3.6em 1fr; gap:5px 9px; align-items:center;
+  font-size:11.5px; color:var(--ink-3); margin-top:5px}
+.fak .fn{font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase}
+.fak .fb2{height:4px; background:var(--sunk); border-radius:3px; overflow:hidden}
+.fak .fb2 i{display:block; height:100%; border-radius:3px;
+  background:linear-gradient(90deg,var(--accent-2),var(--accent))}
 .fak .fd{color:var(--ink-2)}
 
-/* ---------- Chart ---------- */
-.chartbox{background:var(--surface); border:1px solid var(--rule); border-radius:4px; overflow:hidden}
-.chart-h{display:flex; align-items:center; gap:9px; padding:10px 12px; border-bottom:1px solid var(--rule);
-  flex-wrap:wrap}
-.chart-h .nm{font-weight:600; font-size:16px}
-.chart-h .px{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:17px; font-weight:600}
-.chart-h .px.up{color:var(--long)} .chart-h .px.dn{color:var(--bad)}
-.tfbar{display:flex; gap:2px; padding:7px 10px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
-.tfb{appearance:none; border:0; background:none; font:inherit; font-family:"IBM Plex Mono",monospace;
-  font-size:11.5px; color:var(--ink-3); padding:4px 10px; border-radius:3px; cursor:pointer}
-.tfb[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent); font-weight:600}
-.layers{display:flex; gap:5px; padding:6px 10px 8px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
-.lb{appearance:none; border:1px solid var(--rule); background:var(--surface); font:inherit;
-  font-size:10.5px; color:var(--ink-3); padding:3px 8px; border-radius:100px; cursor:pointer}
-.lb[aria-pressed="true"]{background:var(--surface-2); color:var(--ink); border-color:var(--rule-strong)}
-#cv{display:block; width:100%; height:480px; touch-action:none; cursor:crosshair}
-@media (max-width:520px){#cv{height:390px}}
-.legende{display:flex; gap:12px; flex-wrap:wrap; padding:8px 12px; border-top:1px solid var(--rule);
-  font-size:10.5px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
-.legende span{display:flex; align-items:center; gap:4px}
-.legende i{width:11px; height:3px; border-radius:2px; display:inline-block}
-.readout{padding:7px 12px; border-top:1px solid var(--rule); font-family:"IBM Plex Mono",monospace;
-  font-size:11px; color:var(--ink-2); min-height:30px}
+/* ---------- Setup-Karte: der Teil, der die Handelsidee benennt ---------- */
+.setup{margin-top:10px; border:1px solid var(--rule); border-radius:10px; overflow:hidden;
+  background:var(--sunk)}
+.setup .sh{display:flex; align-items:center; gap:8px; padding:9px 12px;
+  border-bottom:1px solid var(--rule); font-family:"Space Grotesk",Inter,sans-serif;
+  font-weight:600; font-size:13px}
+.setup .sq{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:9px;
+  letter-spacing:.14em; text-transform:uppercase; padding:3px 7px; border-radius:5px}
+.setup .sq.sauber{background:var(--long-bg); color:var(--long)}
+.setup .sq.brauchbar{background:var(--accent-soft); color:var(--accent)}
+.setup .sq.unsauber{background:var(--warn-bg); color:var(--warn)}
+.setup .sb{padding:10px 12px 12px; font-size:12.5px; color:var(--ink-2)}
+.setup ul{margin:8px 0 0; padding:0; list-style:none}
+.setup li{position:relative; padding-left:19px; margin-bottom:5px; line-height:1.45}
+.setup li::before{position:absolute; left:0; top:0; font-family:"JetBrains Mono",monospace;
+  font-size:11px}
+.setup li.ja::before{content:"✓"; color:var(--long)}
+.setup li.nein::before{content:"○"; color:var(--warn)}
+.setup .trig{margin-top:10px; padding:8px 10px; border-radius:8px;
+  background:var(--accent-soft); border:1px solid rgba(61,240,208,.22);
+  color:var(--ink); font-size:12px}
+.setup .trig b{color:var(--accent); font-family:"JetBrains Mono",monospace;
+  font-size:9px; letter-spacing:.14em; text-transform:uppercase; display:block; margin-bottom:3px}
 
-/* ---------- Analyse ---------- */
-.mtf{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px}
-.mtf th{text-align:left; font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.09em;
-  text-transform:uppercase; color:var(--ink-3); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--rule)}
-.mtf td{padding:7px 8px; border-bottom:1px solid var(--rule); vertical-align:top}
-.mtf td.tf{font-family:"IBM Plex Mono",monospace; font-weight:600}
+/* ---------- Handelsplan als Ablauf ---------- */
+.steps{list-style:none; margin:8px 0 0; padding:0; counter-reset:s}
+.steps li{position:relative; counter-increment:s; padding:0 0 15px 32px; font-size:13px;
+  color:var(--ink-2); line-height:1.5}
+.steps li::before{content:counter(s); position:absolute; left:0; top:0;
+  width:21px; height:21px; border-radius:50%; display:grid; place-items:center;
+  font-family:"JetBrains Mono",monospace; font-size:10px; font-weight:600;
+  background:var(--accent-soft); color:var(--accent); border:1px solid rgba(61,240,208,.3)}
+/* Die Verbindungslinie macht aus fuenf Saetzen einen Ablauf. */
+.steps li::after{content:""; position:absolute; left:10px; top:24px; bottom:2px; width:1px;
+  background:linear-gradient(180deg,var(--rule-strong),transparent)}
+.steps li:last-child{padding-bottom:0}
+.steps li:last-child::after{display:none}
+.exits{list-style:none; margin:8px 0 0; padding:0}
+.exits li{position:relative; padding-left:19px; margin-bottom:7px; font-size:12.5px;
+  color:var(--ink-2); line-height:1.45}
+.exits li::before{content:"→"; position:absolute; left:0; color:var(--bad);
+  font-family:"JetBrains Mono",monospace}
+
+/* ---------- Chart ---------- */
+.chartbox{background:var(--glass); border:1px solid var(--rule); border-radius:var(--radius);
+  overflow:hidden; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:var(--tiefe)}
+.chart-h{display:flex; align-items:center; gap:10px; padding:12px 14px;
+  border-bottom:1px solid var(--rule); flex-wrap:wrap}
+.chart-h .nm{font-weight:650; font-size:16.5px; font-family:"Space Grotesk",Inter,sans-serif;
+  letter-spacing:-.01em}
+.chart-h .px{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:18px; font-weight:600}
+.chart-h .px.up{color:var(--long)} .chart-h .px.dn{color:var(--bad)}
+.tfbar{display:flex; gap:3px; padding:8px 11px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
+.tfb{appearance:none; border:0; background:none; font:inherit; font-family:"JetBrains Mono",monospace;
+  font-size:11px; color:var(--ink-3); padding:5px 11px; border-radius:7px; cursor:pointer;
+  transition:all .14s; letter-spacing:.06em}
+.tfb:hover{color:var(--ink-2); background:var(--sunk)}
+.tfb[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent); font-weight:600;
+  box-shadow:inset 0 0 0 1px rgba(61,240,208,.25)}
+.layers{display:flex; gap:5px; padding:7px 11px 9px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
+.lb{appearance:none; border:1px solid var(--rule); background:transparent; font:inherit;
+  font-size:10.5px; color:var(--ink-3); padding:4px 9px; border-radius:100px; cursor:pointer;
+  transition:all .14s}
+.lb:hover{color:var(--ink-2); border-color:var(--rule-strong)}
+.lb[aria-pressed="true"]{background:var(--glass-2); color:var(--ink); border-color:var(--rule-strong)}
+#cv{display:block; width:100%; height:500px; touch-action:none; cursor:crosshair}
+@media (max-width:640px){#cv{height:400px}}
+.legende{display:flex; gap:13px; flex-wrap:wrap; padding:9px 14px; border-top:1px solid var(--rule);
+  font-size:10px; color:var(--ink-3); font-family:"JetBrains Mono",monospace; letter-spacing:.06em}
+.legende span{display:flex; align-items:center; gap:5px}
+.legende i{width:12px; height:3px; border-radius:2px; display:inline-block}
+.readout{padding:9px 14px; border-top:1px solid var(--rule); font-family:"JetBrains Mono",monospace;
+  font-size:11px; color:var(--ink-2); min-height:32px; background:var(--sunk)}
+
+/* ---------- Tabellen und Karten ---------- */
+.mtf{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:8px}
+.mtf th{text-align:left; font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:.15em;
+  text-transform:uppercase; color:var(--ink-3); font-weight:600; padding:8px 10px;
+  border-bottom:1px solid var(--rule-strong)}
+.mtf td{padding:9px 10px; border-bottom:1px solid var(--rule); vertical-align:top; color:var(--ink-2)}
+.mtf tr:last-child td{border-bottom:0}
+.mtf td.tf{font-family:"JetBrains Mono",monospace; font-weight:600; color:var(--ink)}
 .mtf .up{color:var(--long)} .mtf .dn{color:var(--bad)} .mtf .nu{color:var(--ink-3)}
-.satzliste{margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--ink-2)}
-.satzliste li{margin-bottom:5px}
-.karte{background:var(--surface); border:1px solid var(--rule); border-radius:4px; padding:13px 14px; margin-bottom:10px}
+.satzliste{margin:8px 0 0; padding-left:0; list-style:none; font-size:13px; color:var(--ink-2)}
+.satzliste li{position:relative; padding-left:17px; margin-bottom:7px; line-height:1.5}
+.satzliste li::before{content:""; position:absolute; left:2px; top:.62em; width:5px; height:5px;
+  border-radius:50%; background:var(--rule-strong)}
+.karte{background:linear-gradient(165deg, var(--glass-2), var(--glass));
+  border:1px solid var(--rule); border-radius:var(--radius);
+  padding:15px 16px; margin-bottom:11px; backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px); position:relative; overflow:hidden;
+  box-shadow:var(--tiefe)}
 .karte h3{margin-top:0}
-.karte.gut{border-left:3px solid var(--long)} .karte.warn{border-left:3px solid var(--warn)}
-.karte.bad{border-left:3px solid var(--bad)}
-.zt{display:flex; gap:12px; flex-wrap:wrap; font-family:"IBM Plex Mono",monospace; font-size:11.5px;
-  color:var(--ink-2); margin-top:8px; padding-top:8px; border-top:1px dashed var(--rule)}
+.karte.gut{border-color:rgba(43,232,165,.28); background:linear-gradient(135deg,var(--long-bg),var(--glass))}
+.karte.warn{border-color:rgba(255,182,72,.28)}
+.karte.bad{border-color:rgba(255,92,122,.28)}
+.zt{display:flex; gap:8px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace; font-size:11px;
+  color:var(--ink-2); margin-top:11px; padding-top:11px; border-top:1px solid var(--rule)}
+.zt span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px; padding:3px 8px}
 .zt b{color:var(--ink)}
-.note-box{background:var(--surface-2); border:1px solid var(--rule); border-radius:4px;
-  padding:11px 13px; font-size:12.5px; color:var(--ink-2); margin:12px 0}
-.note-box.warn{background:var(--warn-bg); border-color:transparent; color:var(--warn)}
-.note-box.bad{background:var(--bad-bg); border-color:transparent; color:var(--bad)}
-.note-box .nt{display:block; font-family:"IBM Plex Mono",monospace; font-size:9.5px;
-  letter-spacing:.1em; text-transform:uppercase; margin-bottom:5px; font-weight:600}
-.alarm{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--rule-strong);
-  border-radius:4px; padding:11px 13px; margin-bottom:8px}
-.alarm.hot{border-left-color:var(--long); background:var(--long-bg)}
-.alarm .ah{font-weight:600; font-size:14.5px; display:flex; gap:10px; align-items:baseline}
-.alarm .ah .d{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
-.alarm p{margin:5px 0 0; font-size:12.5px}
-.rowx{display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--rule);
-  font-size:13px}
+.note-box{background:var(--sunk); border:1px solid var(--rule); border-radius:11px;
+  padding:12px 14px; font-size:12.5px; color:var(--ink-2); margin:14px 0}
+.note-box.warn{background:var(--warn-bg); border-color:rgba(255,182,72,.26); color:var(--warn)}
+.note-box.bad{background:var(--bad-bg); border-color:rgba(255,92,122,.26); color:var(--bad)}
+.note-box .nt{display:block; font-family:"JetBrains Mono",monospace; font-size:9px;
+  letter-spacing:.16em; text-transform:uppercase; margin-bottom:6px; font-weight:600; opacity:.85}
+.alarm{background:linear-gradient(165deg, var(--glass-2), var(--glass));
+  border:1px solid var(--rule); border-radius:var(--radius);
+  padding:13px 15px 13px 17px; margin-bottom:9px; position:relative; overflow:hidden;
+  box-shadow:var(--tiefe)}
+.alarm::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--rule-strong)}
+.alarm.hot::before{background:linear-gradient(180deg,var(--accent),var(--long));
+  box-shadow:0 0 20px rgba(43,232,165,.5)}
+.alarm.hot{border-color:rgba(43,232,165,.26)}
+.alarm .ah{font-weight:650; font-size:14px; display:flex; gap:10px; align-items:baseline;
+  font-family:"Space Grotesk",Inter,sans-serif}
+.alarm .ah .d{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink-3)}
+.alarm p{margin:6px 0 0; font-size:12.5px; color:var(--ink-2)}
+.rowx{display:flex; justify-content:space-between; gap:12px; padding:8px 0;
+  border-bottom:1px solid var(--rule); font-size:13px}
 .rowx:last-child{border-bottom:0}
-.rowx .lab{color:var(--ink-2)} .rowx .val{font-family:"IBM Plex Mono",monospace; font-weight:500}
-.tw{overflow-x:auto}
-.leer{color:var(--ink-3); font-size:13px; padding:16px 0}
-.foot{max-width:760px; margin:0 auto; padding:26px 16px 40px; border-top:1px solid var(--rule);
+.rowx .lab{color:var(--ink-2)} .rowx .val{font-family:"JetBrains Mono",monospace; font-weight:600; color:var(--ink)}
+.tw{overflow-x:auto; -webkit-overflow-scrolling:touch}
+.leer{color:var(--ink-3); font-size:13px; padding:24px 0; text-align:center}
+.foot{max-width:900px; margin:0 auto; padding:28px 18px 46px; border-top:1px solid var(--rule);
   font-size:11.5px; color:var(--ink-3)}
-.foot p{margin:0 0 7px}
+.foot p{margin:0 0 8px}
+
+/* ---------- Bedienelemente ---------- */
 button.link{appearance:none; background:none; border:0; font:inherit; font-size:12.5px;
-  color:var(--accent); cursor:pointer; padding:0; text-decoration:underline}
+  color:var(--accent); cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:3px}
+.btn{appearance:none; border:1px solid var(--rule-strong); background:var(--glass-2);
+  color:var(--ink); font:inherit; font-size:13px; font-weight:600; padding:10px 18px;
+  border-radius:10px; cursor:pointer; transition:all .16s}
+.btn:hover{border-color:var(--accent); color:var(--accent)}
+.btn{box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 3px 10px rgba(0,0,0,.28)}
+.btn:active{transform:translateY(1px)}
+.btn.prim{background:linear-gradient(135deg,var(--accent),var(--accent-2)); border-color:transparent;
+  color:#03121A; box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 6px 24px rgba(61,240,208,.34), 0 2px 6px rgba(0,0,0,.3)}
+.btn.prim:hover{color:#03121A; filter:brightness(1.08)}
+.btn:disabled{opacity:.45; cursor:default}
+input,textarea,select{font:inherit; font-size:14px; color:var(--ink);
+  background:var(--sunk); border:1px solid var(--rule); border-radius:9px; padding:9px 11px;
+  width:100%; transition:border-color .16s}
+input:focus,textarea:focus,select:focus{outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+code,pre{font-family:"JetBrains Mono",monospace}
+pre{background:var(--sunk); border:1px solid var(--rule); border-radius:9px; padding:11px 12px;
+  font-size:10.5px; overflow-x:auto; color:var(--ink-2); margin:9px 0; white-space:pre-wrap;
+  word-break:break-all; max-height:180px}
+a{color:var(--accent); text-underline-offset:3px}
+
+/* ---------- Die grosse Karte oben ----------
+   Sie ist der Grund, warum man die App oeffnet: eine Antwort, gross genug, dass man
+   sie im Vorbeigehen liest. Der Leuchtrand oben laeuft nur, wenn ein Einstieg
+   tatsaechlich erreicht ist — sonst waere das Signal wertlos. */
+.hero{position:relative; overflow:hidden; margin-top:18px; padding:18px 19px 17px;
+  border-radius:18px; border:1px solid var(--rule-strong); cursor:pointer;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(43,232,165,.12), transparent 55%),
+    linear-gradient(150deg, var(--glass-2), var(--glass));
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  transition:transform .18s cubic-bezier(.2,.7,.3,1), border-color .18s}
+.hero.kurz{background:
+  radial-gradient(120% 140% at 0% 0%, rgba(255,92,122,.12), transparent 55%),
+  linear-gradient(150deg, var(--glass-2), var(--glass))}
+.hero{box-shadow:var(--tiefe-hoch)}
+.hero:hover{transform:translateY(-3px); border-color:var(--accent);
+  box-shadow:0 1px 0 rgba(255,255,255,.09) inset, 0 26px 60px rgba(0,0,0,.55), 0 0 60px rgba(61,240,208,.10)}
+.hero::before{content:""; position:absolute; left:0; right:0; top:0; height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),var(--accent-2),transparent);
+  opacity:.5}
+.hero.jetzt::before{opacity:1; animation:glowline 2.6s ease-in-out infinite}
+@keyframes glowline{0%,100%{opacity:.45}50%{opacity:1}}
+.hero.jetzt{border-color:rgba(43,232,165,.42); box-shadow:0 0 44px rgba(43,232,165,.13)}
+.hero-k{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+.hero-k .lbl{font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--ink-3)}
+.hero-k .lbl2{font-size:9.5px; letter-spacing:.1em; color:var(--accent)}
+.hero-k .sc{margin-left:auto; font-size:13px; color:var(--ink-3); font-weight:600}
+.hero-t{font-family:"Space Grotesk",Inter,sans-serif; font-weight:700; font-size:23px;
+  letter-spacing:-.028em; margin:9px 0 3px; line-height:1.15}
+.hero-t .akt{color:var(--long); font-size:16px; font-weight:600; letter-spacing:-.01em;
+  display:inline-block; margin-left:6px}
+.hero.kurz .hero-t .akt{color:var(--bad)}
+.hero-p{margin:2px 0 8px; font-size:13px; color:var(--ink-2)}
+.hero-these{margin:0 0 10px; font-size:13px; color:var(--ink-2); line-height:1.5;
+  max-width:62ch}
+.hero-trig{margin:11px 0 0; font-size:12px; color:var(--ink-2);
+  background:var(--accent-soft); border:1px solid rgba(61,240,208,.20);
+  border-radius:9px; padding:8px 10px}
+.hero-trig b{color:var(--accent); font-family:"JetBrains Mono",monospace; font-size:9px;
+  letter-spacing:.16em; text-transform:uppercase; margin-right:6px}
+/* Die Unterzeile in den Statuskacheln. */
+.status .n{margin-top:6px; font-family:"JetBrains Mono",monospace; font-size:9.5px;
+  color:var(--ink-3); line-height:1.4; letter-spacing:.02em}
+
+/* ---------- Chat ---------- */
+.chatbox{background:var(--glass); border:1px solid var(--rule); border-radius:var(--radius);
+  overflow:hidden; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:var(--tiefe)}
+.chatlauf{height:min(58vh,520px); overflow-y:auto; padding:16px; display:flex;
+  flex-direction:column; gap:12px}
+.chatleer{color:var(--ink-3); font-size:13px; line-height:1.55}
+.msg{display:flex}
+.msg.user{justify-content:flex-end}
+.msg .bl{max-width:82%; padding:11px 14px; border-radius:15px; font-size:13.5px; line-height:1.55}
+.msg.user .bl{background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#03121A;
+  border-bottom-right-radius:5px; font-weight:500; box-shadow:0 3px 16px rgba(61,240,208,.22)}
+.msg.assistant .bl{background:var(--sunk); border:1px solid var(--rule); color:var(--ink);
+  border-bottom-left-radius:5px}
+.msg .bl p{margin:0 0 8px} .msg .bl p:last-child{margin-bottom:0}
+.chateingabe{display:flex; gap:9px; padding:11px; border-top:1px solid var(--rule);
+  background:var(--sunk); align-items:flex-end}
+.chateingabe textarea{resize:none; flex:1}
+.chateingabe .btn{white-space:nowrap}
+
+/* ---------- Alarm-Warnung: das Erste, was man sieht, wenn nichts zugestellt wird ---------- */
+.stoerung{position:relative; overflow:hidden; margin:16px 0 0; padding:15px 17px;
+  border-radius:16px; border:1px solid rgba(255,92,122,.40);
+  background:linear-gradient(150deg, rgba(255,92,122,.14), var(--glass));
+  box-shadow:0 10px 40px rgba(255,92,122,.12), var(--tiefe)}
+.stoerung::before{content:""; position:absolute; left:0; right:0; top:0; height:2px;
+  background:linear-gradient(90deg,transparent,var(--bad),transparent); animation:glowline 2.2s ease-in-out infinite}
+.stoerung h3{margin:0 0 7px; color:var(--bad); font-size:15px;
+  font-family:"Space Grotesk",Inter,sans-serif}
+.stoerung p{margin:0 0 9px; font-size:13px; color:var(--ink-2); line-height:1.55}
+.stoerung ol{margin:10px 0 0; padding-left:20px; font-size:13px; color:var(--ink-2)}
+.stoerung li{margin-bottom:6px}
+
+/* ---------- Ladezustand ---------- */
+.scan{position:relative; overflow:hidden}
+.scan::after{content:""; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(61,240,208,.09),transparent);
+  animation:scan 1.5s linear infinite}
+@keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
 </style>
 </head>
 <body>
@@ -221,7 +518,8 @@ button.link{appearance:none; background:none; border:0; font:inherit; font-size:
       <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Portfolio</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Plan</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Alarme</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">System</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">Chat</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p7" id="t7">System</button>
     </div>
   </div>
 </header>
@@ -254,6 +552,10 @@ button.link{appearance:none; background:none; border:0; font:inherit; font-size:
   </section>
 
   <section class="panel" id="p6" role="tabpanel" aria-labelledby="t6" hidden>
+    <div id="chat"></div>
+  </section>
+
+  <section class="panel" id="p7" role="tabpanel" aria-labelledby="t7" hidden>
     <div id="system"></div>
   </section>
 </main>
@@ -306,11 +608,12 @@ function vorMin(iso){ if (!iso) return null;
   const t = Date.parse(iso); return isFinite(t) ? Math.round((Date.now()-t)/60000) : null; }
 function name(sym){ return (D.names && D.names[sym]) || sym; }
 
+let PF = null;
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
-const TITEL = ['Markt','Chart','Analyse','Portfolio','Plan','Alarme','System'];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Plan','Alarme','Chat','System'];
 function zeigeTab(i){
   TABS.forEach((t,k)=>{
     t.setAttribute('aria-selected', k===i ? 'true':'false');
@@ -318,6 +621,7 @@ function zeigeTab(i){
   });
   $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
   if (i===1) requestAnimationFrame(()=>chart.groesse());
+  if (i===6) zeichneChat();
   try { history.replaceState(null,'','#'+i); } catch(e){}
 }
 TABS.forEach((t,i)=>t.addEventListener('click',()=>zeigeTab(i)));
@@ -339,6 +643,10 @@ async function ladeScan(){
     const rw = await fetch('watchlist.json?v=' + Date.now(), {cache:'no-store'});
     WL = rw.ok ? await rw.json() : null;
   } catch(e){ WL = null; }
+  try {
+    const rp = await fetch('performance.json?v=' + Date.now(), {cache:'no-store'});
+    PF = rp.ok ? await rp.json() : null;
+  } catch(e){ PF = null; }
   zeichneStatus(); zeichneFilter(); zeichneRadar(); zeichneSystem(); zeichneAlarme();
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
   if (start && !AKTIV) waehle(start.instrument, false);
@@ -543,7 +851,7 @@ const chart = (()=>{
     const cAcc = farbe('--accent'), cWarn = farbe('--warn'), cSurf = farbe('--surface');
 
     // Raster + Preisachse
-    ctx.font = '10px "IBM Plex Mono",monospace'; ctx.textBaseline = 'middle';
+    ctx.font = '10px "JetBrains Mono",monospace'; ctx.textBaseline = 'middle';
     ctx.strokeStyle = cRule; ctx.lineWidth = 1;
     const stufen = 5, d = digits((hi+lo)/2);
     for (let k=0;k<=stufen;k++){
@@ -560,7 +868,7 @@ const chart = (()=>{
       const lang = z.richtung === 'bullish' || z.richtung === 'long';
       ctx.fillStyle = (lang ? cLong : cBad) + '1f';
       ctx.fillRect(M.l, Math.min(y1,y2), px, Math.max(1.5, Math.abs(y2-y1)));
-      ctx.fillStyle = cInk3; ctx.font = '9px "IBM Plex Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = cInk3; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
       if (Math.abs(y2-y1) > 9) ctx.fillText(z.art, M.l+3, Math.min(y1,y2)+6);
     }
 
@@ -570,7 +878,7 @@ const chart = (()=>{
       ctx.strokeStyle = cAcc + '77'; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
       for (const y of [yh, ym, yl]){ ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke(); }
       ctx.setLineDash([]);
-      ctx.fillStyle = cAcc; ctx.font = '9px "IBM Plex Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = cAcc; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
       ctx.fillText('EQ', M.l+2, ym-6);
     }
 
@@ -598,7 +906,7 @@ const chart = (()=>{
     // Swings
     if (EBENEN.swings && Z){
       const idx = new Map(v.map((b,i)=>[b.t, i]));
-      ctx.font = '9px "IBM Plex Mono",monospace';
+      ctx.font = '9px "JetBrains Mono",monospace';
       for (const s of (Z.swings||[])){
         const i = idx.get(s.t); if (i == null) continue;
         const x = X(i), y = Y(s.p);
@@ -614,7 +922,7 @@ const chart = (()=>{
     // Strukturbrüche
     if (EBENEN.brueche && Z){
       const idx = new Map(v.map((b,i)=>[b.t, i]));
-      ctx.font = '9px "IBM Plex Mono",monospace';
+      ctx.font = '9px "JetBrains Mono",monospace';
       for (const br of (Z.brueche||[])){
         const i = idx.get(br.t);
         const y = Y(br.p);
@@ -636,7 +944,7 @@ const chart = (()=>{
         ['TP1', C.ziel, cLong], ['TP2', C.tp2, cLong], ['TP3', C.tp3, cLong],
         ['Stop', C.invalidierung, cBad],
       ];
-      ctx.font = '9.5px "IBM Plex Mono",monospace';
+      ctx.font = '9.5px "JetBrains Mono",monospace';
       for (const [lab, p, col] of linien){
         if (p == null || !isFinite(p)) continue;
         const y = Y(p); if (y < M.t-14 || y > H-M.b+14) continue;
@@ -651,7 +959,7 @@ const chart = (()=>{
     // Was ausserhalb der Ansicht liegt, als Marke am Rand — statt es zu verschweigen
     // oder dafür die Kerzen platt zu drücken.
     if (ausserhalb.length){
-      ctx.font = '9.5px "IBM Plex Mono",monospace'; ctx.textAlign = 'right';
+      ctx.font = '9.5px "JetBrains Mono",monospace'; ctx.textAlign = 'right';
       let obenN = 0, untenN = 0;
       for (const [lab, p, oben] of ausserhalb){
         const y = oben ? M.t + 10 + (obenN++)*13 : H - M.b - 8 - (untenN++)*13;
@@ -665,7 +973,7 @@ const chart = (()=>{
       const y = Y(letzterPreis);
       if (y > M.t && y < H-M.b){
         ctx.fillStyle = cAcc; ctx.fillRect(W-M.r, y-8, M.r, 16);
-        ctx.fillStyle = cSurf; ctx.font = '10px "IBM Plex Mono",monospace';
+        ctx.fillStyle = cSurf; ctx.font = '10px "JetBrains Mono",monospace';
         ctx.textAlign = 'left'; ctx.fillText(num(letzterPreis, d), W-M.r+4, y);
       }
     }
@@ -686,7 +994,7 @@ const chart = (()=>{
         ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(W-M.r, y); ctx.stroke();
       }
       ctx.setLineDash([]);
-      ctx.fillStyle = cInk3; ctx.font = '9px "IBM Plex Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = cInk3; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
       ctx.fillText('70', W-M.r+5, RY(70)); ctx.fillText('30', W-M.r+5, RY(30));
       ctx.strokeStyle = cAcc; ctx.lineWidth = 1.4; ctx.beginPath();
       let begonnen = false;
@@ -700,13 +1008,13 @@ const chart = (()=>{
       const letzterR = werte.filter(r=>r!=null).slice(-1)[0];
       if (letzterR != null){
         ctx.fillStyle = letzterR >= 70 ? cBad : letzterR <= 30 ? cLong : cInk3;
-        ctx.textAlign = 'left'; ctx.font = '10px "IBM Plex Mono",monospace';
+        ctx.textAlign = 'left'; ctx.font = '10px "JetBrains Mono",monospace';
         ctx.fillText(`RSI ${letzterR.toFixed(0)}`, M.l+3, yTop - 1);
       }
     }
 
     // Zeitachse
-    ctx.fillStyle = cInk3; ctx.font = '9.5px "IBM Plex Mono",monospace'; ctx.textAlign = 'center';
+    ctx.fillStyle = cInk3; ctx.font = '9.5px "JetBrains Mono",monospace'; ctx.textAlign = 'center';
     const schritt = Math.max(1, Math.floor(v.length/5));
     for (let i=0;i<v.length;i+=schritt){
       const t = v[i].t ? new Date(v[i].t) : null; if (!t) continue;
@@ -780,6 +1088,7 @@ function zeichneStatus(){
   const alter = vorMin(S.erzeugt);
   const fehler = Object.keys(S.fehler||{}).length;
   $('marktstatus').innerHTML = `
+    ${stoerungsBanner()}
     <div class="status">
       <div><div class="k">Gescannt</div><div class="v">${g.length}</div>
         <div class="n">${Object.entries(S.anzahl||{}).map(([k,v])=>`${k} ${v}`).join(' · ')}</div></div>
@@ -812,36 +1121,39 @@ function topSignal(){
   kand.sort((a,b)=>{ const [ra,da]=rang(a), [rb,db]=rang(b); return ra!==rb ? ra-rb : da-db; });
   const x = kand[0], w = x.w, o = x.o || {}, d = digits(w.einstieg);
   const seite = x.lang ? 'KAUFEN' : 'VERKAUFEN';
-  const farbe = x.lang ? 'var(--long)' : 'var(--bad)';
   const jetzt = x.stufe === 'jetzt' || x.stufe === 'im_trade';
   const ziele = [w.tp1, w.tp2, w.tp3].filter(v=>v!=null);
-  return `<div class="karte ${jetzt?'gut':''}" style="margin-top:14px;border-left:4px solid ${farbe}"
+  const st = o.setup || null, pl = o.plan || null;
+  // Die grosse Karte ist das Erste, was beim Öffnen im Blick ist. Sie beantwortet
+  // in dieser Reihenfolge: was, warum, zu welchem Preis, mit welchem Risiko.
+  return `<div class="hero ${x.lang?'lang':'kurz'} ${jetzt?'jetzt':''}"
       data-sym="${esc(w.instrument)}" id="topsignal">
-    <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
-      <span class="mono" style="font-size:9.5px;letter-spacing:.12em;color:var(--ink-3)">BESTE CHANCE</span>
+    <div class="hero-k">
+      <span class="mono lbl">Beste Chance</span>
       <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
-      <span style="margin-left:auto" class="mono" style="font-size:12px;color:var(--ink-3)">
-        ${o.score!=null?`${o.score.toFixed(0)}/100`:''}${o.confidence?` · ${Math.round(o.confidence*100)} %`:''}</span>
+      ${st?`<span class="mono lbl2">${esc(st.name)}</span>`:''}
+      <span class="mono sc">${o.score!=null?`${o.score.toFixed(0)}`:''}</span>
     </div>
-    <h3 style="margin:6px 0 2px;font-size:19px">${esc(name(w.instrument))}
-      <span style="color:${farbe}">${jetzt?`${seite} — JETZT`:`${seite} ab ${num(w.einstieg,d)}`}</span></h3>
-    ${x.kurs!=null?`<p style="margin:2px 0 8px;font-size:13px;color:var(--ink-2)">
-      Kurs <strong>${num(x.kurs,d)}</strong>${x.live?' <span class="up" style="font-size:11px">live</span>':''}
-      ${!jetzt&&x.abstand!=null?` · noch <strong>${Math.abs(x.abstand).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}</p>`:''}
+    <div class="hero-t">${esc(name(w.instrument))}
+      <span class="akt">${jetzt?`${seite} — JETZT`:`${seite} ab ${num(w.einstieg,d)}`}</span></div>
+    ${x.kurs!=null?`<p class="hero-p">Kurs <strong>${num(x.kurs,d)}</strong>${
+      x.live?' <span class="up mono" style="font-size:10px">LIVE</span>':''}${
+      !jetzt&&x.abstand!=null?` · noch <strong>${Math.abs(x.abstand).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}</p>`:''}
+    ${st?`<p class="hero-these">${esc(st.these)}</p>`:''}
     <div class="zt" style="border-top:0;padding-top:0">
       <span>Einstieg <b>${num(w.einstieg,d)}</b></span>
       <span>Stop <b>${num(w.stop,d)}</b></span>
-      ${ziele.map((v,i)=>`<span>TP${i+1} <b>${num(v,d)}</b></span>`).join('')}
-      ${o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:''}
-      ${o.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${o.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(o.erwartete_bewegung_pct,1)}</b></span>`:''}
+      ${ziele.map((v,i)=>`<span>Ziel ${i+1} <b>${num(v,d)}</b></span>`).join('')}
+      ${pl?`<span>CRV <b>1:${pl.crv.toFixed(1)}</b></span><span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`
+          :(o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:'')}
+      ${o.rs!=null?`<span>Rel. Stärke <b>${Math.round(o.rs)}</b></span>`:''}
     </div>
-    ${o.headline?`<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">${esc(o.headline)}</p>`:''}
-    ${(o.warnungen||[]).length?`<p class="warnz">⚠ ${o.warnungen.slice(0,2).map(esc).join(' · ')}</p>`:''}
-    <p style="margin:8px 0 0"><button class="link">Analyse ansehen →</button></p>
+    ${st&&st.trigger?`<p class="hero-trig"><b>Auslöser</b> ${esc(st.trigger)}</p>`:''}
+    ${(o.warnungen||[]).length?`<p class="warnz">${o.warnungen.slice(0,2).map(esc).join('<br>')}</p>`:''}
+    <p style="margin:10px 0 0"><button class="link">Vollständige Analyse →</button></p>
   </div>`;
 }
 
-const REGIME_TEXT = {risk_on:'Risk-on', risk_off:'Risk-off', neutral:'neutral'};
 function makroKasten(){
   const M = S && S.makro;
   if (!M) return '';
@@ -894,32 +1206,44 @@ function oppZeile(o, rang){
   const live = L.get(o.instrument);
   const kurs = live ? live.p : o.kurs;
   const d = digits(kurs);
+  const st = o.setup || null;
+  const pl = o.plan || null;
+  // Die Zeile fuehrt mit dem NAMEN des Setups, nicht mit dem Score. Wer die Liste
+  // ueberfliegt, soll sehen, WAS da ist ("Ruecksetzer im Trend"), und erst danach,
+  // wie gut es bewertet ist. Score allein sagt einem Trader nichts.
+  const kopf = st ? esc(st.name) : (o.urteil === 'WATCH' ? 'Beobachten' : 'kein benanntes Setup');
   return `<div class="opp n-${o.urteil}" data-sym="${esc(o.instrument)}">
     <div class="opp-h">
       <span class="rk">#${rang}</span>
       <span class="nm">${esc(name(o.instrument))}</span>
       <span class="kl">${esc(o.klasse||'')}</span>
-      ${o.richtung?`<span class="dir ${o.richtung}">${o.richtung.toUpperCase()}</span>`:''}
+      ${o.richtung?`<span class="dir ${o.richtung}">${o.richtung==='long'?'LONG':'SHORT'}</span>`:''}
       <span class="note ${nk}">${esc(o.note)}</span>
       <span class="sc">${(o.score||0).toFixed(0)}</span>
     </div>
     <div class="opp-b">
+      <div style="font-family:'Space Grotesk',Inter,sans-serif;font-weight:600;font-size:13.5px;
+                  color:var(--ink);margin-bottom:3px">${kopf}${
+        st?` <span style="font-weight:400;font-size:11px;color:var(--ink-3)">${esc(st.qualitaet)}</span>`:''}</div>
+      ${st?`<div style="font-size:12.5px;color:var(--ink-2);line-height:1.45">${esc(st.these)}</div>`:''}
       <div class="kpi">
         <span data-px="${esc(o.instrument)}">Kurs <b>${num(kurs,d)}</b>${
           live?` <span class="${live.pct>=0?'up':'dn'}">${pct(live.pct,2)}</span>`:''}</span>
-        ${o.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${o.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(o.erwartete_bewegung_pct,1)}</b></span>`:''}
-        ${o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:''}
-        ${o.confidence?`<span>Confidence <b>${Math.round(o.confidence*100)} %</b></span>`:''}
+        ${pl?`<span>CRV <b>1:${pl.crv.toFixed(1)}</b></span>`:(o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:'')}
+        ${pl?`<span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`:''}
+        ${o.rs!=null?`<span>Rel. Stärke <b class="${o.rs>=70?'up':o.rs<=30?'dn':''}">${Math.round(o.rs)}</b></span>`:''}
+        ${o.confidence?`<span>Klarheit <b>${Math.round(o.confidence*100)} %</b></span>`:''}
       </div>
       <div class="kpi">
-        ${o.ziel!=null?`<span>TP1 <b>${num(o.ziel,d)}</b></span>`:''}
-        ${o.tp2!=null?`<span>TP2 <b>${num(o.tp2,d)}</b></span>`:''}
-        ${o.tp3!=null?`<span>TP3 <b>${num(o.tp3,d)}</b></span>`:''}
-        ${o.invalidierung!=null?`<span>Stop <b>${num(o.invalidierung,d)}</b></span>`:''}
+        ${o.einstieg!=null?`<span>Einstieg <b>${num(o.einstieg,d)}</b></span>`:''}
+        ${(pl?pl.stop:o.invalidierung)!=null?`<span>Stop <b>${num(pl?pl.stop:o.invalidierung,d)}</b></span>`:''}
+        ${(pl?pl.tp1:o.ziel)!=null?`<span>Ziel 1 <b>${num(pl?pl.tp1:o.ziel,d)}</b></span>`:''}
+        ${(pl?pl.tp2:o.tp2)!=null?`<span>Ziel 2 <b>${num(pl?pl.tp2:o.tp2,d)}</b></span>`:''}
+        ${(pl?pl.tp3:o.tp3)!=null?`<span>Ziel 3 <b>${num(pl?pl.tp3:o.tp3,d)}</b></span>`:''}
       </div>
+      ${st&&st.trigger?`<div class="muz" style="margin-top:7px"><span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</div>`:''}
       ${(o.muster||[]).length?`<div class="muz">Muster: ${o.muster.map(m=>esc(m.name)+' ('+m.zeitebene+')').join(' · ')}</div>`:''}
-      ${(o.warnungen||[]).length?`<div class="warnz">⚠ ${o.warnungen.map(esc).join(' · ')}</div>`:''}
-      <div class="muz">${esc(o.headline||'')}</div>
+      ${(o.warnungen||[]).length?`<div class="warnz">${o.warnungen.slice(0,3).map(esc).join('<br>')}</div>`:''}
     </div>
   </div>`;
 }
@@ -1043,6 +1367,52 @@ function zeichneAnalyse(){
     </div>
     ${c.begruendung?`<p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(c.begruendung)}</p>`:''}
   </div>`;
+
+  // --- Das Setup. Die Karte steht ganz oben, weil sie die erste Frage beantwortet:
+  // was ist das hier fuer ein Trade? Alles Weitere haengt daran.
+  const ST = c.setup || (K && K.setup) || null;
+  if (ST){
+    h += `<h2>Das Setup</h2>
+      <div class="setup">
+        <div class="sh">${esc(ST.name)}<span class="sq ${esc(ST.qualitaet)}">${esc(ST.qualitaet)}</span></div>
+        <div class="sb">
+          <p style="margin:0">${esc(ST.these)}</p>
+          <ul>
+            ${(ST.erfuellt||[]).map(x=>`<li class="ja">${esc(x)}</li>`).join('')}
+            ${(ST.fehlt||[]).map(x=>`<li class="nein">${esc(x)}</li>`).join('')}
+          </ul>
+          ${ST.trigger?`<div class="trig"><b>Auslöser</b>${esc(ST.trigger)}</div>`:''}
+        </div>
+      </div>`;
+  } else {
+    h += `<h2>Das Setup</h2>
+      <div class="note-box warn"><span class="nt">Kein benanntes Setup</span>
+      <p style="margin:0">Der Chart zeigt gerade nichts, was einen Namen hätte — keinen
+      Rücksetzer im Trend, keinen Ausbruch aus einer Basis, keine Rückeroberung nach
+      einem Liquiditätsgriff. Die Kennzahlen können trotzdem gut aussehen; das reicht
+      aber nicht. Ohne Setup wird hier <strong>nicht gehandelt, sondern beobachtet</strong>.</p></div>`;
+  }
+
+  // --- Der Handelsplan. Nicht "kauf bei X", sondern der komplette Ablauf inklusive
+  // der Frage, wann man aussteigt, obwohl das Ziel nicht erreicht ist. Genau daran
+  // scheitern Trades in der Praxis, nicht am Einstieg.
+  const PL = c.plan || null;
+  if (PL){
+    h += `<h2>So wird gehandelt</h2>
+      <div class="karte">
+        <div class="kpi" style="margin-top:0">
+          <span>Einstieg <b>${num(PL.einstieg,d)}</b></span>
+          <span>Stop <b>${num(PL.stop,d)}</b></span>
+          <span>1 R <b>${num(PL.r,d)}</b></span>
+          <span>Risiko <b>${PL.risiko_pct.toFixed(1)} %</b></span>
+          <span>CRV <b>1:${PL.crv.toFixed(1)}</b></span>
+        </div>
+        <ol class="steps">${(PL.schritte||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
+        <h3 style="margin-top:16px">Wann raus, bevor ein Ziel erreicht ist</h3>
+        <ul class="exits">${(PL.ausstiege||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+        ${PL.untauglich?`<div class="note-box bad" style="margin-bottom:0"><span class="nt">Nicht handelbar</span><p style="margin:0">${esc(PL.untauglich)}</p></div>`:''}
+      </div>`;
+  }
 
   if ((c.warnungen||[]).length)
     h += `<div class="note-box warn"><span class="nt">Was dagegen spricht</span>
@@ -1193,7 +1563,7 @@ function zeichnePortfolio(){
         <div class="n">${einstand?pct(gv/einstand*100,1):'—'}</div></div>
       <div><div class="k">Konzentration</div><div class="v ${konz>35?'mittel':'gut'}">${konz.toFixed(0)} %</div>
         <div class="n">größte: ${esc(groesste?name(groesste.pos.sym):'—')}</div></div>
-      <div><div class="k">Aufteilung</div><div class="v" style="font-size:14px;font-family:'IBM Plex Mono',monospace">
+      <div><div class="k">Aufteilung</div><div class="v" style="font-size:14px;font-family:'JetBrains Mono',monospace">
         ${Object.entries(jeKlasse).map(([k,v])=>`${k.slice(0,3)} ${gesamt?Math.round(v/gesamt*100):0}%`).join('<br>')||'—'}</div></div>
     </div>
     <p class="leer" style="padding:6px 0">* in der Währung deiner Eingabe gerechnet — Kurse
@@ -1255,8 +1625,21 @@ function zeichnePortfolio(){
         <input id="pf_einstieg" class="val" inputmode="decimal" placeholder="61000" style="width:52%"></div>
       <div class="rowx"><span class="lab">Konto</span>
         <input id="pf_konto" class="val" placeholder="Bybit / Trade Republic" style="width:52%"></div>
-      <p style="margin:11px 0 0"><button class="link" id="pf_add">Hinzufügen</button>
-        ${bew.length?` · <button class="link" id="pf_clear">alle löschen</button>`:''}</p>
+      <p style="margin:11px 0 0"><button class="btn" id="pf_add">Hinzufügen</button>
+        ${bew.length?` <button class="link" id="pf_clear" style="margin-left:12px">alle löschen</button>`:''}</p>
+    </div>
+
+    <h2>Ganzes Depot auf einmal</h2>
+    <div class="karte">
+      <p style="margin:0 0 9px;font-size:13px;color:var(--ink-2)">Eine Position je Zeile.
+      Reihenfolge: <span class="mono">Symbol Menge Einstiegskurs Konto</span> — getrennt
+      durch Leerzeichen, Tabulator, Komma oder Semikolon. Komma als Dezimaltrennzeichen
+      geht auch. Das Konto darf fehlen.</p>
+      <textarea id="pf_bulk" rows="6" spellcheck="false"
+        placeholder="NVDA 12 118,40 Trade Republic&#10;BTCUSDT 0,25 61000 Bybit&#10;ETHUSDT 1,5 2380 Kraken"></textarea>
+      <p style="margin:10px 0 0"><button class="btn" id="pf_import">Übernehmen</button>
+        <button class="link" id="pf_export" style="margin-left:14px">Alles als Text ausgeben</button></p>
+      <div id="pf_meldung"></div>
     </div>`;
 
   $('portfolio').innerHTML = h;
@@ -1278,7 +1661,67 @@ function zeichnePortfolio(){
   });
   const clear = $('pf_clear');
   if (clear) clear.addEventListener('click',()=>{ speicherePositionen([]); zeichnePortfolio(); });
+
+  const imp = $('pf_import');
+  if (imp) imp.addEventListener('click',()=>{
+    const {neu, fehler} = leseDepot($('pf_bulk').value || '');
+    if (neu.length){
+      // Bestehende Positionen mit demselben Symbol werden ersetzt, nicht verdoppelt.
+      const behalten = ladePositionen().filter(p=>!neu.some(n=>n.sym===p.sym));
+      speicherePositionen(behalten.concat(neu));
+    }
+    zeichnePortfolio();
+    const m = $('pf_meldung');
+    if (m) m.innerHTML =
+      `<p style="margin-top:10px;font-size:12.5px;color:${neu.length?'var(--long)':'var(--warn)'}">
+        ${neu.length} Position(en) übernommen.${fehler.length
+          ? ` <span style="color:var(--warn)">Nicht gelesen: ${fehler.map(esc).join(' · ')}</span>` : ''}</p>`;
+  });
+  const exp = $('pf_export');
+  if (exp) exp.addEventListener('click',()=>{
+    const text = ladePositionen().map(p=>
+      [p.sym, p.menge, p.einstieg ?? '', p.konto || ''].join(' ').trim()).join('\n');
+    const el = $('pf_bulk'); if (el) el.value = text;
+    const m = $('pf_meldung');
+    if (m) m.innerHTML = `<p style="margin-top:10px;font-size:12.5px;color:var(--ink-2)">
+      Oben steht jetzt dein ganzes Depot als Text — kopieren und auf dem anderen Gerät
+      hier einfügen. Das ist der Umzug: die Daten liegen nur in diesem Browser.</p>`;
+  });
 }
+
+/* Depot aus Text lesen.
+   Absichtlich nachsichtig: Ozan tippt das ab oder kopiert es aus der Broker-App, und
+   dann steht dort mal ein Tabulator, mal ein Semikolon, mal "118,40" und mal "118.40".
+   Ein Import, der daran scheitert, wird kein zweites Mal benutzt. Was nicht gelesen
+   werden kann, wird ZURUECKGEMELDET statt still verschluckt — eine Position, die
+   lautlos fehlt, ist schlimmer als eine Fehlermeldung. */
+function leseDepot(text){
+  const neu = [], fehler = [];
+  for (const roh of String(text).split(/\r?\n/)){
+    const zeile = roh.trim();
+    if (!zeile) continue;
+    /* Das Dezimalkomma ZUERST in einen Punkt umschreiben. Sonst zerlegt der Trenner
+       "118,40" in zwei Felder — die Menge stimmt, der Einstiegskurs wird zu 118 und
+       die 40 landet im Kontonamen. Genau so ist es beim ersten Versuch passiert. */
+    const norm = zeile.replace(/(\d)[,](\d)/g, '$1.$2').replace(/[€$£]/g, ' ');
+    const teile = norm.split(/[\s,;]+/).filter(Boolean);
+    if (teile.length < 2){ fehler.push(zeile.slice(0,24)); continue; }
+    const sym = teile[0].toUpperCase().replace(/[^A-Z0-9.\-]/g, '');
+    let i = 1;
+    const zahlen = [];
+    while (i < teile.length && /^\d+(\.\d+)?$/.test(teile[i])){ zahlen.push(parseFloat(teile[i])); i++; }
+    const menge = zahlen[0];
+    if (!sym || !isFinite(menge) || menge <= 0){ fehler.push(zeile.slice(0,24)); continue; }
+    neu.push({
+      sym,
+      menge,
+      einstieg: isFinite(zahlen[1]) ? zahlen[1] : null,
+      konto: teile.slice(i).join(' ').trim(),
+    });
+  }
+  return {neu, fehler};
+}
+
 let _pfZuletzt = 0;
 function aktualisierePortfolioKurse(){
   if ($('p3').hidden) return;
@@ -1406,10 +1849,12 @@ function ausRanking(){
       instrument: o.instrument, klasse: o.klasse, richtung: o.richtung, note: o.note,
       einstieg: imTrade ? w.einstieg : o.einstieg,
       einstieg_art: imTrade ? w.einstieg_art : (o.einstieg_art || 'sofort'),
-      stop: imTrade ? w.stop : o.invalidierung,
-      tp1: imTrade ? w.tp1 : o.ziel,
-      tp2: imTrade ? w.tp2 : o.tp2,
-      tp3: imTrade ? w.tp3 : o.tp3,
+      stop: imTrade ? w.stop : (o.plan ? o.plan.stop : o.invalidierung),
+      /* Die Ziele kommen aus dem Handelsplan, nicht roh aus der Liquiditaetsliste:
+         dort steht sicher, dass Ziel 1 nie naeher liegt als der Stop entfernt ist. */
+      tp1: imTrade ? w.tp1 : (o.plan ? o.plan.tp1 : o.ziel),
+      tp2: imTrade ? w.tp2 : (o.plan ? o.plan.tp2 : o.tp2),
+      tp3: imTrade ? w.tp3 : (o.plan ? o.plan.tp3 : o.tp3),
       zustand: w ? w.zustand : 'wartet_auf_einstieg',
       erreicht: w ? (w.erreicht||[]) : [],
       einstiegskurs: w ? w.einstiegskurs : null,
@@ -1445,14 +1890,18 @@ function signalKarte(x){
   const euro = Math.round(stueck * w.einstieg);
   const ziele = [w.tp1, w.tp2, w.tp3].filter(v=>v!=null);
 
+  const st = o.setup || null;
   return `<div class="alarm ${klasse}" data-sym="${esc(w.instrument)}">
     <div class="ah">
       <span>${esc(name(w.instrument))}</span>
       <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
       <span class="d">${o.score!=null?`${o.score.toFixed(0)}/100`:''}${
-        o.confidence?` · ${Math.round(o.confidence*100)} % sicher`:''}</span>
+        o.rs!=null?` · RS ${Math.round(o.rs)}`:''}</span>
     </div>
+    ${st?`<div class="mono" style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+      color:var(--accent);margin-top:5px">${esc(st.name)}</div>`:''}
     <p style="font-size:14.5px;margin-top:6px">${urteil}</p>
+    ${st?`<p style="font-size:12.5px;color:var(--ink-2);margin-top:4px">${esc(st.these)}</p>`:''}
     <div class="kpi">
       <span>Einstieg <b>${num(w.einstieg,d)}</b> <span style="color:var(--ink-3)">${esc(w.einstieg_art)}${w.frisch?' · aus dem letzten Scan':' · fest seit Einstieg'}</span></span>
       <span>Stop <b>${num(w.stop,d)}</b></span>
@@ -1471,8 +1920,9 @@ function signalKarte(x){
       gedeckelt?` <span style="color:var(--warn)">Auf ${Math.round(MAX_ANTEIL*100)} % vom
       Kapital begrenzt — der Stop liegt so eng, dass 0,5 % Risiko mehr Geld bräuchte,
       als du hast.</span>`:''}</p>`:''}
-    ${o.headline?`<p style="color:var(--ink-3);font-size:12.5px">${esc(o.headline)}</p>`:''}
-    ${(o.warnungen||[]).length?`<p class="warnz">⚠ ${o.warnungen.map(esc).join(' · ')}</p>`:''}
+    ${st&&st.trigger?`<p style="color:var(--ink-2);font-size:12px;margin-top:7px">
+      <span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</p>`:''}
+    ${(o.warnungen||[]).length?`<p class="warnz">${o.warnungen.map(esc).join('<br>')}</p>`:''}
   </div>`;
 }
 
@@ -1486,16 +1936,13 @@ function zeichneAlarme(){
   const warten = signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
 
-  const erlaubt = typeof Notification !== 'undefined' && Notification.permission === 'granted';
-  let h = `<div class="note-box ${erlaubt?'':'warn'}">
+  let h = stoerungsBanner() + pushBlock();
+  h += `<div class="note-box">
     <span class="nt">Woher diese Liste kommt</span>
     <p>Das sind die <strong>bestbewerteten Setups aus dem letzten Scan</strong> —
       ${S?`${(S.gesamt||[]).length} Werte, Analyse von ${zeit(S.erzeugt)}`:'—'}. Die Liste
       wird bei jedem Scan neu gebildet, die Reihenfolge und der Zustand ändern sich mit
       jedem Kurs. Es steht also nicht immer dasselbe da.</p>
-    <p>${erlaubt
-      ? 'Browser-Benachrichtigungen sind aktiv — dein Gerät meldet sich, sobald ein Einstieg erreicht ist (solange die App offen ist).'
-      : '<button class="link" id="pushan">Benachrichtigungen erlauben</button> — dann meldet sich dein Gerät, sobald ein Einstieg erreicht ist (solange die App offen ist). Für Meldungen bei geschlossener App braucht es Telegram.'}</p>
   </div>`;
 
   h += `<h2>Jetzt einsteigen</h2>`;
@@ -1543,18 +1990,437 @@ function zeichneAlarme(){
   $('alarme').innerHTML = h;
   $('alarme').querySelectorAll('[data-sym]').forEach(el=>
     el.addEventListener('click',()=>waehle(el.dataset.sym)));
-  const knopf = $('pushan');
-  if (knopf) knopf.addEventListener('click', async ()=>{
-    try { await Notification.requestPermission(); } catch(e){}
-    zeichneAlarme();
+  bindePush();
+}
+
+
+/* Warum das ganz oben steht, in Rot, mit Schritten:
+   Am 11. September hat Ozan gemeldet, dass kein einziges Signal ankam. Das System
+   hatte an dem Tag durchgehend gearbeitet und Ereignisse erzeugt — sie hatten nur
+   keinen Weg auf sein Telefon, weil weder Web Push noch Telegram eingerichtet waren.
+   Diese Warnung stand bis dahin nur im CI-Protokoll, wo sie niemand liest.
+
+   Ein Ausfall, den man nicht sieht, ist schlimmer als einer, der kracht. */
+function stoerungsBanner(){
+  const push = (()=>{ try { return !!localStorage.getItem('push_abo'); } catch(e){ return false; } })();
+  if (push) return '';
+  return `<div class="stoerung">
+    <h3>Es kommt nichts an — und das ist der Grund</h3>
+    <p>Der Scanner läuft rund um die Uhr und erzeugt Ereignisse. Aber es gibt derzeit
+    <strong>keinen eingerichteten Weg auf dein Telefon</strong>. Solange das so ist, landen
+    alle Alarme nur hier in der App — auch die guten.</p>
+    <p>Das lässt sich in zwei Minuten beheben, einmalig:</p>
+    <ol>
+      <li><strong>Auf dem iPhone zuerst:</strong> Teilen → Zum Home-Bildschirm. Dann die App
+        von dort öffnen. iOS lässt Push für normale Safari-Tabs nicht zu.</li>
+      <li>Unten auf <strong>Alarme aufs Gerät</strong> tippen und den angezeigten Text kopieren.</li>
+      <li>Auf GitHub unter <span class="mono">Settings → Secrets → Actions</span> zwei Secrets
+        anlegen: <span class="mono">PUSH_ABOS</span> (der kopierte Text) und
+        <span class="mono">VAPID_PRIVATE_KEY</span> (den Wert hast du von mir).</li>
+    </ol>
+  </div>`;
+}
+
+/* ===================================================== ALARME BEI ZUER APP
+   Web Push. Der Unterschied zur Browser-Benachrichtigung ist der entscheidende:
+   eine Benachrichtigung kann die Seite nur ausloesen, solange sie offen ist. Web
+   Push kommt vom Push-Dienst des Browserherstellers an den Service Worker — der
+   laeuft auch dann, wenn die App laengst geschlossen ist.
+
+   Der Preis dafuer ist ein einmaliger Handgriff: das Abo dieses Geraets muss der
+   CI bekannt sein. Es gibt dafuer keinen Server, also wandert es einmal per
+   Kopieren-Einfuegen in ein GitHub-Secret. Danach nie wieder.
+
+   Auf dem iPhone gilt zusaetzlich: Push funktioniert nur, wenn die Seite ueber
+   „Zum Home-Bildschirm" installiert wurde. Steht so unten auch drin — daran
+   scheitert es sonst, ohne dass irgendeine Fehlermeldung erscheint.
+   ===================================================================== */
+const VAPID = '__VAPID__';
+
+function b64url(buf){
+  const b = String.fromCharCode.apply(null, new Uint8Array(buf));
+  return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function vapidBytes(s){
+  const pad = '='.repeat((4 - s.length % 4) % 4);
+  const roh = atob((s + pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from(roh, c=>c.charCodeAt(0));
+}
+function pushMoeglich(){
+  return 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
+}
+function istInstalliert(){
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function pushBlock(){
+  const abo = localStorage.getItem('push_abo') || '';
+  const erlaubt = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  if (!pushMoeglich()){
+    return `<div class="note-box warn"><span class="nt">Alarme bei geschlossener App</span>
+      <p>Dieser Browser kann kein Web Push. Auf dem iPhone geht es ab iOS 16.4 —
+      aber nur, wenn die Seite über <em>Teilen → Zum Home-Bildschirm</em> installiert wurde.</p></div>`;
+  }
+  if (iOS && !istInstalliert()){
+    return `<div class="note-box warn"><span class="nt">Ein Schritt fehlt noch</span>
+      <p>Damit Alarme auch bei geschlossener App ankommen, muss diese Seite auf dem
+      iPhone installiert sein: <strong>Teilen → Zum Home-Bildschirm</strong>. Danach die
+      App von dort öffnen und hier weitermachen — vorher lässt iOS Push nicht zu.</p></div>`;
+  }
+  if (abo){
+    return `<div class="note-box"><span class="nt">Alarme bei geschlossener App</span>
+      <p>Dieses Gerät ist angemeldet. Wenn trotzdem nichts ankommt, ist das Abo noch
+      nicht im Secret <code>PUSH_ABOS</code> hinterlegt —
+      <button class="link" id="pushzeig">Abo nochmal anzeigen</button>.</p>
+      <div id="pushdaten"></div></div>`;
+  }
+  return `<div class="note-box warn"><span class="nt">Alarme bei geschlossener App</span>
+    <p>Noch nicht eingerichtet. Ein Klick, dann einmal einfügen — danach meldet sich das
+    Gerät auch, wenn die App zu ist.</p>
+    <p style="margin-top:10px"><button class="btn prim" id="pushan">Alarme aufs Gerät</button>
+    ${erlaubt?'':'<span style="margin-left:10px;font-size:12px;color:var(--ink-3)">fragt zuerst nach Erlaubnis</span>'}</p>
+    <div id="pushdaten"></div></div>`;
+}
+
+async function pushAnmelden(){
+  const ziel = $('pushdaten');
+  try{
+    const rechte = await Notification.requestPermission();
+    if (rechte !== 'granted'){
+      ziel.innerHTML = `<p style="color:var(--warn);margin-top:10px">Ohne Erlaubnis geht es
+        nicht. Die Einstellung lässt sich im Browser wieder ändern.</p>`;
+      return;
+    }
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidBytes(VAPID),
+      });
+    }
+    const j = sub.toJSON();
+    const kompakt = JSON.stringify({endpoint: j.endpoint, keys: j.keys});
+    localStorage.setItem('push_abo', kompakt);
+    pushZeigen(kompakt);
+  } catch(e){
+    ziel.innerHTML = `<p style="color:var(--bad);margin-top:10px">Hat nicht geklappt: ${esc(String(e))}</p>`;
+  }
+}
+
+function pushZeigen(kompakt){
+  const ziel = $('pushdaten');
+  if (!ziel) return;
+  ziel.innerHTML = `
+    <p style="margin-top:12px">Fertig auf diesem Gerät. Damit die CI weiß, wohin sie senden
+    soll, muss dieser eine Text noch ins Repository — einmalig:</p>
+    <pre id="pushtext">${esc(kompakt)}</pre>
+    <p><button class="btn" id="pushkopie">Kopieren</button>
+       <a class="btn" style="text-decoration:none;display:inline-block;margin-left:8px"
+          href="https://github.com/ozancanerd-ship-it/cl/settings/secrets/actions/new"
+          target="_blank" rel="noopener">Secret anlegen</a></p>
+    <ol class="steps" style="margin-top:12px">
+      <li>Oben auf <strong>Kopieren</strong> tippen.</li>
+      <li><strong>Secret anlegen</strong> öffnen (führt direkt zur richtigen Seite).</li>
+      <li>Name: <code>PUSH_ABOS</code> — Wert: einfügen. Speichern.</li>
+      <li>Zweites Gerät später: hier nochmal anmelden, beide Texte als JSON-Liste
+          <code>[{…},{…}]</code> ins selbe Secret.</li>
+    </ol>
+    <p style="font-size:11.5px;color:var(--ink-3)">Der Text enthält keine Zugangsdaten —
+    nur die Adresse, an die dein Browser Push zustellt. Der geheime Teil (der private
+    VAPID-Schlüssel) liegt ausschließlich im Secret <code>VAPID_PRIVATE_KEY</code>.</p>`;
+  const kb = $('pushkopie');
+  if (kb) kb.addEventListener('click', async ()=>{
+    try{ await navigator.clipboard.writeText(kompakt); kb.textContent = 'Kopiert'; }
+    catch(e){
+      const r = document.createRange(); r.selectNode($('pushtext'));
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      kb.textContent = 'Markiert — jetzt kopieren';
+    }
   });
+}
+
+function bindePush(){
+  const an = $('pushan');
+  if (an) an.addEventListener('click', pushAnmelden);
+  const zeig = $('pushzeig');
+  if (zeig) zeig.addEventListener('click', ()=>pushZeigen(localStorage.getItem('push_abo')||''));
+}
+
+
+/* ============================================================ CHAT
+   Ein Gespraechspartner IN der App, der denselben Stand sieht wie sie.
+
+   WARUM MIT EINEM EIGENEN SCHLUESSEL
+
+   Ozans Anforderung war ausdruecklich: er soll auch dann noch funktionieren, wenn das
+   Nutzungslimit im Claude-Chat erreicht ist. Genau das geht nur ueber einen eigenen
+   API-Schluessel — dann laeuft die Abrechnung ueber sein Konto und nicht ueber die
+   Sitzung, die gerade zu ist.
+
+   WO DER SCHLUESSEL LIEGT — UND WO NICHT
+
+   Ausschliesslich im localStorage dieses Browsers. Er geht nie ins Repository, nie in
+   die gebaute Seite, nie in einen Scan. Das ist keine Formalie: dieses Repository ist
+   oeffentlich, ein Schluessel darin waere binnen Stunden fremd benutzt.
+
+   Der Aufruf geht direkt vom Browser an die API. Das erlaubt Anthropic ausdruecklich
+   ueber den Kopf ``anthropic-dangerous-direct-browser-access``; der Schluessel verlaesst
+   dabei das Geraet nur in Richtung Anthropic.
+
+   WAS DER CHAT WEISS
+
+   Er bekommt bei jeder Frage den aktuellen Stand mitgeschickt: die besten Chancen aus
+   dem letzten Scan mit Setup, Einstieg, Stop und Zielen, den Zustand der Wachliste,
+   Ozans eingetragene Positionen und die Makrolage. Damit kann er "soll ich hier rein?"
+   auf den konkreten Wert beantworten statt allgemein.
+
+   WAS ER NICHT TUT
+
+   Er handelt nicht, er legt keine Order, und er bekommt keine Schluessel einer Boerse
+   zu sehen. Er redet — mehr ist in dieser Stufe nicht vorgesehen und mehr waere auch
+   nicht sicher. */
+
+const CHAT_MODELL_STD = 'claude-sonnet-4-5-20250929';
+let CHAT_VERLAUF = [];
+
+function chatSchluessel(){ try { return localStorage.getItem('api_key') || ''; } catch(e){ return ''; } }
+function chatModell(){ try { return localStorage.getItem('api_modell') || CHAT_MODELL_STD; } catch(e){ return CHAT_MODELL_STD; } }
+
+/* Der Lagebericht, den das Modell bei jeder Frage mitbekommt. Bewusst kompakt: die
+   vollstaendige Rangliste waere ein Vielfaches an Text und wuerde bei jeder Frage neu
+   bezahlt. Zehn Chancen, die laufenden Trades und das Depot reichen, um konkret zu
+   antworten. */
+function chatLage(){
+  const teile = [];
+  if (S){
+    const st = S.statistik || {};
+    teile.push(`Letzter Scan: ${zeit(S.erzeugt)}, ${(S.gesamt||[]).length} Instrumente. ` +
+      `A+ ${st.A_PLUS||0}, A ${st.A||0}, A- ${st.A_MINUS||0}, B+ ${st.B_PLUS||0}, B ${st.B||0}, ` +
+      `beobachten ${st.WATCH||0}, kein Trade ${st.NO_TRADE||0}.`);
+    const top = (S.gesamt||[]).filter(o=>o.handelbar).slice(0,10);
+    if (top.length){
+      teile.push('BESTE CHANCEN:');
+      for (const o of top){
+        const pl = o.plan || {};
+        const st2 = o.setup || {};
+        teile.push(
+          `- ${o.instrument} (${o.klasse}) ${o.richtung} ${o.note}` +
+          (st2.name?` | Setup: ${st2.name} (${st2.qualitaet})`:'') +
+          ` | Kurs ${o.kurs} Einstieg ${o.einstieg} Stop ${pl.stop ?? o.invalidierung}` +
+          ` Ziele ${[pl.tp1??o.ziel, pl.tp2??o.tp2, pl.tp3??o.tp3].filter(v=>v!=null).join('/')}` +
+          (pl.crv?` | CRV 1:${pl.crv.toFixed(1)} Risiko ${pl.risiko_pct.toFixed(1)}%`:'') +
+          (o.rs!=null?` | rel.Staerke ${Math.round(o.rs)}`:'') +
+          (st2.these?` | These: ${st2.these}`:'') +
+          ((o.warnungen||[]).length?` | Dagegen: ${o.warnungen.slice(0,2).join('; ')}`:''));
+      }
+    }
+    if (S.makro) teile.push(`Makro: ${S.makro.lage||'?'} — ${(S.makro.saetze||[]).join(' ')}`);
+  }
+  const wachen = ((WL && WL.wachen) || []).filter(w=>w.zustand==='aktiv');
+  if (wachen.length){
+    teile.push('LAUFENDE TRADES:');
+    for (const w of wachen.slice(0,12))
+      teile.push(`- ${w.instrument} ${w.richtung} ab ${w.einstieg}, Stop ${w.stop}, ` +
+        `erreicht ${(w.erreicht||[]).join(',')||'noch nichts'}, bestes ${w.bestes_r}R`);
+  }
+  const pos = ladePositionen();
+  if (pos.length){
+    teile.push('OZANS DEPOT:');
+    for (const x of pos) teile.push(`- ${x.sym}: ${x.menge} Stueck zu ${x.einstieg ?? '?'}${x.konto?' ('+x.konto+')':''}`);
+  }
+  return teile.join('\n');
+}
+
+const CHAT_SYSTEM = `Du bist der Trading-Gespraechspartner in Ozans eigener App.
+
+Du sprichst Deutsch, direkt und ohne Floskeln. Ozan handelt aggressiven Swing-Stil ueber
+Tage bis Wochen, mit kleinem Konto. Er will ehrliche Einschaetzungen, keine Bestaetigung.
+
+REGELN
+- Antworte konkret auf den genannten Wert, mit den Zahlen aus dem Lagebericht unten.
+- Wenn ein Setup schwach ist, sag das. "Kein Trade" ist eine vollwertige Antwort.
+- Erfinde nie Kurse, Setups oder Zahlen. Steht etwas nicht im Lagebericht, sag das.
+- Du bist kein Anlageberater. Du beschreibst, was im Chart steht, und was dagegen
+  spricht — die Entscheidung trifft Ozan.
+- Die bisherige Bilanz des Systems ist negativ (58 abgeschlossene Signale, -23,5 R,
+  die Haelfte der Einstiege kam nie ins Plus). Verschweige das nicht, wenn es zur
+  Frage passt.
+- Kurz halten. Drei bis acht Saetze, ausser er fragt nach mehr.`;
+
+function zeichneChat(){
+  const key = chatSchluessel();
+  let h = '';
+  if (!key){
+    h = `<div class="karte">
+      <h3 style="margin-top:0">Einmal einrichten</h3>
+      <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">Dieser Chat laeuft ueber
+      deinen <strong>eigenen API-Schluessel</strong>. Genau deshalb funktioniert er auch dann,
+      wenn dein Limit im normalen Claude-Chat erreicht ist — die Abrechnung laeuft ueber dein
+      Konto, nicht ueber die Sitzung.</p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:0 0 12px">Der Schluessel bleibt
+      <strong>ausschliesslich in diesem Browser</strong>. Er geht nie ins Repository und nie
+      auf die oeffentliche Seite — das Repo ist oeffentlich, ein Schluessel darin waere binnen
+      Stunden fremd benutzt.</p>
+      <div class="rowx" style="border:0;padding:0"><input id="chat_key" type="password"
+        placeholder="sk-ant-..." autocomplete="off" spellcheck="false"></div>
+      <p style="margin:12px 0 0"><button class="btn prim" id="chat_save">Speichern</button>
+        <a class="btn" style="margin-left:8px;text-decoration:none;display:inline-block"
+           href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Schluessel holen</a></p>
+      <div id="chat_meld"></div>
+    </div>`;
+    $('chat').innerHTML = h;
+    $('chat_save').addEventListener('click',()=>{
+      const v = ($('chat_key').value||'').trim();
+      if (!v.startsWith('sk-')){ $('chat_meld').innerHTML =
+        `<p style="color:var(--warn);font-size:12.5px;margin-top:10px">Das sieht nicht nach einem Schluessel aus.</p>`; return; }
+      try { localStorage.setItem('api_key', v); } catch(e){}
+      CHAT_VERLAUF = [];
+      zeichneChat();
+    });
+    return;
+  }
+
+  h = `<div class="chatbox">
+    <div class="chatlauf" id="chatlauf"></div>
+    <div class="chateingabe">
+      <textarea id="chat_in" rows="2" placeholder="Soll ich bei XY rein? Was spricht dagegen?"></textarea>
+      <button class="btn prim" id="chat_send">Fragen</button>
+    </div>
+  </div>
+  <p style="margin:10px 0 0;font-size:11.5px;color:var(--ink-3)">
+    Modell <span class="mono">${esc(chatModell())}</span> ·
+    <button class="link" id="chat_reset">Verlauf leeren</button> ·
+    <button class="link" id="chat_key_weg">Schluessel entfernen</button></p>`;
+  $('chat').innerHTML = h;
+  chatMalen();
+  $('chat_send').addEventListener('click', chatSenden);
+  $('chat_in').addEventListener('keydown', e=>{
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) chatSenden();
+  });
+  $('chat_reset').addEventListener('click',()=>{ CHAT_VERLAUF = []; chatMalen(); });
+  $('chat_key_weg').addEventListener('click',()=>{
+    try { localStorage.removeItem('api_key'); } catch(e){}
+    zeichneChat();
+  });
+}
+
+function chatMalen(){
+  const el = $('chatlauf'); if (!el) return;
+  if (!CHAT_VERLAUF.length){
+    el.innerHTML = `<div class="chatleer">
+      <p>Ich sehe denselben Stand wie die App: den letzten Scan, die laufenden Trades und
+      dein eingetragenes Depot.</p>
+      <p style="margin-top:8px">Zum Beispiel:</p>
+      <ul class="satzliste" style="margin-top:6px">
+        <li>„Soll ich bei der Nummer eins rein oder warten?"</li>
+        <li>„Was spricht gegen das Setup?"</li>
+        <li>„Ist mein Depot zu einseitig?"</li>
+        <li>„Warum kam heute kein Alarm?"</li>
+      </ul></div>`;
+    return;
+  }
+  el.innerHTML = CHAT_VERLAUF.map(m=>
+    `<div class="msg ${m.role}"><div class="bl">${
+      m.role==='user' ? esc(m.content) : chatFormat(m.content)}</div></div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+/* Sehr sparsames Markdown: fett, Aufzaehlungen, Absaetze. Eine Bibliothek dafuer zu
+   laden waere mehr Gewicht als Nutzen. */
+function chatFormat(t){
+  return esc(t)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^[-*] (.+)$/gm,'• $1')
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/\n/g,'<br>')
+    .replace(/^/,'<p>').replace(/$/,'</p>');
+}
+
+async function chatSenden(){
+  const feld = $('chat_in');
+  const frage = (feld.value||'').trim();
+  if (!frage) return;
+  feld.value = '';
+  CHAT_VERLAUF.push({role:'user', content:frage});
+  CHAT_VERLAUF.push({role:'assistant', content:'…'});
+  chatMalen();
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-api-key': chatSchluessel(),
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true',
+      },
+      body: JSON.stringify({
+        model: chatModell(),
+        max_tokens: 900,
+        system: CHAT_SYSTEM + '\n\nLAGEBERICHT (Stand jetzt):\n' + chatLage(),
+        messages: CHAT_VERLAUF.slice(0,-1).map(m=>({role:m.role, content:m.content})),
+      }),
+    });
+    if (!r.ok){
+      const t = await r.text();
+      CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant',
+        content: `Die Anfrage ist fehlgeschlagen (HTTP ${r.status}). ${t.slice(0,300)}`};
+    } else {
+      const d = await r.json();
+      const text = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n');
+      CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content: text || '(leere Antwort)'};
+    }
+  } catch(e){
+    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant',
+      content: `Kein Zugriff auf die API: ${String(e)}. Pruefe den Schluessel und die Verbindung.`};
+  }
+  chatMalen();
+}
+
+
+/* Die eigene Bilanz, ungeschoenter Teil der App.
+
+   Sie steht bewusst vor allem anderen im System-Reiter. Ein Scanner, der jeden Tag
+   neue Chancen ausruft und nie zeigt, wie die alten ausgegangen sind, erzeugt
+   Zuversicht statt Wissen — und die erste Auswertung ergab -23,5 R ueber 58
+   abgeschlossene Signale. Diese Zahl gehoert sichtbar, nicht in ein Protokoll. */
+function bilanzKasten(){
+  if (!PF || !PF.abgeschlossen) return `<h2>Eigene Bilanz</h2>
+    <div class="karte"><p style="margin:0;font-size:13px;color:var(--ink-3)">
+    Noch kein abgeschlossener Trade ausgewertet.</p></div>`;
+  const g = (PF.je_regel||{}).ganz || {};
+  const d = (PF.je_regel||{}).drittel || {};
+  const minus = (g.summe_r || 0) < 0;
+  return `<h2>Eigene Bilanz</h2>
+  <div class="karte ${minus?'bad':'gut'}">
+    <div class="status" style="margin-top:0">
+      <div><div class="k">Ergebnis</div>
+        <div class="v ${minus?'':'gut'}" style="${minus?'color:var(--bad)':''}">${(g.summe_r||0).toFixed(1)} R</div>
+        <div class="n">${PF.abgeschlossen} abgeschlossen · ${PF.offen} offen</div></div>
+      <div><div class="k">je Trade</div>
+        <div class="v ${minus?'':'gut'}" style="${minus?'color:var(--bad)':''}">${(g.erwartungswert||0).toFixed(2)}</div>
+        <div class="n">Erwartungswert in R</div></div>
+      <div><div class="k">Treffer</div>
+        <div class="v ${(g.trefferquote||0)>=0.4?'gut':'mittel'}">${Math.round((g.trefferquote||0)*100)} %</div>
+        <div class="n">mit Teilverkauf ${Math.round((d.trefferquote||0)*100)} %</div></div>
+      <div><div class="k">Rückgang</div>
+        <div class="v mittel">${(g.max_rueckgang_r||0).toFixed(1)} R</div>
+        <div class="n">längste Serie ${g.verlustserie||0}</div></div>
+    </div>
+    <ul class="satzliste" style="margin-top:14px">${(PF.saetze||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+  </div>`;
 }
 
 /* ============================================================ SYSTEM */
 function zeichneSystem(){
   const u = S?.universum || {};
   const k = u.krypto || {};
-  let h = `<h2>Letzter Scan</h2><div class="karte">
+  let h = bilanzKasten();
+  h += `<h2>Letzter Scan</h2><div class="karte">
     <div class="rowx"><span class="lab">Zeitpunkt</span><span class="val">${zeit(S?.erzeugt)}</span></div>
     <div class="rowx"><span class="lab">Dauer</span><span class="val">${S?.dauer_s??'—'} s</span></div>
     <div class="rowx"><span class="lab">Profil</span><span class="val">${esc(S?.profil||'—')}</span></div>
@@ -1626,9 +2492,16 @@ function start(){
   const t = parseInt((location.hash||'').replace('#',''), 10);
   zeigeTab(isFinite(t) && t>=0 && t<TABS.length ? t : 0);
   ladeScan();
-  // Der Scan wird stuendlich neu gebaut. Alle fuenf Minuten nachsehen kostet nichts und
-  // erspart das manuelle Neuladen.
+  // Der Scan wird alle zehn Minuten neu gebaut. Alle fuenf Minuten nachsehen kostet
+  // nichts und erspart das manuelle Neuladen.
   setInterval(()=>{ ladeScan(); }, 5*60*1000);
+
+  // Den Service Worker bei jedem Start registrieren, nicht erst beim Anmelden. Ein
+  // Geraet, das sich frueher einmal angemeldet hat, braucht ihn beim naechsten
+  // Oeffnen sofort wieder — sonst kommt der Push an, und niemand nimmt ihn entgegen.
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
 }
 start();
 </script>
