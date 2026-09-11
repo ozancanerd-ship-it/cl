@@ -327,3 +327,64 @@ Der Tag zählt nicht als Forward-Tag mit.
 - `docs/INDEPENDENT-METHOD-AUDIT-2026-09-03.md` — die zwölf Befunde, die zur
   Widerlegung der SMC-Familie führten
 - `docs/TRADE-REPUBLIC-ANBINDUNG.md` — warum es keine API gibt
+
+---
+
+## Alarme, wenn die App zu ist (Web Push)
+
+Die Benachrichtigung, die die Seite selbst auslöst, funktioniert nur, solange ein Tab
+offen ist. Für Meldungen bei geschlossener App gibt es zwei Wege; beide brauchen genau
+einmal einen Handgriff, danach nie wieder.
+
+### Weg 1 — Web Push (keine fremde App nötig)
+
+1. App öffnen → Reiter **Alarme** → **Alarme aufs Gerät**.
+   Auf dem iPhone vorher *Teilen → Zum Home-Bildschirm* und die App von dort öffnen —
+   iOS lässt Push für normale Safari-Tabs nicht zu.
+2. Der angezeigte Text ist das Abo dieses Geräts. **Kopieren** drücken.
+3. Der Knopf daneben führt direkt zu
+   `github.com/<repo>/settings/secrets/actions/new`.
+   Name `PUSH_ABOS`, Wert einfügen, speichern.
+4. Zweites Gerät: dort ebenfalls anmelden und beide Texte als JSON-Liste
+   `[{…},{…}]` in dasselbe Secret schreiben.
+
+Zusätzlich muss einmalig `VAPID_PRIVATE_KEY` als Secret gesetzt sein — der private
+Gegenpart zu dem öffentlichen Schlüssel, der in `ops/notify.py` steht und beim Bauen
+in die Seite eingesetzt wird. Der öffentliche Schlüssel darf im Repository stehen; das
+ist der Sinn des Verfahrens. Der private darf es nie.
+
+Ein Abo, das der Browser weggeworfen hat (Gerät zurückgesetzt, Rechte entzogen),
+antwortet mit 404 oder 410. Der Lauf schreibt das als `::warning::` in das Protokoll
+und macht weiter — dann hilft nur, sich in der App neu anzumelden.
+
+### Weg 2 — Telegram
+
+`TELEGRAM_BOT_TOKEN` und `TELEGRAM_CHAT_ID` als Secrets setzen. `scripts/telegram_check.py`
+prüft die vier Fehlerquellen (Schlüssel fehlt, Token abgelehnt, falsche Chat-ID, Bot nie
+mit `/start` angeschrieben) und meldet sie im Klartext.
+
+### Was passiert, wenn keiner der beiden Wege steht
+
+`watch_levels.py` schreibt eine deutliche Warnung ins Protokoll und liefert die
+Ereignisse nur noch in die Datei und damit in die App. Das ist Absicht: der teuerste
+Fehler dieses Projekts war ein Versandweg, der wochenlang still nichts tat.
+
+---
+
+## Wie ein Signal jetzt zustande kommt
+
+Die Reihenfolge ist bewusst diese und nicht umgekehrt:
+
+1. **Setup** (`scanner/setups.py`) — hat der Chart einen Namen? Rücksetzer im Trend,
+   Ausbruch aus der Basis, Rückeroberung nach einem Liquiditätsgriff, Abpraller an der
+   Unterstützung. Ohne Namen ist bei **B+** Schluss: der Wert steht in der App, aber er
+   klingelt nicht. Alarme gehen erst ab A− raus.
+2. **Score** (`scanner/chart_score.py`) — sechs Faktoren, wie gehabt. Er ordnet
+   *innerhalb* dessen, was ein Setup ist.
+3. **Plan** (`scanner/plan.py`) — Ziele aus Struktur **und** Risiko: Ziel 1 liegt nie
+   näher als der Stop entfernt ist, Ziel 2 nie weiter als 3,5 R. Dazu Drittelung,
+   Stop auf Einstand nach Ziel 1, Trailing über Swing-Tiefs oder 2 ATR, Zeit-Stop
+   nach 12 Tagen. Ein Stop weiter als 10 % vom Einstieg macht den Plan untauglich.
+4. **Relative Stärke** (`scanner/relative_strength.py`) — nach dem Scan, klassenweise.
+   Long in einem Nachzügler und Short in einem Marktführer werden auf A− gedeckelt.
+   Stärke hebt nie eine Note an; sie ist ein Filter, keine Punktequelle.
