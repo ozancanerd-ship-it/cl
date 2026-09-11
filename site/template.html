@@ -679,6 +679,27 @@ function zeigeTab(i){
 }
 TABS.forEach((t,i)=>t.addEventListener('click',()=>zeigeTab(i)));
 
+/* Ein Teil darf ausfallen, nicht die Seite.
+
+   Was hier abgefangen wird, ist immer ein Programmierfehler — kein erwarteter Zustand.
+   Deshalb wird er nicht verschluckt: er landet in der Konsole UND sichtbar in dem
+   Bereich, der nicht gezeichnet werden konnte. Eine App, die stumm haengenbleibt, ist
+   schlimmer als eine, die zugibt, dass etwas kaputt ist. */
+const AUSFALL = [];
+function sicher(name, fn){
+  try { fn(); return true; }
+  catch(e){
+    AUSFALL.push(name + ': ' + (e && e.message ? e.message : e));
+    console.error('[Aufbau] ' + name, e);
+    const ziel = {Rangliste:'radar', Bilanz:'bilanz', Alarme:'alarme', System:'system'}[name];
+    const el = ziel && document.getElementById(ziel);
+    if (el) el.innerHTML = `<div class="note-box bad"><span class="nt">${esc(name)} nicht aufgebaut</span>
+      <p>${esc(String(e && e.message || e))}</p><p>Das ist ein Fehler in der App, nicht im Markt.
+      Die anderen Bereiche laufen weiter.</p></div>`;
+    return false;
+  }
+}
+
 /* ------------------------------------------------------- Scan laden */
 async function ladeScan(){
   try {
@@ -700,8 +721,17 @@ async function ladeScan(){
     const rp = await fetch('performance.json?v=' + Date.now(), {cache:'no-store'});
     PF = rp.ok ? await rp.json() : null;
   } catch(e){ PF = null; }
-  merkeNamen(S && S.gesamt);
-  zeichneStatus(); zeichneFilter(); zeichneRadar(); zeichneSystem(); zeichneBilanz(); zeichneAlarme();
+  sicher('Namen', ()=>merkeNamen(S && S.gesamt));
+  /* Jeder Teil fuer sich. Vorher standen die Aufrufe in einer Zeile hintereinander —
+     ein Fehler im ersten hat alle folgenden mitgenommen, und die App blieb bei
+     "Scan wird geladen …" stehen, ohne dass irgendwo etwas davon stand. Genau das ist
+     passiert. Jetzt faellt hoechstens ein Kasten aus, und er sagt es. */
+  sicher('Status', zeichneStatus);
+  sicher('Filter', zeichneFilter);
+  sicher('Rangliste', zeichneRadar);
+  sicher('System', zeichneSystem);
+  sicher('Bilanz', zeichneBilanz);
+  sicher('Alarme', zeichneAlarme);
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
   if (start && !AKTIV) waehle(start.instrument, false);
   starteLive();
@@ -1208,6 +1238,21 @@ function topSignal(){
   </div>`;
 }
 
+/* Diese Tabelle fehlte — und der Fehler war teuer.
+
+   `REGIME_TEXT` wurde an zwei Stellen benutzt und nirgends definiert. Die Folge war
+   nicht etwa ein fehlendes Wort, sondern eine ReferenceError mitten in `zeichneStatus()`
+   — und damit starben in `ladeScan()` alle Aufrufe danach: Rangliste, Bilanz, Alarme.
+   Die App zeigte "Scan wird geladen …" und blieb dabei stehen. Ein einziger fehlender
+   Bezeichner hat die komplette Oberflaeche unbrauchbar gemacht.
+
+   Deshalb steht die Zuordnung jetzt hier, und der Aufruf ist zusaetzlich abgesichert. */
+const REGIME_TEXT = {
+  risk_on:  'Risikofreude',
+  neutral:  'gemischte Lage',
+  risk_off: 'Risiko raus',
+};
+
 function makroKasten(){
   const M = S && S.makro;
   if (!M) return '';
@@ -1217,7 +1262,7 @@ function makroKasten(){
     return t.wirkung === 'High' && ts > Date.now() && ts < Date.now() + 72*3600*1000;
   }).slice(0,4);
   return `<div class="note-box ${kl}">
-    <span class="nt">Makro · ${esc(REGIME_TEXT[M.regime]||M.regime)}</span>
+    <span class="nt">Makro · ${esc((REGIME_TEXT||{})[M.regime]||M.regime)}</span>
     <p>${(M.begruendung||[]).map(esc).join(' · ')}</p>
     <div class="kpi">${(M.werte||[]).map(w=>
       `<span>${esc(w.name.replace('Volatilitaetsindex ','').replace('10-jaehrige ',''))}
@@ -2742,7 +2787,7 @@ function zeichneSystem(){
   const M = S?.makro;
   if (M){
     h += `<h2>Makro</h2><div class="karte">
-      <div class="rowx"><span class="lab">Lage</span><span class="val">${esc(REGIME_TEXT[M.regime]||M.regime)} (${M.punkte>=0?'+':''}${M.punkte.toFixed(2)})</span></div>
+      <div class="rowx"><span class="lab">Lage</span><span class="val">${esc((REGIME_TEXT||{})[M.regime]||M.regime)} (${M.punkte>=0?'+':''}${M.punkte.toFixed(2)})</span></div>
       ${(M.werte||[]).map(w=>`<div class="rowx"><span class="lab">${esc(w.name)}</span>
         <span class="val">${num(w.wert, w.wert>1000?0:2)}${w.aenderung_20t_pct!=null?` · 20T ${pct(w.aenderung_20t_pct,1)}`:''}</span></div>`).join('')}
       <div class="rowx"><span class="lab">Termine im Kalender</span><span class="val">${(M.termine||[]).length}</span></div>
