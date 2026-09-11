@@ -71,6 +71,7 @@ permissions:
   contents: write   # Journalzeile zurueckschreiben
   pages: write      # Seite veroeffentlichen
   id-token: write   # von deploy-pages verlangt
+  issues: write     # Alarm als Issue — der Weg, der ohne eingerichtete Secrets ankommt
 
 jobs:
   tagesplan:
@@ -201,6 +202,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          # Der Auffangkanal. GITHUB_TOKEN wird je Lauf erzeugt und muss nirgends
+          # hinterlegt werden — damit kommt auch ohne eingerichtete Secrets etwas an.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/watch_levels.py --send --vollstaendig
 
       # Die eigene Bilanz. Laeuft nach der Wachliste und schreibt sie in die App —
@@ -224,6 +228,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          # Der Auffangkanal. GITHUB_TOKEN wird je Lauf erzeugt und muss nirgends
+          # hinterlegt werden — damit kommt auch ohne eingerichtete Secrets etwas an.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/watch_levels.py --send
 
       - name: Web-App bauen
