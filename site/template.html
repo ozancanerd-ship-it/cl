@@ -492,6 +492,14 @@ a{color:var(--accent); text-underline-offset:3px}
 .stoerung ol{margin:10px 0 0; padding-left:20px; font-size:13px; color:var(--ink-2)}
 .stoerung li{margin-bottom:6px}
 
+/* ---------- Dialog ---------- */
+.modal{position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:18px;
+  background:rgba(3,5,10,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  animation:auf .18s ease}
+.modalk{width:100%; max-width:420px; background:linear-gradient(165deg,var(--glass-2),var(--bg-2));
+  border:1px solid var(--rule-strong); border-radius:18px; padding:22px 22px 20px;
+  box-shadow:var(--tiefe-hoch)}
+
 /* ---------- Ladezustand ---------- */
 .scan{position:relative; overflow:hidden}
 .scan::after{content:""; position:absolute; inset:0;
@@ -606,10 +614,42 @@ function zeit(iso){ if (!iso) return '—';
     {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return '—'; } }
 function vorMin(iso){ if (!iso) return null;
   const t = Date.parse(iso); return isFinite(t) ? Math.round((Date.now()-t)/60000) : null; }
-function name(sym){ return (D.names && D.names[sym]) || sym; }
+/* Voller Name statt Kuerzel.
+   Ozan hat es so gesagt: "schreib auch die Aktien Kryptos vollstaendig auf, nicht die
+   Abkuerzungen. Ich muss jedes Mal suchen." Der Scanner liefert den Namen jetzt in der
+   Zeile mit; NAMEN faengt die Werte ab, die vor dieser Aenderung gebaut wurden. */
+const NAMEN = {};
+function merkeNamen(rows){ for (const o of (rows||[])) if (o && o.instrument && o.name) NAMEN[o.instrument] = o.name; }
+function name(sym){ return NAMEN[sym] || (D.names && D.names[sym]) || sym; }
+function kuerzel(sym){ return String(sym||'').replace(/-YFD$/,'').replace(/USDT$/,''); }
 
 let PF = null;
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
+
+/* ---- Euro, Broker, Gebuehr -------------------------------------------------
+   Ozan handelt Einzelaktien ueber Trade Republic — dort stehen sie in Euro, und
+   jede Ausfuehrung kostet 1 €. Ein Signal mit Dollarkursen ist fuer ihn nicht
+   ausfuehrbar, und bei einer Position von 300 € frisst die Gebuehr hin und zurueck
+   ein Drittel eines Zwei-Prozent-Gewinns. Beides gehoert neben das Signal. */
+function istAktie(o){ return (o && o.klasse) === 'aktien'; }
+function eurWert(o, feld){ return (o && o.eur && o.eur[feld] != null) ? o.eur[feld] : null; }
+function preis(o, feld, fallback, d){
+  const e = eurWert(o, feld);
+  if (e != null) return `${num(e,d)} €`;
+  return num(fallback, d) + (istAktie(o) ? ' $' : '');
+}
+function gebuehrSatz(o, positionswert){
+  if (!positionswert || positionswert <= 0) return '';
+  const gewinnPct = o && o.erwartete_bewegung_pct;
+  if (!gewinnPct || gewinnPct <= 0) return '';
+  const kosten = istAktie(o) ? 2 : positionswert * 0.002;
+  const gewinn = positionswert * gewinnPct / 100;
+  const anteil = kosten / gewinn;
+  const txt = `Gebühr hin und zurück ${kosten.toFixed(2).replace('.',',')} ${istAktie(o)?'€':'USDT'}`;
+  return anteil >= 0.2
+    ? `<span style="color:var(--warn)">${txt} — ${Math.round(anteil*100)} % des erwarteten Gewinns. Entweder größer einsteigen oder lassen.</span>`
+    : `${txt} (${Math.round(anteil*100)} % des erwarteten Gewinns).`;
+}
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
@@ -647,6 +687,7 @@ async function ladeScan(){
     const rp = await fetch('performance.json?v=' + Date.now(), {cache:'no-store'});
     PF = rp.ok ? await rp.json() : null;
   } catch(e){ PF = null; }
+  merkeNamen(S && S.gesamt);
   zeichneStatus(); zeichneFilter(); zeichneRadar(); zeichneSystem(); zeichneAlarme();
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
   if (start && !AKTIV) waehle(start.instrument, false);
@@ -1903,9 +1944,9 @@ function signalKarte(x){
     <p style="font-size:14.5px;margin-top:6px">${urteil}</p>
     ${st?`<p style="font-size:12.5px;color:var(--ink-2);margin-top:4px">${esc(st.these)}</p>`:''}
     <div class="kpi">
-      <span>Einstieg <b>${num(w.einstieg,d)}</b> <span style="color:var(--ink-3)">${esc(w.einstieg_art)}${w.frisch?' · aus dem letzten Scan':' · fest seit Einstieg'}</span></span>
-      <span>Stop <b>${num(w.stop,d)}</b></span>
-      ${ziele.length?`<span>Ziele <b>${ziele.map(v=>num(v,d)).join(' / ')}</b></span>`:''}
+      <span>Einstieg <b>${preis(o,'einstieg',w.einstieg,d)}</b> <span style="color:var(--ink-3)">${esc(w.einstieg_art)}${w.frisch?' · aus dem letzten Scan':' · fest seit Einstieg'}</span></span>
+      <span>Stop <b>${preis(o,'stop',w.stop,d)}</b></span>
+      ${ziele.length?`<span>Ziele <b>${ziele.map((v,i)=>preis(o,'tp'+(i+1),v,d)).join(' / ')}</b></span>`:''}
     </div>
     <div class="kpi">
       ${x.kurs!=null?`<span>Kurs <b>${num(x.kurs,d)}</b>${x.live?' <span class="up">live</span>':''}</span>`:''}
@@ -1922,6 +1963,13 @@ function signalKarte(x){
       als du hast.</span>`:''}</p>`:''}
     ${st&&st.trigger?`<p style="color:var(--ink-2);font-size:12px;margin-top:7px">
       <span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</p>`:''}
+    <div class="kpi" style="margin-top:8px">
+      <span>Kaufen bei <b>${esc(o.broker||'—')}</b></span>
+      ${o.eurusd?`<span>Kurs gerechnet zu <b>${num(o.eurusd,4)}</b> USD/€</span>`:''}
+    </div>
+    ${euro>0?`<p style="font-size:11.5px;color:var(--ink-3);margin-top:6px">${gebuehrSatz(o, euro)}</p>`:''}
+    <p style="margin:10px 0 0"><button class="btn" data-kauf="${esc(w.instrument)}"
+      data-menge="${stueck}" data-kurs="${w.einstieg}">Gekauft — ins Depot</button></p>
     ${(o.warnungen||[]).length?`<p class="warnz">${o.warnungen.map(esc).join('<br>')}</p>`:''}
   </div>`;
 }
@@ -1990,6 +2038,9 @@ function zeichneAlarme(){
   $('alarme').innerHTML = h;
   $('alarme').querySelectorAll('[data-sym]').forEach(el=>
     el.addEventListener('click',()=>waehle(el.dataset.sym)));
+  $('alarme').querySelectorAll('[data-kauf]').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation(); kaufDialog(b.dataset.kauf, b.dataset.menge, b.dataset.kurs);
+  }));
   bindePush();
 }
 
@@ -2415,11 +2466,95 @@ function bilanzKasten(){
   </div>`;
 }
 
+
+/* ---- "Gekauft" ------------------------------------------------------------
+   Ozans Wunsch, woertlich: "mach so einen Button, dass ich dann eingeben kann, wie
+   viel ich gekauft hab und dass er dann das automatisch mein Portfolio hier mit
+   ausschreibt. Das ist nicht alles immer extern machen muss."
+
+   Die Vorschlagswerte kommen aus dem Signal — Stueckzahl aus der Risikorechnung,
+   Kurs aus dem Plan. Er kann beides ueberschreiben, denn ausgefuehrt wird selten
+   exakt zum geplanten Kurs, und was im Depot steht, muss der WIRKLICHE Einstieg
+   sein. Ein Depot mit Wunschkursen rechnet sich selbst schoen. */
+function kaufDialog(sym, mengeVorschlag, kursVorschlag){
+  const alt = document.getElementById('kaufbox');
+  if (alt) alt.remove();
+  const box = document.createElement('div');
+  box.id = 'kaufbox';
+  box.className = 'modal';
+  box.innerHTML = `<div class="modalk">
+    <h3 style="margin-top:0">${esc(name(sym))} ins Depot</h3>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:0 0 12px">Trag ein, was du
+    <strong>tatsächlich</strong> bekommen hast — nicht den geplanten Kurs. Sonst rechnet
+    sich das Depot selbst schön.</p>
+    <div class="rowx"><span class="lab">Stück</span>
+      <input id="k_menge" inputmode="decimal" value="${esc(mengeVorschlag||'')}" style="width:55%"></div>
+    <div class="rowx"><span class="lab">Kurs</span>
+      <input id="k_kurs" inputmode="decimal" value="${esc(kursVorschlag||'')}" style="width:55%"></div>
+    <div class="rowx"><span class="lab">Konto</span>
+      <input id="k_konto" placeholder="Trade Republic / Bybit" style="width:55%"></div>
+    <p style="margin:14px 0 0"><button class="btn prim" id="k_ok">Übernehmen</button>
+      <button class="link" id="k_ab" style="margin-left:14px">Abbrechen</button></p>
+  </div>`;
+  document.body.appendChild(box);
+  const zu = ()=>box.remove();
+  box.addEventListener('click', e=>{ if (e.target === box) zu(); });
+  document.getElementById('k_ab').addEventListener('click', zu);
+  document.getElementById('k_ok').addEventListener('click', ()=>{
+    const menge = parseFloat((document.getElementById('k_menge').value||'').replace(',','.'));
+    const kurs  = parseFloat((document.getElementById('k_kurs').value||'').replace(',','.'));
+    if (!isFinite(menge) || menge <= 0) return;
+    const a = ladePositionen().filter(p=>p.sym !== sym);
+    a.push({sym, menge, einstieg: isFinite(kurs)?kurs:null,
+            konto: (document.getElementById('k_konto').value||'').trim()});
+    speicherePositionen(a);
+    zu();
+    zeichnePortfolio();
+    zeigeTab(3);
+  });
+}
+
+/* ---- Signal-Historie ------------------------------------------------------
+   "Ich möchte auf der Seite noch mal eine Extraseite haben, wo ich dann sehe, wie die
+   zum Beispiel ausgegangen sind, wie viel Plus oder Minus die Trades gemacht hätten."
+
+   Genau das. Jedes abgeschlossene Signal einzeln, jüngstes zuerst, mit dem Ergebnis
+   nach beiden Ausstiegsregeln — damit sichtbar bleibt, was der Teilverkauf ausmacht.
+   Keine Auswahl, keine Bestenliste: es stehen ALLE da, auch die schlechten. Eine
+   Historie, aus der man die Verlierer herausnimmt, ist Werbung. */
+function historieKasten(){
+  const t = (PF && PF.trades) || [];
+  if (!t.length) return '';
+  const zeilen = t.slice(0, 60).map(x=>{
+    const gut = x.r_ganz > 0, schlecht = x.r_ganz < 0;
+    const farbe = gut ? 'var(--long)' : schlecht ? 'var(--bad)' : 'var(--ink-3)';
+    const ausgang = {stop:'Stop', ziel_erreicht:'Ziel', invalidiert:'ungültig', abgelaufen:'abgelaufen'}[x.zustand] || x.zustand;
+    return `<tr>
+      <td class="tf">${esc(name(x.instrument))}</td>
+      <td>${esc(x.note)}</td>
+      <td>${esc(ausgang)}${(x.erreicht||[]).length?` <span style="color:var(--ink-3)">${x.erreicht.join(',')}</span>`:''}</td>
+      <td style="color:${farbe};font-weight:600">${x.r_ganz>0?'+':''}${x.r_ganz.toFixed(2)} R</td>
+      <td style="color:${x.r_drittel>0?'var(--long)':x.r_drittel<0?'var(--bad)':'var(--ink-3)'}">${x.r_drittel>0?'+':''}${x.r_drittel.toFixed(2)} R</td>
+      <td class="mono" style="color:var(--ink-3);font-size:11px">${esc((x.beendet||'').slice(5,16).replace('T',' '))}</td>
+    </tr>`;
+  }).join('');
+  return `<h2>Wie die Signale ausgegangen sind</h2>
+  <p class="lead">Jedes abgeschlossene Signal einzeln, das jüngste zuerst — auch die
+  schlechten. <strong>Ganz</strong> ist alles-oder-nichts, <strong>Drittel</strong> mit
+  Teilverkauf am ersten Ziel und Stop auf Einstand.</p>
+  <div class="tw"><table class="mtf">
+    <tr><th>Wert</th><th>Note</th><th>Ausgang</th><th>Ganz</th><th>Drittel</th><th>Beendet</th></tr>
+    ${zeilen}
+  </table></div>
+  ${t.length>60?`<p class="leer">… und ${t.length-60} ältere.</p>`:''}`;
+}
+
 /* ============================================================ SYSTEM */
 function zeichneSystem(){
   const u = S?.universum || {};
   const k = u.krypto || {};
   let h = bilanzKasten();
+  h += historieKasten();
   h += `<h2>Letzter Scan</h2><div class="karte">
     <div class="rowx"><span class="lab">Zeitpunkt</span><span class="val">${zeit(S?.erzeugt)}</span></div>
     <div class="rowx"><span class="lab">Dauer</span><span class="val">${S?.dauer_s??'—'} s</span></div>
