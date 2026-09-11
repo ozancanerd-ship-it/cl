@@ -64,9 +64,15 @@ def _laden(pfad: str) -> dict[str, Any] | None:
 
 async def _extrema(
     namen_je_klasse: dict[str, list[str]], seit: datetime, bis: datetime
-) -> dict[str, dict[str, float]]:
-    """Hoch, Tief und letzter Kurs je Instrument im Fenster ``seit``..``bis``."""
+) -> tuple[dict[str, dict[str, float]], dict[str, list[Any]]]:
+    """Hoch, Tief und letzter Kurs je Instrument im Fenster ``seit``..``bis``.
+
+    Zusaetzlich die Kerzen selbst. Sie werden ohnehin geholt, um Hoch und Tief zu
+    bestimmen — sie danach wegzuwerfen und den Einstieg nur an einer beruehrten Marke
+    festzumachen war genau der Fehler, der die Haelfte aller Trades gekostet hat.
+    """
     aus: dict[str, dict[str, float]] = {}
+    reihen: dict[str, list[Any]] = {}
 
     async def sammle(prov: Any, namen: list[str]) -> None:
         for name in namen:
@@ -84,6 +90,7 @@ async def _extrema(
                 "letzter": float(bars[-1].close),
                 "bars": float(len(bars)),
             }
+            reihen[name] = list(bars)
 
     krypto = namen_je_klasse.get("krypto", []) + namen_je_klasse.get("gold", [])
     if krypto:
@@ -106,7 +113,7 @@ async def _extrema(
         finally:
             with contextlib.suppress(Exception):
                 await prov2.aclose()
-    return aus
+    return aus, reihen
 
 
 def _seit(stand: dict[str, Any] | None, jetzt: datetime) -> datetime:
@@ -151,7 +158,14 @@ async def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
     args = ap.parse_args()
 
-    from trading_agent.ops.notify import FileSink, Notification, Notifier, Severity, TelegramSink
+    from trading_agent.ops.notify import (
+        FileSink,
+        Notification,
+        Notifier,
+        Severity,
+        TelegramSink,
+        WebPushSink,
+    )
     from trading_agent.utils.logging import configure_logging
 
     configure_logging("WARNING")
@@ -175,9 +189,9 @@ async def main() -> int:
             je_klasse.setdefault(w.klasse or "krypto", []).append(w.instrument)
         seit = _seit(stand, jetzt)
         print(f"Fenster: {seit:%d.%m. %H:%M} – {jetzt:%H:%M} UTC")
-        kurse = await _extrema(je_klasse, seit, jetzt)
+        kurse, reihen = await _extrema(je_klasse, seit, jetzt)
         print(f"Kurse fuer {len(kurse)} von {len(offen)} Werten")
-        ereignisse += liste.pruefen(kurse, jetzt=jetzt)
+        ereignisse += liste.pruefen(kurse, jetzt=jetzt, kerzen=reihen)
 
     # Neue Setups unterhalb von A− landen auf der Wachliste und in der App, aber nicht
     # aufs Telefon. Alles, was einen laufenden Trade betrifft, geht immer raus.
@@ -191,14 +205,23 @@ async def main() -> int:
         print(f"\n[{'!' if e.dringend else ' '}] {e.titel}\n{e.text}")
 
     if args.send and zu_senden:
+        # Zwei Wege aufs Telefon, beide unabhaengig voneinander. Web Push braucht keine
+        # fremde App und funktioniert auch bei geschlossener Seite; Telegram ist der
+        # einfachere Weg, wenn der Bot schon steht. Fehlt beides, sagt der Lauf das
+        # deutlich — ein stiller Ausfall ist der schlimmste Fall.
         tg = TelegramSink(min_severity=Severity.INFO)
-        if not tg.available():
-            print(
-                "\n::warning::Telegram nicht konfiguriert — TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID"
-            )
+        push = WebPushSink(min_severity=Severity.INFO)
         sinks: list[Any] = [FileSink(PROTOKOLL)]
         if tg.available():
             sinks.insert(0, tg)
+        if push.available():
+            sinks.insert(0, push)
+        if not tg.available() and not push.available():
+            print(
+                "\n::warning::Kein Push-Weg konfiguriert. Entweder VAPID_PRIVATE_KEY + "
+                "PUSH_ABOS (Web Push) oder TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID setzen — "
+                "sonst bleiben die Alarme in der App."
+            )
         # dedup_window 0: die Ereignisschluessel sind schon einmalig je Wache.
         n = Notifier(sinks, max_per_window=10, dedup_window_s=0.0)
         raus = 0
@@ -214,6 +237,8 @@ async def main() -> int:
             ):
                 raus += 1
         print(f"\n{raus} von {len(zu_senden)} verschickt ({n.active_sinks})")
+        for satz in push.fehler:
+            print(f"::warning::Web Push: {satz}")
 
     # Hat sich am Zustand etwas geaendert? Nur dann muss der Stand gesichert werden.
     # Sonst wuerde die CI viermal pro Stunde einen Commit erzeugen, der nichts sagt

@@ -27,6 +27,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from trading_agent.ops.notify import VAPID_PUBLIC
+
 # Lesbare Namen. Der Instrumentenschluessel ist fuer die Maschine, nicht fuer Ozan.
 NAMES: dict[str, str] = {
     "BTCUSDT": "Bitcoin",
@@ -226,18 +228,42 @@ def main() -> int:
     tpl = (repo / "site" / "template.html").read_text(encoding="utf-8")
     # In ein <script type="application/json"> darf kein "</script>" geraten.
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
-    (out / "index.html").write_text(tpl.replace("__DATA__", blob), encoding="utf-8")
+    # Der oeffentliche VAPID-Schluessel wird beim Bauen eingesetzt statt fest im
+    # Template zu stehen — so gibt es genau eine Quelle dafuer (den Code), und ein
+    # Schluesselwechsel muss nicht an zwei Stellen nachgezogen werden.
+    seite = tpl.replace("__DATA__", blob).replace("__VAPID__", VAPID_PUBLIC)
+    (out / "index.html").write_text(seite, encoding="utf-8")
 
+    # Der Service Worker macht die Meldungen bei geschlossener App moeglich. Er wird
+    # unveraendert kopiert — er darf keine gebauten Daten enthalten, sonst muesste er
+    # bei jedem Scan neu registriert werden.
+    (out / "sw.js").write_text(
+        (repo / "site" / "sw.js").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    # ``display: standalone`` ist die Bedingung dafuer, dass iOS ueberhaupt Push
+    # zulaesst: dort funktioniert Web Push nur fuer Seiten, die ueber „Zum Home-
+    # Bildschirm" installiert wurden.
     (out / "manifest.webmanifest").write_text(
         json.dumps(
             {
-                "name": "Trading-Signale",
-                "short_name": "Signale",
+                "name": "AI Trading Desk",
+                "short_name": "Trading Desk",
                 "start_url": ".",
+                "scope": ".",
                 "display": "standalone",
-                "background_color": "#F3F5F4",
-                "theme_color": "#1D5C57",
-                "icons": [{"src": "icon.png", "sizes": "512x512", "type": "image/png"}],
+                "orientation": "any",
+                "background_color": "#05070D",
+                "theme_color": "#05070D",
+                "icons": [
+                    {"src": "icon.png", "sizes": "512x512", "type": "image/png"},
+                    {
+                        "src": "icon.png",
+                        "sizes": "512x512",
+                        "type": "image/png",
+                        "purpose": "maskable",
+                    },
+                ],
             },
             indent=2,
         ),

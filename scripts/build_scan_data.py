@@ -41,6 +41,7 @@ from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnun
 from trading_agent.scanner.chart_score import bewerte_chart
 from trading_agent.scanner.grading import NOTE_KURZ, NOTEN, Profil
 from trading_agent.scanner.patterns import muster_ueber_zeitebenen
+from trading_agent.scanner.relative_strength import anwenden as rs_anwenden
 from trading_agent.scanner.scan_runner import (
     FENSTER,
     handelt_durchgehend,
@@ -264,6 +265,22 @@ def _raeume(ordner: Path, *, behalten: set[str] | None) -> tuple[int, int]:
     return entfernt, blockiert
 
 
+#: Reihenfolge in der Rangliste: erst die Note, dann die relative Staerke, dann der
+#: Score. Vorher entschied allein der Score — dadurch stand ein B-Setup mit Score 61
+#: ueber einem A-Setup mit Score 58, obwohl die Note genau die Zusammenfassung ist,
+#: die entscheiden soll.
+_NOTE_RANG = {n: i for i, n in enumerate(NOTEN)}
+
+
+def _rang(r: dict[str, Any]) -> tuple[int, float, float]:
+    note = _NOTE_RANG.get(str(r.get("urteil")), len(NOTEN))
+    rs = r.get("rs")
+    richtung = r.get("richtung")
+    # Bei Short zaehlt die umgekehrte Staerke: dort ist der schwaechste Wert der beste.
+    staerke = 50.0 if rs is None else (float(rs) if richtung != "short" else 100.0 - float(rs))
+    return (note, -staerke, -float(r.get("score") or 0.0))
+
+
 def _kompakt(chance: Any, klasse: str, muster: list[Any]) -> dict[str, Any]:
     """Die Zeile fuer die Rangliste — alles, was ohne Klick sichtbar sein soll.
 
@@ -434,11 +451,25 @@ async def main() -> int:
     behalten |= {str(r.get("instrument")) for r in kompakt_alt_frueh if r.get("instrument")}
     _raeume(ordner, behalten=behalten)
 
-    kompakt_neu = [
-        _kompakt(c, klasse_je.get(c.instrument, ""), muster_je.get(c.instrument, [])) for c in alle
-    ]
+    # Die Zeilen werden GENAU EINMAL gebaut und dann ueberall wiederverwendet. Vorher
+    # entstanden sie dreimal getrennt (Rangliste, Klassenliste, Gesamtliste) — was
+    # bedeutet haette, dass eine nachtraegliche Anpassung wie die relative Staerke nur
+    # in einer der drei Listen ankommt.
+    zeile_je: dict[str, dict[str, Any]] = {
+        c.instrument: _kompakt(c, klasse_je.get(c.instrument, ""), muster_je.get(c.instrument, []))
+        for c in alle
+    }
+    kompakt_neu = [zeile_je[c.instrument] for c in alle]
     kompakt_alt = [r for reihen in uebernommen.values() for r in reihen]
-    kompakt_alle = sorted(kompakt_neu + kompakt_alt, key=lambda r: -float(r.get("score") or 0.0))
+
+    # Relative Staerke: jede Klasse gegen sich selbst. Muss hier passieren und nicht
+    # im Scan — sie braucht alle Werte der Klasse gleichzeitig.
+    nach_klasse: dict[str, list[dict[str, Any]]] = {}
+    for r in kompakt_neu + kompakt_alt:
+        nach_klasse.setdefault(str(r.get("klasse") or "?"), []).append(r)
+    rs_anwenden(nach_klasse)
+
+    kompakt_alle = sorted(kompakt_neu + kompakt_alt, key=_rang)
 
     statistik = dict.fromkeys(NOTEN, 0)
     for r in kompakt_alle:
@@ -459,16 +490,9 @@ async def main() -> int:
         "detail_vorhanden": sorted(behalten),
         "makro": lage.as_dict() if lage is not None else None,
         "klassen": {
-            k: [
-                _kompakt(c, k, muster_je.get(c.instrument, []))
-                for c in sorted(v, key=lambda x: -x.score)
-            ]
-            for k, v in klassen.items()
+            k: sorted((zeile_je[c.instrument] for c in v), key=_rang) for k, v in klassen.items()
         },
-        "gesamt": [
-            _kompakt(c, klasse_je.get(c.instrument, ""), muster_je.get(c.instrument, []))
-            for c in alle
-        ],
+        "gesamt": sorted(kompakt_neu, key=_rang),
     }
     (out / "scan.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
