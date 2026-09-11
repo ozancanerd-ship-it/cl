@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import sys
 from dataclasses import replace
@@ -40,6 +41,7 @@ from trading_agent.core.enums import AssetClass, Timeframe
 from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnung
 from trading_agent.scanner.chart_score import bewerte_chart
 from trading_agent.scanner.grading import NOTE_KURZ, NOTEN, Profil
+from trading_agent.scanner.handelbarkeit import beschrifte
 from trading_agent.scanner.patterns import muster_ueber_zeitebenen
 from trading_agent.scanner.relative_strength import anwenden as rs_anwenden
 from trading_agent.scanner.scan_runner import (
@@ -295,6 +297,34 @@ def _kompakt(chance: Any, klasse: str, muster: list[Any]) -> dict[str, Any]:
     return d
 
 
+async def _eurusd() -> float | None:
+    """Der Eurokurs, fuer die Umrechnung der Aktienkurse.
+
+    Faellt er aus, gibt es **keinen** Ersatzwert. Ein geschaetzter Wechselkurs waere
+    schlimmer als gar keiner: er sieht aus wie eine Angabe, auf die man eine Order
+    legen kann.
+    """
+    try:
+        from trading_agent.data.providers.yahoo_finance import YahooFinanceProvider
+
+        prov = YahooFinanceProvider()
+        try:
+            bars = await prov.fetch_ohlcv(
+                "EURUSD-YFD",
+                Timeframe.D1,
+                datetime.now(UTC) - timedelta(days=10),
+                datetime.now(UTC),
+            )
+        finally:
+            with contextlib.suppress(Exception):
+                await prov.aclose()
+        reihe = [b for b in bars if b is not None]
+        return float(reihe[-1].close) if reihe else None
+    except Exception as exc:
+        print(f"  EURUSD nicht ladbar: {type(exc).__name__}: {exc}")
+        return None
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="web", help="Ausgabeordner (scan.json + asset/)")
@@ -469,6 +499,21 @@ async def main() -> int:
         nach_klasse.setdefault(str(r.get("klasse") or "?"), []).append(r)
     rs_anwenden(nach_klasse)
 
+    # Name, Boerse, Waehrung — und bei Aktien der Euro-Preis.
+    #
+    # Ozan handelt Einzelaktien ueber Trade Republic, dort stehen sie in Euro. Ein
+    # Signal mit Dollarkursen ist fuer ihn nicht ausfuehrbar; er muesste jedes Mal
+    # selbst umrechnen und vorher nachschlagen, welche Firma hinter dem Kuerzel steckt.
+    # Analysiert wird trotzdem die US-Notierung: dort entsteht die Struktur, die
+    # deutsche Notierung hat einen Bruchteil des Umsatzes und Luecken im Chart.
+    eurusd = await _eurusd()
+    if eurusd:
+        print(f"  EURUSD {eurusd:.4f} — Aktienkurse zusaetzlich in Euro")
+    else:
+        print("  ::warning::EURUSD nicht ladbar — Aktien bleiben in Dollar")
+    for r in kompakt_neu + kompakt_alt:
+        beschrifte(r, eurusd=eurusd)
+
     kompakt_alle = sorted(kompakt_neu + kompakt_alt, key=_rang)
 
     statistik = dict.fromkeys(NOTEN, 0)
@@ -489,6 +534,7 @@ async def main() -> int:
         "statistik": statistik,
         "detail_vorhanden": sorted(behalten),
         "makro": lage.as_dict() if lage is not None else None,
+        "eurusd": eurusd,
         "klassen": {
             k: sorted((zeile_je[c.instrument] for c in v), key=_rang) for k, v in klassen.items()
         },
