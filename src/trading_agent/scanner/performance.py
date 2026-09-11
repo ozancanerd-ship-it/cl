@@ -232,6 +232,11 @@ class Bericht:
     #: Anteil der Trades, die nie nennenswert ins Plus kamen. Die aussagekräftigste
     #: Einzelzahl: sie trennt ein Ziel-Problem von einem Einstiegs-Problem.
     nie_im_plus: float | None
+    #: Jeder abgeschlossene Trade einzeln, jüngster zuerst. Ozan hat ausdrücklich danach
+    #: gefragt: er will nicht nur die Summe sehen, sondern nachlesen können, wie die
+    #: Signale ausgegangen sind, die ihm angezeigt wurden. Eine Kennzahl, die man nicht
+    #: auf einzelne Fälle zurückführen kann, glaubt man oder nicht — mehr nicht.
+    trades: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     saetze: tuple[str, ...] = field(default_factory=tuple)
 
     def as_dict(self) -> dict[str, Any]:
@@ -246,6 +251,7 @@ class Bericht:
             "mfe_schnitt": round(self.mfe_schnitt, 2) if self.mfe_schnitt is not None else None,
             "mae_schnitt": round(self.mae_schnitt, 2) if self.mae_schnitt is not None else None,
             "nie_im_plus": round(self.nie_im_plus, 3) if self.nie_im_plus is not None else None,
+            "trades": [dict(t) for t in self.trades],
             "saetze": list(self.saetze),
         }
 
@@ -374,6 +380,22 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
         mfe_schnitt=(sum(mfe) / len(mfe)) if mfe else None,
         mae_schnitt=(sum(mae) / len(mae)) if mae else None,
         nie_im_plus=(sum(1 for m in mfe if m < IM_PLUS_AB) / len(mfe) if mfe else None),
+        trades=tuple(
+            {
+                "instrument": e.instrument,
+                "klasse": e.klasse,
+                "note": e.note,
+                "setup": e.setup,
+                "zustand": e.zustand,
+                "erreicht": list(e.erreicht),
+                "r_ganz": round(e.r_ganz, 2),
+                "r_drittel": round(e.r_drittel, 2),
+                "mfe": round(e.mfe, 2),
+                "mae": round(e.mae, 2),
+                "beendet": e.beendet,
+            }
+            for e in reversed(ergebnisse)
+        ),
         saetze=tuple(_saetze(ergebnisse, je_regel)),
     )
 
