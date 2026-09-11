@@ -344,18 +344,47 @@ def kommentar(
     for m in list(muster)[:3]:
         was_ich_sehe.append(f"{m.zeitebene}: {m.name} — {m.beschreibung}")
 
+    # WARUM JETZT — in Traderworten, nicht als Faktorliste.
+    #
+    # Vorher stand hier "mtf ausrichtung: D1↑ H4↑ H1· M15·" und "zonen: 3 offene Zone(n)".
+    # Das ist die Innenansicht des Scores, nicht die Begruendung eines Trades. Ozan hat
+    # es so gesagt: weniger Mathe, mehr Trading. Also fuehrt jetzt das benannte Setup,
+    # und die Zahlen kommen danach — als Groessenordnung, nicht als Argument.
+    setup = getattr(chance, "setup", None)
     warum_jetzt: list[str] = []
-    for f in getattr(chance, "faktoren", ()) or ():
-        if f.anteil >= 0.5:
-            warum_jetzt.append(f"{f.name.replace('_', ' ')}: {f.detail}")
-    rr = getattr(chance, "rr", None)
-    if rr:
-        warum_jetzt.append(f"Chance-Risiko-Verhaeltnis 1:{rr:.2f} bis TP2")
-    move = getattr(chance, "erwartete_bewegung_pct", None)
-    if move:
-        warum_jetzt.append(f"erwartete Bewegung {move:+.1f} % bis TP2")
+    if setup is not None:
+        warum_jetzt.append(f"{setup.name} ({setup.qualitaet}). {setup.these}")
+        warum_jetzt.extend(setup.erfuellt)
+    else:
+        warum_jetzt.append(
+            "Kein Setup mit Namen. Die Zahlen sind ausgerichtet, aber der Chart zeigt "
+            "gerade keinen Ruecksetzer, keinen Ausbruch und keine Rueckeroberung — "
+            "und ohne das ist es kein Trade, sondern eine Vermutung."
+        )
+        for f in getattr(chance, "faktoren", ()) or ():
+            if f.anteil >= 0.6:
+                warum_jetzt.append(f"{f.name.replace('_', ' ')}: {f.detail}")
+
+    plan = getattr(chance, "plan", None)
+    if plan is not None:
+        warum_jetzt.append(
+            f"Risiko {plan.risiko_pct:.1f} % vom Einstieg, Chance-Risiko 1:{plan.crv:.1f} "
+            f"bis zum zweiten Ziel."
+        )
+    else:
+        rr = getattr(chance, "rr", None)
+        if rr:
+            warum_jetzt.append(f"Chance-Risiko-Verhaeltnis 1:{rr:.2f} bis TP2")
+    rs = z.get("rs")
+    if rs is not None:
+        warum_jetzt.append(
+            f"Relative Staerke {float(rs):.0f} von 100 innerhalb der eigenen Klasse."
+        )
     if z.get("umsatz_24h"):
-        warum_jetzt.append(f"24h-Umsatz {float(z['umsatz_24h']) / 1e6:.0f} Mio USDT — handelbar")
+        warum_jetzt.append(
+            f"{float(z['umsatz_24h']) / 1e6:.0f} Mio USDT Tagesumsatz — gross genug, "
+            "um wieder herauszukommen."
+        )
 
     erwartung: list[str] = []
     ziel = getattr(chance, "ziel", None)
@@ -406,11 +435,28 @@ def kommentar(
             "Ohne Invalidierung gibt es keine These, die falsch werden koennte."
         )
 
+    # Was den Trade beendet, bevor der Stop erreicht ist — der Teil, an dem in der
+    # Praxis das meiste Geld verloren geht.
+    if setup is not None:
+        was_waere_falsch.insert(0, setup.trigger)
+        for satz in setup.fehlt:
+            was_waere_falsch.append(f"Fehlt noch: {satz}")
+    for satz in getattr(chance, "warnungen", ()) or ():
+        if satz not in was_waere_falsch:
+            was_waere_falsch.append(satz)
+
+    so_handeln: list[str] = []
+    if plan is not None:
+        so_handeln.extend(plan.schritte)
+        so_handeln.extend(plan.ausstiege)
+
     return {
         "was_ich_sehe": was_ich_sehe,
         "warum_jetzt": warum_jetzt,
         "erwartung": erwartung,
         "was_waere_falsch": was_waere_falsch,
+        "so_handeln": so_handeln,
+        "setup": setup.as_dict() if setup is not None else None,
     }
 
 

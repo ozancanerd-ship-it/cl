@@ -37,6 +37,9 @@ from trading_agent.scanner.grading import (
     benote,
     confidence,
 )
+from trading_agent.scanner.plan import Handelsplan, baue_plan
+from trading_agent.scanner.relative_strength import renditen
+from trading_agent.scanner.setups import Setup, erkenne_setup
 
 
 def _passt(objekt_richtung: Any, wette: Direction) -> bool:
@@ -133,6 +136,11 @@ class ChartChance:
     einstieg: float | None = None
     einstieg_art: str = "sofort"
     einstieg_zone: tuple[float, float] | None = None
+    #: Das benannte Setup. ``None`` heisst: hier ist gerade nichts mit einem Namen —
+    #: und daraus wird kein Trade, egal wie gut die Zahlen aussehen.
+    setup: Setup | None = None
+    #: Der ausfuehrbare Plan: Teilziele, Stop-Nachziehen, Ausstiege.
+    plan: Handelsplan | None = None
 
     @property
     def note_kurz(self) -> str:
@@ -175,6 +183,8 @@ class ChartChance:
             "deckel": self.deckel,
             "warnungen": list(self.warnungen),
             "zusatz": dict(self.zusatz),
+            "setup": self.setup.as_dict() if self.setup else None,
+            "plan": self.plan.as_dict() if self.plan else None,
             "faktoren": [
                 {
                     "name": f.name,
@@ -498,6 +508,21 @@ def bewerte_chart(
     gegenwind = _gegenwind(per_tf, richtung)
     warnungen = list(gegenwind) + [w for w in warnungen if w not in gegenwind]
 
+    # --- Das Setup. Der Punkt, an dem aus Zahlen ein Trade wird (oder eben nicht).
+    #
+    # Bis hier beschreibt der Score, wie viele Dinge ausgerichtet sind. Ein Trader
+    # fragt zuerst nach dem Namen: Ruecksetzer, Ausbruch, Rueckeroberung, Abpraller.
+    # Findet sich keiner, ist das kein "knapp verfehlt", sondern die ehrliche Antwort
+    # "hier ist gerade nichts". Genau daran haben die ersten Alarme gekrankt: hoher
+    # Score, gutes Chance-Risiko — und kein Setup, das man haette benennen koennen.
+    setup = erkenne_setup(per_tf, kurs, richtung, atr)
+    if setup is None:
+        gegenwind = [*gegenwind, "kein benennbares Setup — nur ein Chartbild"]
+    elif setup.qualitaet == "unsauber":
+        for satz in setup.fehlt:
+            if satz not in warnungen:
+                warnungen.append(satz)
+
     urteilung = benote(
         score=score,
         rr=rr,
@@ -507,6 +532,74 @@ def bewerte_chart(
         einigkeit=einigkeit if richtung is not None else None,
         gegenwind=gegenwind,
     )
+
+    # Der Setup-Deckel.
+    #
+    # Er begrenzt die Note nach oben, statt Punkte zu vergeben — ein sauberes Setup
+    # soll eine schlechte Grundlage nicht schoenrechnen koennen, und umgekehrt soll
+    # ein fehlendes Setup einen brauchbaren Chart nicht ganz aus der Liste werfen.
+    #
+    # Die Hoehe des Deckels ist bewusst gewaehlt: Alarme gehen erst ab A− aufs
+    # Telefon. Ohne benanntes Setup ist bei B+ Schluss — der Wert steht damit in der
+    # App auf der Beobachtungsliste, klingelt aber nicht. Genau das war Ozans Kritik:
+    # nicht zu wenige Kandidaten, sondern zu viele schlechte ALARME. Ein Deckel auf
+    # WATCH waere die Ueberreaktion in die andere Richtung gewesen.
+    note = urteilung.note
+    deckel = urteilung.deckel
+    bremse = urteilung.bremse
+
+    # --- Der Einstieg braucht einen GRUND, an genau diesem Preis zu sein.
+    #
+    # Die Auswertung der echten Wachliste am 11. September ist an dieser Stelle
+    # eindeutig, und zwar unangenehm eindeutig:
+    #
+    #     55 von 56 abgeschlossenen Trades hatten die Einstiegsart "sofort".
+    #     Sie zusammen: -24,5 R. Der eine Ruecklauf-Einstieg: 0 R.
+    #
+    # "Sofort" heisst: gekauft zum Kurs, den der Scanner gerade vorfand. Das ist kein
+    # Einstiegsniveau, das ist ein Zeitpunkt — und zwar ein zufaelliger, naemlich der,
+    # an dem der Zehn-Minuten-Takt lief. Dass der Markt dort etwas tut, folgt daraus
+    # nicht.
+    #
+    # Der Beleg dafuer, dass genau das die Ursache ist, steht in derselben Auswertung:
+    # die Note A- war der SCHLECHTESTE Eimer (-0,54 R je Trade, mittleres bestes
+    # Ergebnis nur +0,19 R, 75 % nie auch nur 0,3 R im Plus). Je besser der Score,
+    # desto ausgerichteter das Bild — und desto weiter war die Bewegung schon gelaufen,
+    # als gekauft wurde. Der Score hat nicht Qualitaet gemessen, sondern Verspaetung.
+    #
+    # Deshalb: ein Markt-Einstieg ist nur dort zulaessig, wo das Setup selbst den
+    # Zeitpunkt bestimmt — beim Ausbruch (Schluss ueber der Kante) und bei der
+    # Rueckeroberung (zurueck ueber die abgeraeumte Marke). Beide haben einen
+    # Ausloeser, den ``scanner.trigger`` prueft. Ruecksetzer und Abpraller dagegen
+    # LEBEN vom Preis, zu dem man hineinkommt; ohne Ruecklaufzone gibt es dort nichts
+    # zu kaufen, nur etwas zu beobachten.
+    #
+    # Das ist ausdruecklich KEIN Schritt weg vom aggressiven Stil. Aggressiv heisst
+    # breiteres Universum, mehr Setups, groessere Ziele, mehr Risiko je Trade. Es
+    # heisst nicht: schlechtere Einstiegskurse. Disziplin beim Einstieg kostet nichts
+    # ausser den Trades, die ohne Ruecksicht davonlaufen.
+    MIT_EIGENEM_AUSLOESER = {"AUSBRUCH", "RUECKEROBERUNG"}
+    if (
+        einstieg_art == "sofort"
+        and note in HANDELBAR
+        and (setup is None or setup.art not in MIT_EIGENEM_AUSLOESER)
+    ):
+        note, deckel = "WATCH", "kein Einstiegsniveau, nur der aktuelle Kurs"
+        bremse = (
+            "Es gibt keine Zone, in die der Kurs zurueckkommen muesste — der Einstieg "
+            "waere schlicht der Preis von jetzt. Genau so sind 55 von 56 alten Trades "
+            "entstanden, zusammen -24,5 R. Beobachten, bis ein Ruecklauf entsteht."
+        )
+    if setup is None and note in ("A_PLUS", "A", "A_MINUS"):
+        note, deckel = "B_PLUS", "kein Setup mit Namen"
+        bremse = (
+            "Die Zahlen passen, aber der Chart zeigt kein Setup, das man benennen "
+            "koennte — kein Ruecksetzer, kein Ausbruch, keine Rueckeroberung, kein "
+            "Abpraller. Beobachten, nicht darauf wetten."
+        )
+    elif setup is not None and setup.qualitaet == "unsauber" and note in ("A_PLUS", "A"):
+        note, deckel = "A_MINUS", f"{setup.name}, aber unsauber"
+        bremse = setup.fehlt[0] if setup.fehlt else "das Setup ist nicht sauber"
 
     daten_ok = all(
         not getattr(per_tf.get(tf), "blocks_trading", False)
@@ -522,22 +615,51 @@ def bewerte_chart(
         warnungen=len(warnungen),
     )
 
+    # Der Plan. Er rechnet die Ziele aus Struktur UND Risiko, damit TP1 nie naeher
+    # liegt als der Stop weg ist — sonst stimmt die Rechnung im Kopf nicht mit dem
+    # ueberein, was auf dem Chart steht.
+    handelsplan: Handelsplan | None = None
+    if richtung is not None and inval is not None and einstieg:
+        handelsplan = baue_plan(
+            einstieg=float(einstieg),
+            stop=float(inval),
+            lang=richtung is Direction.LONG,
+            strukturziele=[x for x in (ziel, tp2, tp3) if x is not None],
+            atr=atr,
+        )
+    if handelsplan is not None and handelsplan.untauglich:
+        if handelsplan.untauglich not in warnungen:
+            warnungen.append(handelsplan.untauglich)
+        if note in HANDELBAR:
+            note, deckel = "WATCH", "Stop zu weit fuer einen Swing-Trade"
+            bremse = handelsplan.untauglich
+
+    # Renditen fuer die relative Staerke. Die Einordnung selbst passiert erst nach dem
+    # Scan — sie braucht alle Werte der Klasse und kann hier noch nicht entstehen.
+    d1_bars = list(getattr(per_tf.get(Timeframe.D1), "bars", ()) or [])
+    r = renditen(d1_bars)
+    if r:
+        zusatz["renditen"] = r
+
+    # --- Ueberschrift. Sie fuehrt mit dem NAMEN des Setups, nicht mit einer Zahl.
+    # Ozan hat den alten Kopf zu Recht kritisiert: "Score 63, CRV 1:2.1" sagt einem
+    # Trader nichts darueber, was er da eigentlich vor sich hat.
     if richtung is None:
         kopf = "kein klarer Trend"
     else:
-        seite = "LONG" if richtung is Direction.LONG else "SHORT"
-        note_text = NOTE_KURZ.get(urteilung.note, "—")
-        if urteilung.note in HANDELBAR:
-            luft = f", {erwartet:.1f} % bis TP2" if erwartet else ""
-            kopf = (
-                f"{seite} {note_text} — Score {score:.0f}, CRV 1:{rr:.1f}{luft}"
-                if rr
-                else (f"{seite} {note_text} — Score {score:.0f}")
-            )
-        elif urteilung.note == "WATCH":
-            kopf = f"{seite} beobachten — {urteilung.bremse or 'noch nicht handelbar'}"
+        seite = "Long" if richtung is Direction.LONG else "Short"
+        note_text = NOTE_KURZ.get(note, "—")
+        if note in HANDELBAR and setup is not None:
+            luft = f", Raum {erwartet:.1f} %" if erwartet else ""
+            crv = f", CRV 1:{handelsplan.crv:.1f}" if handelsplan else ""
+            kopf = f"{setup.name} · {seite} {note_text}{crv}{luft}"
+        elif note in HANDELBAR:
+            kopf = f"{seite} {note_text}" + (f", CRV 1:{rr:.1f}" if rr else "")
+        elif note == "WATCH":
+            wenn = setup.trigger if setup is not None else (bremse or "noch nicht handelbar")
+            kopf = f"{seite} beobachten — {wenn}"
         else:
-            kopf = f"{seite} — kein Trade: {urteilung.bremse or 'nichts passt zusammen'}"
+            kopf = f"{seite} — kein Trade: {bremse or 'nichts passt zusammen'}"
 
     return ChartChance(
         instrument=instrument,
@@ -554,18 +676,20 @@ def bewerte_chart(
         bewegung_atr=bew_atr,
         rr=rr,
         headline=kopf,
-        urteil=urteilung.note,
+        urteil=note,
         erwartete_bewegung_pct=erwartet,
         confidence=conf,
         profil=str(urteilung.profil.value),
         begruendung=urteilung.begruendung,
-        bremse=urteilung.bremse,
-        deckel=urteilung.deckel,
+        bremse=bremse,
+        deckel=deckel,
         warnungen=tuple(warnungen),
         zusatz=zusatz,
         einstieg=einstieg if einstieg is not None else (kurs if richtung is not None else None),
         einstieg_art=einstieg_art,
         einstieg_zone=einstieg_zone,
+        setup=setup,
+        plan=handelsplan,
     )
 
 

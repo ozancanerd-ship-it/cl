@@ -100,6 +100,15 @@ class Wache:
     einstiegskurs: float | None = None
     bestes_r: float = 0.0
     schlechtestes_r: float = 0.0
+    #: Name des Setups ("Ruecksetzer im Trend"). Ohne Namen kein Alarm — genau daran
+    #: haben die ersten Meldungen gekrankt: Zahlen ohne erkennbare Handelsidee.
+    setup: str = ""
+    #: Ein Satz, warum dieser Trade ueberhaupt Sinn ergibt.
+    these: str = ""
+    #: Was passieren muss, bevor eingestiegen wird.
+    trigger: str = ""
+    #: Relative Staerke innerhalb der eigenen Klasse, 0..100.
+    rs: float | None = None
 
     @property
     def long(self) -> bool:
@@ -139,6 +148,10 @@ class Wache:
             "einstiegskurs": self.einstiegskurs,
             "bestes_r": round(self.bestes_r, 2),
             "schlechtestes_r": round(self.schlechtestes_r, 2),
+            "setup": self.setup,
+            "these": self.these,
+            "trigger": self.trigger,
+            "rs": self.rs,
         }
 
     @classmethod
@@ -177,18 +190,34 @@ def _fmt(v: float | None) -> str:
 
 
 def _plan_text(w: Wache) -> str:
+    """Der Alarmtext. Er fuehrt mit dem Setup, nicht mit dem Score.
+
+    Ein Alarm, der mit "Score 63" anfaengt, zwingt den Leser, sich die Handelsidee
+    selbst zusammenzureimen. Der Name des Setups und ein Satz zur These beantworten
+    dagegen sofort die einzige Frage, die zaehlt: was ist das hier, und warum jetzt.
+    """
+    kopf = w.setup or ("Long-Setup" if w.long else "Short-Setup")
     zeilen = [
-        f"{w.instrument}  {'LONG' if w.long else 'SHORT'}  [{w.note}]  Score {w.score:.0f}",
+        f"{w.instrument}  {'LONG' if w.long else 'SHORT'}  [{w.note}]",
+        kopf,
+        "",
         f"Einstieg  {_fmt(w.einstieg)}  ({w.einstieg_art})",
         f"Stop      {_fmt(w.stop)}",
     ]
     for name, v in (("Ziel 1", w.tp1), ("Ziel 2", w.tp2), ("Ziel 3", w.tp3)):
         if v is not None:
-            zeilen.append(f"{name}    {_fmt(v)}")
+            r = w.r_bei(v)
+            zeilen.append(f"{name}    {_fmt(v)}" + (f"   ({r:+.1f}R)" if r else ""))
     if w.rr:
         zeilen.append(f"CRV       1:{w.rr:.2f}")
-    if w.erwartet_pct:
-        zeilen.append(f"Erwartet  {w.erwartet_pct:+.1f} %")
+    if w.einstieg > 0:
+        zeilen.append(f"Risiko    {w.risiko / w.einstieg * 100:.1f} % vom Einstieg")
+    if w.rs is not None:
+        zeilen.append(f"Rel. St.  {w.rs:.0f}/100 in der eigenen Klasse")
+    if w.these:
+        zeilen += ["", w.these]
+    if w.trigger:
+        zeilen += ["", f"Ausloeser: {w.trigger}"]
     return "\n".join(zeilen)
 
 
@@ -222,7 +251,19 @@ class Wachliste:
         seine Marken. Sonst wandert der Stop mit jedem Scan, und hinterher weiss niemand,
         gegen welchen Plan das Ergebnis gemessen wurde.
         """
+        from trading_agent.scanner.exposure import Grenzen, pruefe
+
         neu: list[Ereignis] = []
+        # Wie viel darf ueberhaupt noch dazukommen? Am 11. September standen 40
+        # Positionen gleichzeitig offen, 22 davon dieselbe Krypto-Wette; am 9. wurden
+        # elf an einem Tag ausgestoppt. Der Deckel greift VOR der Aufnahme, nicht
+        # hinterher — hinterher ist er nur eine Statistik.
+        grenzen = Grenzen()
+        laufend: list[dict[str, Any]] = [
+            {"klasse": v.klasse, "richtung": v.richtung}
+            for v in self.wachen.values()
+            if v.zustand == Zustand.AKTIV.value
+        ]
         alt_einstieg = {
             k: v.einstieg for k, v in self.wachen.items() if v.zustand == Zustand.WARTET.value
         }
@@ -248,6 +289,16 @@ class Wachliste:
             stop = z.get("invalidierung")
             if einstieg is None or stop is None:
                 continue
+            # Ein Setup, fuer das kein Platz mehr ist, wird gar nicht erst aufgenommen.
+            # Es bleibt in der Rangliste sichtbar — es klingelt nur nicht.
+            if not pruefe({"klasse": z.get("klasse"), "richtung": z.get("richtung")},
+                          laufend, grenzen).ja:
+                continue
+            setup = z.get("setup") or {}
+            # Die Ziele kommen aus dem Handelsplan, nicht roh aus der Liquiditaetsliste.
+            # Der Plan sorgt dafuer, dass Ziel 1 nie naeher liegt als der Stop weg ist —
+            # sonst steht im Alarm ein Chance-Risiko, das es so nie gab.
+            pl = z.get("plan") or {}
             w = Wache(
                 instrument=name,
                 klasse=str(z.get("klasse") or ""),
@@ -256,14 +307,18 @@ class Wachliste:
                 einstieg=float(einstieg),
                 einstieg_art=str(z.get("einstieg_art") or "sofort"),
                 stop=float(stop),
-                tp1=z.get("ziel"),
-                tp2=z.get("tp2"),
-                tp3=z.get("tp3"),
+                tp1=pl.get("tp1", z.get("ziel")),
+                tp2=pl.get("tp2", z.get("tp2")),
+                tp3=pl.get("tp3", z.get("tp3")),
                 score=float(z.get("score") or 0.0),
-                rr=z.get("rr"),
+                rr=pl.get("crv", z.get("rr")),
                 erwartet_pct=z.get("erwartete_bewegung_pct"),
                 aufgenommen=jetzt.isoformat(),
                 zuletzt=jetzt.isoformat(),
+                setup=str(setup.get("name") or ""),
+                these=str(setup.get("these") or ""),
+                trigger=str(setup.get("trigger") or ""),
+                rs=z.get("rs"),
             )
             if w.risiko <= 0 or w.richtung not in ("long", "short"):
                 continue
@@ -307,8 +362,23 @@ class Wachliste:
         return neu
 
     # ------------------------------------------------------------------ pruefen
-    def pruefen(self, kurse: dict[str, dict[str, float]], *, jetzt: datetime) -> list[Ereignis]:
-        """``kurse`` je Instrument: ``{"hoch":…, "tief":…, "letzter":…}`` seit der letzten Pruefung."""
+    def pruefen(
+        self,
+        kurse: dict[str, dict[str, float]],
+        *,
+        jetzt: datetime,
+        kerzen: dict[str, list[Any]] | None = None,
+    ) -> list[Ereignis]:
+        """``kurse`` je Instrument: ``{"hoch":…, "tief":…, "letzter":…}`` seit der letzten Pruefung.
+
+        ``kerzen`` sind die geschlossenen Kerzen desselben Fensters. Sind sie da, entscheidet
+        ``scanner.trigger`` ueber den Einstieg — eine beruehrte Marke allein reicht dann
+        nicht mehr. Fehlen sie, bleibt es beim alten Verhalten; ein fehlender Kurs-Feed
+        darf nicht dazu fuehren, dass gar nichts mehr passiert.
+        """
+        from trading_agent.scanner.trigger import pruefe_einstieg
+
+        kerzen = kerzen or {}
         ereignisse: list[Ereignis] = []
         for name, w in list(self.wachen.items()):
             if w.zustand in ENDZUSTAENDE:
@@ -326,17 +396,53 @@ class Wachliste:
 
             if w.zustand == Zustand.WARTET.value:
                 getroffen = tief <= w.einstieg if w.long else hoch >= w.einstieg
+
+                # Bestaetigung, wo Kerzen vorliegen. Der Befund dahinter: 29 von 58
+                # abgeschlossenen Trades kamen nie auch nur 0,3 R ins Plus — sie liefen
+                # ab der ersten Minute gegen uns, weil bei blosser Beruehrung gekauft
+                # wurde. Ein Wasserfall geht durch jede Marke unter sich hindurch.
+                b = None
+                reihe = kerzen.get(name) or []
+                if getroffen and len(reihe) >= 2:
+                    b = pruefe_einstieg(
+                        reihe,
+                        einstieg=w.einstieg,
+                        lang=w.long,
+                        atr=abs(w.einstieg - w.stop) / 1.5,
+                    )
+                    if b.hinfaellig:
+                        w.zustand = Zustand.INVALIDIERT.value
+                        ereignisse.append(
+                            Ereignis(
+                                art="INVALIDIERT",
+                                instrument=name,
+                                dringend=False,
+                                titel=f"Setup gebrochen  {name}",
+                                text=b.hinfaellig,
+                                dedup_key=f"gebrochen:{name}:{w.aufgenommen}",
+                            )
+                        )
+                        continue
+                    if not b.ja:
+                        # Marke erreicht, aber nicht bestaetigt: weiter warten statt
+                        # blind einzusteigen. Das kostet Einstiegskurs und verhindert
+                        # genau die Trades, die nie funktioniert haben.
+                        ereignisse += self._haltbarkeit(w, jetzt)
+                        continue
+
                 if getroffen:
                     w.zustand = Zustand.AKTIV.value
-                    w.einstiegskurs = w.einstieg
+                    w.einstiegskurs = b.kurs if (b is not None and b.kurs) else w.einstieg
                     ereignisse.append(
                         Ereignis(
                             art="EINSTIEG",
                             instrument=name,
                             dringend=True,
-                            titel=f"EINSTIEG ERREICHT  {name}  {'LONG' if w.long else 'SHORT'}",
+                            titel=f"EINSTIEG BESTAETIGT  {name}  {'LONG' if w.long else 'SHORT'}",
                             text=(
-                                f"{name} hat {_fmt(w.einstieg)} erreicht (Kurs jetzt {_fmt(letzter)}).\n"
+                                f"{name} hat {_fmt(w.einstieg)} erreicht (Kurs jetzt {_fmt(letzter)})."
+                                + (f"\n{b.grund.capitalize()}." if b is not None else "")
+                                + "\n"
                                 f"Stop {_fmt(w.stop)} · Ziel 1 {_fmt(w.tp1)}"
                                 + (f" · Ziel 2 {_fmt(w.tp2)}" if w.tp2 else "")
                                 + (f"\nCRV 1:{w.rr:.2f}" if w.rr else "")
