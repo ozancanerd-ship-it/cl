@@ -100,8 +100,15 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
     import shutil
 
     quelle = repo / "web"
-    stat = {"scan": 0, "wachliste": 0, "assets": 0}
-    for name, schluessel in (("scan.json", "scan"), ("watchlist.json", "wachliste")):
+    stat = {"scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0}
+    # performance.json wurde hier vergessen — die App holte sie, bekam 404 und zeigte
+    # deshalb "noch kein abgeschlossener Trade ausgewertet", obwohl 60 in der Datei
+    # standen. Genau die Zahl, die man sehen muss, bevor man dem naechsten Signal glaubt.
+    for name, schluessel in (
+        ("scan.json", "scan"),
+        ("watchlist.json", "wachliste"),
+        ("performance.json", "bilanz"),
+    ):
         f = quelle / name
         if f.exists():
             shutil.copy2(f, out / name)
