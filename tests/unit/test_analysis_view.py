@@ -209,7 +209,17 @@ def test_kommentar_beantwortet_alle_vier_fragen() -> None:
     m = _mtf()
     zeilen = mtf_tabelle(m, 105.0)
     k = kommentar(Chance(), zeilen, [])
-    assert set(k) == {"was_ich_sehe", "warum_jetzt", "erwartung", "was_waere_falsch"}
+    # Die vier Fragen sind der Kern; "so_handeln" und "setup" sind spaeter dazugekommen,
+    # weil eine Analyse ohne Handelsplan nur eine Meinung ist.
+    assert {"was_ich_sehe", "warum_jetzt", "erwartung", "was_waere_falsch"} <= set(k)
+    assert set(k) <= {
+        "was_ich_sehe",
+        "warum_jetzt",
+        "erwartung",
+        "was_waere_falsch",
+        "so_handeln",
+        "setup",
+    }
     assert len(k["was_ich_sehe"]) == 4
     assert any("112" in s for s in k["erwartung"])
     assert any("96" in s for s in k["was_waere_falsch"])

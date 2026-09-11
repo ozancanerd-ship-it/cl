@@ -277,3 +277,29 @@ def test_stop_haelt_mindestabstand_gegen_die_eigenen_gebuehren() -> None:
     stop_short = _invalidierung(per_tf, kurs, Direction.SHORT, winzig_atr)
     assert stop_short is not None
     assert (stop_short - kurs) / kurs * 100 >= MIN_STOP_PCT - 1e-9
+
+
+# ── Der Einstieg braucht einen Grund, an genau diesem Preis zu sein ──────────────
+def test_markteinstieg_ohne_ruecklaufzone_wird_nur_beobachtet() -> None:
+    """Der teuerste Befund des Projekts, als Test festgehalten.
+
+    55 von 56 abgeschlossenen Trades hatten die Einstiegsart "sofort" — zusammen
+    -24,5 R. "Sofort" ist kein Einstiegsniveau, sondern ein Zeitpunkt: der, an dem der
+    Zehn-Minuten-Takt lief. Ohne Ruecklaufzone und ohne eigenen Ausloeser gibt es
+    nichts zu kaufen, nur etwas zu beobachten.
+    """
+    per_tf = {
+        tf: _tfc_long(
+            structure_breaks=(_Bruch(_Pol("bos"), _Pol("bullish"), 95.0),),
+            liquidity=(
+                _Level(140.0, 0.9, _Pol("open"), _Pol("swing_high")),
+                _Level(180.0, 0.9, _Pol("open"), _Pol("swing_high")),
+            ),
+        )
+        for tf in (Timeframe.D1, Timeframe.H4, Timeframe.H1, Timeframe.M15)
+    }
+    c = bewerte_chart("TEST", _Mtf(per_tf), 100.0)
+    assert c.einstieg_art == "sofort", "ohne offene Zone gibt es keinen Ruecklauf"
+    assert not c.handelbar, "ein Markt-Einstieg ohne Ausloeser darf nicht handelbar sein"
+    assert c.urteil == "WATCH"
+    assert c.deckel == "kein Einstiegsniveau, nur der aktuelle Kurs"
