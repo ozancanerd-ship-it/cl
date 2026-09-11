@@ -14,6 +14,7 @@ Sinks: `ConsoleSink`, `FileSink` (JSONL) jetzt; `TelegramSink` **UNAVAILABLE** o
 from __future__ import annotations
 
 import json
+import os
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -125,6 +126,133 @@ class TelegramSink(Sink):
         self.sent += 1
 
 
+#: Der oeffentliche VAPID-Schluessel. Er gehoert in die Seite und darf oeffentlich sein —
+#: das ist der Sinn des Verfahrens. Der zugehoerige private Schluessel steht
+#: ausschliesslich in einem GitHub-Secret und niemals im Code.
+VAPID_PUBLIC = (
+    "BHIXvrID7IczXuTn_07q5OTCugGPSLHvduoLV-CFuxIKDD6bbBPRyrAkeeQc7jXFa7tM0yfhy1ZHRYDSegNgIwQ"
+)
+
+
+class WebPushSink(Sink):
+    """Push aufs Geraet — auch wenn die App zu ist.
+
+    WARUM DAS ANDERS IST ALS DIE BENACHRICHTIGUNG IN DER APP
+
+    Die App kann nur melden, solange ein Tab offen ist. Genau das war Ozans Einwand:
+    „Ich brauche die Alarme auch wenn die App aus ist." Web Push loest das, weil die
+    Meldung nicht von der Seite kommt, sondern vom Push-Dienst des Browserherstellers
+    an den Service Worker — der laeuft auch ohne offene Seite.
+
+    WAS DAFUER NOETIG IST
+
+    Zwei Dinge, beide einmalig:
+
+    * ``VAPID_PRIVATE_KEY`` — der private Teil des Schluesselpaars, als GitHub-Secret.
+    * ``PUSH_ABOS`` — die Abonnements der Geraete, als JSON-Liste. Die App erzeugt sie
+      beim Klick auf „Alarme aufs Handy" und zeigt sie zum Kopieren an.
+
+    Ohne beides ist die Senke schlicht nicht verfuegbar und meldet das auch so, statt
+    stillschweigend nichts zu tun. Genau dieser stille Ausfall hat wochenlang dafuer
+    gesorgt, dass niemand gemerkt hat, dass die Telegram-Secrets fehlten.
+    """
+
+    name = "webpush"
+
+    def __init__(
+        self,
+        *,
+        key_env: str = "VAPID_PRIVATE_KEY",
+        abos_env: str = "PUSH_ABOS",
+        kontakt: str = "mailto:alerts@example.invalid",
+        min_severity: Severity = Severity.WARNING,
+        transport: object | None = None,
+    ) -> None:
+        self._key = get_secret(key_env, allow_keychain=True)
+        self._abos_roh = os.environ.get(abos_env, "").strip()
+        self.kontakt = kontakt
+        self.min_severity = min_severity
+        self._transport = transport
+        self.sent = 0
+        self.fehler: list[str] = []
+
+    def abos(self) -> list[dict[str, object]]:
+        """Die Abonnements aus dem Secret. Tolerant gegenueber dem, was ein Mensch einfuegt.
+
+        Erlaubt sind eine JSON-Liste, ein einzelnes JSON-Objekt oder mehrere Objekte
+        untereinander. Wer ein Abo aus dem Browser kopiert, bekommt genau eines davon —
+        und soll nicht daran scheitern, dass eckige Klammern fehlen.
+        """
+        text = self._abos_roh
+        if not text:
+            return []
+        try:
+            geladen = json.loads(text)
+        except json.JSONDecodeError:
+            aus: list[dict[str, object]] = []
+            for zeile in text.splitlines():
+                zeile = zeile.strip().rstrip(",")
+                if not zeile:
+                    continue
+                try:
+                    obj = json.loads(zeile)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(obj, dict):
+                    aus.append(obj)
+            return aus
+        if isinstance(geladen, dict):
+            return [geladen]
+        if isinstance(geladen, list):
+            return [x for x in geladen if isinstance(x, dict)]
+        return []
+
+    def available(self) -> bool:
+        return self._key.present and bool(self.abos())
+
+    def deliver(self, note: Notification) -> None:
+        if not self.available() or note.severity < self.min_severity:
+            return
+        nutzlast = json.dumps(
+            {
+                "titel": note.title,
+                "text": note.body,
+                "dringend": note.severity >= Severity.CRITICAL,
+                "ts": note.ts.isoformat(),
+                "dedup": note.dedup_key,
+            },
+            ensure_ascii=False,
+        )
+        if self._transport is not None:
+            for abo in self.abos():
+                self._transport(abo, nutzlast)  # type: ignore[operator]
+            self.sent += 1
+            return
+        try:  # pragma: no cover - echter Netzwerk-Pfad
+            from pywebpush import (  # type: ignore[import-not-found]
+                WebPushException,
+                webpush,
+            )
+        except ImportError:  # pragma: no cover
+            self.fehler.append("pywebpush fehlt — pip install pywebpush")
+            return
+        for abo in self.abos():  # pragma: no cover - echter Netzwerk-Pfad
+            try:
+                webpush(
+                    subscription_info=abo,
+                    data=nutzlast,
+                    vapid_private_key=self._key.reveal(),
+                    vapid_claims={"sub": self.kontakt},
+                    ttl=3600,
+                )
+                self.sent += 1
+            except WebPushException as exc:
+                # 404/410 heisst: das Geraet hat das Abo weggeworfen. Kein Fehler,
+                # der wiederholt werden muesste — es muss neu abonniert werden.
+                code = getattr(getattr(exc, "response", None), "status_code", None)
+                self.fehler.append(f"{str(abo.get('endpoint', ''))[:40]}… → {code or exc}")
+
+
 class Notifier:
     def __init__(
         self,
@@ -196,6 +324,7 @@ class Notifier:
 
 
 __all__ = [
+    "VAPID_PUBLIC",
     "ConsoleSink",
     "FileSink",
     "Notification",
@@ -203,4 +332,5 @@ __all__ = [
     "Severity",
     "Sink",
     "TelegramSink",
+    "WebPushSink",
 ]
