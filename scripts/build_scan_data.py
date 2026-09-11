@@ -310,8 +310,11 @@ async def _eurusd() -> float | None:
 
         prov = YahooFinanceProvider()
         try:
+            # Ohne Suffix: der Anbieter bildet die kanonischen Namen selbst auf die
+            # Yahoo-Schreibweise ab (EURUSD -> EURUSD=X). Mit "-YFD" kam ein 404, und
+            # weil es keinen Ersatzwert gibt, blieben die Aktien stumm in Dollar.
             bars = await prov.fetch_ohlcv(
-                "EURUSD-YFD",
+                "EURUSD",
                 Timeframe.D1,
                 datetime.now(UTC) - timedelta(days=10),
                 datetime.now(UTC),
