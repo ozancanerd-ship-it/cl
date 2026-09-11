@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.analysis.macro_context import MacroLage, warnungen_fuer
 from trading_agent.core.enums import AssetClass, Timeframe
+from trading_agent.scanner import erwartung as erw
 from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnung
 from trading_agent.scanner.chart_score import bewerte_chart
 from trading_agent.scanner.grading import NOTE_KURZ, NOTEN, Profil
@@ -325,6 +326,62 @@ async def _eurusd() -> float | None:
         return None
 
 
+def _quotentabelle() -> dict[str, erw.Quote]:
+    """Die Trefferhaeufigkeiten aus der eigenen Wachliste.
+
+    Bewusst aus dem Zustand der Wachliste und nicht aus ``web/performance.json``: die
+    Bilanz wird im Tagesablauf **nach** dem Scan gerechnet, die Datei waere also einen
+    Lauf alt. Dieselbe Quelle, nur ohne den Umweg.
+    """
+    quelle = Path("data/repository_real/live/watchlist.json")
+    if not quelle.is_file():
+        return {}
+    try:
+        daten = json.loads(quelle.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"  ::warning::Wachliste fuer Trefferquoten nicht lesbar: {exc}")
+        return {}
+    from trading_agent.scanner.performance import bericht
+
+    b = bericht(daten)
+    tab = erw.quoten([dict(t) for t in b.trades])
+    if tab:
+        alle = tab.get("alle")
+        if alle:
+            print(
+                f"  Trefferquoten aus {alle.n} abgeschlossenen Signalen "
+                f"(TP1 {alle.tp1:.0%}, Stop {alle.stop:.0%})"
+            )
+    return tab
+
+
+def _erwartung_anhaengen(r: dict[str, Any], tabelle: dict[str, erw.Quote]) -> None:
+    """Haengt ``erwartung`` an eine Zeile — nur dort, wo es einen Plan gibt.
+
+    Ohne Einstieg und Ziel gibt es keine Strecke zu rechnen, und eine Trefferquote ohne
+    Trade danebenzustellen waere Deko.
+    """
+    plan = r.get("plan") if isinstance(r.get("plan"), dict) else None
+    einstieg = (plan or {}).get("einstieg") or r.get("einstieg") or r.get("kurs")
+    stop = (plan or {}).get("stop") or r.get("invalidierung")
+    tp1 = (plan or {}).get("tp1") or r.get("ziel")
+    tp3 = (plan or {}).get("tp3") or r.get("tp3")
+    if not einstieg or not tp1:
+        return
+    setup = r.get("setup") if isinstance(r.get("setup"), dict) else None
+    e = erw.rechne(
+        einstieg=float(einstieg),
+        stop=float(stop) if stop else None,
+        tp1=float(tp1),
+        tp3=float(tp3) if tp3 else None,
+        lang=str(r.get("richtung") or "long") == "long",
+        note=str(r.get("note") or "") or None,
+        setup=str((setup or {}).get("art") or "") or None,
+        tabelle=tabelle,
+    )
+    r["erwartung"] = e.as_dict()
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="web", help="Ausgabeordner (scan.json + asset/)")
@@ -513,6 +570,16 @@ async def main() -> int:
         print("  ::warning::EURUSD nicht ladbar — Aktien bleiben in Dollar")
     for r in kompakt_neu + kompakt_alt:
         beschrifte(r, eurusd=eurusd)
+
+    # Wie viel es bringen kann — und wie oft so etwas bisher aufging.
+    #
+    # Die zweite Zahl kommt aus der eigenen Wachliste, nicht aus einem Modell. Sie wird
+    # hier angehaengt und NICHT in den Score eingerechnet: sonst wuerde sich das System
+    # an seiner eigenen sechs Wochen langen Vergangenheit festbeissen. Faellt die
+    # Wachliste aus, bleibt die Karte ohne Quote — mit einem Satz, der das sagt.
+    tabelle = _quotentabelle()
+    for r in kompakt_neu + kompakt_alt:
+        _erwartung_anhaengen(r, tabelle)
 
     kompakt_alle = sorted(kompakt_neu + kompakt_alt, key=_rang)
 

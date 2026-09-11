@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from trading_agent.scanner import erwartung as erw
 from trading_agent.scanner.performance import bericht
 
 STAND = "data/repository_real/live/watchlist.json"
@@ -49,11 +50,16 @@ def main() -> int:
             print(f"::warning::Wachliste nicht lesbar: {exc}")
 
     b = bericht(daten, jetzt=datetime.now(UTC))
+
+    # Die Trefferhaeufigkeiten kommen mit in die Datei — dieselbe Tabelle, die im Scan
+    # neben jedem Signal steht. Damit laesst sich in der App nachschlagen, worauf die
+    # Quote auf einer Signalkarte beruht, statt sie glauben zu muessen.
+    doc = b.as_dict()
+    doc["quoten"] = {k: q.as_dict() for k, q in erw.quoten([dict(t) for t in b.trades]).items()}
+
     ziel = Path(args.out)
     ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(
-        json.dumps(b.as_dict(), ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
-    )
+    ziel.write_text(json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     ganz = b.je_regel["ganz"]
     drittel = b.je_regel["drittel"]
