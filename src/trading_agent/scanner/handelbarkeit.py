@@ -171,6 +171,11 @@ AKTIEN_NAMEN: dict[str, str] = {
     "CAT": "Caterpillar",
     "GE": "General Electric",
     "LMT": "Lockheed Martin",
+    "HON": "Honeywell",
+    "NEE": "NextEra Energy",
+    "LIN": "Linde",
+    "MCD": "McDonald's",
+    "CRM": "Salesforce",
 }
 
 KRYPTO_NAMEN: dict[str, str] = {
