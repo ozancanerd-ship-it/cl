@@ -160,6 +160,7 @@ async def main() -> int:
 
     from trading_agent.ops.notify import (
         FileSink,
+        GitHubIssueSink,
         Notification,
         Notifier,
         Severity,
@@ -211,16 +212,26 @@ async def main() -> int:
         # deutlich — ein stiller Ausfall ist der schlimmste Fall.
         tg = TelegramSink(min_severity=Severity.INFO)
         push = WebPushSink(min_severity=Severity.INFO)
+        # Der Auffangkanal: braucht kein Geheimnis, das jemand erst setzen muss. Er
+        # meldet nur das Dringende — ein Issue je Kursbewegung waere Spam.
+        gh = GitHubIssueSink(erwaehnen="ozancanerd-ship-it")
         sinks: list[Any] = [FileSink(PROTOKOLL)]
         if tg.available():
             sinks.insert(0, tg)
         if push.available():
             sinks.insert(0, push)
+        if gh.available():
+            sinks.append(gh)
         if not tg.available() and not push.available():
             print(
-                "\n::warning::Kein Push-Weg konfiguriert. Entweder VAPID_PRIVATE_KEY + "
-                "PUSH_ABOS (Web Push) oder TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID setzen — "
-                "sonst bleiben die Alarme in der App."
+                "\n::warning::Kein echter Push-Weg konfiguriert. Entweder VAPID_PRIVATE_KEY + "
+                "PUSH_ABOS (Web Push) oder TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID setzen. "
+                + (
+                    "Dringende Signale gehen solange als GitHub-Issue raus — die kommen "
+                    "per Mail und in der GitHub-App an, sind aber langsamer."
+                    if gh.available()
+                    else "Es geht gerade gar nichts raus."
+                )
             )
         # dedup_window 0: die Ereignisschluessel sind schon einmalig je Wache.
         n = Notifier(sinks, max_per_window=10, dedup_window_s=0.0)
@@ -239,6 +250,8 @@ async def main() -> int:
         print(f"\n{raus} von {len(zu_senden)} verschickt ({n.active_sinks})")
         for satz in push.fehler:
             print(f"::warning::Web Push: {satz}")
+        for satz in gh.fehler:
+            print(f"::warning::GitHub-Issue: {satz}")
 
     # Hat sich am Zustand etwas geaendert? Nur dann muss der Stand gesichert werden.
     # Sonst wuerde die CI viermal pro Stunde einen Commit erzeugen, der nichts sagt
