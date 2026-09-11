@@ -253,6 +253,103 @@ class WebPushSink(Sink):
                 self.fehler.append(f"{str(abo.get('endpoint', ''))[:40]}… → {code or exc}")
 
 
+class GitHubIssueSink(Sink):
+    """Alarm als GitHub-Issue — der einzige Kanal, der **ohne jede Einrichtung** ankommt.
+
+    DAS PROBLEM, DAS ER LÖST
+
+    Alle anderen Kanäle brauchen ein Geheimnis, das jemand einmal von Hand setzen muss:
+    Telegram braucht Token und Chat-ID, Web Push braucht den privaten VAPID-Schlüssel und
+    die Abos der Geräte. Solange das nicht passiert ist, kommt **nichts** an — und genau
+    das war wochenlang der Fall, ohne dass es jemandem auffiel. Ozans Satz dazu:
+    „heute kam kein einziges Signal an."
+
+    In einem GitHub-Actions-Lauf liegt aber immer schon ein Token bereit: ``GITHUB_TOKEN``.
+    Es wird für jeden Lauf frisch erzeugt, gilt nur für dieses Repository und läuft danach
+    ab — niemand muss es anlegen, kopieren oder irgendwo hinterlegen. Damit lässt sich ein
+    Issue öffnen, und ein Issue, in dem der Kontoinhaber erwähnt wird, erzeugt bei GitHub
+    eine echte Benachrichtigung: E-Mail, und auf dem Handy eine Push-Meldung, wenn die
+    GitHub-App installiert ist. Ohne offene Seite, ohne Einrichtung.
+
+    WAS ER NICHT IST
+
+    Kein Ersatz für Web Push. Die Meldung kommt über den Umweg einer Software-Plattform,
+    sie ist langsamer als eine echte Push-Nachricht und sie landet in einer Liste, die
+    eigentlich für Fehlerberichte gedacht ist. Das ist der Preis dafür, dass sie ohne
+    einen einzigen Handgriff funktioniert. Sobald die Push-Secrets gesetzt sind, laufen
+    beide Kanäle nebeneinander — doppelt gemeldet ist besser als gar nicht gemeldet, und
+    der Dedup-Schlüssel verhindert ohnehin, dass dieselbe Lage zweimal aufschlägt.
+
+    Schwelle bewusst hoch: nur ``CRITICAL``. Ein Issue je Kursbewegung wäre genau der
+    Spam, den der Masterplan ausschließt.
+    """
+
+    name = "github-issue"
+
+    def __init__(
+        self,
+        *,
+        token_env: str = "GITHUB_TOKEN",
+        repo_env: str = "GITHUB_REPOSITORY",
+        erwaehnen: str = "",
+        min_severity: Severity = Severity.CRITICAL,
+        transport: object | None = None,
+    ) -> None:
+        self._token = get_secret(token_env, allow_keychain=False)
+        self._repo = os.environ.get(repo_env, "").strip()
+        #: Wer im Text erwähnt wird — ohne Erwähnung schickt GitHub nichts los.
+        self.erwaehnen = erwaehnen or os.environ.get("ALARM_MENTION", "").strip()
+        self.min_severity = min_severity
+        self._transport = transport
+        self.sent = 0
+        self.fehler: list[str] = []
+
+    def available(self) -> bool:
+        return self._token.present and bool(self._repo)
+
+    def _titel(self, note: Notification) -> str:
+        roh = note.title.strip() or "Signal"
+        return roh[:120]
+
+    def _text(self, note: Notification) -> str:
+        teile = []
+        if self.erwaehnen:
+            teile.append(f"@{self.erwaehnen.lstrip('@')}")
+        teile.append(note.body or note.title)
+        teile.append(
+            "\n---\n*Automatisch aus dem Marktlauf. Nichts wird ausgeführt — das ist ein "
+            "Hinweis, keine Order. Schließe das Issue, wenn du es gesehen hast.*"
+        )
+        return "\n\n".join(teile)
+
+    def deliver(self, note: Notification) -> None:
+        if not self.available() or note.severity < self.min_severity:
+            return
+        url = f"https://api.github.com/repos/{self._repo}/issues"
+        payload = {"title": self._titel(note), "body": self._text(note), "labels": ["signal"]}
+        if self._transport is not None:
+            self._transport(url, payload)  # type: ignore[operator]
+            self.sent += 1
+            return
+        try:  # pragma: no cover - echter Netzwerkpfad
+            import httpx
+
+            antwort = httpx.post(
+                url,
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self._token.reveal()}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                timeout=15.0,
+            )
+            antwort.raise_for_status()
+            self.sent += 1
+        except Exception as exc:  # pragma: no cover - echter Netzwerkpfad
+            self.fehler.append(f"{type(exc).__name__}: {exc}")
+
+
 class Notifier:
     def __init__(
         self,
