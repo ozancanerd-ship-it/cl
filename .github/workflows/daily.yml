@@ -87,6 +87,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
+          # Web Push braucht eine eigene Bibliothek. Sie ist bewusst KEINE
+          # Projekt-Abhaengigkeit: sie wird nur hier gebraucht, nicht im Paket.
+          pip install pywebpush
 
       # continue-on-error, weil ein Datenausfall die FOLGENDEN Schritte nicht verhindern
       # darf: die Warnung soll trotzdem aufs Handy und auf die Seite. Der Lauf wird am
@@ -107,6 +110,8 @@ jobs:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
         # Sonntags zusaetzlich ein Wochenstand, auch wenn sich nichts geaendert hat.
         # Sonst kann es Wochen still bleiben, und dann weiss man nicht, ob nichts passiert
         # ist oder ob etwas kaputt ist.
@@ -130,6 +135,8 @@ jobs:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
         run: |
           if [ "${{ inputs.telegram_ping }}" = "true" ]; then
             python scripts/telegram_check.py --ping
@@ -178,6 +185,8 @@ jobs:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
         run: python scripts/scan_alert.py --scan web/scan.json --send --ohne-setups
 
       # Nach dem Scan: neue Setups auf die Wachliste, ueberholte verwerfen, und pruefen,
@@ -190,7 +199,19 @@ jobs:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
         run: python scripts/watch_levels.py --send --vollstaendig
+
+      # Die eigene Bilanz. Laeuft nach der Wachliste und schreibt sie in die App —
+      # ein Scanner, der nie nachrechnet, ob die alten Chancen aufgegangen sind,
+      # erzeugt Zuversicht statt Wissen.
+      - name: Bilanz rechnen
+        if: github.event.schedule != '*/5 * * * *'
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: python scripts/build_performance.py --out web/performance.json
 
       # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan, keine
       # Veroeffentlichung. Dauert Sekunden und darf deshalb alle fuenf Minuten laufen.
@@ -201,6 +222,8 @@ jobs:
           PYTHONPATH: src
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
         run: python scripts/watch_levels.py --send
 
       - name: Web-App bauen
