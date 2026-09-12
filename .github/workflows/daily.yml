@@ -171,7 +171,10 @@ jobs:
           if [ "${{ github.event.schedule }}" = "2,12,22,32,42,52 * * * *" ]; then
             python scripts/build_scan_data.py --out web --krypto 110 --detail 60 --nur krypto,gold
           else
-            python scripts/build_scan_data.py --out web --krypto 110 --aktien 40 --detail 60
+            # --aktien muss mindestens so gross sein wie die Liste in build_scan_data.py,
+            # sonst faellt hinten etwas ab, ohne dass es jemand merkt. Der Lauf meldet
+            # das inzwischen als ::warning::.
+            python scripts/build_scan_data.py --out web --krypto 110 --aktien 60 --detail 60
           fi
 
       # Marktweite Aenderungen: weggebrochenes Setup, neue Nummer 1, ein Chart der
