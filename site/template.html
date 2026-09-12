@@ -908,6 +908,7 @@ function frischeAuf(){
   // Laeuft IMMER, nicht nur wenn der Depot-Reiter offen ist. Ein Verkaufssignal, das
   // man nur sieht, wenn man ohnehin gerade hinschaut, ist kein Signal.
   pruefeDepotAlarme();
+  pruefeUrteilWechsel();
   pruefeTerminAlarme();
 }
 
@@ -939,6 +940,58 @@ function pruefeDepotAlarme(){
       new Notification(`VERKAUFEN · ${name(p.sym)}`, {body: schritt.titel + ' — ' + schritt.text, tag: key});
     } catch(e){}
   }
+}
+
+/* ==================================== URTEILSWECHSEL IM DEPOT — ALARM
+
+   „Das Portfolio soll auch immer neu bewertet werden."
+
+   Der Ausstiegsplan oben meldet sich, wenn eine feste Marke erreicht ist — Stop, Ziel.
+   Aber die haeufigere Art, wie eine Position schlecht wird, ist leiser: die Struktur
+   traegt nicht mehr, der Score faellt, und das steht nur im Depot-Reiter, wenn man ihn
+   aufmacht. Genau solche Positionen liegen dann wochenlang herum.
+
+   Hier wird deshalb das URTEIL selbst beobachtet. Gemeldet wird nur die Verschlechterung
+   in eine Stufe, die eine Entscheidung verlangt — und jede Stufe nur einmal, bis sie
+   sich wieder aendert. Eine Aufwertung meldet sich nicht: „es laeuft weiter gut" ist
+   keine Nachricht, sondern Laerm. */
+const URTEIL_KEY = 'desk.urteil.v1';
+const URTEIL_MELDEN = new Set(['REDUZIEREN', 'GEGEN DIE THESE', 'BEOBACHTEN']);
+const URTEIL_DRINGEND = new Set(['REDUZIEREN', 'GEGEN DIE THESE']);
+function urteilStandLaden(){
+  try { return JSON.parse(localStorage.getItem(URTEIL_KEY) || '{}') || {}; } catch(e){ return {}; }
+}
+function pruefeUrteilWechsel(){
+  let pos;
+  try { pos = ladePositionen(); } catch(e){ return; }
+  if (!pos.length || !S) return;
+  const stand = urteilStandLaden();
+  let geaendert = false;
+  for (const p of pos){
+    let b;
+    try { b = bewertePosition(p); } catch(e){ continue; }
+    if (!b.urteil || b.urteil === 'UNBEKANNT') continue;
+    const vorher = stand[p.sym];
+    if (vorher === b.urteil) continue;
+    stand[p.sym] = b.urteil;
+    geaendert = true;
+    // Beim allerersten Lauf ist nichts gespeichert — dann nur merken, nicht melden.
+    // Sonst bekommt Ozan beim ersten Oeffnen eine Meldung fuer jede Position.
+    if (vorher === undefined) continue;
+    if (!URTEIL_MELDEN.has(b.urteil)) continue;
+    const key = 'urteil:' + p.sym + ':' + b.urteil;
+    if (gemeldetLaden()[key]) continue;
+    gemeldetMerken(key);
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
+      const rat = positionsRat(b);
+      new Notification(
+        (URTEIL_DRINGEND.has(b.urteil) ? 'PRÜFEN · ' : 'Beobachten · ') + name(p.sym)
+          + ' → ' + b.urteil,
+        {body: (rat.saetze||[])[0] || ('Neue Einschätzung: ' + b.urteil), tag: key});
+    } catch(e){}
+  }
+  if (geaendert){ try { localStorage.setItem(URTEIL_KEY, JSON.stringify(stand)); } catch(e){} }
 }
 
 /* ============================================ WICHTIGE TERMINE — ALARM
@@ -1885,12 +1938,170 @@ function ladePositionen(){
 function speicherePositionen(a){
   try { localStorage.setItem(SPEICHER, JSON.stringify(a)); } catch(e){}
 }
-function scanRow(sym){ return (S?.gesamt||[]).find(o=>o.instrument===sym) || null; }
+/* Eine Position dem Scan zuordnen — ueber die MUENZE, nicht ueber das Paar.
+
+   Das war ein echter Ausfall: als der Scan von Euro auf Dollar umgestellt wurde, hiess
+   Solana im Scan ploetzlich SOLUSD, im Depot aber weiter SOLEUR. Ergebnis: saemtliche
+   Kryptopositionen standen auf einen Schlag ohne Bewertung da — kein Kurs, kein Urteil,
+   kein Ausstiegsplan. Und zwar lautlos.
+
+   Wer 1,79 Solana haelt, haelt 1,79 Solana. In welcher Waehrung die Boerse das Paar
+   notiert, ist eine Eigenschaft der Boerse, nicht der Position. Also wird ab jetzt die
+   Muenze verglichen und die Waehrung hinterher verrechnet.                          */
+function muenzeVon(sym){
+  const s = String(sym||'').toUpperCase().split('-')[0];
+  for (const q of ['USDT','USDC','USD','EUR']){
+    if (s.endsWith(q) && s.length > q.length) return s.slice(0, -q.length);
+  }
+  return s;
+}
+function scanRow(sym){
+  const g = (S?.gesamt||[]);
+  const genau = g.find(o => o.instrument === sym);
+  if (genau) return genau;
+  const m = muenzeVon(sym);
+  return g.find(o => muenzeVon(o.instrument) === m) || null;
+}
+/* In welcher Waehrung eine Position tatsaechlich gerechnet wird.
+
+   Das steht nicht immer im Kuerzel. SOLEUR sagt es, NVDA nicht — und eine Aktie bei
+   Trade Republic wird nun einmal in Euro gekauft, auch wenn der Scan sie in Dollar
+   fuehrt. Ohne diese Unterscheidung wird ein Einstieg zu 154,72 € gegen einen Kurs von
+   218,29 $ gerechnet: +41 % statt der echten +21 %. Ein Depot, das sich um zwanzig
+   Prozentpunkte verschaetzt, ist schlimmer als gar keins. */
+function posWaehrung(pos){
+  if (pos && pos.waehrung) return String(pos.waehrung).toUpperCase();
+  const s = String(pos?.sym||'').toUpperCase();
+  const m = s.match(/(USDT|USDC|USD|EUR)$/);
+  if (m) return m[1] === 'EUR' ? 'EUR' : 'USD';
+  // Kein Kuerzel: das Konto entscheidet. Trade Republic rechnet in Euro.
+  if (/trade\s*republic/i.test(String(pos?.konto||''))) return 'EUR';
+  return 'USD';
+}
+function waehrungsZeichen(w){ return w === 'EUR' ? ' €' : ' $'; }
+
+/* Wie viel eine Zahl aus der Zeile in der Waehrung der POSITION wert ist.
+   Steht die Position in Euro und der Scan in Dollar, wird umgerechnet — sonst sieht ein
+   Depot nach einem Waehrungswechsel plotzlich 16 % besser oder schlechter aus, ohne dass
+   sich am Markt irgendetwas getan haette. */
+function inPositionsWaehrung(row, wert, pos){
+  if (wert == null || !row) return wert;
+  const pw = typeof pos === 'string' ? posWaehrung({sym: pos}) : posWaehrung(pos);
+  const rw = row.waehrung === 'EUR' ? 'EUR' : 'USD';
+  if (pw === rw) return wert;
+  const kurs = row.eurusd || (S && S.eurusd);
+  if (!kurs) return wert;
+  return pw === 'EUR' ? wert / kurs : wert * kurs;
+}
+
+/* ======================================================== BASISWERTE
+   „Es fehlen noch Solana und die anderen Sachen, die du im Portfolio nicht bewerten
+   kannst. Die musst du alle mit einbeziehen."
+
+   Ein Turbo-Zertifikat auf TSMC ist kein eigener Markt. Es ist TSMC mit Hebel und einer
+   Schwelle, an der der Schein wertlos verfaellt. Ein Welt-ETF ist kein Einzelwert,
+   sondern der halbe Aktienmarkt. Bisher stand bei beiden nur „keine Bewertung" — ehrlich,
+   aber nutzlos: ueber TSMC laesst sich sehr wohl etwas sagen, und genau daran haengt der
+   Schein.
+
+   Also wird der Basiswert mitgescannt und das Urteil von ihm hergeleitet — deutlich
+   gekennzeichnet. Die Marken des Basiswerts sind NICHT die Marken des Scheins: der Hebel
+   verschiebt jeden Abstand, und die Knock-out-Schwelle kennt nur der Emittent. */
+const BASISWERT = {
+  'TURBO-TSMC-LONG':    {sym:'TSM',  art:'turbo', richtung:'long'},
+  'TURBO-NETFLIX-LONG': {sym:'NFLX', art:'turbo', richtung:'long'},
+  'TURBO-META-LONG':    {sym:'META', art:'turbo', richtung:'long'},
+  'FTSE-ALL-WORLD':     {art:'breit'},
+};
+const BASIS_STOPP = new Set(['LONG','SHORT','TURBO','CALL','PUT','MINI','FUTURE','OPEN',
+                             'END','WORLD','ALL','ETF','FTSE','MSCI','INDEX','LANG']);
+/* Aus einem Freitext-Kuerzel den Basiswert erraten: „TURBO-NETFLIX-LONG" enthaelt
+   NETFLIX, und NETFLIX ist der Klarname von NFLX. Damit findet auch ein Schein seinen
+   Basiswert, den niemand von Hand eingetragen hat. */
+function errateBasis(sym){
+  const s = String(sym||'').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (s.length < 4) return null;
+  let best = null;
+  for (const o of (S?.gesamt||[])){
+    if (o.klasse !== 'aktien') continue;
+    const stuecke = [String(o.instrument||''), ...String(o.name||'').split(/[^A-Za-z]+/)];
+    for (const roh of stuecke){
+      const t = roh.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (t.length < 4 || BASIS_STOPP.has(t)) continue;
+      if (s.includes(t) && (!best || t.length > best.laenge)) best = {sym: o.instrument, laenge: t.length};
+    }
+  }
+  return best ? best.sym : null;
+}
+function basisVon(pos){
+  if (!pos) return null;
+  if (pos.basis) return {sym: String(pos.basis).toUpperCase(), art:'turbo',
+                         richtung: pos.basis_richtung || 'long'};
+  const s = String(pos.sym||'').toUpperCase();
+  if (BASISWERT[s]) return BASISWERT[s];
+  const geraten = errateBasis(s);
+  return geraten ? {sym: geraten, art:'turbo', richtung:'long', geraten:true} : null;
+}
+/* Marktbreite: wie viel Prozent der gescannten Aktien stehen ueber ihrem Stand von vor
+   einem Quartal. Das ist die ehrlichste Zahl, die sich fuer einen Welt-ETF aus den
+   vorhandenen Daten bilden laesst — ein Index steigt, wenn die Mehrheit steigt. */
+function marktbreite(){
+  const a = (S?.gesamt||[]).filter(o => o.klasse === 'aktien'
+    && o.zusatz && o.zusatz.renditen && o.zusatz.renditen.r63 != null);
+  if (a.length < 10) return null;
+  const oben = a.filter(o => o.zusatz.renditen.r63 > 0).length;
+  return {anteil: oben / a.length * 100, n: a.length, oben};
+}
+
+/* ============================================= URTEIL ZU EINER POSITION
+
+   Hier steckte ein Denkfehler, und zwar ein teurer.
+
+   Das Depot benutzte den SCORE aus der Rangliste. Der Score beantwortet aber eine ganz
+   andere Frage: „Gibt es hier GERADE JETZT einen guten Einstieg?" Bei einem Wert, in dem
+   man laengst drin ist, steht da fast immer eine kleine Zahl — nicht weil die Position
+   schlecht waere, sondern weil der Einstieg vorbei ist. Solana stand auf 5 von 100, Fetch
+   auf 3, Render auf 2. Das Depot sagte deshalb bei fast allem „REDUZIEREN". Ein Rat, der
+   immer gleich lautet, ist kein Rat, sondern ein kaputtes Messgeraet.
+
+   Gemessen wird jetzt, was fuer eine BESTEHENDE Position zaehlt: die relative Staerke
+   innerhalb der eigenen Klasse — jeder Coin gegen alle anderen gescannten Coins, jede
+   Aktie gegen alle anderen Aktien. Das ist die eine Momentum-Aussage mit ordentlichem
+   empirischem Rueckhalt: relative Staerke bleibt ueber Wochen bis Monate eher bestehen,
+   als dass sie dreht. Ein Nachzuegler bleibt meistens einer.
+
+   Der Score bleibt auf der Karte sichtbar — er sagt weiterhin etwas darueber, ob man HEUTE
+   nachkaufen wuerde. Er entscheidet nur nicht mehr ueber das Halten. */
+const RS_FUEHRER = 70, RS_MITTE = 45, RS_SCHWACH = 25;
+function haltUrteil(row){
+  if (!row) return null;
+  const rs = row.rs;
+  const ren = (row.zusatz && row.zusatz.renditen) || {};
+  const gegen = row.richtung === 'short';
+  if (rs == null){
+    const t = ren.r21;
+    if (t == null) return {urteil:'HALTEN', kl:'', rs:null, ren, gegen,
+                           grund:'zu wenig Historie für einen Klassenvergleich'};
+    return t >= 0
+      ? {urteil:'HALTEN', kl:'gut', rs:null, ren, gegen, grund:'eigene Rendite positiv'}
+      : {urteil:'BEOBACHTEN', kl:'warn', rs:null, ren, gegen, grund:'eigene Rendite negativ'};
+  }
+  let urteil, kl;
+  if (rs >= RS_FUEHRER)      { urteil = 'STARK HALTEN'; kl = 'gut'; }
+  else if (rs >= RS_MITTE)   { urteil = 'HALTEN';       kl = 'gut'; }
+  else if (rs >= RS_SCHWACH) { urteil = 'BEOBACHTEN';   kl = 'warn'; }
+  else                       { urteil = 'REDUZIEREN';   kl = 'bad'; }
+  // Ein aktuelles Short-Setup im eigenen Wert hebt kein Halten auf, deckelt es aber.
+  if (gegen && kl === 'gut'){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
+  return {urteil, kl, rs, ren, gegen};
+}
 
 function bewertePosition(pos){
   const row = scanRow(pos.sym);
-  const live = L.get(pos.sym);
-  const kurs = live ? live.p : (row ? row.kurs : null);
+  const live = L.get(pos.sym) || (row ? L.get(row.instrument) : null);
+  const roh = live ? live.p : (row ? row.kurs : null);
+  const kurs = inPositionsWaehrung(row, roh, pos);
+  const w = posWaehrung(pos);
   /* Nicht alles im Depot steht im Scan: ein ETF, ein Turbo-Zertifikat, ein
      ausgelisteter Coin. Fuer die gibt es keinen Kurs — und ohne Kurs stand die Position
      vorher mit leerem Wert da, als waere sie nichts wert. Deshalb duerfen Wert und
@@ -1903,20 +2114,45 @@ function bewertePosition(pos){
   const gvPct = (gv != null && einstand) ? gv / einstand * 100 : null;
   let r = null;
   if (row && row.invalidierung != null && pos.einstieg){
-    const risiko = Math.abs(pos.einstieg - row.invalidierung);
+    const risiko = Math.abs(pos.einstieg - inPositionsWaehrung(row, row.invalidierung, pos));
     if (risiko > 0 && kurs != null) r = (kurs - pos.einstieg) / risiko;
   }
   const score = row ? row.score : null;
-  let urteil = 'UNBEKANNT', kl = '';
-  if (score != null){
-    const gegen = row.richtung === 'short';
-    if (gegen) { urteil = 'GEGEN DIE THESE'; kl = 'bad'; }
-    else if (score >= 66) { urteil = 'STRONG HOLD'; kl = 'gut'; }
-    else if (score >= 52) { urteil = 'HOLD'; kl = 'gut'; }
-    else if (score >= 40) { urteil = 'WATCH'; kl = 'warn'; }
-    else { urteil = 'REDUZIEREN'; kl = 'bad'; }
+  const halt = haltUrteil(row);
+  let urteil = halt ? halt.urteil : 'UNBEKANNT';
+  let kl = halt ? halt.kl : '';
+
+  /* Kein eigener Scan-Eintrag? Dann ueber den Basiswert. Der Schein selbst bleibt
+     unbewertbar — was der Basiswert macht, ist trotzdem die halbe Antwort. */
+  let basis = null;
+  if (!row){
+    const b = basisVon(pos);
+    if (b && b.art === 'breit'){
+      const br = marktbreite();
+      const lage = (S && S.makro && S.makro.regime) || 'neutral';
+      if (br){
+        basis = {art:'breit', breite: br, lage};
+        if (lage === 'risk_off' || br.anteil < 35){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
+        else if (br.anteil < 25){ urteil = 'REDUZIEREN'; kl = 'bad'; }
+        else { urteil = 'HALTEN'; kl = 'gut'; }
+      }
+    } else if (b && b.sym){
+      const brow = scanRow(b.sym);
+      if (brow){
+        basis = {art:'turbo', sym: b.sym, row: brow, richtung: b.richtung || 'long',
+                 geraten: !!b.geraten};
+        const s = brow.score;
+        const gegenlaeufig = (brow.richtung === 'short') === (basis.richtung === 'long')
+                          && brow.richtung != null;
+        if (gegenlaeufig){ urteil = 'GEGEN DIE THESE'; kl = 'bad'; }
+        else if (s >= 52){ urteil = 'HALTEN'; kl = 'gut'; }   // nie STRONG — mit Hebel nie
+        else if (s >= 40){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
+        else { urteil = 'REDUZIEREN'; kl = 'bad'; }
+      }
+    }
   }
-  return {pos, row, kurs, wert, einstand, gv, gvPct, r, score, urteil, kl, live: !!live};
+  return {pos, row, kurs, wert, einstand, gv, gvPct, r, score, urteil, kl,
+          live: !!live, w, basis, halt};
 }
 
 /* ================================================== AUSSTIEGSPLAN
@@ -2018,36 +2254,107 @@ function positionsRat(b){
   let stufe = 'neutral';
 
   if (!r){
+    const ba = b.basis;
+    if (ba && ba.art === 'turbo' && ba.row){
+      const br = ba.row;
+      const saetze = [
+        `Der Schein selbst laesst sich nicht scannen — sein Basiswert schon. `
+        + `${name(ba.sym)} steht bei Score ${br.score.toFixed(0)} (Note ${br.note}): `
+        + `${br.headline || 'kein klares Bild'}.`];
+      if (br.score >= 52) saetze.push('Solange der Basiswert traegt, traegt auch der Schein — '
+        + 'nur schneller in beide Richtungen.');
+      else if (br.score >= 40) saetze.push('Der Basiswert traegt nicht mehr richtig. Mit Hebel '
+        + 'ist das frueher ein Problem als ohne: dieselbe Seitwaertsbewegung kostet hier Geld, '
+        + 'weil der Schein Zeit und Abstand zur Schwelle verliert.');
+      else saetze.push('Der Basiswert ist schwach. Ein gehebelter Schein auf einen schwachen '
+        + 'Basiswert ist die Kombination, bei der aus einem Minus sehr schnell ein Totalverlust '
+        + 'wird — die Knock-out-Schwelle wartet nicht auf eine Erholung.');
+      saetze.push('Wichtig: Stop und Ziele des Basiswerts sind NICHT die des Scheins. Der Hebel '
+        + 'verschiebt jeden Abstand, und die genaue Schwelle steht nur im Papier des Emittenten.');
+      if (ba.geraten) saetze.push('(Basiswert automatisch aus dem Namen erkannt — wenn das nicht '
+        + 'stimmt, trag die Position mit dem richtigen Kuerzel neu ein.)');
+      const stufe = br.score >= 52 ? 'gut' : (br.score >= 40 ? 'warn' : 'bad');
+      return {stufe, kopf: 'Ueber den Basiswert ' + name(ba.sym), saetze};
+    }
+    if (ba && ba.art === 'breit'){
+      const a = ba.breite.anteil;
+      const saetze = [
+        `Ein Welt-ETF hat keinen einzelnen Basiswert — er ist der Markt. Gemessen wird er `
+        + `deshalb an der Marktbreite: ${ba.breite.oben} von ${ba.breite.n} gescannten Aktien `
+        + `stehen ueber ihrem Stand von vor einem Quartal (${a.toFixed(0)} %).`];
+      saetze.push(a >= 60
+        ? 'Das ist ein breiter Markt. Genau dafuer ist so ein ETF da: er braucht keine einzelne '
+          + 'Aktie, die funktioniert, sondern nur die Mehrheit.'
+        : a >= 35
+        ? 'Das ist ein gespaltener Markt — es traegt, aber es traegt nicht breit. Halten ist hier '
+          + 'meist richtiger als handeln; ein Welt-ETF ist kein Instrument fuer Timing.'
+        : 'Die Mehrheit faellt. Das ist der eine Fall, in dem auch ein Welt-ETF nicht diversifiziert '
+          + 'ist — in einem breiten Abschwung faellt er mit.');
+      saetze.push('Und der Punkt, der dabei oft untergeht: ein Welt-ETF ist der Teil des Depots, '
+        + 'der NICHT beobachtet werden muss. Er ist die Gegenposition zu allem anderen hier.');
+      const stufe = a >= 60 ? 'gut' : (a >= 35 ? 'neutral' : 'warn');
+      return {stufe, kopf:'Ueber die Marktbreite', saetze};
+    }
     return {stufe:'unbekannt', kopf:'Keine Bewertung',
       saetze:[ (pos.wert_manuell != null)
-        ? 'Dieser Posten steht nicht im gescannten Universum — ETF, Turbo-Zertifikat oder '
-          + 'ausgelisteter Coin lassen sich hier nicht bewerten. Wert und Einstand hast du '
-          + 'eingetragen, mehr kann die App dazu ehrlicherweise nicht sagen.'
+        ? 'Dieser Posten steht nicht im gescannten Universum und hat auch keinen erkennbaren '
+          + 'Basiswert. Wert und Einstand hast du eingetragen, mehr kann die App dazu '
+          + 'ehrlicherweise nicht sagen.'
         : 'Der Wert war im letzten Scan nicht dabei. Entweder ausserhalb des Universums '
           + 'oder die Datenquelle war stumm.' ]};
   }
 
+  const h = b.halt || haltUrteil(r);
   const gegen = r.richtung === 'short';
   const score = r.score;
+  const klasse = r.klasse === 'aktien' ? 'Aktien' : (r.klasse === 'krypto' ? 'Coins' : 'Werte');
+
+  if (h && h.rs != null){
+    const rs = h.rs;
+    const monat = h.ren.r21, quartal = h.ren.r63;
+    const lauf = [];
+    if (monat != null) lauf.push(`${monat>=0?'+':''}${monat.toFixed(0)} % im letzten Monat`);
+    if (quartal != null) lauf.push(`${quartal>=0?'+':''}${quartal.toFixed(0)} % im Quartal`);
+    if (rs >= RS_FUEHRER){
+      stufe = 'gut';
+      saetze.push(`Läuft besser als ${rs.toFixed(0)} % der gescannten ${klasse}`
+        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Relative Stärke hält meist über Wochen '
+        + 'an — das ist die Position, die man am wenigsten anfassen sollte.');
+    } else if (rs >= RS_MITTE){
+      stufe = 'gut';
+      saetze.push(`Mittelfeld: besser als ${rs.toFixed(0)} % der ${klasse}`
+        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Kein Grund auszusteigen, aber auch keiner '
+        + 'nachzulegen.');
+    } else if (rs >= RS_SCHWACH){
+      stufe = 'warn';
+      saetze.push(`Nachzügler: nur besser als ${rs.toFixed(0)} % der ${klasse}`
+        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Wenn der Rest der Klasse läuft und dieser '
+        + 'Wert nicht, gibt es dafür meistens einen Grund. Beobachten, nicht nachkaufen.');
+    } else {
+      stufe = 'bad';
+      saetze.push(`Schlusslicht: schwächer als ${(100-rs).toFixed(0)} % der ${klasse}`
+        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Genau hier liegt totes Kapital am längsten. '
+        + 'Die ehrliche Frage ist nicht „kommt es zurück", sondern: würdest du das heute nochmal '
+        + 'kaufen — und wenn nein, warum hältst du es dann?');
+    }
+  } else if (h){
+    stufe = h.kl === 'bad' ? 'bad' : (h.kl === 'warn' ? 'warn' : 'gut');
+    saetze.push('Für einen Vergleich mit der eigenen Klasse fehlt die Historie — '
+      + (h.grund || 'zu wenig Daten') + '.');
+  }
+
   if (gegen){
-    stufe = 'warn';
-    saetze.push('Die Analyse zeigt gerade nach unten (Short-Seite). Du haeltst also gegen '
-      + 'die Richtung, die das System sieht. Das ist kein Verkaufsbefehl — aber es ist der '
-      + 'Moment, in dem man einen Stop haben sollte.');
-  } else if (score >= 66){
-    stufe = 'gut';
-    saetze.push(`Struktur traegt weiter (Score ${score.toFixed(0)}, Note ${r.note}). Halten.`);
-  } else if (score >= 52){
-    stufe = 'gut';
-    saetze.push(`Noch in Ordnung (Score ${score.toFixed(0)}). Halten und im Blick behalten.`);
-  } else if (score >= 40){
-    stufe = 'warn';
-    saetze.push(`Die Struktur traegt nicht mehr richtig (Score ${score.toFixed(0)}). Beobachten, `
-      + 'nicht nachkaufen.');
-  } else {
-    stufe = 'bad';
-    saetze.push(`Schwach (Score ${score.toFixed(0)}). Wuerdest du das heute nochmal kaufen? `
-      + 'Wenn nein, ist das der eigentliche Grund zu reduzieren — nicht der Kurs.');
+    if (stufe === 'gut') stufe = 'warn';
+    saetze.push('Dazu kommt: die Analyse sieht hier gerade ein Setup nach UNTEN. Du hältst '
+      + 'also gegen die Richtung, die das System sieht. Kein Verkaufsbefehl — aber der Moment, '
+      + 'in dem ein Stop im Depot stehen sollte.');
+  }
+  if (score != null){
+    saetze.push(score >= 52
+      ? `Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — hier wäre heute sogar ein `
+        + 'Zukauf vertretbar.'
+      : `Einstiegsseite: Score ${score.toFixed(0)} — kein frisches Setup. Das ist eine Aussage `
+        + 'über den Einstieg, nicht über das Halten; für einen Zukauf fehlt gerade der Anlass.');
   }
 
   if (gv != null && gv <= -20){
@@ -2066,6 +2373,34 @@ function positionsRat(b){
   return {stufe, kopf, saetze};
 }
 
+/* Die Zahlen des Basiswerts — sichtbar getrennt von den Zahlen der Position, damit
+   niemand den Stop von TSMC fuer den Stop seines Scheins haelt. */
+function basisKasten(b){
+  const ba = b.basis;
+  if (!ba) return `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">
+    Nicht im letzten Scan — keine Bewertung. Entweder außerhalb des Universums
+    oder die Datenquelle war stumm.</p>`;
+  if (ba.art === 'breit'){
+    const a = ba.breite.anteil;
+    return `<div class="zt" style="margin-top:8px">
+      <span>Marktbreite <b class="${a>=60?'up':(a>=35?'':'dn')}">${a.toFixed(0)} %</b></span>
+      <span>über Quartalsstand <b>${ba.breite.oben}/${ba.breite.n}</b></span>
+      <span>Makro <b>${esc((REGIME_TEXT||{})[ba.lage]||ba.lage)}</b></span>
+    </div>`;
+  }
+  const r = ba.row;
+  const d = digits(r.kurs||1);
+  return `<div class="zt" style="margin-top:8px">
+      <span>Basiswert <b>${esc(name(ba.sym))}</b></span>
+      <span>Kurs <b>${num(r.kurs,d)} ${esc(r.waehrung||'')}</b></span>
+      <span>Score <b>${r.score.toFixed(0)}</b></span>
+      <span>Note <b>${esc(r.note)}</b></span>
+      ${r.rs!=null?`<span>rel. Stärke <b>${r.rs.toFixed(0)}</b></span>`:''}
+    </div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.headline||'')}
+      <span style="color:var(--ink-3)"> — gilt für ${esc(name(ba.sym))}, nicht für den Schein.</span></p>`;
+}
+
 function ratKasten(b){
   const rat = positionsRat(b);
   const farbe = rat.stufe === 'bad' ? 'bad' : (rat.stufe === 'warn' ? 'warn' : '');
@@ -2078,16 +2413,25 @@ function ratKasten(b){
 function zeichnePortfolio(){
   const positionen = ladePositionen();
   const bew = positionen.map(bewertePosition);
-  const gesamt = bew.reduce((s,b)=>s + (b.wert||0), 0);
-  const gv = bew.reduce((s,b)=>s + (b.gv||0), 0);
-  const einstand = bew.reduce((s,b)=>s + (b.einstand||0), 0);
+  /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
+     die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
+     sein Geld tatsaechlich hat. */
+  const kursEU = (S && S.eurusd) || null;
+  const inEuro = (b, wert) => {
+    if (wert == null) return null;
+    if (b.w === 'EUR' || !kursEU) return wert;
+    return wert / kursEU;
+  };
+  const gesamt = bew.reduce((s,b)=>s + (inEuro(b, b.wert)||0), 0);
+  const gv = bew.reduce((s,b)=>s + (inEuro(b, b.gv)||0), 0);
+  const einstand = bew.reduce((s,b)=>s + (inEuro(b, b.einstand)||0), 0);
   const jeKlasse = {};
   for (const b of bew){
-    const k = b.row?.klasse || 'unbekannt';
-    jeKlasse[k] = (jeKlasse[k]||0) + (b.wert||0);
+    const k = b.row?.klasse || (b.basis ? (b.basis.art === 'breit' ? 'aktien' : 'aktien') : 'unbekannt');
+    jeKlasse[k] = (jeKlasse[k]||0) + (inEuro(b, b.wert)||0);
   }
-  const groesste = bew.slice().sort((a,b)=>(b.wert||0)-(a.wert||0))[0];
-  const konz = (groesste && gesamt) ? (groesste.wert||0)/gesamt*100 : 0;
+  const groesste = bew.slice().sort((a,b)=>(inEuro(b,b.wert)||0)-(inEuro(a,a.wert)||0))[0];
+  const konz = (groesste && gesamt) ? (inEuro(groesste, groesste.wert)||0)/gesamt*100 : 0;
 
   let h = `<div class="note-box"><span class="nt">Nur auf diesem Gerät</span>
     <p>Deine Positionen werden ausschließlich lokal in diesem Browser gespeichert. Sie
@@ -2105,20 +2449,24 @@ function zeichnePortfolio(){
       <div><div class="k">Aufteilung</div><div class="v" style="font-size:14px;font-family:'JetBrains Mono',monospace">
         ${Object.entries(jeKlasse).map(([k,v])=>`${k.slice(0,3)} ${gesamt?Math.round(v/gesamt*100):0}%`).join('<br>')||'—'}</div></div>
     </div>
-    <p class="leer" style="padding:6px 0">* in der Währung deiner Eingabe gerechnet — Kurse
-      kommen für Krypto live von der Börse, für Aktien aus dem letzten Scan.</p>`;
+    <p class="leer" style="padding:6px 0">* alles in Euro umgerechnet${kursEU?` (${num(kursEU,4)} $/€)`:''} —
+      Kurse kommen für Krypto live von der Börse, für Aktien aus dem letzten Scan.
+      Positionen ohne Kurs gehen mit dem Wert ein, den du eingetragen hast.
+      Neu bewertet: ${new Date().toLocaleTimeString('de-DE')} — das läuft weiter, auch
+      wenn dieser Reiter zu ist.</p>`;
 
     h += `<h2>Positionen</h2>`;
     h += bew.map(b=>{
       const d = digits(b.kurs||1);
       const r = b.row;
+      const z = waehrungsZeichen(b.w);
       return `<div class="karte ${b.kl}">
         <h3>${esc(name(b.pos.sym))} <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
           <span style="float:right" class="note ${b.kl==='gut'?'gut':''}">${esc(b.urteil)}</span></h3>
         <div class="kpi">
           ${b.pos.menge?`<span>Menge <b>${num(b.pos.menge, 6)}</b></span>`:''}
-          ${b.pos.einstieg?`<span>Einstieg <b>${num(b.pos.einstieg,d)}</b></span>`:''}
-          ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}</b>${b.live?' <span class="up">live</span>':''}</span>`
+          ${b.pos.einstieg?`<span>Einstieg <b>${num(b.pos.einstieg,d)}${z}</b></span>`:''}
+          ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}${z}</b>${b.live?' <span class="up">live</span>':''}</span>`
             :`<span>Wert <b>${num(b.wert,2)} €</b> <span style="color:var(--ink-3)">von dir eingetragen</span></span>`}
           ${b.gvPct!=null?`<span>G/V <b class="${b.gvPct>=0?'up':'dn'}">${pct(b.gvPct,1)}</b></span>`:''}
           ${b.r!=null?`<span>R <b class="${b.r>=0?'up':'dn'}">${b.r.toFixed(2)}R</b></span>`:''}
@@ -2131,25 +2479,35 @@ function zeichnePortfolio(){
           ${r.invalidierung!=null?`<span>Stop <b>${num(r.invalidierung,d)}</b></span>`:''}
         </div>
         <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.headline||'')}</p>`
-        : `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">
-             Nicht im letzten Scan — keine Bewertung. Entweder außerhalb des Universums
-             oder die Datenquelle war stumm.</p>`}
+        : basisKasten(b)}
         ${ratKasten(b)}
         ${ausstiegsKasten(b)}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
-          ${r?` · <button class="link" data-zeig="${esc(b.pos.sym)}">Chart ansehen</button>`:''}</p>
+          ${r?` · <button class="link" data-zeig="${esc(r.instrument)}">Chart ansehen</button>`:''}
+          ${(!r && b.basis && b.basis.sym)?` · <button class="link" data-zeig="${esc(b.basis.sym)}">Basiswert im Chart</button>`:''}</p>
       </div>`;
     }).join('');
 
-    // Rotation
-    const beste = (S?.gesamt||[]).filter(o=>o.handelbar)[0];
-    const schwaechste = bew.filter(b=>b.score!=null).sort((a,b)=>a.score-b.score)[0];
-    if (beste && schwaechste && beste.score - schwaechste.score >= 15 &&
-        beste.instrument !== schwaechste.pos.sym){
+    /* Rotation — aber nur mit echtem Anlass.
+
+       Vorher wurde der Score der Position gegen den Score der besten Chance gestellt. Das
+       musste immer anschlagen: eine Position, in der man drin ist, hat fast nie ein frisches
+       Einstiegssetup. Der Kasten stand deshalb praktisch dauerhaft da und hat sich damit
+       selbst entwertet.
+
+       Jetzt braucht es zwei Dinge gleichzeitig: die Position muss in ihrer Klasse
+       tatsaechlich hinterherlaufen (Schlusslicht), UND es muss ein handelbares Setup mit
+       ordentlicher Note geben. Sonst ist Umschichten nur Gebuehren zahlen. */
+    const beste = (S?.gesamt||[]).filter(o=>o.handelbar && o.score >= 52)[0];
+    const nachzuegler = bew.filter(b=>b.halt && b.halt.rs != null && b.halt.rs < RS_SCHWACH)
+                           .sort((a,b)=>a.halt.rs - b.halt.rs)[0];
+    if (beste && nachzuegler && beste.instrument !== nachzuegler.row?.instrument){
       h += `<div class="note-box warn"><span class="nt">Kapital könnte besser stehen</span>
-        <p><strong>${esc(name(schwaechste.pos.sym))}</strong> steht bei Score
-        ${schwaechste.score.toFixed(0)}, während <strong>${esc(name(beste.instrument))}</strong>
-        gerade ${beste.score.toFixed(0)} hat (${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+pct(beste.erwartete_bewegung_pct,1):''}).</p>
+        <p><strong>${esc(name(nachzuegler.pos.sym))}</strong> ist das Schlusslicht deiner
+        ${nachzuegler.row?.klasse === 'aktien' ? 'Aktien' : 'Coins'} — schwächer als
+        ${(100-nachzuegler.halt.rs).toFixed(0)} % der Klasse. Gleichzeitig hat
+        <strong>${esc(name(beste.instrument))}</strong> ein handelbares Setup
+        (Score ${beste.score.toFixed(0)}, Note ${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+pct(beste.erwartete_bewegung_pct,1):''}).</p>
         <p>Das ist ein Hinweis, keine Anweisung — und nichts wird automatisch umgeschichtet.
         Ein Wechsel kostet Gebühren und Spread und wirft die laufende These weg.</p></div>`;
     }
