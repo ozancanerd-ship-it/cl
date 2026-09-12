@@ -134,6 +134,8 @@ async def _extrema(
     # Die Wachliste kann Paare aus beiden Quellen enthalten: BTCEUR von Kraken,
     # BTCUSDT von Bybit. Welche Boerse gefragt wird, entscheidet der Name des Paares —
     # das ist die einzige Angabe, die immer stimmt.
+    # USDT/USDC gibt es nur bei Bybit, USD und EUR nur bei Kraken. Der Paarname sagt,
+    # wer gefragt wird — die einzige Angabe, die immer stimmt.
     usdt = [n for n in krypto if n.upper().endswith(("USDT", "USDC"))]
     krypto = [n for n in krypto if n not in usdt]
     if usdt:
@@ -155,9 +157,11 @@ async def _extrema(
 
         prov = KrakenDataProvider()
         try:
-            # Einmal die Paarliste holen, damit BTCEUR -> XXBTZEUR aufgeloest wird.
-            with contextlib.suppress(Exception):
-                await prov.list_symbol_info(quote="EUR")
+            # Einmal je Waehrung die Paarliste holen, damit BTCUSD -> XXBTZUSD und
+            # BTCEUR -> XXBTZEUR aufgeloest werden koennen.
+            for q in ("USD", "EUR"):
+                with contextlib.suppress(Exception):
+                    await prov.list_symbol_info(quote=q)
             await sammle(prov, krypto)
         finally:
             with contextlib.suppress(Exception):

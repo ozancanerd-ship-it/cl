@@ -97,29 +97,29 @@ AKTIEN = [
     "CRM",
 ]
 
-#: Gold ueber Kraken in EURO: PAXG ist 1:1 physisch hinterlegt und bei Kraken direkt
-#: in Euro handelbar. Der Yahoo-Weg ueber GC=F liefert den Future — ein Signal ohne
-#: Ausfuehrungsmoeglichkeit.
-GOLD = ["PAXGEUR"]
+#: Gold ueber PAXG: 1:1 physisch hinterlegt und bei Kraken wie bei Bybit handelbar.
+#: Der Yahoo-Weg ueber GC=F liefert den Future — ein Signal ohne Ausfuehrungsmoeglichkeit.
+GOLD = ["PAXGUSD"]
 
-#: Die Schwellen fuer das Krypto-Universum bei Kraken, in EURO.
-#:
-#: Die Zahlen sind niedriger als frueher, und das ist kein Nachlassen: der Euro-Markt
-#: bei Kraken ist kleiner als der USDT-Markt bei Binance. 300.000 € Tagesumsatz klingt
-#: wenig, ist es fuer eine Position von 50 bis 200 € aber nicht — dort ist sie ein
-#: Tropfen. Gleichzeitig bleibt die Pruefung auf die Zahl der Abschluesse, weil viel
-#: Umsatz aus wenigen Grossorders keine Tiefe ist.
-KRYPTO_QUOTE = "EUR"
-#: Tiefer angesetzt als zuvor (300.000), damit auch die Coins mitlaufen, die Ozan
-#: tatsaechlich haelt. 50.000 Euro Tagesumsatz ist duenn — fuer eine Position von 50 bis
-#: 200 Euro aber immer noch reichlich, und eine gehaltene Position ohne Bewertung ist
-#: das groessere Problem.
-#: tatsaechlich haelt — SEI, Optimism, Render liegen bei Kraken in Euro unter der alten
-#: Schwelle und waren deshalb im Depot ohne Bewertung. Eine Position, die niemand
-#: bewertet, ist die gefaehrlichste: sie faellt niemandem auf.
-KRYPTO_MIN_UMSATZ = 50_000.0
-KRYPTO_MIN_TRADES = 100
-KRYPTO_IMMER = ("BTCEUR", "ETHEUR")
+# DOLLAR ZUERST, EURO NUR ALS NOTLOESUNG.
+#
+# Ozans Korrektur vom 12. September: „Dollar soll bevorzugt werden … die Krypto kann
+# ich im Dollar-Markt kaufen und die sind auch besser." Das stimmt sachlich: die
+# USD-/USDT-Maerkte sind bei jeder Boerse die tiefen. Bei Kraken stehen 117 liquide
+# USD-Paare gegenueber 76 in Euro, und bei Bybit gibt es Euro praktisch gar nicht.
+#
+# Euro bleibt als letzte Stufe drin — fuer den Fall, dass einmal weder Bybit noch der
+# Kraken-Dollarmarkt erreichbar ist. Dann lieber ein Euro-Signal als gar keins.
+#
+# Einzelaktien bleiben in Euro: die laufen ueber Trade Republic, und dort gibt es
+# nichts anderes.
+KRYPTO_QUOTE = "USD"
+KRYPTO_MIN_UMSATZ = 150_000.0
+KRYPTO_MIN_TRADES = 300
+
+#: Die Euro-Notloesung: gleiche Idee, niedrigere Schwelle, weil der Markt duenner ist.
+EUR_MIN_UMSATZ = 50_000.0
+EUR_MIN_TRADES = 100
 
 #: Bybit rechnet in USDT und ist deutlich groesser — dort darf die Schwelle hoeher
 #: liegen. Die Zahl der Abschluesse liefert Bybit nicht, deshalb faellt diese Pruefung
@@ -190,7 +190,9 @@ async def _krypto_quelle(limit: int) -> tuple[Any, str, list[Any], Any]:
 
     versuche: list[tuple[str, Any, str, float, int]] = [
         ("Bybit", BybitPublicDataProvider(category="spot"), "USDT", BYBIT_MIN_UMSATZ, 0),
-        ("Kraken", KrakenDataProvider(), KRYPTO_QUOTE, KRYPTO_MIN_UMSATZ, KRYPTO_MIN_TRADES),
+        ("Kraken", KrakenDataProvider(), "USD", KRYPTO_MIN_UMSATZ, KRYPTO_MIN_TRADES),
+        # Letzte Stufe: Euro. Nur, wenn beide Dollarmaerkte ausfallen.
+        ("Kraken (Euro)", KrakenDataProvider(), "EUR", EUR_MIN_UMSATZ, EUR_MIN_TRADES),
     ]
     letzter: Exception | None = None
     for name, prov, quote, min_umsatz, min_trades in versuche:
@@ -283,8 +285,8 @@ async def _gold(
 
     prov = KrakenDataProvider()
     try:
-        # Kraken braucht die Paarliste einmal, um BTCEUR -> XXBTZEUR aufloesen zu koennen.
-        await prov.list_symbol_info(quote=KRYPTO_QUOTE)
+        # Kraken braucht die Paarliste einmal, um BTCUSD -> XXBTZUSD aufloesen zu koennen.
+        await prov.list_symbol_info(quote="USD")
         erg = await scanne(
             prov,
             GOLD,
