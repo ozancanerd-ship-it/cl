@@ -306,6 +306,15 @@ def voller_name(instrument: str, klasse: str = "") -> str:
     return KRYPTO_NAMEN.get(kern, kern)
 
 
+def waehrung_von(instrument: str, ersatz: str = "EUR") -> str:
+    """Die Währung, in der ein Paar notiert — aus dem Namen, nicht aus einer Tabelle."""
+    s = (instrument or "").strip().upper()
+    for endung in ("USDT", "USDC", "EUR", "USD"):
+        if s.endswith(endung) and len(s) > len(endung):
+            return endung
+    return ersatz
+
+
 def beschrifte(zeile: dict[str, Any], *, eurusd: float | None = None) -> None:
     """Ergänzt eine Scan-Zeile um Name, Handelsort und — bei Aktien — Euro-Preise.
 
@@ -317,7 +326,10 @@ def beschrifte(zeile: dict[str, Any], *, eurusd: float | None = None) -> None:
     o = ort(klasse)
     zeile["name"] = voller_name(name, klasse)
     zeile["broker"] = o.broker
-    zeile["waehrung"] = o.waehrung
+    # Die Währung steht am Paar, nicht in einer Tabelle. Sobald der Scan auf Bybit
+    # ausweicht, heißen die Paare BTCUSDT statt BTCEUR — und dann muss auf der Karte
+    # USDT stehen und nicht Euro, sonst rechnet er mit dem falschen Geld.
+    zeile["waehrung"] = waehrung_von(name, o.waehrung)
     if o.hinweis:
         zeile["broker_hinweis"] = o.hinweis
 
@@ -353,4 +365,5 @@ __all__ = [
     "in_euro",
     "ort",
     "voller_name",
+    "waehrung_von",
 ]
