@@ -1433,9 +1433,38 @@ function terminKasten(){
     .map(t => ({...t, ts: Date.parse(t.zeitpunkt)}))
     .filter(t => isFinite(t.ts) && t.ts > jetzt - 2*3600*1000 && t.ts < jetzt + 72*3600*1000)
     .sort((a,b) => a.ts - b.ts);
-  if (!kommend.length) return `<div class="note-box"><span class="nt">Termine</span>
-    <p>In den nächsten drei Tagen steht nichts Großes an. Das ist eine gute Nachricht:
-    ruhige Tage sind die, an denen ein Setup auch das machen darf, was es soll.</p></div>`;
+  if (!kommend.length){
+    /* Wichtige Unterscheidung, sonst steht hier eine Unwahrheit.
+       Die Quelle (faireconomy) veroeffentlicht immer nur die LAUFENDE Woche und rollt
+       sonntags auf die naechste. Am Samstagnachmittag liegt die ganze Datei also in der
+       Vergangenheit — und "es steht nichts an" waere dann schlicht falsch: es ist bloss
+       noch nichts veroeffentlicht. */
+    const spaetester = alle.map(t => Date.parse(t.zeitpunkt)).filter(isFinite).sort((a,b)=>b-a)[0];
+    const nichtsMehr = spaetester && spaetester < jetzt;
+    const letzte = alle.map(t=>({...t, ts:Date.parse(t.zeitpunkt)}))
+      .filter(t=>t.wirkung==='High' && isFinite(t.ts)).sort((a,b)=>b.ts-a.ts).slice(0,6);
+    return `<h2>Termine, die den Markt bewegen</h2>
+    <div class="note-box ${nichtsMehr?'warn':''}"><span class="nt">${
+      nichtsMehr?'Kalender noch nicht fortgeschrieben':'Ruhige Tage'}</span>
+    <p>${nichtsMehr
+      ? 'Die Quelle veröffentlicht immer nur die <strong>laufende Woche</strong> und rollt '
+        + 'sonntags weiter. Gerade steht deshalb kein künftiger Termin in der Datei — das '
+        + 'heißt <strong>nicht</strong>, dass nächste Woche nichts ansteht, sondern nur, dass '
+        + 'es noch nicht veröffentlicht ist. Spätestens Sonntag steht hier wieder die volle Woche.'
+      : 'In den nächsten drei Tagen steht nichts Großes an. Ruhige Tage sind die, an denen '
+        + 'ein Setup auch das machen darf, was es soll.'}</p></div>
+    ${letzte.length?`<h2>Was diese Woche lief</h2>
+      <p class="lead">Zur Einordnung — diese Termine liegen hinter uns und erklären
+      oft, warum ein Chart aussieht, wie er aussieht.</p>
+      <div class="tw"><table class="mtf">
+        <tr><th>Wann</th><th>Land</th><th>Termin</th><th></th></tr>
+        ${letzte.map(t=>`<tr style="opacity:.7">
+          <td class="mono" style="white-space:nowrap">${esc(new Date(t.ts).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'}))}</td>
+          <td>${esc(t.land||'')}</td><td class="tf">${esc(t.titel||'')}</td>
+          <td class="mono" style="color:var(--ink-3);font-size:11px">${
+            t.vorher!=null?'vorher '+esc(String(t.vorher)):''}</td></tr>`).join('')}
+      </table></div>`:''}`;
+  }
 
   const hoch = kommend.filter(t => t.wirkung === 'High');
   const naechster = hoch[0];
