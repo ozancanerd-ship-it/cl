@@ -646,10 +646,20 @@ const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','
    ein Drittel eines Zwei-Prozent-Gewinns. Beides gehoert neben das Signal. */
 function istAktie(o){ return (o && o.klasse) === 'aktien'; }
 function eurWert(o, feld){ return (o && o.eur && o.eur[feld] != null) ? o.eur[feld] : null; }
+/* Waehrungszeichen aus der Zeile, nicht geraten.
+   Seit Krypto ueber Kraken in EURO gescannt wird, sind die Rohzahlen bei Krypto und
+   Gold schon Euro — bei Aktien bleiben sie Dollar, und nur dort wird umgerechnet.
+   Eine Zahl ohne Waehrung ist bei einem Kaufsignal keine Kleinigkeit. */
+function zeichen(o){
+  const w = (o && o.waehrung) || '';
+  if (w === 'EUR') return ' €';
+  if (w === 'USDT') return ' USDT';
+  return istAktie(o) ? ' $' : '';
+}
 function preis(o, feld, fallback, d){
   const e = eurWert(o, feld);
   if (e != null) return `${num(e,d)} €`;
-  return num(fallback, d) + (istAktie(o) ? ' $' : '');
+  return num(fallback, d) + zeichen(o);
 }
 function gebuehrSatz(o, positionswert){
   if (!positionswert || positionswert <= 0) return '';
@@ -768,8 +778,10 @@ async function waehle(sym, wechseln = true){
 function kryptoSymbole(){
   if (!S) return [];
   const aus = [];
+  // GROSS, nicht klein: Kraken meldet die Symbole gross zurueck, und der Livespeicher
+  // wird an anderer Stelle mit dem Instrumentnamen aus dem Scan abgefragt.
   for (const o of (S.gesamt||[])) if (o.klasse === 'krypto' || o.klasse === 'gold')
-    aus.push(o.instrument.toLowerCase());
+    aus.push(String(o.instrument).toUpperCase());
   return aus.slice(0, 180);
 }
 function setzeLiveChip(an, text){
@@ -782,29 +794,52 @@ function starteLive(){
   if (!syms.length) { setzeLiveChip(false,'keine Krypto-Werte'); return; }
   if (WS) { try{ WS.close(); }catch(e){} }
   setzeLiveChip(false,'verbinde …');
+  /* Kraken statt Binance.
+     Der Livestream muss dieselbe Boerse sein wie die Analyse, sonst zeigt die Karte
+     einen Kurs, zu dem hier niemand kaufen kann — und bei EUR-Paaren waere der
+     Unterschied nicht nur Rauschen, sondern der ganze Wechselkurs.
+     Kraken verlangt anders als Binance ein Abonnement je Symbol, in der Schreibweise
+     "BTC/EUR". */
   let url;
-  try { url = 'wss://stream.binance.com:9443/ws/!miniTicker@arr'; WS = new WebSocket(url); }
+  try { url = 'wss://ws.kraken.com/v2'; WS = new WebSocket(url); }
   catch(e){ setzeLiveChip(false,'kein Livestream'); return; }
-  WS.onopen = ()=>{ WS_OK = true; WS_TRY = 0; setzeLiveChip(true,'live'); };
+  WS.onopen = ()=>{
+    WS_OK = true; WS_TRY = 0; setzeLiveChip(true,'live');
+    const paare = syms.slice(0,90).map(krakenPaar).filter(Boolean);
+    if (paare.length) try {
+      WS.send(JSON.stringify({method:'subscribe', params:{channel:'ticker', symbol:paare}}));
+    } catch(e){}
+  };
   WS.onerror = ()=>{ if(!WS_OK) setzeLiveChip(false,'Stream blockiert'); };
   WS.onclose = ()=>{
     WS_OK = false; setzeLiveChip(false,'getrennt');
     if (WS_TRY++ < 6) setTimeout(starteLive, Math.min(30000, 2000 * Math.pow(2, WS_TRY)));
   };
   WS.onmessage = ev => {
-    let arr; try { arr = JSON.parse(ev.data); } catch(e){ return; }
-    if (!Array.isArray(arr)) return;
+    let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+    if (!m || m.channel !== 'ticker' || !Array.isArray(m.data)) return;
     let neu = false;
-    for (const t of arr){
-      const sym = t.s;
-      if (!sym) continue;
-      const p = parseFloat(t.c), o = parseFloat(t.o);
-      if (!isFinite(p)) continue;
-      L.set(sym, {p, pct: o ? (p/o-1)*100 : null, t: Date.now()});
+    for (const t of m.data){
+      const sym = ausKrakenPaar(t.symbol);
+      const p = parseFloat(t.last);
+      if (!sym || !isFinite(p)) continue;
+      const pct = (t.change_pct != null && isFinite(parseFloat(t.change_pct)))
+        ? parseFloat(t.change_pct) : null;
+      L.set(sym, {p, pct, t: Date.now()});
       neu = true;
     }
     if (neu) planeAuffrischen();
   };
+}
+
+/* "BTCEUR" <-> "BTC/EUR". Kraken v2 spricht bereits BTC und nicht mehr XBT. */
+function krakenPaar(sym){
+  const s = String(sym||'').toUpperCase();
+  return s.endsWith('EUR') && s.length > 3 ? `${s.slice(0,-3)}/EUR` : null;
+}
+function ausKrakenPaar(paar){
+  const s = String(paar||'').toUpperCase();
+  return s.includes('/') ? s.replace('/','') : null;
 }
 let _alarmZuletzt = 0;
 let _auf = 0;
