@@ -67,7 +67,11 @@ class KrakenDataProvider(AsyncOHLCVSource, AsyncTradeSource, AsyncQuoteSource):
         self._client = client or HttpClient(
             "https://api.kraken.com",
             name=self.name,
-            rate_per_sec=1.0,
+            # 2 Anfragen je Sekunde statt 1. Der Scan holt je Wert vier Zeitebenen;
+            # bei 60 Paaren sind das 240 Abrufe, und bei 1/s dauert allein das Holen
+            # vier Minuten — zu lang fuer einen Lauf alle 15 Minuten. Kraken erlaubt
+            # auf den oeffentlichen Endpunkten mehr; 2/s bleibt deutlich darunter.
+            rate_per_sec=2.0,
             transport=transport,
         )
         self._health = HealthTracker(self.name, clock=self._clock)
