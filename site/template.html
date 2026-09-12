@@ -650,12 +650,14 @@ function eurWert(o, feld){ return (o && o.eur && o.eur[feld] != null) ? o.eur[fe
    Seit Krypto ueber Kraken in EURO gescannt wird, sind die Rohzahlen bei Krypto und
    Gold schon Euro — bei Aktien bleiben sie Dollar, und nur dort wird umgerechnet.
    Eine Zahl ohne Waehrung ist bei einem Kaufsignal keine Kleinigkeit. */
+/* Das Zeichen gehoert zur ZAHL, nicht zum Wunsch.
+   Eine Aktie notiert in Dollar und wird in Euro gekauft — steht der Eurokurs nicht zur
+   Verfuegung, ist die Zahl daneben eine Dollarzahl und bekommt ein Dollarzeichen. */
 function zeichen(o){
   const w = (o && o.waehrung) || '';
   if (w === 'EUR') return ' €';
   if (w === 'USDT') return ' USDT';
-  if (w === 'USD') return ' $';
-  return istAktie(o) ? ' $' : '';
+  return ' $';
 }
 /* Welche Zahl gross dasteht, entscheidet die AUSFUEHRUNG, nicht der Geschmack.
    Aktien laufen ueber Trade Republic und dort gibt es nur Euro — also Euro.
@@ -1413,9 +1415,9 @@ function oppZeile(o, rang){
         ${(pl?pl.tp3:o.tp3)!=null?`<span>Ziel 3 <b>${preis(o,'tp3',pl?pl.tp3:o.tp3,d)}</b></span>`:''}
       </div>
       ${o.broker?`<div class="muz" style="margin-top:6px">Kaufen bei <strong>${esc(o.broker)}</strong>${
-        o.waehrung?` · ${esc(o.waehrung)}`:''}${
-        eurHinweis(o)?' · '+eurHinweis(o):''}${
-        istAktie(o)&&!eurWert(o,'kurs')?' · <span style="color:var(--warn)">Eurokurs fehlt, Preise in Dollar</span>':''}</div>`:''}
+        istAktie(o) ? (eurWert(o,'kurs')?' · EUR':' · <span style="color:var(--warn)">USD — Eurokurs fehlt gerade</span>')
+                    : (o.waehrung?` · ${esc(o.waehrung)}`:'')}${
+        eurHinweis(o)?' · '+eurHinweis(o):''}</div>`:''}
       ${o.erwartung&&o.erwartung.quote?`<div class="muz" style="margin-top:5px">
         ${o.erwartung.bis_tp1_pct!=null?`bis Ziel 1 <strong>${pct(o.erwartung.bis_tp1_pct,1)}</strong> · `:''}
         vergleichbare Signale trafen bisher <strong>${Math.round(o.erwartung.quote.tp1*100)} %</strong>
