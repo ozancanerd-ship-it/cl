@@ -656,6 +656,22 @@ async def main() -> int:
     for r in kompakt_neu + kompakt_alt:
         _erwartung_anhaengen(r, tabelle)
 
+    # Welche Coins stehen nur als Kuerzel da? Das Universum ist dynamisch — heute ist
+    # ein Coin liquide, morgen ein anderer. Die Namenstabelle laeuft dem hinterher.
+    # Statt das stillschweigend hinzunehmen, sagt es der Lauf: dann laesst es sich
+    # nachtragen, bevor Ozan wieder suchen muss.
+    ohne_namen = sorted(
+        {
+            str(r.get("instrument"))
+            for r in kompakt_neu
+            if str(r.get("klasse")) in ("krypto", "gold")
+            and str(r.get("name") or "")
+            == str(r.get("instrument") or "").upper().removesuffix("EUR").removesuffix("USDT")
+        }
+    )
+    if ohne_namen:
+        print(f"  ::warning::ohne ausgeschriebenen Namen: {', '.join(ohne_namen)}")
+
     kompakt_alle = sorted(kompakt_neu + kompakt_alt, key=_rang)
 
     statistik = dict.fromkeys(NOTEN, 0)
