@@ -188,7 +188,11 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
-        run: python scripts/scan_alert.py --scan web/scan.json --send --ohne-setups
+        # --min critical: die Scan-Meldungen ("Note geaendert", "neu im Ranking") sind
+        # Lagebericht, keine Handlungsaufforderung. Sie stehen in der App und im
+        # Protokoll; aufs Telefon geht von hier aus nichts mehr. Ozans Einwand war
+        # eindeutig: nur Alarme, bei denen er einsteigen kann.
+        run: python scripts/scan_alert.py --scan web/scan.json --send --ohne-setups --min critical
 
       # Nach dem Scan: neue Setups auf die Wachliste, ueberholte verwerfen, und pruefen,
       # ob eine Marke getroffen wurde.
