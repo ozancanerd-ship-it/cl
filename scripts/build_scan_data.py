@@ -110,8 +110,15 @@ GOLD = ["PAXGEUR"]
 #: Tropfen. Gleichzeitig bleibt die Pruefung auf die Zahl der Abschluesse, weil viel
 #: Umsatz aus wenigen Grossorders keine Tiefe ist.
 KRYPTO_QUOTE = "EUR"
-KRYPTO_MIN_UMSATZ = 300_000.0
-KRYPTO_MIN_TRADES = 300
+#: Tiefer angesetzt als zuvor (300.000), damit auch die Coins mitlaufen, die Ozan
+#: tatsaechlich haelt. 50.000 Euro Tagesumsatz ist duenn — fuer eine Position von 50 bis
+#: 200 Euro aber immer noch reichlich, und eine gehaltene Position ohne Bewertung ist
+#: das groessere Problem.
+#: tatsaechlich haelt — SEI, Optimism, Render liegen bei Kraken in Euro unter der alten
+#: Schwelle und waren deshalb im Depot ohne Bewertung. Eine Position, die niemand
+#: bewertet, ist die gefaehrlichste: sie faellt niemandem auf.
+KRYPTO_MIN_UMSATZ = 50_000.0
+KRYPTO_MIN_TRADES = 100
 KRYPTO_IMMER = ("BTCEUR", "ETHEUR")
 
 #: Bybit rechnet in USDT und ist deutlich groesser — dort darf die Schwelle hoeher
