@@ -169,6 +169,7 @@ def in_euro(wert: float | None, eurusd: float | None) -> float | None:
 #: das ist immer noch besser als das volle Handelspaar.
 AKTIEN_NAMEN: dict[str, str] = {
     "NVDA": "NVIDIA",
+    "TSM": "TSMC (Taiwan Semiconductor)",
     "AMD": "AMD",
     "MSFT": "Microsoft",
     "GOOGL": "Alphabet (Google)",
