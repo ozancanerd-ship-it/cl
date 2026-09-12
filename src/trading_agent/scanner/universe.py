@@ -34,6 +34,16 @@ STABLECOINS = frozenset(
         # Seit das Universum in EURO gebildet wird, ist Tether eine BASIS und keine
         # Quote mehr — ohne diesen Eintrag stand USDTEUR als "Chance" in der Liste.
         "USDT",
+        # Euro-Stablecoins: bei EUR-Quote tauchen sie als "EURCEUR" auf und sahen im
+        # Ranking aus wie eine Chance. Ein Euro gegen einen Euro ist kein Trade.
+        "EURC",
+        "EURQ",
+        "EURR",
+        "EURS",
+        "STEUR",
+        "USDG",
+        "USDS",
+        "RLUSD",
         "USDC",
         "FDUSD",
         "TUSD",
