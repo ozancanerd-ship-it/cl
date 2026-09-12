@@ -1770,6 +1770,81 @@ function ausstiegsKasten(b){
     <div class="kpi" style="margin-top:8px">${marken}</div>${knopf}</div>`;
 }
 
+/* ================================================ URTEIL JE POSITION
+   „Analysier auch immer mein Portfolio — ob ich rausgehen soll oder reingehen."
+
+   Der Scanner bewertet den Chart. Eine gehaltene Position braucht aber eine andere
+   Frage als eine Chance: nicht „ist das ein guter Einstieg", sondern „wuerde ich das
+   heute nochmal kaufen". Das ist dieselbe Information, anders herum gelesen — und sie
+   faellt bei jedem Scan neu an, ohne dass jemand etwas anklicken muss.
+
+   Was hier NICHT passiert: automatisch verkaufen, und so tun, als waere ein Score eine
+   Anweisung. Jeder Satz sagt, worauf er beruht. */
+function positionsRat(b){
+  const r = b.row;
+  const pos = b.pos;
+  const gv = b.gvPct;
+  const saetze = [];
+  let stufe = 'neutral';
+
+  if (!r){
+    return {stufe:'unbekannt', kopf:'Keine Bewertung',
+      saetze:[ (pos.wert_manuell != null)
+        ? 'Dieser Posten steht nicht im gescannten Universum — ETF, Turbo-Zertifikat oder '
+          + 'ausgelisteter Coin lassen sich hier nicht bewerten. Wert und Einstand hast du '
+          + 'eingetragen, mehr kann die App dazu ehrlicherweise nicht sagen.'
+        : 'Der Wert war im letzten Scan nicht dabei. Entweder ausserhalb des Universums '
+          + 'oder die Datenquelle war stumm.' ]};
+  }
+
+  const gegen = r.richtung === 'short';
+  const score = r.score;
+  if (gegen){
+    stufe = 'warn';
+    saetze.push('Die Analyse zeigt gerade nach unten (Short-Seite). Du haeltst also gegen '
+      + 'die Richtung, die das System sieht. Das ist kein Verkaufsbefehl — aber es ist der '
+      + 'Moment, in dem man einen Stop haben sollte.');
+  } else if (score >= 66){
+    stufe = 'gut';
+    saetze.push(`Struktur traegt weiter (Score ${score.toFixed(0)}, Note ${r.note}). Halten.`);
+  } else if (score >= 52){
+    stufe = 'gut';
+    saetze.push(`Noch in Ordnung (Score ${score.toFixed(0)}). Halten und im Blick behalten.`);
+  } else if (score >= 40){
+    stufe = 'warn';
+    saetze.push(`Die Struktur traegt nicht mehr richtig (Score ${score.toFixed(0)}). Beobachten, `
+      + 'nicht nachkaufen.');
+  } else {
+    stufe = 'bad';
+    saetze.push(`Schwach (Score ${score.toFixed(0)}). Wuerdest du das heute nochmal kaufen? `
+      + 'Wenn nein, ist das der eigentliche Grund zu reduzieren — nicht der Kurs.');
+  }
+
+  if (gv != null && gv <= -20){
+    saetze.push(`Du liegst ${gv.toFixed(0)} % im Minus. Die Frage ist nicht, wann es `
+      + 'zurueckkommt, sondern ob dieselbe These heute noch gilt. Ein Verlust wird nicht '
+      + 'dadurch kleiner, dass man ihn aussitzt.');
+  } else if (gv != null && gv >= 20){
+    saetze.push(`${gv.toFixed(0)} % im Plus. Wenn es kein Ziel gibt, gibt es auch keinen `
+      + 'Grund auszusteigen — aber dann gehoert wenigstens ein nachgezogener Stop hin, '
+      + 'damit aus dem Gewinn nicht wieder eine Null wird.');
+  }
+  if ((r.warnungen||[]).length) saetze.push('Dagegen: ' + r.warnungen.slice(0,2).join(' · '));
+
+  const kopf = {gut:'Halten', warn:'Beobachten', bad:'Reduzieren erwaegen',
+                neutral:'Halten', unbekannt:'Keine Bewertung'}[stufe];
+  return {stufe, kopf, saetze};
+}
+
+function ratKasten(b){
+  const rat = positionsRat(b);
+  const farbe = rat.stufe === 'bad' ? 'bad' : (rat.stufe === 'warn' ? 'warn' : '');
+  return `<div class="note-box ${farbe}" style="margin:10px 0 0">
+    <span class="nt">Was das System dazu sagt</span>
+    <p style="font-size:14px;margin:0 0 4px"><strong>${esc(rat.kopf)}</strong></p>
+    ${rat.saetze.map(x=>`<p style="margin:0 0 4px">${esc(x)}</p>`).join('')}</div>`;
+}
+
 function zeichnePortfolio(){
   const positionen = ladePositionen();
   const bew = positionen.map(bewertePosition);
@@ -1829,6 +1904,7 @@ function zeichnePortfolio(){
         : `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">
              Nicht im letzten Scan — keine Bewertung. Entweder außerhalb des Universums
              oder die Datenquelle war stumm.</p>`}
+        ${ratKasten(b)}
         ${ausstiegsKasten(b)}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
           ${r?` · <button class="link" data-zeig="${esc(b.pos.sym)}">Chart ansehen</button>`:''}</p>
