@@ -166,6 +166,88 @@ class BybitPublicDataProvider(
             ingested_at=ensure_utc(self._clock.now()),
         )
 
+    # ---- Universum: Symbolliste und 24-h-Ticker ----------------------
+    #
+    # Damit kann Bybit die Quelle des Krypto-Universums sein. Es ist die bevorzugte:
+    # mehr Paare als Kraken und 0,10 % statt 0,40 % Gebuehr. Bybit sperrt die API
+    # allerdings aus mehreren Laendern per CloudFront (HTTP 403) — deshalb wird es im
+    # Scan versucht und nicht vorausgesetzt, mit Kraken als Rueckfallebene.
+
+    async def list_symbol_info(self, *, quote: str | None = None) -> list[dict[str, Any]]:
+        """Handelbare Spot-Paare mit Basis und Quote.
+
+        Bybit blaettert ueber ``nextPageCursor``; ohne die Schleife kaemen nur die ersten
+        1000 Symbole — was heute reicht und morgen still abschneidet.
+        """
+        aus: list[dict[str, Any]] = []
+        cursor: str | None = None
+        for _ in range(10):  # harte Grenze gegen eine Schleife ohne Ende
+            params: dict[str, Any] = {"category": "spot", "limit": 1000}
+            if cursor:
+                params["cursor"] = cursor
+            try:
+                result = self._unwrap(
+                    await self._client.get_json("/v5/market/instruments-info", params)
+                )
+            except Exception as exc:
+                self._health.record_failure(str(exc))
+                raise
+            for row in result.get("list", []):
+                if str(row.get("status") or "Trading") != "Trading":
+                    continue
+                q = str(row.get("quoteCoin") or "").upper()
+                if quote and q != quote.upper():
+                    continue
+                aus.append(
+                    {
+                        "instrument": str(row.get("symbol") or "").upper(),
+                        "basis": str(row.get("baseCoin") or "").upper(),
+                        "quote": q,
+                        "spot": True,
+                    }
+                )
+            cursor = result.get("nextPageCursor") or None
+            if not cursor:
+                break
+        self._health.record_success(latency_ms=1.0)
+        return aus
+
+    async def fetch_ticker_24h_all(self) -> list[dict[str, Any]]:
+        """Alle Spot-Ticker in einem Aufruf.
+
+        **Was Bybit nicht liefert: die Zahl der Abschluesse.** Binance gab ``count`` mit,
+        und der Universumsfilter hat damit „viel Umsatz aus wenigen Grossorders"
+        aussortiert. Diese Pruefung faellt hier weg — sie laesst sich nicht erfinden.
+        Ausgeglichen wird das ueber eine hoehere Umsatzschwelle im Aufrufer; ``trades``
+        bleibt 0, damit nirgends eine Zahl steht, die es nicht gibt.
+        """
+        try:
+            result = self._unwrap(
+                await self._client.get_json("/v5/market/tickers", {"category": "spot"})
+            )
+        except Exception as exc:
+            self._health.record_failure(str(exc))
+            raise
+        aus: list[dict[str, Any]] = []
+        for row in result.get("list", []):
+            try:
+                aus.append(
+                    {
+                        "instrument": str(row["symbol"]).upper(),
+                        "last": float(row["lastPrice"]),
+                        "high": float(row["highPrice24h"]),
+                        "low": float(row["lowPrice24h"]),
+                        "quote_volume": float(row["turnover24h"]),
+                        # Bybit gibt den Tagesertrag als Anteil (0,0123), nicht in Prozent.
+                        "price_change_pct": float(row.get("price24hPcnt") or 0.0) * 100.0,
+                        "trades": 0,
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        self._health.record_success(latency_ms=1.0)
+        return aus
+
     async def fetch_funding(self, instrument: str, start: datetime, end: datetime) -> list[Funding]:
         start = ensure_utc(start)
         end = ensure_utc(end)
