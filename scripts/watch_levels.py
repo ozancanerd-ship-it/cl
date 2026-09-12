@@ -131,6 +131,22 @@ async def _extrema(
             reihen[name] = list(bars)
 
     krypto = namen_je_klasse.get("krypto", []) + namen_je_klasse.get("gold", [])
+    # Die Wachliste kann Paare aus beiden Quellen enthalten: BTCEUR von Kraken,
+    # BTCUSDT von Bybit. Welche Boerse gefragt wird, entscheidet der Name des Paares —
+    # das ist die einzige Angabe, die immer stimmt.
+    usdt = [n for n in krypto if n.upper().endswith(("USDT", "USDC"))]
+    krypto = [n for n in krypto if n not in usdt]
+    if usdt:
+        from trading_agent.data.providers.bybit_public import BybitPublicDataProvider
+
+        prov0 = BybitPublicDataProvider(category="spot")
+        try:
+            await sammle(prov0, usdt)
+        except Exception as exc:
+            print(f"  Bybit nicht erreichbar ({type(exc).__name__}) — USDT-Paare ohne Kurs")
+        finally:
+            with contextlib.suppress(Exception):
+                await prov0.aclose()
     if krypto:
         # Kraken, nicht Binance: die Wachliste muss dieselben Kurse sehen wie der
         # Scan, sonst wird eine Marke auf einer Boerse getroffen und auf der anderen

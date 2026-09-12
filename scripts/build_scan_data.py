@@ -114,6 +114,11 @@ KRYPTO_MIN_UMSATZ = 300_000.0
 KRYPTO_MIN_TRADES = 300
 KRYPTO_IMMER = ("BTCEUR", "ETHEUR")
 
+#: Bybit rechnet in USDT und ist deutlich groesser — dort darf die Schwelle hoeher
+#: liegen. Die Zahl der Abschluesse liefert Bybit nicht, deshalb faellt diese Pruefung
+#: dort weg und wird durch den hoeheren Umsatz ausgeglichen.
+BYBIT_MIN_UMSATZ = 3_000_000.0
+
 #: Fenster fuer Yahoo: kein natives H4, also muss M5 lang genug sein, damit die
 #: MTF-Schicht H4 daraus bilden kann (55 Tage M5 ≈ 330 H4-Kerzen).
 FENSTER_YAHOO = {
@@ -171,6 +176,39 @@ def _bewerter_mit_makro(lage: MacroLage | None, klasse: str) -> Any:
     return bewerte
 
 
+async def _krypto_quelle(limit: int) -> tuple[Any, str, list[Any], Any]:
+    """Bybit versuchen, sonst Kraken. Gibt Anbieter, Name, Universum und Bericht zurueck."""
+    from trading_agent.data.providers.bybit_public import BybitPublicDataProvider
+    from trading_agent.data.providers.kraken import KrakenDataProvider
+
+    versuche: list[tuple[str, Any, str, float, int]] = [
+        ("Bybit", BybitPublicDataProvider(category="spot"), "USDT", BYBIT_MIN_UMSATZ, 0),
+        ("Kraken", KrakenDataProvider(), KRYPTO_QUOTE, KRYPTO_MIN_UMSATZ, KRYPTO_MIN_TRADES),
+    ]
+    letzter: Exception | None = None
+    for name, prov, quote, min_umsatz, min_trades in versuche:
+        try:
+            eintraege, bericht = await hole_universum(
+                prov,
+                UniversumFilter(
+                    quote=quote,
+                    max_symbole=limit,
+                    min_umsatz=min_umsatz,
+                    min_trades=min_trades,
+                    immer_dabei=(f"BTC{quote}", f"ETH{quote}"),
+                ),
+            )
+            if eintraege:
+                print(f"  Quelle: {name} ({quote})")
+                return prov, name, eintraege, bericht
+            print(f"  {name} lieferte ein leeres Universum — naechste Quelle")
+        except Exception as exc:
+            letzter = exc
+            print(f"  {name} nicht erreichbar: {type(exc).__name__}: {str(exc)[:120]}")
+        await schliesse(prov)
+    raise RuntimeError(f"keine Krypto-Quelle erreichbar: {letzter}")
+
+
 async def _krypto(
     profil: Profil, limit: int, verarbeite: Any, lage: MacroLage | None
 ) -> tuple[list[Any], dict[str, Any], str | None]:
@@ -183,20 +221,20 @@ async def _krypto(
     # aber per CloudFront gesperrt (HTTP 403); dieselben Coins liegen dort ohnehin als
     # USDT-Paar. Also: Kraken als Quelle, Euro als Waehrung, Bybit als Alternative
     # beim Ausfuehren.
-    from trading_agent.data.providers.kraken import KrakenDataProvider
-
-    prov = KrakenDataProvider()
+    # ERST BYBIT, DANN KRAKEN.
+    #
+    # Ozan kauft die meisten Coins lieber bei Bybit: mehr Paare, und 0,10 % statt
+    # 0,40 % Gebuehr — bei einem Swing-Trade mit 4 % erwartetem Gewinn ist das der
+    # Unterschied zwischen 5 % und 20 % des Gewinns. Bybit sperrt die API allerdings
+    # aus mehreren Laendern per CloudFront (HTTP 403), und aus welchem Land der
+    # CI-Laeufer kommt, entscheidet GitHub, nicht wir.
+    #
+    # Also wird es jedes Mal versucht und nicht einmal vorab entschieden: geht Bybit,
+    # kommt das groessere und billigere Universum; geht es nicht, uebernimmt Kraken mit
+    # Euro-Paaren. Welcher Weg es war, steht danach im Scan und in der App — eine
+    # Ausweichloesung, die niemand sieht, ist eine Falle.
+    prov, quelle, eintraege, bericht = await _krypto_quelle(limit)
     try:
-        eintraege, bericht = await hole_universum(
-            prov,
-            UniversumFilter(
-                quote=KRYPTO_QUOTE,
-                max_symbole=limit,
-                min_umsatz=KRYPTO_MIN_UMSATZ,
-                min_trades=KRYPTO_MIN_TRADES,
-                immer_dabei=KRYPTO_IMMER,
-            ),
-        )
         namen = [e.instrument for e in eintraege]
         zusatz = {e.instrument: e.as_dict() for e in eintraege}
         print(
@@ -215,6 +253,7 @@ async def _krypto(
         )
         info = {
             **bericht.as_dict(),
+            "quelle": quelle,
             "dauer_s": erg.dauer_s,
             "ausfaelle": len(erg.ausfaelle),
             "abgelehnt": len(erg.abgelehnt),
