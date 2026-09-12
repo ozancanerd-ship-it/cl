@@ -376,10 +376,15 @@ def beschrifte(zeile: dict[str, Any], *, eurusd: float | None = None) -> None:
     o = ort(klasse)
     zeile["name"] = voller_name(name, klasse)
     zeile["broker"] = o.broker
-    # Die Währung steht am Paar, nicht in einer Tabelle. Sobald der Scan auf Bybit
-    # ausweicht, heißen die Paare BTCUSDT statt BTCEUR — und dann muss auf der Karte
-    # USDT stehen und nicht Euro, sonst rechnet er mit dem falschen Geld.
-    zeile["waehrung"] = waehrung_von(name, o.waehrung)
+    # Die Währung steht am Paar, nicht in einer Tabelle: BTCUSD ist Dollar, BTCEUR ist
+    # Euro, und eine US-Aktie notiert in Dollar, auch wenn sie in Euro gekauft wird.
+    #
+    # Hier stand vorher der Handelsort als Rückfall — und damit bei jeder Aktie „EUR",
+    # obwohl die Zahlen daneben Dollarkurse waren. Fehlte einmal der Umrechnungskurs,
+    # zeigte die App eine Dollarzahl mit einem Eurozeichen daran. Bei einer Order ist
+    # das kein Schönheitsfehler.
+    roh = waehrung_von(name, "USD")
+    zeile["waehrung"] = roh
     if o.hinweis:
         zeile["broker_hinweis"] = o.hinweis
 
@@ -389,7 +394,7 @@ def beschrifte(zeile: dict[str, Any], *, eurusd: float | None = None) -> None:
     # bei Krypto ist es die Orientierung: gekauft wird im Dollarmarkt, aber Ozan denkt
     # in Euro und zahlt am Ende in Euro. Beides nebeneinander zu zeigen kostet nichts
     # und erspart das Kopfrechnen.
-    if not eurusd or zeile.get("waehrung") == "EUR":
+    if not eurusd or roh == "EUR":
         return
     plan = zeile.get("plan") or {}
     eur: dict[str, float] = {}
