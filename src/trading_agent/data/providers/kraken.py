@@ -71,6 +71,13 @@ class KrakenDataProvider(AsyncOHLCVSource, AsyncTradeSource, AsyncQuoteSource):
             transport=transport,
         )
         self._health = HealthTracker(self.name, clock=self._clock)
+        #: kanonischer Name -> Kraken-Paarname, gefuellt von :meth:`list_symbol_info`
+        self._gelernt: dict[str, str] = {}
+        #: jeder Kraken-Schreibweise (Schluessel UND altname) ihr kanonischer Name.
+        #: Kraken fuehrt dasselbe Paar unter zwei Namen — der Ticker antwortet unter dem
+        #: einen, die Paarliste nennt den anderen. Ohne beide Eintraege fielen
+        #: ausgerechnet die aeltesten und groessten Paare (BTC, ETH) aus dem Universum.
+        self._rueck: dict[str, str] = {}
 
     def status(self) -> ProviderStatus:
         return self._health.status()
@@ -79,7 +86,31 @@ class KrakenDataProvider(AsyncOHLCVSource, AsyncTradeSource, AsyncQuoteSource):
         await self._client.aclose()
 
     def _pair(self, instrument: str) -> str:
-        return _PAIR.get(instrument.upper(), instrument.upper())
+        """Kanonischer Name -> Kraken-Paarname.
+
+        Kraken hat zwei Schreibweisen fuer dasselbe Paar (``XXBTZEUR`` und ``XBTEUR``)
+        und nennt Bitcoin ``XBT``. Die Zuordnung lernt der Anbieter beim Aufbau des
+        Universums selbst (:meth:`list_symbol_info`) — eine von Hand gepflegte Tabelle
+        waere nach dem naechsten neuen Paar wieder unvollstaendig.
+        """
+        name = instrument.upper()
+        gelernt = self._gelernt.get(name)
+        if gelernt:
+            return gelernt
+        return _PAIR.get(name, name)
+
+    @staticmethod
+    def _muenze(roh: str) -> str:
+        """``XXBT`` -> ``BTC``, ``ZEUR`` -> ``EUR``.
+
+        Kraken haengt historisch ein ``X`` an Kryptowaehrungen und ein ``Z`` an
+        Landeswaehrungen, und nennt Bitcoin ``XBT``. Das steht in keiner Watchlist und
+        in keinem Depot — nach aussen heisst es hier so, wie es ueberall sonst heisst.
+        """
+        m = roh.upper()
+        if len(m) == 4 and m[0] in "XZ":
+            m = m[1:]
+        return "BTC" if m == "XBT" else ("DOGE" if m == "XDG" else m)
 
     @staticmethod
     def _unwrap(payload: dict[str, Any]) -> dict[str, Any]:
@@ -159,6 +190,95 @@ class KrakenDataProvider(AsyncOHLCVSource, AsyncTradeSource, AsyncQuoteSource):
             source=self.name,
             ingested_at=now,
         )
+
+    # ---- Universum: Symbolliste und 24-h-Ticker ----------------------
+    #
+    # Damit wird Kraken zur Quelle des Krypto-Universums. Vorher kam es von Binance —
+    # und das war kein Schoenheitsfehler: gescannt wurden Paare, die Ozan bei seinen
+    # Boersen gar nicht kaufen kann. Ein Signal auf ein Paar, das es dort nicht gibt,
+    # ist kein Signal, sondern Arbeit fuer nichts.
+    #
+    # Kraken statt Bybit als Quelle hat einen simplen Grund: Bybit sperrt die Abfrage
+    # aus mehreren Laendern per CloudFront (HTTP 403), auch aus der CI. Was sich nicht
+    # abrufen laesst, taugt nicht als Grundlage — unabhaengig davon, wie gut die Boerse
+    # sonst ist. Dieselben Coins stehen bei Bybit ohnehin als USDT-Paar bereit.
+
+    async def list_symbol_info(self, *, quote: str | None = None) -> list[dict[str, Any]]:
+        """Handelbare Paare mit Basis und Quote, in kanonischer Schreibweise.
+
+        Nebenwirkung mit Absicht: die Zuordnung kanonisch -> Kraken-Paarname wird
+        gemerkt, damit :meth:`fetch_ohlcv` danach mit ``BTCEUR`` aufgerufen werden kann.
+        """
+        try:
+            result = self._unwrap(await self._client.get_json("/0/public/AssetPairs", {}))
+        except Exception as exc:
+            self._health.record_failure(str(exc))
+            raise
+        aus: list[dict[str, Any]] = []
+        for kraken_name, row in result.items():
+            if not isinstance(row, dict) or row.get("status") != "online":
+                continue
+            b, q = str(row.get("base") or ""), str(row.get("quote") or "")
+            if not b or not q:
+                continue
+            basis, waehrung = self._muenze(b), self._muenze(q)
+            if quote and waehrung != quote.upper():
+                continue
+            name = f"{basis}{waehrung}"
+            altname = str(row.get("altname") or kraken_name)
+            self._gelernt[name] = altname
+            self._rueck[kraken_name] = name
+            self._rueck[altname] = name
+            aus.append(
+                {"instrument": name, "basis": basis, "quote": waehrung, "spot": True}
+            )
+        self._health.record_success(latency_ms=1.0)
+        return aus
+
+    async def fetch_ticker_24h_all(self) -> list[dict[str, Any]]:
+        """Alle Ticker in einem Aufruf, auf dieselben Felder gebracht wie anderswo.
+
+        Kraken liefert den Umsatz nicht direkt: ``v[1]`` ist das Volumen in der Basis,
+        ``p[1]`` der volumengewichtete Schnitt. Das Produkt ist der Umsatz in der
+        Quote-Waehrung — dieselbe Groesse, die der Universumsfilter erwartet. Die Zahl
+        der Abschluesse steht in ``t[1]`` und wird mitgenommen: sie trennt echten Umsatz
+        von wenigen Grossorders.
+        """
+        try:
+            result = self._unwrap(await self._client.get_json("/0/public/Ticker", {}))
+        except Exception as exc:
+            self._health.record_failure(str(exc))
+            raise
+        rueck = self._rueck
+        aus: list[dict[str, Any]] = []
+        for kraken_name, row in result.items():
+            if not isinstance(row, dict):
+                continue
+            name = rueck.get(kraken_name)
+            if name is None:
+                continue
+            try:
+                vol = float(row["v"][1])
+                vwap = float(row["p"][1])
+                aus.append(
+                    {
+                        "instrument": name,
+                        "last": float(row["c"][0]),
+                        "high": float(row["h"][1]),
+                        "low": float(row["l"][1]),
+                        "quote_volume": vol * vwap,
+                        "price_change_pct": (
+                            (float(row["c"][0]) / float(row["o"]) - 1.0) * 100.0
+                            if float(row.get("o") or 0) > 0
+                            else 0.0
+                        ),
+                        "trades": int(row["t"][1]),
+                    }
+                )
+            except (KeyError, TypeError, ValueError, IndexError):
+                continue
+        self._health.record_success(latency_ms=1.0)
+        return aus
 
     async def fetch_trades(self, instrument: str, start: datetime, end: datetime) -> list[Trade]:
         start = ensure_utc(start)
