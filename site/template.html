@@ -654,12 +654,28 @@ function zeichen(o){
   const w = (o && o.waehrung) || '';
   if (w === 'EUR') return ' €';
   if (w === 'USDT') return ' USDT';
+  if (w === 'USD') return ' $';
   return istAktie(o) ? ' $' : '';
 }
+/* Welche Zahl gross dasteht, entscheidet die AUSFUEHRUNG, nicht der Geschmack.
+   Aktien laufen ueber Trade Republic und dort gibt es nur Euro — also Euro.
+   Krypto kauft Ozan im Dollarmarkt, weil der tiefer ist — also Dollar, mit dem
+   Euro-Gegenwert einmal pro Karte daneben. Eine Zahl in der falschen Waehrung ist bei
+   einer Order kein Schoenheitsfehler. */
 function preis(o, feld, fallback, d){
-  const e = eurWert(o, feld);
-  if (e != null) return `${num(e,d)} €`;
+  if (istAktie(o)){
+    const e = eurWert(o, feld);
+    if (e != null) return `${num(e,d)} €`;
+  }
   return num(fallback, d) + zeichen(o);
+}
+/* Der Euro-Gegenwert als eine Zeile, nicht an jeder Zahl. */
+function eurHinweis(o){
+  if (!o || istAktie(o)) return '';
+  const e = eurWert(o, 'kurs');
+  if (e == null || !o.eurusd) return '';
+  const d = digits(e);
+  return `<span style="color:var(--ink-3)">≈ ${num(e,d)} € bei ${num(o.eurusd,4)} $/€</span>`;
 }
 function gebuehrSatz(o, positionswert){
   if (!positionswert || positionswert <= 0) return '';
@@ -791,6 +807,7 @@ function setzeLiveChip(an, text){
 }
 function starteLive(){
   const syms = kryptoSymbole();
+  KRYPTO_NAMEN_LIVE = new Set(syms);
   if (!syms.length) { setzeLiveChip(false,'keine Krypto-Werte'); return; }
   if (WS) { try{ WS.close(); }catch(e){} }
   setzeLiveChip(false,'verbinde …');
@@ -832,15 +849,35 @@ function starteLive(){
   };
 }
 
-/* "BTCEUR" <-> "BTC/EUR". Kraken v2 spricht bereits BTC und nicht mehr XBT. */
+/* "BTCUSD" <-> "BTC/USD". Kraken v2 spricht bereits BTC und nicht mehr XBT.
+   Seit der Scan den Dollarmarkt bevorzugt, muessen beide Endungen erkannt werden —
+   sonst liefe der Livestream leer, waehrend die Karten Dollarpreise zeigen. */
 function krakenPaar(sym){
   const s = String(sym||'').toUpperCase();
-  return s.endsWith('EUR') && s.length > 3 ? `${s.slice(0,-3)}/EUR` : null;
+  for (const q of ['USDT','USDC','USD','EUR']){
+    if (s.endsWith(q) && s.length > q.length){
+      // Kraken kennt kein USDT-Paar fuer die meisten Coins — dort dann USD.
+      const ziel = (q === 'USDT' || q === 'USDC') ? 'USD' : q;
+      return `${s.slice(0, -q.length)}/${ziel}`;
+    }
+  }
+  return null;
 }
 function ausKrakenPaar(paar){
   const s = String(paar||'').toUpperCase();
-  return s.includes('/') ? s.replace('/','') : null;
+  if (!s.includes('/')) return null;
+  const flach = s.replace('/','');
+  // Zurueck auf den Namen, den der Scan benutzt: ein USDT-Paar aus dem Scan wird als
+  // USD-Paar abonniert und muss hier wieder seinen Scan-Namen bekommen.
+  if (KRYPTO_NAMEN_LIVE.has(flach)) return flach;
+  const basis = flach.slice(0, -3);
+  for (const q of ['USDT','USDC','EUR']){
+    if (KRYPTO_NAMEN_LIVE.has(basis + q)) return basis + q;
+  }
+  return flach;
 }
+/* Welche Instrumentnamen der Scan kennt — fuer die Rueckuebersetzung oben. */
+let KRYPTO_NAMEN_LIVE = new Set();
 let _alarmZuletzt = 0;
 let _auf = 0;
 function planeAuffrischen(){
@@ -1377,6 +1414,7 @@ function oppZeile(o, rang){
       </div>
       ${o.broker?`<div class="muz" style="margin-top:6px">Kaufen bei <strong>${esc(o.broker)}</strong>${
         o.waehrung?` · ${esc(o.waehrung)}`:''}${
+        eurHinweis(o)?' · '+eurHinweis(o):''}${
         istAktie(o)&&!eurWert(o,'kurs')?' · <span style="color:var(--warn)">Eurokurs fehlt, Preise in Dollar</span>':''}</div>`:''}
       ${o.erwartung&&o.erwartung.quote?`<div class="muz" style="margin-top:5px">
         ${o.erwartung.bis_tp1_pct!=null?`bis Ziel 1 <strong>${pct(o.erwartung.bis_tp1_pct,1)}</strong> · `:''}
@@ -2271,7 +2309,7 @@ function signalKarte(x){
       <span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</p>`:''}
     <div class="kpi" style="margin-top:8px">
       <span>Kaufen bei <b>${esc(o.broker||'—')}</b></span>
-      ${o.eurusd?`<span>Kurs gerechnet zu <b>${num(o.eurusd,4)}</b> USD/€</span>`:''}
+      ${eurHinweis(o)?`<span>${eurHinweis(o)}</span>`:''}
     </div>
     ${euro>0?`<p style="font-size:11.5px;color:var(--ink-3);margin-top:6px">${gebuehrSatz(o, euro)}</p>`:''}
     ${erwartungsKasten(o)}
