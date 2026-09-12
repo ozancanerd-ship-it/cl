@@ -44,6 +44,23 @@ TR_GEBUEHR_EUR = 1.0
 #: Ab diesem Anteil am erwarteten Gewinn ist die Gebühr ein ernstes Argument.
 GEBUEHR_WARNUNG_ANTEIL = 0.20
 
+# Die echten Kryptogebühren — nachgeschlagen, nicht geschätzt (Stand 12.09.2026).
+#
+# Das ist kein Detail. Im Code stand vorher pauschal 0,1 % je Seite, weil Binance so
+# viel nimmt. Bei Kraken ist es das Vier- bis Achtfache, und bei einem Swing-Trade mit
+# 4 % erwartetem Gewinn ist der Unterschied zwischen 0,2 % und 1,6 % Rundlauf der
+# Unterschied zwischen einem Trade, der sich lohnt, und einem, der es nicht tut.
+#
+#: Kraken Pro, unterste Stufe (< 10.000 $ Monatsumsatz): Limit-Order, die im Buch liegt.
+KRAKEN_MAKER_PCT = 0.40
+#: Kraken Pro, unterste Stufe: Market-Order, die sofort ausgeführt wird.
+KRAKEN_TAKER_PCT = 0.80
+#: Die einfache Kraken-App („Instant Buy") — 1 % auf Sofortkauf, 1,5 % auf eigene
+#: Orders. Steht hier, damit der Hinweis auf der Karte nicht geraten ist.
+KRAKEN_APP_PCT = 1.5
+#: Bybit Spot, VIP 0: gleich für Maker und Taker.
+BYBIT_PCT = 0.10
+
 
 @dataclass(frozen=True, slots=True)
 class Handelsort:
@@ -63,10 +80,14 @@ class Handelsort:
 #: ist kein Signal.
 ORTE: dict[str, Handelsort] = {
     "krypto": Handelsort(
-        broker="Bybit oder Kraken",
-        waehrung="USDT",
-        gebuehr_pct=0.1,
-        hinweis="Gebühr prozentual, deshalb auch bei kleinen Positionen tragbar.",
+        broker="Kraken (EUR) oder Bybit (USDT)",
+        waehrung="EUR",
+        gebuehr_pct=KRAKEN_MAKER_PCT,
+        hinweis=(
+            "Bei Kraken direkt in Euro — aber nur über Kraken Pro mit Limit-Order "
+            "(0,40 %). Die einfache Kraken-App nimmt 1 % bis 1,5 %, eine Market-Order "
+            "bei Pro 0,80 %. Bybit kostet 0,10 %, handelt aber in USDT."
+        ),
     ),
     "aktien": Handelsort(
         broker="Trade Republic",
@@ -75,9 +96,10 @@ ORTE: dict[str, Handelsort] = {
         hinweis="1 € je Ausführung — bei kleinen Positionen der größte Einzelposten.",
     ),
     "gold": Handelsort(
-        broker="Bybit oder Kraken",
-        waehrung="USDT",
-        gebuehr_pct=0.1,
+        broker="Kraken (PAXG/EUR)",
+        waehrung="EUR",
+        gebuehr_pct=KRAKEN_MAKER_PCT,
+        hinweis="PAXG ist 1:1 mit physischem Gold hinterlegt und bei Kraken in Euro handelbar.",
     ),
 }
 
@@ -112,6 +134,21 @@ def gebuehr_anteil(
         )
     else:
         satz = f"Gebühr hin und zurück {euro} ({anteil:.0%} des erwarteten Gewinns)."
+
+    # Bei Krypto gibt es zwei Wege mit sehr verschiedenem Preis. Das gehört auf die
+    # Karte, nicht in eine Fußnote: der Unterschied zwischen Kraken-Market und Bybit
+    # ist bei einer 200-€-Position das Achtfache — und er kostet keinen Gedanken mehr,
+    # wenn er einmal dasteht.
+    if (klasse or "").lower() in ("krypto", "gold"):
+        taker = 2 * positionswert * KRAKEN_TAKER_PCT / 100.0
+        bybit = 2 * positionswert * BYBIT_PCT / 100.0
+        t_txt = f"{taker:.2f} €".replace(".", ",")
+        b_txt = f"{bybit:.2f} €".replace(".", ",")
+        satz += (
+            f" Das gilt für eine Limit-Order bei Kraken Pro; eine Market-Order kostet "
+            f"{t_txt}, die einfache Kraken-App mehr. Bei Bybit wären es {b_txt} — "
+            "dafür in USDT statt Euro."
+        )
     return anteil, satz
 
 

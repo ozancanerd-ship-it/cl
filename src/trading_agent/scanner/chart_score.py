@@ -67,13 +67,60 @@ TF_GEWICHT: dict[Timeframe, float] = {
 }
 
 #: Der Stop muss mindestens so weit weg sein — in Prozent vom Kurs.
-#: Begruendung sind die Kosten, nicht der Chart: bei Binance kostet ein Trade rund
-#: 0,1 % je Seite, also 0,2 % hin und zurueck, dazu der Spread. Ein Stop 0,06 %
-#: entfernt ist damit schon vom Gebuehrenband erledigt, bevor der Markt ueberhaupt
-#: etwas tut. Genau das ist bei UUSDT passiert: Stop 0,06 % weg, Ziel 1,5 % weg,
-#: Chance-Risiko 1:25 auf dem Papier — und in der Wirklichkeit ein sicherer Verlust.
-#: Der Wert ist bewusst das Dreifache der Rundlaufkosten.
+#: Begruendung sind die Kosten, nicht der Chart: bei Bybit kostet ein Trade 0,1 % je
+#: Seite, bei Kraken Pro 0,4 % (Maker) bis 0,8 % (Taker) — hin und zurueck also bis zu
+#: 1,6 %, dazu der Spread. Ein Stop 0,06 % entfernt ist damit vom Gebuehrenband
+#: erledigt, bevor der Markt ueberhaupt etwas tut. Genau das ist bei UUSDT passiert:
+#: Stop 0,06 % weg, Ziel 1,5 % weg, Chance-Risiko 1:25 auf dem Papier — und in der
+#: Wirklichkeit ein sicherer Verlust.
 MIN_STOP_PCT = 0.6
+
+# ---------------------------------------------------------------------------
+# DAS MASSBAND — und warum es das gibt
+#
+# Am 12. September habe ich die 60 abgeschlossenen Signale nach Merkmalen sortiert,
+# statt nur ihre Summe anzusehen. Das Ergebnis war eindeutig und unangenehm:
+#
+#     Stopabstand  ≥ 4 %      n=46   Ø −0,38 R   TP1 15 %
+#     Stopabstand  2–4 %      n= 9   Ø −0,11 R   TP1 33 %
+#     erwarteter Weg ≥ 10 %   n=36   Ø −0,46 R   TP1 11 %
+#     erwarteter Weg 6–10 %   n=18   Ø −0,06 R   TP1 33 %
+#     geplantes CRV 3–5       n=10   Ø −0,57 R   TP1 10 %
+#     geplantes CRV < 2       n=34   Ø −0,23 R   TP1 21 %
+#
+# Dreimal dieselbe Aussage aus drei Richtungen: **je weiter Stop und Ziel, desto
+# schlechter das Ergebnis.** Und das System hat genau das belohnt — der Faktor
+# „bewegungsraum" gab bis zu 20 Punkte, linear steigend mit dem Abstand zu TP2, voll
+# ausgereizt erst bei 6 ATR. Wer weit weg zielt, bekam die beste Note. Deshalb war
+# ausgerechnet Note A− die schlechteste Gruppe im Buch (9 % Treffer) und B die beste
+# (24 %). Die Notenskala stand auf dem Kopf, weil der Score das Falsche gemessen hat.
+#
+# Ein weiter Weg zum Ziel heisst in der Praxis eins von zwei Dingen: der Kurs ist
+# schon gelaufen (dann ist der naechste Widerstand weit, aber die Bewegung vorbei),
+# oder die Struktur ist locker (dann ist der Stop weit weg, weil es keinen nahen
+# Punkt gibt, an dem die Idee sauber falsch waere). Beides sind schlechte Trades.
+#
+# ACHTUNG, EHRLICH GESAGT: die beste Kombination in den Daten (Stop 2–6 %, Weg
+# 4–10 %) hatte n=12 und +2,0 R. Das ist eine Zahl, die man NACH dem Ansehen der
+# Daten gefunden hat — genau die Art Fund, die im Nachhinein immer gut aussieht. Die
+# Grenzen unten sind deshalb bewusst WEITER gesetzt als das Optimum: sie sollen den
+# Unsinn abschneiden, nicht das Optimum treffen. Ob es hilft, sagt erst der naechste
+# Vorlauf.
+
+#: Weiter darf der Stop nicht vom Einstieg weg sein (Prozent). Darueber ist es kein
+#: Stop mehr, sondern die Hoffnung, dass es schon gutgehen wird.
+MAX_STOP_PCT = 6.0
+
+#: Weiter darf das letzte Ziel nicht weg sein (Prozent). Ein Swing-Trade ueber Tage
+#: bis Wochen laeuft keine 20 % — und wenn doch, war es nicht dieser Plan.
+MAX_ERWARTET_PCT = 12.0
+
+#: Der Abstand zu TP2, gemessen in ATR, bei dem der Bewegungsraum voll zaehlt.
+#: Darunter lohnt der Weg nicht, darueber ist er nicht mehr glaubwuerdig.
+RAUM_BAND = (1.5, 4.0)
+
+#: Ab hier faellt die Bewertung des Bewegungsraums wieder auf null.
+RAUM_AUS = 8.0
 
 MAX_PUNKTE: dict[str, float] = {
     "mtf_ausrichtung": 25.0,
@@ -379,8 +426,18 @@ def bewerte_chart(
             # Bewertet wird der Weg bis TP2 — dorthin laeuft der Trade, wenn er laeuft.
             fern = tp2 if tp2 is not None else ziel
             in_atr = abs(fern - kurs) / atr
-            # Unter 1 ATR lohnt der Weg nicht, ab 6 ATR ist die Skala ausgereizt.
-            punkte = MAX_PUNKTE["bewegungsraum"] * min(1.0, max(0.0, (in_atr - 1.0) / 5.0))
+            # Ein BAND, keine Rampe. Vorher stieg die Punktzahl mit dem Abstand — und
+            # belohnte damit genau die Setups, die in den echten Daten am schlechtesten
+            # gelaufen sind (siehe MASSBAND oben). Jetzt zaehlt der brauchbare Bereich
+            # voll, und alles darueber faellt wieder ab.
+            unten, oben = RAUM_BAND
+            if in_atr <= unten:
+                anteil = max(0.0, in_atr / unten) ** 2
+            elif in_atr <= oben:
+                anteil = 1.0
+            else:
+                anteil = max(0.0, (RAUM_AUS - in_atr) / (RAUM_AUS - oben))
+            punkte = MAX_PUNKTE["bewegungsraum"] * anteil
             detail = (
                 f"TP1 {ziel:,.2f} ({weg / kurs * 100:.1f} %)"
                 + (f" · TP2 {tp2:,.2f}" if tp2 else "")
@@ -633,6 +690,32 @@ def bewerte_chart(
         if note in HANDELBAR:
             note, deckel = "WATCH", "Stop zu weit fuer einen Swing-Trade"
             bremse = handelsplan.untauglich
+
+    # Das Massband (siehe oben). Zwei Groessen, beide am eigenen Buch gemessen: ein zu
+    # weiter Stop und ein zu weites Ziel. Beides macht aus einem Setup keinen Fehler —
+    # aber es macht ihn zu etwas, das man beobachtet und nicht kauft.
+    if note in HANDELBAR and einstieg and inval:
+        stop_pct = abs(float(einstieg) - float(inval)) / float(einstieg) * 100.0
+        if stop_pct > MAX_STOP_PCT:
+            note, deckel = "WATCH", f"Stop {stop_pct:.1f} % weg"
+            bremse = (
+                f"Der Stop liegt {stop_pct:.1f} % vom Einstieg entfernt. In den eigenen "
+                f"60 abgeschlossenen Signalen brachten Stops ab 4 % im Schnitt −0,38 R, "
+                f"die engeren −0,11 R. Ueber {MAX_STOP_PCT:.0f} % wird hier nur noch "
+                "beobachtet."
+            )
+            if bremse not in warnungen:
+                warnungen.append(bremse)
+    if note in HANDELBAR and erwartet and abs(erwartet) > MAX_ERWARTET_PCT:
+        note, deckel = "WATCH", f"Ziel {abs(erwartet):.0f} % weit"
+        bremse = (
+            f"Bis zum letzten Ziel sind es {abs(erwartet):.0f} %. Signale mit einem Weg "
+            "ab 10 % liefen im eigenen Buch auf −0,46 R bei 11 % Treffern; die mit 6–10 % "
+            "auf −0,06 R bei 33 %. Ein so weites Ziel heisst meistens: der Kurs ist schon "
+            "gelaufen, oder die Struktur ist zu locker fuer einen engen Stop."
+        )
+        if bremse not in warnungen:
+            warnungen.append(bremse)
 
     # Renditen fuer die relative Staerke. Die Einordnung selbst passiert erst nach dem
     # Scan — sie braucht alle Werte der Klasse und kann hier noch nicht entstehen.

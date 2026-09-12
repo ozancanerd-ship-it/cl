@@ -31,6 +31,9 @@ from typing import Any
 #: Basiswerte, die keine eigene Wette sind.
 STABLECOINS = frozenset(
     {
+        # Seit das Universum in EURO gebildet wird, ist Tether eine BASIS und keine
+        # Quote mehr — ohne diesen Eintrag stand USDTEUR als "Chance" in der Liste.
+        "USDT",
         "USDC",
         "FDUSD",
         "TUSD",
