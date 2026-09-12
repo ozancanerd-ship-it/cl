@@ -1379,6 +1379,7 @@ function zeichneStatus(){
       <div><div class="k">Scan</div><div class="v ${alter!=null&&alter<90?'gut':'mittel'}">${alter!=null?alter+'′':'—'}</div>
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
+    ${depotZeile()}
     ${topSignal()}
     ${makroKasten()}
     ${fehler ? `<div class="note-box bad"><span class="nt">Eine Anlageklasse fehlt</span>
@@ -1386,8 +1387,55 @@ function zeichneStatus(){
       <p>Die Rangliste ist unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>` : ''}`;
   const top = $('topsignal');
   if (top) top.addEventListener('click', ()=>waehle(top.dataset.sym));
+  const dz = $('depotzeile');
+  if (dz) dz.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); });
   $('stempel').textContent = `${g.length} Instrumente · Scan ${zeit(S.erzeugt)}` +
     (alter != null ? ` (vor ${alter} Min.)` : '');
+}
+
+/* ================================================ DEPOT AUF DER STARTSEITE
+
+   „Das Portfolio soll auch immer neu bewertet werden."
+
+   Die Bewertung lief schon immer bei jedem Kurs — sie stand nur im Depot-Reiter, und
+   den macht man auf, wenn man ohnehin schon nachdenkt. Die erste Frage beim Oeffnen ist
+   aber nicht „was koennte ich kaufen", sondern „was ist mit dem Geld, das schon drin
+   liegt". Also steht das Depot jetzt ueber der besten Chance, nicht hinter ihr.
+
+   Eine Zeile, vier Zahlen, ein Klick ins Detail. Kein zweites Depot — dieselbe
+   Bewertung, nur frueher sichtbar. */
+function depotZeile(){
+  let pos;
+  try { pos = ladePositionen(); } catch(e){ return ''; }
+  if (!pos.length) return '';
+  let bew;
+  try { bew = pos.map(bewertePosition); } catch(e){ return ''; }
+  const kursEU = (S && S.eurusd) || null;
+  const euro = (b, v) => v == null ? null : (b.w === 'EUR' || !kursEU ? v : v / kursEU);
+  const wert = bew.reduce((s,b)=>s + (euro(b,b.wert)||0), 0);
+  const einstand = bew.reduce((s,b)=>s + (euro(b,b.einstand)||0), 0);
+  const gv = bew.reduce((s,b)=>s + (euro(b,b.gv)||0), 0);
+  const zaehl = (...u) => bew.filter(b=>u.includes(b.urteil)).length;
+  const halten = zaehl('STARK HALTEN','HALTEN');
+  const schauen = zaehl('BEOBACHTEN');
+  const raus = zaehl('REDUZIEREN','GEGEN DIE THESE');
+  const ohneStop = bew.filter(b=>b.kurs != null && !(b.pos.plan && b.pos.plan.stop != null)).length;
+  return `<div class="karte ${raus?'bad':(schauen?'warn':'gut')}" style="margin:10px 0 0;cursor:pointer" id="depotzeile">
+    <h3>Dein Depot <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">
+      ${bew.length} Positionen · zum Reiter →</span></h3>
+    <div class="kpi">
+      <span>Wert <b>${num(wert,0)} €</b></span>
+      <span>G/V <b class="${gv>=0?'up':'dn'}">${num(gv,0)} €${einstand?` (${pct(gv/einstand*100,1)})`:''}</b></span>
+      <span>Halten <b class="up">${halten}</b></span>
+      <span>Beobachten <b class="${schauen?'nu':''}">${schauen}</b></span>
+      <span>Reduzieren <b class="${raus?'dn':''}">${raus}</b></span>
+    </div>
+    ${ohneStop ? `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">
+      <strong>${ohneStop}</strong> Position${ohneStop===1?'':'en'} ohne Stop — dort meldet sich
+      die App nicht, wenn es eng wird. Im Depot-Reiter in einem Klick nachtragen.</p>` : ''}
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">Bewertet nach relativer
+      Stärke in der eigenen Klasse, nicht nach Einstiegs-Score — läuft bei jedem Kurs neu.</p>
+  </div>`;
 }
 
 /* Das beste Setup ganz oben, sobald man die App oeffnet. Ozans Endbild aus dem
@@ -2198,8 +2246,21 @@ function naechsterSchritt(pos, kurs){
   }
   // 3 — Noch unterwegs: sagen, wohin und wie weit.
   const naechstes = ziele.find(([m,z]) => z != null && !erledigt.has(m));
-  if (!naechstes) return {stufe:'fertig', titel:'Alle Ziele erreicht',
-    text:'Es gibt keinen Plan mehr. Entweder schliessen oder bewusst neu entscheiden.'};
+  if (!naechstes){
+    // Ein Plan, der nur aus einem Stop besteht, ist kein halber Plan — fuer eine
+    // laufende Position ist er oft der ganze. „Kein Ziel" heisst dann nicht „fertig",
+    // sondern: laufen lassen, solange der Stop haelt.
+    if (pl.stop != null && !erledigt.size){
+      const weg = Math.abs(kurs - pl.stop) / kurs * 100;
+      return {stufe:'halten', titel:'Halten — Stop steht',
+        text:`Kein festes Ziel, aber ein Stop bei ${num(pl.stop,d)}${w} — `
+          + `${weg.toFixed(1).replace('.',',')} % entfernt. So lange laufen lassen und den `
+          + 'Stop nachziehen, wenn der Kurs davonläuft. Verkauft wird, wenn der Stop fällt, '
+          + 'nicht wenn es sich unangenehm anfühlt.'};
+    }
+    return {stufe:'fertig', titel:'Alle Ziele erreicht',
+      text:'Es gibt keinen Plan mehr. Entweder schliessen oder bewusst neu entscheiden.'};
+  }
   const [m, z] = naechstes;
   const wegZiel = Math.abs(z - kurs) / kurs * 100;
   const wegStop = pl.stop != null ? Math.abs(kurs - pl.stop) / kurs * 100 : null;
@@ -2210,13 +2271,72 @@ function naechsterSchritt(pos, kurs){
       + 'Nichts tun ist hier die Arbeit.'};
 }
 
+/* Ein Stop, den die App aus der laufenden Analyse ableiten kann — oder ehrlich: keiner.
+
+   Positionen, die von Hand eingetragen wurden (also das ganze bestehende Depot), hatten
+   bisher gar keinen Ausstiegsplan. Damit lief auch kein einziger Verkaufsalarm: die App
+   konnte melden, wenn ein Stop faellt, nur hatte keine dieser Positionen einen.
+
+   Erfunden wird hier nichts. Gibt die Analyse eine Invalidierung her, steht sie als
+   Vorschlag da — zum Uebernehmen mit einem Klick. Gibt sie keine her, sagt die App das
+   und laesst Ozan selbst eine Zahl eintragen. Ein selbst gesetzter Stop, den die App
+   ueberwacht, ist unendlich viel mehr wert als ein ausgedachter. */
+function stopVorschlag(b){
+  const r = b.row || (b.basis && b.basis.row) || null;
+  if (!r) return null;
+  const um = (v) => v == null ? null : inPositionsWaehrung(r, v, b.pos);
+  const stop = um(r.invalidierung);
+  if (stop == null) return null;
+  // Ein Vorschlag ueber dem aktuellen Kurs waere bei einer Long-Position Unsinn.
+  if (b.kurs != null && stop >= b.kurs) return null;
+  return {stop, tp1: um(r.ziel), tp2: um(r.tp2), tp3: um(r.tp3),
+          vomBasiswert: !b.row && !!(b.basis && b.basis.row)};
+}
+
 function ausstiegsKasten(b){
   const schritt = naechsterSchritt(b.pos, b.kurs);
   if (!schritt){
-    return `<div class="note-box" style="margin:10px 0 0"><span class="nt">Kein Ausstiegsplan</span>
-      <p>Diese Position wurde ohne Plan eingetragen. Kauf das nächste Mal über den Knopf
-      <em>„Gekauft — ins Depot"</em> auf der Signalkarte, dann stehen Stop und Ziele hier
-      automatisch — und die App sagt dir, wann du verkaufst.</p></div>`;
+    // Ohne Kurs kein Stop: bei einem Turbo oder einem ETF, der hier nur mit dem von Hand
+    // eingetragenen Wert steht, waere eine Stopmarke eine Zahl ohne Gegenstueck.
+    if (b.kurs == null){
+      return `<div class="note-box" style="margin:10px 0 0"><span class="nt">Kein Ausstiegsplan</span>
+        <p>Für diesen Posten hat die App keinen laufenden Kurs — nur den Wert, den du
+        eingetragen hast. Einen Stop kann sie deshalb nicht überwachen.
+        ${b.basis && b.basis.sym ? `Was sie kann: dir sagen, wenn <strong>${esc(name(b.basis.sym))}</strong>
+        als Basiswert kippt — das steht oben im Urteil.` : ''}</p></div>`;
+    }
+    const v = stopVorschlag(b);
+    const d = digits(b.kurs || 1);
+    const z = waehrungsZeichen(b.w);
+    const sym = esc(b.pos.sym);
+    const vorschlag = v ? `<p style="margin:6px 0 0">Aus der laufenden Analyse
+        ${v.vomBasiswert ? '<em>des Basiswerts</em> ' : ''}ergibt sich:
+        <strong>Stop ${num(v.stop,d)}${z}</strong>${v.tp1!=null?` · Ziel ${num(v.tp1,d)}${z}`:''}
+        ${v.tp2!=null?` / ${num(v.tp2,d)}${z}`:''}${v.tp3!=null?` / ${num(v.tp3,d)}${z}`:''}
+        ${v.vomBasiswert ? '<br><span style="color:var(--ink-3)">Achtung: das sind die Marken des '
+          + 'Basiswerts. Für einen gehebelten Schein liegen sie anders — nur als Orientierung.</span>' : ''}</p>
+      <p style="margin:8px 0 0"><button class="btn" data-plan="${sym}"
+         data-stop="${v.stop}" data-tp1="${v.tp1==null?'':v.tp1}"
+         data-tp2="${v.tp2==null?'':v.tp2}" data-tp3="${v.tp3==null?'':v.tp3}">Vorschlag übernehmen</button></p>`
+      : `<p style="margin:6px 0 0">Die Analyse gibt hier gerade <strong>keine</strong>
+         Invalidierung her — also erfindet die App auch keine. Setz den Stop dahin, wo der
+         Grund, aus dem du gekauft hast, nicht mehr gilt.</p>`;
+    return `<div class="note-box warn" style="margin:10px 0 0"><span class="nt">Kein Ausstiegsplan</span>
+      <p>Diese Position hat keinen Stop — und damit meldet sich die App bei ihr auch nicht,
+      wenn es eng wird. Das ist die wichtigste Lücke in deinem Depot.</p>
+      ${vorschlag}
+      <p style="margin:8px 0 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label style="font-size:12.5px;color:var(--ink-2)">eigener Stop</label>
+        <input type="number" step="any" inputmode="decimal" data-stopfeld="${sym}"
+               placeholder="${b.kurs!=null?num(b.kurs*0.9,d):'Preis'}"
+               style="width:120px;padding:5px 7px;border:1px solid var(--linie);border-radius:6px;
+                      background:var(--flaeche);color:var(--ink)">
+        <label style="font-size:12.5px;color:var(--ink-2)">Ziel (optional)</label>
+        <input type="number" step="any" inputmode="decimal" data-zielfeld="${sym}"
+               style="width:120px;padding:5px 7px;border:1px solid var(--linie);border-radius:6px;
+                      background:var(--flaeche);color:var(--ink)">
+        <button class="btn" data-stopsetzen="${sym}">Stop speichern</button>
+      </p></div>`;
   }
   const farbe = schritt.stufe === 'stop' ? 'bad' : (schritt.stufe === 'halten' ? '' : 'warn');
   const pl = b.pos.plan || {};
@@ -2548,6 +2668,30 @@ function zeichnePortfolio(){
   }));
   $('portfolio').querySelectorAll('[data-zeig]').forEach(b=>b.addEventListener('click',()=>
     waehle(b.dataset.zeig)));
+  /* Stop nachtraeglich setzen — per Vorschlag oder von Hand. Ab dem Moment ueberwacht
+     die App die Position und meldet sich, wenn der Stop faellt. */
+  const planSetzen = (sym, plan) => {
+    const a = ladePositionen();
+    const p = a.find(x => x.sym === sym);
+    if (!p) return;
+    p.plan = {...(p.plan||{}), richtung:'long', waehrung: posWaehrung(p), ...plan};
+    speicherePositionen(a);
+    zeichnePortfolio();
+  };
+  $('portfolio').querySelectorAll('[data-plan]').forEach(b=>b.addEventListener('click',()=>{
+    const z = (s) => s === '' || s == null ? null : Number(s);
+    planSetzen(b.dataset.plan, {stop: Number(b.dataset.stop), tp1: z(b.dataset.tp1),
+                                tp2: z(b.dataset.tp2), tp3: z(b.dataset.tp3), quelle:'analyse'});
+  }));
+  $('portfolio').querySelectorAll('[data-stopsetzen]').forEach(b=>b.addEventListener('click',()=>{
+    const sym = b.dataset.stopsetzen;
+    const feld = $('portfolio').querySelector(`[data-stopfeld="${CSS.escape(sym)}"]`);
+    const zf = $('portfolio').querySelector(`[data-zielfeld="${CSS.escape(sym)}"]`);
+    const stop = feld && feld.value !== '' ? Number(feld.value) : null;
+    if (stop == null || !isFinite(stop)){ if (feld) feld.focus(); return; }
+    const ziel = zf && zf.value !== '' ? Number(zf.value) : null;
+    planSetzen(sym, {stop, tp1: isFinite(ziel) ? ziel : null, quelle:'selbst'});
+  }));
   // Ein erreichtes Ziel abhaken: danach zeigt der Plan den naechsten Schritt statt
   // denselben nochmal. Ohne das stuende bei jedem Aufruf wieder "TP1 verkaufen".
   $('portfolio').querySelectorAll('[data-erledigt]').forEach(b=>b.addEventListener('click',()=>{
