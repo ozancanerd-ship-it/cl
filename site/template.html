@@ -1391,8 +1391,14 @@ function oppZeile(o, rang){
 
 function zeichneRadar(){
   const g = gefiltert();
-  if (!g.length){ $('radar').innerHTML = `<p class="leer">Kein Wert in dieser Auswahl.</p>`; return; }
-  $('radar').innerHTML = g.slice(0,60).map((o,i)=>oppZeile(o,i+1)).join('') +
+  // Ozan hat gefragt, ob er hier oder unter Alarme kauft. Die Frage gehoert einmal
+  // beantwortet, und zwar da, wo sie entsteht — nicht in einem Hilfetext irgendwo.
+  const kopf = `<div class="note-box"><span class="nt">Diese Seite ist zum Nachsehen</span>
+    <p>Das ist die vollständige Rangliste. <strong>„Handelbar" heißt: das Setup taugt</strong> —
+    nicht, dass der Kurs schon am Einstieg steht. Gekauft wird im Reiter
+    <strong>Alarme</strong> unter „Jetzt einsteigen".</p></div>`;
+  if (!g.length){ $('radar').innerHTML = kopf + `<p class="leer">Kein Wert in dieser Auswahl.</p>`; return; }
+  $('radar').innerHTML = kopf + g.slice(0,60).map((o,i)=>oppZeile(o,i+1)).join('') +
     (g.length>60?`<p class="leer">… und ${g.length-60} weitere.</p>`:'');
   $('radar').querySelectorAll('.opp').forEach(el=>
     el.addEventListener('click',()=>waehle(el.dataset.sym)));
@@ -1677,6 +1683,87 @@ function bewertePosition(pos){
   return {pos, row, kurs, wert, einstand, gv, gvPct, r, score, urteil, kl, live: !!live};
 }
 
+/* ================================================== AUSSTIEGSPLAN
+   „Wenn ich reingehe und kaufe, soll er mir auch sagen, wann ich wieder verkaufe."
+
+   Ein Einstiegssignal ohne Ausstiegsplan ist ein halbes Signal — und die schlechtere
+   Haelfte. Die eigene Bilanz zeigt es schwarz auf weiss: mit Teilverkauf am ersten
+   Ziel und Stop auf Einstand waeren aus −24,5 R nur −16,5 R geworden. Acht R
+   Unterschied, allein durch das Verhalten NACH dem Einstieg.
+
+   Deshalb wird der Plan beim Kauf mitgespeichert und hier bei jedem Kurs neu
+   ausgerechnet. Er sagt genau einen naechsten Schritt — nicht fuenf Moeglichkeiten. */
+
+function naechsterSchritt(pos, kurs){
+  const pl = pos && pos.plan;
+  if (!pl || kurs == null || !isFinite(kurs)) return null;
+  const lang = (pl.richtung || 'long') === 'long';
+  const erledigt = new Set(pos.erledigt || []);
+  const erreicht = (ziel) => ziel != null && (lang ? kurs >= ziel : kurs <= ziel);
+  const d = digits(kurs);
+  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : '');
+
+  // 1 — Stop zuerst. Wenn der gerissen ist, ist alles andere egal.
+  if (pl.stop != null && (lang ? kurs <= pl.stop : kurs >= pl.stop)){
+    return {stufe:'stop', titel:'Stop erreicht — raus',
+      text:`Der Kurs steht bei ${num(kurs,d)}${w}, der Stop lag bei ${num(pl.stop,d)}${w}. `
+        + 'Die Idee ist widerlegt. Verkaufen, nicht nachverhandeln — genau hier entstehen '
+        + 'aus kleinen Verlusten grosse.'};
+  }
+  // 2 — Ziele der Reihe nach.
+  const ziele = [['TP1', pl.tp1, 'ein Drittel'], ['TP2', pl.tp2, 'das zweite Drittel'],
+                 ['TP3', pl.tp3, 'den Rest']];
+  for (const [marke, ziel, teil] of ziele){
+    if (ziel == null || erledigt.has(marke)) continue;
+    if (erreicht(ziel)){
+      const danach = marke === 'TP1'
+        ? ' Danach den Stop auf deinen Einstieg ziehen — ab da kann der Trade nichts mehr kosten.'
+        : (marke === 'TP2' ? ' Stop auf das erste Ziel nachziehen.' : ' Damit ist der Trade zu.');
+      return {stufe:'ziel', marke, titel:`${marke} erreicht — ${teil} verkaufen`,
+        text:`Kurs ${num(kurs,d)}${w}, Ziel war ${num(ziel,d)}${w}. ${teil.charAt(0).toUpperCase()+teil.slice(1)} `
+          + 'verkaufen.' + danach};
+    }
+  }
+  // 3 — Noch unterwegs: sagen, wohin und wie weit.
+  const naechstes = ziele.find(([m,z]) => z != null && !erledigt.has(m));
+  if (!naechstes) return {stufe:'fertig', titel:'Alle Ziele erreicht',
+    text:'Es gibt keinen Plan mehr. Entweder schliessen oder bewusst neu entscheiden.'};
+  const [m, z] = naechstes;
+  const wegZiel = Math.abs(z - kurs) / kurs * 100;
+  const wegStop = pl.stop != null ? Math.abs(kurs - pl.stop) / kurs * 100 : null;
+  return {stufe:'halten', titel:'Halten',
+    text:`Bis ${m} sind es ${wegZiel.toFixed(1).replace('.',',')} %`
+      + (wegStop != null ? `, bis zum Stop ${wegStop.toFixed(1).replace('.',',')} %` : '')
+      + `. Verkauft wird bei ${num(z,d)}${w}, ausgestoppt bei ${pl.stop!=null?num(pl.stop,d)+w:'—'}. `
+      + 'Nichts tun ist hier die Arbeit.'};
+}
+
+function ausstiegsKasten(b){
+  const schritt = naechsterSchritt(b.pos, b.kurs);
+  if (!schritt){
+    return `<div class="note-box" style="margin:10px 0 0"><span class="nt">Kein Ausstiegsplan</span>
+      <p>Diese Position wurde ohne Plan eingetragen. Kauf das nächste Mal über den Knopf
+      <em>„Gekauft — ins Depot"</em> auf der Signalkarte, dann stehen Stop und Ziele hier
+      automatisch — und die App sagt dir, wann du verkaufst.</p></div>`;
+  }
+  const farbe = schritt.stufe === 'stop' ? 'bad' : (schritt.stufe === 'halten' ? '' : 'warn');
+  const pl = b.pos.plan || {};
+  const d = digits(b.kurs || 1);
+  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : '');
+  const marken = [['Stop', pl.stop], ['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]]
+    .filter(([,v]) => v != null)
+    .map(([k,v]) => `<span>${k} <b>${num(v,d)}${w}</b></span>`).join('');
+  const knopf = schritt.marke
+    ? `<p style="margin:9px 0 0"><button class="btn" data-erledigt="${esc(b.pos.sym)}"
+         data-marke="${esc(schritt.marke)}">${esc(schritt.marke)} verkauft — abhaken</button></p>`
+    : '';
+  return `<div class="note-box ${farbe}" style="margin:10px 0 0">
+    <span class="nt">Was jetzt zu tun ist</span>
+    <p style="font-size:14px;margin:0 0 4px"><strong>${esc(schritt.titel)}</strong></p>
+    <p style="margin:0">${esc(schritt.text)}</p>
+    <div class="kpi" style="margin-top:8px">${marken}</div>${knopf}</div>`;
+}
+
 function zeichnePortfolio(){
   const positionen = ladePositionen();
   const bew = positionen.map(bewertePosition);
@@ -1735,6 +1822,7 @@ function zeichnePortfolio(){
         : `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">
              Nicht im letzten Scan — keine Bewertung. Entweder außerhalb des Universums
              oder die Datenquelle war stumm.</p>`}
+        ${ausstiegsKasten(b)}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
           ${r?` · <button class="link" data-zeig="${esc(b.pos.sym)}">Chart ansehen</button>`:''}</p>
       </div>`;
@@ -1789,6 +1877,16 @@ function zeichnePortfolio(){
   }));
   $('portfolio').querySelectorAll('[data-zeig]').forEach(b=>b.addEventListener('click',()=>
     waehle(b.dataset.zeig)));
+  // Ein erreichtes Ziel abhaken: danach zeigt der Plan den naechsten Schritt statt
+  // denselben nochmal. Ohne das stuende bei jedem Aufruf wieder "TP1 verkaufen".
+  $('portfolio').querySelectorAll('[data-erledigt]').forEach(b=>b.addEventListener('click',()=>{
+    const a = ladePositionen();
+    const pos = a.find(p=>p.sym === b.dataset.erledigt);
+    if (!pos) return;
+    pos.erledigt = Array.from(new Set([...(pos.erledigt||[]), b.dataset.marke]));
+    speicherePositionen(a);
+    zeichnePortfolio();
+  }));
   const add = $('pf_add');
   if (add) add.addEventListener('click',()=>{
     const sym = ($('pf_sym').value||'').trim().toUpperCase();
@@ -2111,7 +2209,19 @@ function zeichneAlarme(){
   jetzt.forEach(benachrichtige);
 
   let h = stoerungsBanner() + pushBlock();
-  h += `<div class="note-box">
+  h += `<div class="note-box" style="border-color:rgba(0,229,255,.28)">
+    <span class="nt" style="color:var(--accent)">Hier wird gekauft</span>
+    <p style="font-size:13.5px"><strong>Diese Seite ist die Handlungsliste.</strong> Was unter
+    <em>„Jetzt einsteigen"</em> steht, ist da — Kurs an der Marke und bestätigt. Das kaufst du.
+    <em>„Kaufen ab …"</em> sind Kandidaten mit dem Preis, ab dem es losgeht: dort gehört eine
+    <strong>Limit-Order</strong> hin, dann brauchst du gar keinen Alarm (und zahlst bei Kraken
+    0,40 % statt 0,80 %).</p>
+    <p>Der Reiter <strong>Markt</strong> ist etwas anderes: die vollständige Rangliste zum
+    Nachsehen. „Handelbar" heißt dort nur, dass das Setup gut genug ist — <strong>nicht</strong>,
+    dass der Kurs schon am Einstieg steht. Kurz: <strong>Markt = lesen, Alarme = handeln.</strong></p>
+    <p>Ist „Jetzt einsteigen" leer, ist gerade nichts zu tun. Das ist ein Ergebnis, kein Fehler.</p>
+  </div>
+  <div class="note-box">
     <span class="nt">Woher diese Liste kommt</span>
     <p>Das sind die <strong>bestbewerteten Setups aus dem letzten Scan</strong> —
       ${S?`${(S.gesamt||[]).length} Werte, Analyse von ${zeit(S.erzeugt)}`:'—'}. Die Liste
@@ -2501,36 +2611,245 @@ einem Quartalsbericht ist die richtige Antwort meistens kleiner oder gar nicht.
 NO TRADE ist ein Ergebnis, kein Versagen. Unklare Struktur, schlechtes CRV, zu weit
 gelaufen, Klumpen im Depot, wichtige Nachricht kurz bevor: dann sagst du das.`;
 
+/* ============================================ ANTWORT OHNE SCHLUESSEL
+
+   „Mir ist wirklich am wichtigsten, diesen Chatbot zu haben, wo ich sagen kann:
+   soll ich jetzt wirklich rein oder nicht."
+
+   Das ist die Frage, um die es geht — und sie braucht kein Sprachmodell. Alles, was
+   fuer die Antwort noetig ist, steht schon auf dieser Seite: die Note, das Setup, die
+   Warnungen, der Abstand zum Einstieg, die Trefferquote vergleichbarer Signale, die
+   Gebuehren, die Belegung des Depots. Ein Modell wuerde dieselben Zahlen lesen und
+   danach schoener formulieren.
+
+   Deshalb antwortet die App auch OHNE API-Schluessel — sofort, kostenlos, immer
+   verfuegbar. Der Schluessel macht das Gespraech besser, nicht die Antwort moeglich.
+   Was hier steht, ist kein Ersatz fuer Nachdenken und keine Anlageberatung: es ist die
+   Zusammenfassung dessen, was das System gerade sieht, in einem Satz statt in zehn
+   Kaesten. */
+
+function findeWert(frage){
+  const t = (frage||'').toUpperCase();
+  const zeilen = (S && S.gesamt) || [];
+  // Erst der volle Name (er ist eindeutiger), dann das Kuerzel.
+  for (const o of zeilen){
+    const n = String(o.name || '').toUpperCase();
+    if (n.length >= 3 && t.includes(n)) return o;
+  }
+  for (const o of zeilen){
+    const sym = String(o.instrument || '').toUpperCase();
+    const basis = sym.replace(/(EUR|USDT|USDC|USD)$/, '').replace(/-YFD$/, '');
+    if (basis.length >= 2 && new RegExp(`\\b${basis}\\b`).test(t)) return o;
+  }
+  return null;
+}
+
+function urteilFuer(o){
+  const live = L.get(o.instrument);
+  const kurs = live ? live.p : o.kurs;
+  const d = digits(kurs || 1);
+  const w = o.waehrung === 'EUR' ? ' €' : (o.waehrung === 'USDT' ? ' USDT' : '');
+  const e = o.erwartung || {};
+  const q = e.quote;
+  const zeilen = [];
+
+  const handelbar = !!o.handelbar;
+  const einstieg = o.einstieg;
+  const abstand = (einstieg && kurs) ? (kurs - einstieg) / einstieg * 100 : null;
+  const lang = o.richtung === 'long';
+  const erreicht = einstieg && kurs && (lang ? kurs <= einstieg * 1.002 : kurs >= einstieg * 0.998);
+
+  let kopf;
+  if (!handelbar){
+    kopf = `**Nein — ${esc(name(o.instrument))} ist gerade kein Trade.**`;
+    zeilen.push(o.deckel ? `Grund: ${o.deckel}.` : 'Das Setup reicht nicht.');
+    if (o.bremse) zeilen.push(o.bremse);
+  } else if (erreicht){
+    kopf = `**Ja — der Einstieg ist erreicht.** ${esc(name(o.instrument))}, ${lang?'Long':'Short'}, Note ${esc(o.note)}.`;
+    zeilen.push(`Einstieg ${num(einstieg,d)}${w}, Stop ${num((o.plan&&o.plan.stop) ?? o.invalidierung, d)}${w}`
+      + `, erstes Ziel ${num((o.plan&&o.plan.tp1) ?? o.ziel, d)}${w}.`);
+  } else {
+    kopf = `**Noch nicht.** ${esc(name(o.instrument))} sieht gut aus, steht aber noch nicht am Einstieg.`;
+    zeilen.push(`Gekauft wird ab ${num(einstieg,d)}${w} — das sind noch `
+      + `${Math.abs(abstand||0).toFixed(2).replace('.',',')} %. Leg eine Limit-Order dorthin, `
+      + 'dann brauchst du keinen Alarm.');
+  }
+
+  if (o.setup && o.setup.name) zeilen.push(`Setup: ${o.setup.name} (${o.setup.qualitaet}). ${o.setup.these||''}`);
+  if (e.bis_tp1_pct != null) zeilen.push(`Wenn es aufgeht: ${pct(e.bis_tp1_pct,1)} bis zum ersten Ziel`
+    + (e.risiko_pct != null ? `, wenn nicht −${e.risiko_pct.toFixed(1).replace('.',',')} % bis zum Stop.` : '.'));
+  if (q) zeilen.push(`Vergleichbare Signale trafen bisher ${Math.round(q.tp1*100)} % — aus ${q.n} Fällen, `
+    + `im Schnitt ${q.schnitt_r >= 0 ? '+' : ''}${String(q.schnitt_r).replace('.',',')} R. Das ist Vergangenheit, keine Vorhersage.`);
+  if ((o.warnungen||[]).length) zeilen.push('Dagegen spricht: ' + o.warnungen.slice(0,3).join(' · '));
+  if (o.broker) zeilen.push(`Kaufen bei ${o.broker}.`);
+
+  const offen = ladePositionen().length;
+  if (offen >= 4) zeilen.push(`Achtung: du hast schon ${offen} Positionen offen. Jede weitere `
+    + 'erhöht das, was gleichzeitig im Feuer steht — im letzten Vorlauf sind an einem Tag elf gleichzeitig ausgestoppt worden.');
+
+  return [kopf, ...zeilen].join('\n\n');
+}
+
+function lokaleAntwort(frage){
+  const t = (frage||'').toLowerCase();
+  const o = findeWert(frage);
+  if (o) return urteilFuer(o);
+
+  if (/bilanz|ergebnis|wie lief|performance|trefferquote/.test(t)){
+    if (!PF || !PF.abgeschlossen) return 'Es ist noch kein Signal abgeschlossen — es gibt noch nichts zu bilanzieren.';
+    const g = (PF.je_regel||{}).ganz || {};
+    return `Über ${PF.abgeschlossen} abgeschlossene Signale steht das System bei **${g.summe_r} R** `
+      + `(${Math.round((g.trefferquote||0)*100)} % Treffer). ${Math.round((PF.nie_im_plus||0)*100)} % der Trades `
+      + 'kamen nie ins Plus — das ist ein Einstiegsproblem, kein Zielproblem. Alle Zahlen stehen im Reiter Bilanz.';
+  }
+  if (/was.*(jetzt|gerade|kaufen|rein)|beste|chance|empfehl/.test(t)){
+    const gut = (S?.gesamt||[]).filter(x=>x.handelbar).slice(0,3);
+    if (!gut.length) return 'Gerade ist nichts handelbar. Das ist ein Ergebnis, kein Ausfall — '
+      + 'die Filter lassen nur durch, was Stop und Ziel im brauchbaren Bereich hat.';
+    return 'Das steht gerade oben:\n\n' + gut.map(x =>
+      `**${name(x.instrument)}** (${x.klasse}, ${x.richtung==='long'?'Long':'Short'}, Note ${x.note}) — `
+      + `Einstieg ${num(x.einstieg, digits(x.einstieg))}, bei ${x.broker||'—'}`).join('\n\n')
+      + '\n\nFrag nach einem davon mit Namen, dann bekommst du das ganze Urteil.';
+  }
+  if (/portfolio|depot|positionen/.test(t)){
+    const pos = ladePositionen();
+    if (!pos.length) return 'Im Depot steht noch nichts. Trag deine Positionen im Reiter Portfolio ein '
+      + 'oder benutz den Knopf „Gekauft — ins Depot" auf einer Signalkarte.';
+    return pos.map(p=>{
+      const b = bewertePosition(p);
+      const schritt = naechsterSchritt(p, b.kurs);
+      return `**${name(p.sym)}** — ${schritt ? schritt.titel + ': ' + schritt.text : 'kein Ausstiegsplan hinterlegt'}`;
+    }).join('\n\n');
+  }
+  return 'Nenn mir einen Wert beim Namen — zum Beispiel „soll ich bei Bitcoin rein?" oder '
+    + '„was ist mit NVIDIA?". Dann sage ich dir, was das System gerade dazu sieht: Note, Setup, '
+    + 'Einstieg, Stop, Ziele, was dagegen spricht und wie oft so etwas bisher aufging.\n\n'
+    + 'Du kannst auch fragen: „was ist gerade gut?", „wie ist die Bilanz?", „wie steht mein Depot?".';
+}
+
+/* Was genau ist kaputt? — die Frage, die „funktioniert nicht" beantwortet.
+
+   Ozan hat den Schluessel eingegeben und es passierte nichts Brauchbares. Die App hat
+   zwar den rohen Fehlertext gezeigt, aber „HTTP 400 {"type":"error",...}" sagt einem
+   Menschen nichts. Und die haeufigste Ursache ist gar kein Fehler im Schluessel: die
+   API wird getrennt abgerechnet, ein Pro-Abo enthaelt KEIN Guthaben. Wer das nicht
+   weiss, sucht stundenlang am falschen Ende.
+
+   Deshalb: ein Testaufruf mit 1 Token, und jede Antwort in einen Satz uebersetzt, der
+   sagt, was zu tun ist. */
+function chatFehlerText(status, roh){
+  const t = String(roh||'');
+  if (/credit balance/i.test(t)) return 'Der Schluessel stimmt, aber das API-Guthaben ist leer. '
+    + 'Die API wird getrennt vom Abo abgerechnet — unter console.anthropic.com → Billing aufladen. '
+    + 'Schon 5 $ reichen fuer sehr viele Fragen.';
+  if (status === 401) return 'Der Schluessel wird nicht akzeptiert. Entweder ist er falsch kopiert, '
+    + 'widerrufen, oder es ist gar kein API-Schluessel (er muss mit sk-ant-api03- beginnen und '
+    + 'kommt von console.anthropic.com → API keys).';
+  if (status === 403) return 'Der Schluessel darf das nicht. Meist eine Einschraenkung im '
+    + 'Anthropic-Konto (Workspace oder erlaubte Modelle).';
+  if (status === 404) return 'Dieses Modell gibt es fuer deinen Schluessel nicht. '
+    + 'Ich versuche es automatisch mit einem anderen.';
+  if (status === 429) return 'Zu viele Anfragen in kurzer Zeit. Kurz warten und nochmal.';
+  if (status >= 500) return 'Die API hat gerade ein Problem (Serverfehler). Das liegt nicht an dir.';
+  if (status === 400) return 'Die Anfrage wurde abgelehnt: ' + t.slice(0,200);
+  return `Unerwarteter Fehler (HTTP ${status}): ` + t.slice(0,200);
+}
+
+/* Die Modelle, die versucht werden — in dieser Reihenfolge.
+   Ein fest verdrahtetes Modell ist eine Zeitbombe: Namen aendern sich, und dann steht
+   die App mit einem 404 da, ohne dass jemand weiss, warum. */
+const CHAT_MODELLE = ['claude-sonnet-4-5-20250929', 'claude-3-5-haiku-20241022'];
+
+async function chatRuf(key, koerper){
+  let letzte = {status: 0, text: ''};
+  for (const modell of [chatModell(), ...CHAT_MODELLE.filter(m=>m!==chatModell())]){
+    let r;
+    try {
+      r = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{'content-type':'application/json','x-api-key':key,
+          'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body: JSON.stringify({...koerper, model: modell}),
+      });
+    } catch(e){
+      return {ok:false, status:0, text:'Keine Verbindung zur API: ' + String(e)
+        + ' — Internet, Werbeblocker oder Firewall pruefen.'};
+    }
+    if (r.ok){
+      if (modell !== chatModell()) { try { localStorage.setItem('api_modell', modell); } catch(e){} }
+      return {ok:true, status:200, daten: await r.json()};
+    }
+    const t = await r.text();
+    letzte = {status: r.status, text: t};
+    if (r.status !== 404) break;   // nur bei „Modell gibt es nicht" weiterprobieren
+  }
+  return {ok:false, status: letzte.status, text: chatFehlerText(letzte.status, letzte.text)};
+}
+
+async function chatPruefen(key){
+  const a = await chatRuf(key, {max_tokens: 8, messages:[{role:'user', content:'ok'}]});
+  return a.ok ? {ok:true} : {ok:false, text:a.text};
+}
+
 function zeichneChat(){
   const key = chatSchluessel();
   let h = '';
   if (!key){
-    h = `<div class="karte">
-      <h3 style="margin-top:0">Einmal einrichten</h3>
+    h = `<div class="note-box" style="margin-top:0"><span class="nt">Der Chat läuft — auch ohne Schlüssel</span>
+      <p>Frag einfach: <em>„soll ich bei Bitcoin rein?"</em>, <em>„was ist gerade gut?"</em>,
+      <em>„wie steht mein Depot?"</em>. Die Antwort kommt aus denselben Daten, die auf den
+      anderen Reitern stehen — Note, Setup, Einstieg, Stop, Ziele, Trefferquote, Gebühren.
+      Sofort und kostenlos.</p>
+      <p style="margin-top:8px">Mit eigenem API-Schlüssel wird daraus ein echtes Gespräch:
+      Rückfragen, Vergleiche, Begründungen. Das kostet dann Geld pro Frage — siehe unten.</p></div>
+    <div class="karte">
+      <h3 style="margin-top:0">Optional: richtiges Gespräch einrichten</h3>
       <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">Dieser Chat laeuft ueber
       deinen <strong>eigenen API-Schluessel</strong>. Genau deshalb funktioniert er auch dann,
       wenn dein Limit im normalen Claude-Chat erreicht ist — die Abrechnung laeuft ueber dein
       Konto, nicht ueber die Sitzung.</p>
+      <div class="note-box warn" style="margin:0 0 12px"><span class="nt">Das wird oft uebersehen</span>
+      <p style="margin:0">Die API wird <strong>getrennt abgerechnet</strong>. Ein Pro- oder
+      Max-Abo enthaelt <strong>kein</strong> API-Guthaben. Ohne Guthaben antwortet der Schluessel
+      mit „credit balance is too low" — der Schluessel ist dann richtig, nur das Konto leer.
+      Guthaben laedst du unter <span class="mono">console.anthropic.com → Billing</span> auf.</p>
+      <p style="margin:8px 0 0">Der Schluessel beginnt mit <span class="mono">sk-ant-api03-</span>.
+      Ein Schluessel aus der Claude-App oder aus dem Browser ist etwas anderes und funktioniert hier nicht.</p></div>
       <p style="font-size:12.5px;color:var(--ink-3);margin:0 0 12px">Der Schluessel bleibt
       <strong>ausschliesslich in diesem Browser</strong>. Er geht nie ins Repository und nie
       auf die oeffentliche Seite — das Repo ist oeffentlich, ein Schluessel darin waere binnen
       Stunden fremd benutzt.</p>
       <div class="rowx" style="border:0;padding:0"><input id="chat_key" type="password"
         placeholder="sk-ant-..." autocomplete="off" spellcheck="false"></div>
-      <p style="margin:12px 0 0"><button class="btn prim" id="chat_save">Speichern</button>
+      <p style="margin:12px 0 0"><button class="btn prim" id="chat_save">Speichern und pruefen</button>
         <a class="btn" style="margin-left:8px;text-decoration:none;display:inline-block"
            href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Schluessel holen</a></p>
       <div id="chat_meld"></div>
     </div>`;
     $('chat').innerHTML = h;
-    $('chat_save').addEventListener('click',()=>{
-      const v = ($('chat_key').value||'').trim();
-      if (!v.startsWith('sk-')){ $('chat_meld').innerHTML =
-        `<p style="color:var(--warn);font-size:12.5px;margin-top:10px">Das sieht nicht nach einem Schluessel aus.</p>`; return; }
-      try { localStorage.setItem('api_key', v); } catch(e){}
-      CHAT_VERLAUF = [];
-      zeichneChat();
+    $('chat_save').addEventListener('click', async ()=>{
+      // Leerzeichen und Zeilenumbrueche mit abschneiden: beim Kopieren aus der Konsole
+      // haengt oft eins dran, und ein Schluessel mit Leerzeichen ist einfach falsch.
+      const v = ($('chat_key').value||'').replace(/\s+/g,'');
+      const meld = $('chat_meld');
+      if (!v.startsWith('sk-ant-')){
+        meld.innerHTML = `<p style="color:var(--warn);font-size:12.5px;margin-top:10px">
+          Das sieht nicht nach einem API-Schluessel aus. Er beginnt mit
+          <span class="mono">sk-ant-api03-</span> und steht unter console.anthropic.com → API keys.</p>`;
+        return;
+      }
+      meld.innerHTML = `<p style="font-size:12.5px;margin-top:10px;color:var(--ink-3)">Pruefe …</p>`;
+      const urteil = await chatPruefen(v);
+      if (urteil.ok){
+        try { localStorage.setItem('api_key', v); } catch(e){}
+        CHAT_VERLAUF = [];
+        zeichneChat();
+        return;
+      }
+      meld.innerHTML = `<div class="note-box bad" style="margin-top:12px">
+        <span class="nt">Schluessel nicht benutzbar</span><p>${esc(urteil.text)}</p></div>`;
     });
+    chatAnhaengen(false);
     return;
   }
 
@@ -2546,13 +2865,36 @@ function zeichneChat(){
     <button class="link" id="chat_reset">Verlauf leeren</button> ·
     <button class="link" id="chat_key_weg">Schluessel entfernen</button></p>`;
   $('chat').innerHTML = h;
+  chatVerdrahten(true);
+}
+
+/* Der Chatkasten wird an das angehaengt, was schon im Reiter steht — damit die
+   Einrichtung sichtbar bleibt und man trotzdem sofort fragen kann. */
+function chatAnhaengen(mitSchluessel){
+  const kasten = document.createElement('div');
+  kasten.innerHTML = `<div class="chatbox" style="margin-top:16px">
+    <div class="chatlauf" id="chatlauf"></div>
+    <div class="chateingabe">
+      <textarea id="chat_in" rows="2" placeholder="Soll ich bei Bitcoin rein? Was spricht dagegen?"></textarea>
+      <button class="btn prim" id="chat_send">Fragen</button>
+    </div>
+  </div>
+  <p style="margin:10px 0 0;font-size:11.5px;color:var(--ink-3)">
+    Antwort aus den Daten dieser Seite · <button class="link" id="chat_reset">Verlauf leeren</button></p>`;
+  $('chat').appendChild(kasten);
+  chatVerdrahten(mitSchluessel);
+}
+
+function chatVerdrahten(mitSchluessel){
   chatMalen();
   $('chat_send').addEventListener('click', chatSenden);
   $('chat_in').addEventListener('keydown', e=>{
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) chatSenden();
   });
-  $('chat_reset').addEventListener('click',()=>{ CHAT_VERLAUF = []; chatMalen(); });
-  $('chat_key_weg').addEventListener('click',()=>{
+  const reset = $('chat_reset');
+  if (reset) reset.addEventListener('click',()=>{ CHAT_VERLAUF = []; chatMalen(); });
+  const weg = $('chat_key_weg');
+  if (weg) weg.addEventListener('click',()=>{
     try { localStorage.removeItem('api_key'); } catch(e){}
     zeichneChat();
   });
@@ -2599,34 +2941,31 @@ async function chatSenden(){
   CHAT_VERLAUF.push({role:'assistant', content:'…'});
   chatMalen();
 
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{
-        'content-type':'application/json',
-        'x-api-key': chatSchluessel(),
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true',
-      },
-      body: JSON.stringify({
-        model: chatModell(),
-        max_tokens: 900,
-        system: CHAT_SYSTEM + '\n\nLAGEBERICHT (Stand jetzt):\n' + chatLage(),
-        messages: CHAT_VERLAUF.slice(0,-1).map(m=>({role:m.role, content:m.content})),
-      }),
-    });
-    if (!r.ok){
-      const t = await r.text();
-      CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant',
-        content: `Die Anfrage ist fehlgeschlagen (HTTP ${r.status}). ${t.slice(0,300)}`};
-    } else {
-      const d = await r.json();
-      const text = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n');
-      CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content: text || '(leere Antwort)'};
-    }
-  } catch(e){
+  const key = chatSchluessel();
+
+  // Ohne Schluessel — oder wenn die API nicht will — antwortet die App selbst.
+  // Das ist der Unterschied zwischen einem Chat, der manchmal geht, und einem, der
+  // immer eine Antwort auf „soll ich rein oder nicht" hat.
+  if (!key){
+    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content: lokaleAntwort(frage)};
+    chatMalen();
+    return;
+  }
+
+  const a = await chatRuf(key, {
+    max_tokens: 900,
+    system: CHAT_SYSTEM + '\n\nLAGEBERICHT (Stand jetzt):\n' + chatLage(),
+    messages: CHAT_VERLAUF.slice(0,-1).map(m=>({role:m.role, content:m.content})),
+  });
+
+  if (a.ok){
+    const text = (a.daten.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n');
+    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content: text || '(leere Antwort)'};
+  } else {
+    // Nicht nur den Fehler zeigen — die Frage trotzdem beantworten.
     CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant',
-      content: `Kein Zugriff auf die API: ${String(e)}. Pruefe den Schluessel und die Verbindung.`};
+      content: lokaleAntwort(frage) + '\n\n---\n*Das kam ohne die API — sie hat gerade nicht '
+        + 'geantwortet: ' + a.text + '*'};
   }
   chatMalen();
 }
@@ -2681,8 +3020,27 @@ function kaufDialog(sym, mengeVorschlag, kursVorschlag){
   const box = document.createElement('div');
   box.id = 'kaufbox';
   box.className = 'modal';
+  const q = scanRow(sym) || {};
+  const pl = q.plan || {};
+  const plan = {
+    richtung: q.richtung || 'long',
+    stop: pl.stop ?? q.invalidierung ?? null,
+    tp1: pl.tp1 ?? q.ziel ?? null,
+    tp2: pl.tp2 ?? q.tp2 ?? null,
+    tp3: pl.tp3 ?? q.tp3 ?? null,
+    waehrung: q.waehrung || '',
+    klasse: q.klasse || '',
+    note: q.note || '',
+    setup: (q.setup && q.setup.name) || '',
+    gekauft: new Date().toISOString(),
+  };
+  const zt = [plan.tp1, plan.tp2, plan.tp3].filter(v=>v!=null);
   box.innerHTML = `<div class="modalk">
     <h3 style="margin-top:0">${esc(name(sym))} ins Depot</h3>
+    ${plan.stop!=null?`<div class="note-box" style="margin:0 0 12px"><span class="nt">Dein Ausstiegsplan wird mitgespeichert</span>
+      <p style="margin:0">Stop <strong>${num(plan.stop, digits(plan.stop))}</strong>${
+        zt.length?` · Ziele <strong>${zt.map(v=>num(v,digits(v))).join(' / ')}</strong>`:''}.
+      Ab jetzt steht im Depot bei jedem Kurs, was als Nächstes zu tun ist.</p></div>`:''}
     <p style="font-size:12.5px;color:var(--ink-2);margin:0 0 12px">Trag ein, was du
     <strong>tatsächlich</strong> bekommen hast — nicht den geplanten Kurs. Sonst rechnet
     sich das Depot selbst schön.</p>
@@ -2705,7 +3063,8 @@ function kaufDialog(sym, mengeVorschlag, kursVorschlag){
     if (!isFinite(menge) || menge <= 0) return;
     const a = ladePositionen().filter(p=>p.sym !== sym);
     a.push({sym, menge, einstieg: isFinite(kurs)?kurs:null,
-            konto: (document.getElementById('k_konto').value||'').trim()});
+            konto: (document.getElementById('k_konto').value||'').trim(),
+            plan, erledigt: []});
     speicherePositionen(a);
     zu();
     zeichnePortfolio();
