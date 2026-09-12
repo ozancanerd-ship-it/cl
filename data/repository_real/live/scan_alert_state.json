@@ -104,6 +104,7 @@
     "setup:RUNEUSDT:B_PLUS:long": "2026-09-11T02:19:42.002950+00:00",
     "setup:SAHARAUSDT:B:long": "2026-09-11T00:42:27.039466+00:00",
     "setup:SAHARAUSDT:B_PLUS:long": "2026-09-11T05:03:27.769721+00:00",
+    "setup:SEIEUR:B_PLUS:long": "2026-09-12T12:27:24.094232+00:00",
     "setup:SHOP:A_MINUS:short": "2026-09-10T14:02:51.074408+00:00",
     "setup:SHOP:B_PLUS:short": "2026-09-11T16:23:01.740645+00:00",
     "setup:SMCI:B_PLUS:short": "2026-09-11T14:03:19.507750+00:00",
@@ -126,6 +127,7 @@
     "setup:WMT:B_PLUS:long": "2026-09-11T19:46:31.837466+00:00",
     "setup:XAUTUSDT:B:short": "2026-09-11T00:48:51.611390+00:00",
     "setup:XAUTUSDT:B_PLUS:short": "2026-09-11T01:19:29.349351+00:00",
+    "setup:XMREUR:A_MINUS:long": "2026-09-12T12:27:24.094232+00:00",
     "setup:ZECUSDT:A:long": "2026-09-12T04:48:21.843516+00:00",
     "setup:ZECUSDT:A_MINUS:long": "2026-09-12T01:18:31.687849+00:00",
     "weg:AAPL:B": "2026-09-10T20:03:25.523234+00:00",
@@ -144,6 +146,7 @@
     "weg:BCHUSDT:B_PLUS": "2026-09-11T00:42:27.039466+00:00",
     "weg:BNBUSDT:A_MINUS": "2026-09-12T00:43:03.192755+00:00",
     "weg:BNBUSDT:B": "2026-09-11T02:19:42.002950+00:00",
+    "weg:BTCEUR:B_PLUS": "2026-09-12T12:27:24.094232+00:00",
     "weg:BTCUSDT:A_MINUS": "2026-09-11T20:36:19.649067+00:00",
     "weg:BTCUSDT:B": "2026-09-12T02:49:52.587539+00:00",
     "weg:BTCUSDT:B_PLUS": "2026-09-12T06:54:55.627706+00:00",
@@ -243,6 +246,16 @@
       "score": 5.7,
       "urteil": "NO_TRADE"
     },
+    "AEROEUR": {
+      "richtung": "long",
+      "score": 54.6,
+      "urteil": "WATCH"
+    },
+    "ALGOEUR": {
+      "richtung": null,
+      "score": 7.7,
+      "urteil": "NO_TRADE"
+    },
     "AMD": {
       "richtung": "short",
       "score": 49.7,
@@ -273,6 +286,11 @@
       "score": 53.1,
       "urteil": "WATCH"
     },
+    "ASTEREUR": {
+      "richtung": "long",
+      "score": 29.3,
+      "urteil": "NO_TRADE"
+    },
     "ATOMEUR": {
       "richtung": "long",
       "score": 58.9,
@@ -293,20 +311,40 @@
       "score": 6.1,
       "urteil": "NO_TRADE"
     },
+    "BATEUR": {
+      "richtung": null,
+      "score": 5.6,
+      "urteil": "NO_TRADE"
+    },
     "BCHEUR": {
       "richtung": "short",
       "score": 68.6,
       "urteil": "WATCH"
     },
-    "BTCEUR": {
+    "BILLEUR": {
+      "richtung": "short",
+      "score": 54.2,
+      "urteil": "WATCH"
+    },
+    "BNBEUR": {
       "richtung": "long",
-      "score": 59.1,
-      "urteil": "B_PLUS"
+      "score": 75.8,
+      "urteil": "WATCH"
+    },
+    "BTCEUR": {
+      "richtung": null,
+      "score": 3.4,
+      "urteil": "NO_TRADE"
     },
     "CAT": {
       "richtung": "short",
       "score": 85.6,
       "urteil": "B_PLUS"
+    },
+    "CHZEUR": {
+      "richtung": null,
+      "score": 10.0,
+      "urteil": "NO_TRADE"
     },
     "COIN": {
       "richtung": null,
@@ -316,6 +354,11 @@
     "CRM": {
       "richtung": "long",
       "score": 72.5,
+      "urteil": "WATCH"
+    },
+    "CRVEUR": {
+      "richtung": "long",
+      "score": 48.2,
       "urteil": "WATCH"
     },
     "CRWD": {
@@ -330,7 +373,7 @@
     },
     "DASHEUR": {
       "richtung": "short",
-      "score": 61.4,
+      "score": 62.8,
       "urteil": "WATCH"
     },
     "DIS": {
@@ -350,17 +393,47 @@
     },
     "ENAEUR": {
       "richtung": "short",
-      "score": 45.1,
+      "score": 43.6,
       "urteil": "WATCH"
+    },
+    "ETCEUR": {
+      "richtung": null,
+      "score": 2.2,
+      "urteil": "NO_TRADE"
     },
     "ETHEUR": {
       "richtung": "long",
       "score": 68.5,
       "urteil": "WATCH"
     },
+    "ETHFIEUR": {
+      "richtung": "long",
+      "score": 50.0,
+      "urteil": "WATCH"
+    },
+    "FARTCOINEUR": {
+      "richtung": null,
+      "score": 4.3,
+      "urteil": "NO_TRADE"
+    },
+    "FETEUR": {
+      "richtung": null,
+      "score": 3.7,
+      "urteil": "NO_TRADE"
+    },
+    "FILEUR": {
+      "richtung": null,
+      "score": 7.0,
+      "urteil": "NO_TRADE"
+    },
     "GOOGL": {
       "richtung": null,
       "score": 6.4,
+      "urteil": "NO_TRADE"
+    },
+    "HBAREUR": {
+      "richtung": null,
+      "score": 4.1,
       "urteil": "NO_TRADE"
     },
     "HON": {
@@ -371,6 +444,11 @@
     "HYPEEUR": {
       "richtung": "short",
       "score": 59.3,
+      "urteil": "WATCH"
+    },
+    "ICPEUR": {
+      "richtung": "long",
+      "score": 57.5,
       "urteil": "WATCH"
     },
     "INJEUR": {
@@ -386,6 +464,11 @@
     "JPM": {
       "richtung": null,
       "score": 2.7,
+      "urteil": "NO_TRADE"
+    },
+    "KASEUR": {
+      "richtung": null,
+      "score": 5.9,
       "urteil": "NO_TRADE"
     },
     "KO": {
@@ -433,6 +516,16 @@
       "score": 62.8,
       "urteil": "WATCH"
     },
+    "MONEUR": {
+      "richtung": "long",
+      "score": 37.7,
+      "urteil": "WATCH"
+    },
+    "MOODENGEUR": {
+      "richtung": "short",
+      "score": 54.4,
+      "urteil": "WATCH"
+    },
     "MSFT": {
       "richtung": null,
       "score": 0.8,
@@ -458,6 +551,11 @@
       "score": 65.1,
       "urteil": "A_MINUS"
     },
+    "NIGHTEUR": {
+      "richtung": null,
+      "score": 3.7,
+      "urteil": "NO_TRADE"
+    },
     "NOW": {
       "richtung": null,
       "score": 0.0,
@@ -473,10 +571,25 @@
       "score": 70.0,
       "urteil": "WATCH"
     },
+    "ONDOEUR": {
+      "richtung": null,
+      "score": 3.7,
+      "urteil": "NO_TRADE"
+    },
+    "OPEUR": {
+      "richtung": "short",
+      "score": 50.4,
+      "urteil": "WATCH"
+    },
     "PAXGEUR": {
       "richtung": "short",
       "score": 52.8,
       "urteil": "B"
+    },
+    "PENGUEUR": {
+      "richtung": "short",
+      "score": 51.3,
+      "urteil": "WATCH"
     },
     "PG": {
       "richtung": null,
@@ -498,9 +611,39 @@
       "score": 1.6,
       "urteil": "NO_TRADE"
     },
+    "QNTEUR": {
+      "richtung": null,
+      "score": 3.5,
+      "urteil": "NO_TRADE"
+    },
+    "RAYEUR": {
+      "richtung": null,
+      "score": 3.9,
+      "urteil": "NO_TRADE"
+    },
+    "RENDEREUR": {
+      "richtung": null,
+      "score": 2.4,
+      "urteil": "NO_TRADE"
+    },
+    "SEIEUR": {
+      "richtung": "long",
+      "score": 50.7,
+      "urteil": "B_PLUS"
+    },
     "SHOP": {
       "richtung": "short",
       "score": 70.0,
+      "urteil": "WATCH"
+    },
+    "SKREUR": {
+      "richtung": null,
+      "score": 3.9,
+      "urteil": "NO_TRADE"
+    },
+    "SKYEUR": {
+      "richtung": "short",
+      "score": 57.1,
       "urteil": "WATCH"
     },
     "SMCI": {
@@ -513,6 +656,21 @@
       "score": 5.5,
       "urteil": "NO_TRADE"
     },
+    "SPXEUR": {
+      "richtung": "long",
+      "score": 46.0,
+      "urteil": "WATCH"
+    },
+    "STBLEUR": {
+      "richtung": "long",
+      "score": 40.3,
+      "urteil": "WATCH"
+    },
+    "STORJEUR": {
+      "richtung": "long",
+      "score": 30.0,
+      "urteil": "NO_TRADE"
+    },
     "SUIEUR": {
       "richtung": "short",
       "score": 51.2,
@@ -522,6 +680,16 @@
       "richtung": null,
       "score": 2.0,
       "urteil": "NO_TRADE"
+    },
+    "TIAEUR": {
+      "richtung": null,
+      "score": 3.1,
+      "urteil": "NO_TRADE"
+    },
+    "TRUMPEUR": {
+      "richtung": "long",
+      "score": 56.5,
+      "urteil": "WATCH"
     },
     "TRXEUR": {
       "richtung": null,
@@ -558,14 +726,39 @@
       "score": 0.0,
       "urteil": "NO_TRADE"
     },
+    "VSNEUR": {
+      "richtung": null,
+      "score": 6.6,
+      "urteil": "NO_TRADE"
+    },
+    "VTHOEUR": {
+      "richtung": "long",
+      "score": 29.5,
+      "urteil": "NO_TRADE"
+    },
     "VVVEUR": {
       "richtung": null,
       "score": 2.2,
       "urteil": "NO_TRADE"
     },
+    "WEUR": {
+      "richtung": null,
+      "score": 6.6,
+      "urteil": "NO_TRADE"
+    },
+    "WIFEUR": {
+      "richtung": "short",
+      "score": 51.1,
+      "urteil": "WATCH"
+    },
     "WLDEUR": {
       "richtung": null,
       "score": 3.2,
+      "urteil": "NO_TRADE"
+    },
+    "WLFIEUR": {
+      "richtung": null,
+      "score": 10.0,
       "urteil": "NO_TRADE"
     },
     "WMT": {
@@ -573,14 +766,34 @@
       "score": 63.3,
       "urteil": "B_PLUS"
     },
+    "XCNEUR": {
+      "richtung": null,
+      "score": 6.0,
+      "urteil": "NO_TRADE"
+    },
+    "XDCEUR": {
+      "richtung": null,
+      "score": 3.6,
+      "urteil": "NO_TRADE"
+    },
     "XLMEUR": {
       "richtung": null,
       "score": 7.5,
       "urteil": "NO_TRADE"
     },
+    "XMREUR": {
+      "richtung": "long",
+      "score": 80.0,
+      "urteil": "A_MINUS"
+    },
     "XOM": {
       "richtung": null,
       "score": 10.0,
+      "urteil": "NO_TRADE"
+    },
+    "XPLEUR": {
+      "richtung": null,
+      "score": 2.4,
       "urteil": "NO_TRADE"
     },
     "XRPEUR": {
@@ -588,9 +801,19 @@
       "score": 52.4,
       "urteil": "WATCH"
     },
+    "XTZEUR": {
+      "richtung": null,
+      "score": 3.8,
+      "urteil": "NO_TRADE"
+    },
     "ZECEUR": {
       "richtung": "long",
       "score": 79.1,
+      "urteil": "WATCH"
+    },
+    "ZROEUR": {
+      "richtung": "long",
+      "score": 47.6,
       "urteil": "WATCH"
     }
   },
@@ -603,7 +826,9 @@
     "ACEUSDT": "krypto",
     "ADAEUR": "krypto",
     "ADAUSDT": "krypto",
+    "AEROEUR": "krypto",
     "AIXBTUSDT": "krypto",
+    "ALGOEUR": "krypto",
     "ALGOUSDT": "krypto",
     "ALLOUSDT": "krypto",
     "AMD": "aktien",
@@ -617,6 +842,7 @@
     "ARKUSDT": "krypto",
     "ARM": "aktien",
     "ARUSDT": "krypto",
+    "ASTEREUR": "krypto",
     "ASTERUSDT": "krypto",
     "ATOMEUR": "krypto",
     "ATOMUSDT": "krypto",
@@ -626,11 +852,14 @@
     "AVNTUSDT": "krypto",
     "BA": "aktien",
     "BANKUSDT": "krypto",
+    "BATEUR": "krypto",
     "BCHEUR": "krypto",
     "BCHUSDT": "krypto",
     "BICOUSDT": "krypto",
+    "BILLEUR": "krypto",
     "BLURUSDT": "krypto",
     "BMTUSDT": "krypto",
+    "BNBEUR": "krypto",
     "BNBUSDT": "krypto",
     "BOMEUSDT": "krypto",
     "BROCCOLI714USDT": "krypto",
@@ -641,11 +870,13 @@
     "CATIUSDT": "krypto",
     "CFGUSDT": "krypto",
     "CHIPUSDT": "krypto",
+    "CHZEUR": "krypto",
     "CHZUSDT": "krypto",
     "CKBUSDT": "krypto",
     "COIN": "aktien",
     "COTIUSDT": "krypto",
     "CRM": "aktien",
+    "CRVEUR": "krypto",
     "CRVUSDT": "krypto",
     "CRWD": "aktien",
     "CVX": "aktien",
@@ -666,14 +897,19 @@
     "ENJUSDT": "krypto",
     "ENSOUSDT": "krypto",
     "EPICUSDT": "krypto",
+    "ETCEUR": "krypto",
     "ETCUSDT": "krypto",
     "ETHEUR": "krypto",
+    "ETHFIEUR": "krypto",
     "ETHFIUSDT": "krypto",
     "ETHUSDT": "krypto",
     "EURCEUR": "krypto",
+    "FARTCOINEUR": "krypto",
+    "FETEUR": "krypto",
     "FETUSDT": "krypto",
     "FFUSDT": "krypto",
     "FIDAUSDT": "krypto",
+    "FILEUR": "krypto",
     "FILUSDT": "krypto",
     "FORMUSDT": "krypto",
     "GIGGLEUSDT": "krypto",
@@ -684,12 +920,14 @@
     "GRTUSDT": "krypto",
     "GUSDT": "krypto",
     "HAEDALUSDT": "krypto",
+    "HBAREUR": "krypto",
     "HBARUSDT": "krypto",
     "HEIUSDT": "krypto",
     "HEMIUSDT": "krypto",
     "HOLOUSDT": "krypto",
     "HON": "aktien",
     "HYPEEUR": "krypto",
+    "ICPEUR": "krypto",
     "ICPUSDT": "krypto",
     "INJEUR": "krypto",
     "INJUSDT": "krypto",
@@ -700,6 +938,7 @@
     "JTOUSDT": "krypto",
     "JUPUSDT": "krypto",
     "KAITOUSDT": "krypto",
+    "KASEUR": "krypto",
     "KATUSDT": "krypto",
     "KAVAUSDT": "krypto",
     "KO": "aktien",
@@ -723,6 +962,8 @@
     "MINAUSDT": "krypto",
     "MIRAUSDT": "krypto",
     "MITOUSDT": "krypto",
+    "MONEUR": "krypto",
+    "MOODENGEUR": "krypto",
     "MORPHOUSDT": "krypto",
     "MSFT": "aktien",
     "MSTR": "aktien",
@@ -732,19 +973,23 @@
     "NEARUSDT": "krypto",
     "NEE": "aktien",
     "NEWTUSDT": "krypto",
+    "NIGHTEUR": "krypto",
     "NKE": "aktien",
     "NMRUSDT": "krypto",
     "NOMUSDT": "krypto",
     "NOW": "aktien",
     "NVDA": "aktien",
     "NVO": "aktien",
+    "ONDOEUR": "krypto",
     "ONDOUSDT": "krypto",
+    "OPEUR": "krypto",
     "OPUSDT": "krypto",
     "ORCAUSDT": "krypto",
     "ORDIUSDT": "krypto",
     "PAXGEUR": "gold",
     "PAXGUSDT": "gold",
     "PENDLEUSDT": "krypto",
+    "PENGUEUR": "krypto",
     "PENGUUSDT": "krypto",
     "PG": "aktien",
     "PHAUSDT": "krypto",
@@ -757,7 +1002,10 @@
     "PUMPUSDT": "krypto",
     "PYTHUSDT": "krypto",
     "QKCUSDT": "krypto",
+    "QNTEUR": "krypto",
+    "RAYEUR": "krypto",
     "RAYUSDT": "krypto",
+    "RENDEREUR": "krypto",
     "RENDERUSDT": "krypto",
     "REUSDT": "krypto",
     "REZUSDT": "krypto",
@@ -771,10 +1019,13 @@
     "SANDUSDT": "krypto",
     "SCRUSDT": "krypto",
     "SCUSDT": "krypto",
+    "SEIEUR": "krypto",
     "SEIUSDT": "krypto",
     "SENTUSDT": "krypto",
     "SHOP": "aktien",
     "SIGNUSDT": "krypto",
+    "SKREUR": "krypto",
+    "SKYEUR": "krypto",
     "SKYUSDT": "krypto",
     "SMCI": "aktien",
     "SOLEUR": "krypto",
@@ -782,6 +1033,9 @@
     "SOLVUSDT": "krypto",
     "SOPHUSDT": "krypto",
     "SPKUSDT": "krypto",
+    "SPXEUR": "krypto",
+    "STBLEUR": "krypto",
+    "STORJEUR": "krypto",
     "STRKUSDT": "krypto",
     "STXUSDT": "krypto",
     "SUIEUR": "krypto",
@@ -793,8 +1047,10 @@
     "TFUELUSDT": "krypto",
     "THETAUSDT": "krypto",
     "THEUSDT": "krypto",
+    "TIAEUR": "krypto",
     "TIAUSDT": "krypto",
     "TREEUSDT": "krypto",
+    "TRUMPEUR": "krypto",
     "TRUMPUSDT": "krypto",
     "TRXEUR": "krypto",
     "TRXUSDT": "krypto",
@@ -810,21 +1066,31 @@
     "V": "aktien",
     "VETUSDT": "krypto",
     "VIRTUALUSDT": "krypto",
+    "VSNEUR": "krypto",
+    "VTHOEUR": "krypto",
     "VTHOUSDT": "krypto",
     "VVVEUR": "krypto",
+    "WEUR": "krypto",
+    "WIFEUR": "krypto",
     "WIFUSDT": "krypto",
     "WLDEUR": "krypto",
     "WLDUSDT": "krypto",
+    "WLFIEUR": "krypto",
     "WLFIUSDT": "krypto",
     "WMT": "aktien",
     "WOOUSDT": "krypto",
     "XAUTUSDT": "gold",
+    "XCNEUR": "krypto",
+    "XDCEUR": "krypto",
     "XLMEUR": "krypto",
     "XLMUSDT": "krypto",
+    "XMREUR": "krypto",
     "XOM": "aktien",
+    "XPLEUR": "krypto",
     "XPLUSDT": "krypto",
     "XRPEUR": "krypto",
     "XRPUSDT": "krypto",
+    "XTZEUR": "krypto",
     "XTZUSDT": "krypto",
     "YGGUSDT": "krypto",
     "ZAMAUSDT": "krypto",
@@ -834,10 +1100,11 @@
     "ZKCUSDT": "krypto",
     "ZKPUSDT": "krypto",
     "ZKUSDT": "krypto",
+    "ZROEUR": "krypto",
     "ZROUSDT": "krypto",
     "币安人生USDT": "krypto"
   },
   "rang1": "MSTR",
-  "stand": "2026-09-12T12:08:06.379353+00:00",
+  "stand": "2026-09-12T12:27:24.094232+00:00",
   "stumme_klassen": []
 }
