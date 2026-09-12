@@ -80,13 +80,14 @@ class Handelsort:
 #: ist kein Signal.
 ORTE: dict[str, Handelsort] = {
     "krypto": Handelsort(
-        broker="Kraken (EUR) oder Bybit (USDT)",
-        waehrung="EUR",
-        gebuehr_pct=KRAKEN_MAKER_PCT,
+        broker="Bybit (USDT) oder Kraken (USD)",
+        waehrung="USD",
+        gebuehr_pct=BYBIT_PCT,
         hinweis=(
-            "Bei Kraken direkt in Euro — aber nur über Kraken Pro mit Limit-Order "
-            "(0,40 %). Die einfache Kraken-App nimmt 1 % bis 1,5 %, eine Market-Order "
-            "bei Pro 0,80 %. Bybit kostet 0,10 %, handelt aber in USDT."
+            "Der Dollarmarkt ist der tiefe — dort wird analysiert und gekauft. Bybit "
+            "kostet 0,10 % je Seite, Kraken Pro 0,40 % mit Limit-Order und 0,80 % mit "
+            "Market-Order (die einfache Kraken-App 1 % bis 1,5 %). Der Euro-Preis steht "
+            "zur Orientierung daneben."
         ),
     ),
     "aktien": Handelsort(
@@ -96,10 +97,10 @@ ORTE: dict[str, Handelsort] = {
         hinweis="1 € je Ausführung — bei kleinen Positionen der größte Einzelposten.",
     ),
     "gold": Handelsort(
-        broker="Kraken (PAXG/EUR)",
-        waehrung="EUR",
-        gebuehr_pct=KRAKEN_MAKER_PCT,
-        hinweis="PAXG ist 1:1 mit physischem Gold hinterlegt und bei Kraken in Euro handelbar.",
+        broker="Bybit oder Kraken (PAXG)",
+        waehrung="USD",
+        gebuehr_pct=BYBIT_PCT,
+        hinweis="PAXG ist 1:1 mit physischem Gold hinterlegt und an beiden Börsen handelbar.",
     ),
 }
 
@@ -382,7 +383,13 @@ def beschrifte(zeile: dict[str, Any], *, eurusd: float | None = None) -> None:
     if o.hinweis:
         zeile["broker_hinweis"] = o.hinweis
 
-    if klasse != "aktien" or not eurusd:
+    # Umgerechnet wird ab jetzt fuer ALLES, was nicht schon in Euro notiert.
+    #
+    # Bei Aktien ist Euro der Ausfuehrungspreis (Trade Republic kann nichts anderes),
+    # bei Krypto ist es die Orientierung: gekauft wird im Dollarmarkt, aber Ozan denkt
+    # in Euro und zahlt am Ende in Euro. Beides nebeneinander zu zeigen kostet nichts
+    # und erspart das Kopfrechnen.
+    if not eurusd or zeile.get("waehrung") == "EUR":
         return
     plan = zeile.get("plan") or {}
     eur: dict[str, float] = {}
