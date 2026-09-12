@@ -2172,14 +2172,40 @@ function lage(w){
   return {w, kurs, lang, risiko, abstand, r, stufe, live: !!live};
 }
 
-/* Lokale Benachrichtigung, wenn ein Setup live auf "jetzt" springt. Funktioniert,
-   solange die App offen ist — ohne Server, ohne Schlüssel. Kein Ersatz für Telegram,
-   aber sofort und ohne Abhängigkeit. */
-const GEMELDET = new Set();
+/* Lokale Benachrichtigung, wenn ein Setup live auf "jetzt" springt.
+
+   WARUM DAS GEDAECHTNIS AUF DER PLATTE LIEGT UND NICHT IM ARBEITSSPEICHER
+
+   Vorher merkte sich die App im laufenden Betrieb, was sie schon gemeldet hat. Beim
+   naechsten OEFFNEN war das Gedaechtnis leer — und dann meldete sie alles noch einmal.
+   Auf dem iPhone, wo eine Seite vom Home-Bildschirm bei jedem Start neu laedt, heisst
+   das: bei jedem Blick in die App ein Schwung Meldungen fuer dieselben Signale, die
+   man schon kennt. Genau das hat Ozan als Spam erlebt.
+
+   Jetzt steht der Schluessel im localStorage und ueberlebt jeden Neustart. Dazu eine
+   Sperre von zwoelf Stunden: derselbe Wert meldet sich hoechstens einmal am halben Tag,
+   selbst wenn die Wachliste ihn neu aufnimmt. */
+const GEMELDET_KEY = 'desk.gemeldet.v1';
+const GEMELDET_SPERRE_MS = 12 * 3600 * 1000;
+function gemeldetLaden(){
+  try {
+    const roh = JSON.parse(localStorage.getItem(GEMELDET_KEY) || '{}');
+    const jetzt = Date.now(), sauber = {};
+    for (const [k, t] of Object.entries(roh)) if (jetzt - t < GEMELDET_SPERRE_MS) sauber[k] = t;
+    return sauber;
+  } catch(e){ return {}; }
+}
+function gemeldetMerken(key){
+  try {
+    const a = gemeldetLaden();
+    a[key] = Date.now();
+    localStorage.setItem(GEMELDET_KEY, JSON.stringify(a));
+  } catch(e){}
+}
 function benachrichtige(x){
   const key = x.w.instrument + ':' + x.w.aufgenommen;
-  if (GEMELDET.has(key)) return;
-  GEMELDET.add(key);
+  if (gemeldetLaden()[key]) return;
+  gemeldetMerken(key);
   try {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     const d = digits(x.w.einstieg);
