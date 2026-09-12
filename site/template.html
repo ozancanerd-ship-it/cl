@@ -1661,8 +1661,14 @@ function bewertePosition(pos){
   const row = scanRow(pos.sym);
   const live = L.get(pos.sym);
   const kurs = live ? live.p : (row ? row.kurs : null);
-  const wert = kurs != null ? kurs * pos.menge : null;
-  const einstand = pos.einstieg ? pos.einstieg * pos.menge : null;
+  /* Nicht alles im Depot steht im Scan: ein ETF, ein Turbo-Zertifikat, ein
+     ausgelisteter Coin. Fuer die gibt es keinen Kurs — und ohne Kurs stand die Position
+     vorher mit leerem Wert da, als waere sie nichts wert. Deshalb duerfen Wert und
+     Einstand auch von Hand kommen; auf der Karte steht dann, dass es so ist. */
+  const wert = (kurs != null && pos.menge) ? kurs * pos.menge
+             : (pos.wert_manuell != null ? pos.wert_manuell : null);
+  const einstand = pos.einstieg && pos.menge ? pos.einstieg * pos.menge
+                 : (pos.einstand_manuell != null ? pos.einstand_manuell : null);
   const gv = (wert != null && einstand != null) ? wert - einstand : null;
   const gvPct = (gv != null && einstand) ? gv / einstand * 100 : null;
   let r = null;
@@ -1805,9 +1811,10 @@ function zeichnePortfolio(){
         <h3>${esc(name(b.pos.sym))} <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
           <span style="float:right" class="note ${b.kl==='gut'?'gut':''}">${esc(b.urteil)}</span></h3>
         <div class="kpi">
-          <span>Menge <b>${num(b.pos.menge, 6)}</b></span>
-          <span>Einstieg <b>${num(b.pos.einstieg,d)}</b></span>
-          <span>Kurs <b>${num(b.kurs,d)}</b>${b.live?' <span class="up">live</span>':''}</span>
+          ${b.pos.menge?`<span>Menge <b>${num(b.pos.menge, 6)}</b></span>`:''}
+          ${b.pos.einstieg?`<span>Einstieg <b>${num(b.pos.einstieg,d)}</b></span>`:''}
+          ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}</b>${b.live?' <span class="up">live</span>':''}</span>`
+            :`<span>Wert <b>${num(b.wert,2)} €</b> <span style="color:var(--ink-3)">von dir eingetragen</span></span>`}
           ${b.gvPct!=null?`<span>G/V <b class="${b.gvPct>=0?'up':'dn'}">${pct(b.gvPct,1)}</b></span>`:''}
           ${b.r!=null?`<span>R <b class="${b.r>=0?'up':'dn'}">${b.r.toFixed(2)}R</b></span>`:''}
         </div>
