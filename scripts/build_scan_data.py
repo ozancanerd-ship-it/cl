@@ -95,6 +95,11 @@ AKTIEN = [
     "BA",
     "MCD",
     "CRM",
+    # Basiswerte aus dem eigenen Depot: auf TSMC, Netflix und Meta laufen
+    # Turbo-Zertifikate bei Trade Republic. Der Schein selbst ist nicht scanbar,
+    # der Basiswert schon — und daran haengt, ob der Schein noch Sinn ergibt.
+    "TSM",
+    "NFLX",
 ]
 
 #: Gold ueber PAXG: 1:1 physisch hinterlegt und bei Kraken wie bei Bybit handelbar.
@@ -125,6 +130,24 @@ EUR_MIN_TRADES = 100
 #: liegen. Die Zahl der Abschluesse liefert Bybit nicht, deshalb faellt diese Pruefung
 #: dort weg und wird durch den hoeheren Umsatz ausgeglichen.
 BYBIT_MIN_UMSATZ = 3_000_000.0
+
+#: Coins, die IMMER im Universum stehen — unabhaengig davon, wo sie gerade in der
+#: Umsatzrangliste liegen.
+#:
+#: Warum das noetig ist: das Universum wird nach 24-Stunden-Umsatz sortiert und unten
+#: gekappt. Ein Coin, der an einem ruhigen Tag unter die Schwelle rutscht, verschwindet
+#: damit komplett aus dem Scan — und mit ihm jede Bewertung fuer eine Position, die man
+#: darin haelt. Das faellt niemandem auf, weil an der Stelle einfach nichts mehr steht.
+#: Fuer einen Wert, in dem Geld liegt, ist „heute kein Umsatz" aber gerade kein Grund,
+#: weniger hinzusehen, sondern einer, mehr hinzusehen.
+#:
+#: Die Auswahl folgt Marktkapitalisierung und Bekanntheit — also dem, was ein Scanner
+#: fuer Krypto ohnehin abdecken sollte.
+KERN_COINS: tuple[str, ...] = (
+    "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LINK", "AVAX", "DOT", "LTC",
+    "ARB", "OP", "INJ", "SEI", "RENDER", "FET", "NEAR", "ATOM", "TIA",
+    "SUI", "APT", "KAS", "TAO", "UNI", "AAVE", "FIL", "ICP", "ETC", "BCH",
+)
 
 #: Fenster fuer Yahoo: kein natives H4, also muss M5 lang genug sein, damit die
 #: MTF-Schicht H4 daraus bilden kann (55 Tage M5 ≈ 330 H4-Kerzen).
@@ -204,7 +227,7 @@ async def _krypto_quelle(limit: int) -> tuple[Any, str, list[Any], Any]:
                     max_symbole=limit,
                     min_umsatz=min_umsatz,
                     min_trades=min_trades,
-                    immer_dabei=(f"BTC{quote}", f"ETH{quote}"),
+                    immer_dabei=tuple(f"{c}{quote}" for c in KERN_COINS),
                 ),
             )
             if eintraege:
