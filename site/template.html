@@ -534,9 +534,10 @@ a{color:var(--accent); text-underline-offset:3px}
       <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Portfolio</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Plan</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Alarme</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">Bilanz</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p7" id="t7">Chat</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p8" id="t8">System</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">News</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p7" id="t7">Bilanz</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p8" id="t8">Chat</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p9" id="t9">System</button>
     </div>
   </div>
 </header>
@@ -569,14 +570,18 @@ a{color:var(--accent); text-underline-offset:3px}
   </section>
 
   <section class="panel" id="p6" role="tabpanel" aria-labelledby="t6" hidden>
-    <div id="bilanz"></div>
+    <div id="news"></div>
   </section>
 
   <section class="panel" id="p7" role="tabpanel" aria-labelledby="t7" hidden>
-    <div id="chat"></div>
+    <div id="bilanz"></div>
   </section>
 
   <section class="panel" id="p8" role="tabpanel" aria-labelledby="t8" hidden>
+    <div id="chat"></div>
+  </section>
+
+  <section class="panel" id="p9" role="tabpanel" aria-labelledby="t9" hidden>
     <div id="system"></div>
   </section>
 </main>
@@ -694,7 +699,7 @@ function gebuehrSatz(o, positionswert){
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
-const TITEL = ['Markt','Chart','Analyse','Portfolio','Plan','Alarme','Bilanz','Chat','System'];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Plan','Alarme','News','Bilanz','Chat','System'];
 function zeigeTab(i){
   TABS.forEach((t,k)=>{
     t.setAttribute('aria-selected', k===i ? 'true':'false');
@@ -702,7 +707,7 @@ function zeigeTab(i){
   });
   $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
   if (i===1) requestAnimationFrame(()=>chart.groesse());
-  if (i===7) zeichneChat();
+  if (i===8) zeichneChat();
   try { history.replaceState(null,'','#'+i); } catch(e){}
 }
 TABS.forEach((t,i)=>t.addEventListener('click',()=>zeigeTab(i)));
@@ -758,6 +763,7 @@ async function ladeScan(){
   sicher('Filter', zeichneFilter);
   sicher('Rangliste', zeichneRadar);
   sicher('System', zeichneSystem);
+  sicher('News', zeichneNews);
   sicher('Bilanz', zeichneBilanz);
   sicher('Alarme', zeichneAlarme);
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
@@ -898,6 +904,69 @@ function frischeAuf(){
   if (!$('p5').hidden && Date.now() - _alarmZuletzt > 2500){
     _alarmZuletzt = Date.now();
     zeichneAlarme();
+  }
+  // Laeuft IMMER, nicht nur wenn der Depot-Reiter offen ist. Ein Verkaufssignal, das
+  // man nur sieht, wenn man ohnehin gerade hinschaut, ist kein Signal.
+  pruefeDepotAlarme();
+  pruefeTerminAlarme();
+}
+
+/* =========================================== VERKAUFEN — ALARM FUERS DEPOT
+
+   „Wenn ich bei meinem Portfolio was verkaufen soll, will ich auch direkt einen Alarm."
+
+   Genau das. Der Scanner meldet Einstiege; was danach passiert, stand bisher nur im
+   Depot-Reiter und nur, wenn man ihn aufmacht. Hier wird bei jedem Kurs geprueft, ob
+   eine EIGENE Position ihren Stop oder ein Ziel erreicht hat — und dann meldet es sich.
+
+   Die Sperre liegt auf der Platte, nicht im Arbeitsspeicher: sonst meldet die App
+   dieselbe Sache bei jedem Neustart wieder. Und es meldet sich NUR, was zu tun ist —
+   „halten" ist kein Alarm. */
+function pruefeDepotAlarme(){
+  let pos;
+  try { pos = ladePositionen(); } catch(e){ return; }
+  if (!pos.length) return;
+  for (const p of pos){
+    let b;
+    try { b = bewertePosition(p); } catch(e){ continue; }
+    const schritt = naechsterSchritt(p, b.kurs);
+    if (!schritt || (schritt.stufe !== 'stop' && schritt.stufe !== 'ziel')) continue;
+    const key = 'verkauf:' + p.sym + ':' + (schritt.marke || 'stop');
+    if (gemeldetLaden()[key]) continue;
+    gemeldetMerken(key);
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
+      new Notification(`VERKAUFEN · ${name(p.sym)}`, {body: schritt.titel + ' — ' + schritt.text, tag: key});
+    } catch(e){}
+  }
+}
+
+/* ============================================ WICHTIGE TERMINE — ALARM
+
+   Eine Zinsentscheidung oder ein Arbeitsmarktbericht bewegt den ganzen Markt, und zwar
+   in Minuten. Das ist der zweite Fall, in dem eine Meldung wirklich etwas aendert:
+   nicht „kauf jetzt", sondern „in einer Stunde ist Fed — heute nichts Neues aufmachen".
+
+   Gemeldet wird nur, was wirklich schwer wiegt (Wirkung High) und nur einmal je Termin. */
+function pruefeTerminAlarme(){
+  const termine = (S && S.makro && S.makro.termine) || [];
+  if (!termine.length) return;
+  const jetzt = Date.now();
+  for (const t of termine){
+    if (t.wirkung !== 'High') continue;
+    const ts = Date.parse(t.zeitpunkt);
+    if (!isFinite(ts)) continue;
+    const min = (ts - jetzt) / 60000;
+    if (min < 0 || min > 60) continue;
+    const key = 'termin:' + t.titel + ':' + t.zeitpunkt;
+    if (gemeldetLaden()[key]) continue;
+    gemeldetMerken(key);
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
+      new Notification(`In ${Math.round(min)} Min: ${t.titel} (${t.land})`, {
+        body: 'Wichtiger Termin. Bis er durch ist, nichts Neues aufmachen — und bei '
+            + 'laufenden Positionen den Stop im Blick behalten.', tag: key});
+    } catch(e){}
   }
 }
 function abonniere(sym){ /* miniTicker liefert alle Symbole; nichts zu tun. */ }
@@ -1326,6 +1395,98 @@ const REGIME_TEXT = {
   neutral:  'gemischte Lage',
   risk_off: 'Risiko raus',
 };
+
+/* ==================================================== NEWS UND TERMINE
+
+   „Ich weiss nicht, ob du Live-News eingebaut hast — dass man sehen kann: heute
+   passiert das und das."
+
+   Hier steht es. Nicht Schlagzeilen — die sind fuer einen Swing-Trade meistens Laerm
+   und kommen sowieso zu spaet —, sondern der Wirtschaftskalender: die Termine, von
+   denen man VORHER weiss, dass sie den Markt bewegen. Zinsentscheidungen,
+   Arbeitsmarktdaten, Inflationszahlen.
+
+   Der Nutzen ist nicht die Zahl selbst, sondern das Timing: eine Stunde vor einer
+   Fed-Entscheidung eine neue Position aufzumachen ist kein Trade, sondern eine Wette
+   auf einen Wuerfel. Deshalb steht zu jedem Termin dabei, was er bedeutet. */
+/* Die kurze Fassung fuer den Alarme-Reiter: nur, wenn es wirklich gleich soweit ist. */
+function terminWarnung(){
+  const alle = (S && S.makro && S.makro.termine) || [];
+  const jetzt = Date.now();
+  const bald = alle
+    .map(t => ({...t, ts: Date.parse(t.zeitpunkt)}))
+    .filter(t => t.wirkung === 'High' && isFinite(t.ts) && t.ts > jetzt && t.ts - jetzt < 3*3600*1000)
+    .sort((a,b) => a.ts - b.ts)[0];
+  if (!bald) return '';
+  const min = Math.round((bald.ts - jetzt) / 60000);
+  return `<div class="note-box warn"><span class="nt">Gleich ist ein wichtiger Termin</span>
+    <p><strong>${esc(bald.titel)}</strong> (${esc(bald.land)}) in ${min < 60 ? min + ' Minuten' : Math.round(min/60) + ' Stunden'}.
+    Bis das durch ist, lieber nichts Neues aufmachen — solche Termine bewegen den ganzen
+    Markt in Minuten. Alle Termine stehen im Reiter <strong>News</strong>.</p></div>`;
+}
+
+function terminKasten(){
+  const alle = (S && S.makro && S.makro.termine) || [];
+  if (!alle.length) return '';
+  const jetzt = Date.now();
+  const kommend = alle
+    .map(t => ({...t, ts: Date.parse(t.zeitpunkt)}))
+    .filter(t => isFinite(t.ts) && t.ts > jetzt - 2*3600*1000 && t.ts < jetzt + 72*3600*1000)
+    .sort((a,b) => a.ts - b.ts);
+  if (!kommend.length) return `<div class="note-box"><span class="nt">Termine</span>
+    <p>In den nächsten drei Tagen steht nichts Großes an. Das ist eine gute Nachricht:
+    ruhige Tage sind die, an denen ein Setup auch das machen darf, was es soll.</p></div>`;
+
+  const hoch = kommend.filter(t => t.wirkung === 'High');
+  const naechster = hoch[0];
+  const stunden = naechster ? (naechster.ts - jetzt) / 3600000 : null;
+
+  const zeile = t => {
+    const wann = new Date(t.ts);
+    const heute = new Date().toDateString() === wann.toDateString();
+    const tag = heute ? 'heute' : wann.toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit'});
+    const uhr = wann.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+    const kl = t.wirkung === 'High' ? 'dn' : (t.wirkung === 'Medium' ? 'nu' : '');
+    const vergangen = t.ts < jetzt;
+    return `<tr style="${vergangen?'opacity:.45':''}">
+      <td class="mono" style="white-space:nowrap">${esc(tag)} ${esc(uhr)}</td>
+      <td>${esc(t.land||'')}</td>
+      <td class="tf">${esc(t.titel||'')}</td>
+      <td class="${kl}">${t.wirkung==='High'?'hoch':(t.wirkung==='Medium'?'mittel':'klein')}</td>
+      <td class="mono" style="color:var(--ink-3);font-size:11px">${
+        t.prognose!=null?`Prognose ${esc(String(t.prognose))}`:''}${
+        t.vorher!=null?` · vorher ${esc(String(t.vorher))}`:''}</td>
+    </tr>`;
+  };
+
+  let kopf = '';
+  if (naechster && stunden != null){
+    const dringend = stunden <= 2;
+    kopf = `<div class="note-box ${dringend?'warn':''}" style="margin-bottom:12px">
+      <span class="nt">Als Nächstes</span>
+      <p style="font-size:14px;margin:0 0 4px"><strong>${esc(naechster.titel)}</strong>
+        (${esc(naechster.land)}) — ${stunden < 1 ? `in ${Math.max(0,Math.round(stunden*60))} Minuten`
+          : `in ${stunden.toFixed(0)} Stunden`}</p>
+      <p style="margin:0">${dringend
+        ? 'Bis das durch ist, keine neue Position aufmachen. Solche Termine bewegen den '
+          + 'ganzen Markt in Minuten, und ein Stop, der vorher sinnvoll war, ist danach Zufall.'
+        : 'Weit genug weg, um normal zu handeln — aber wenn du eine Position über den '
+          + 'Termin hinweg hältst, weißt du jetzt, warum es ruckeln kann.'}</p></div>`;
+  }
+
+  return `<h2>Termine, die den Markt bewegen</h2>
+  <p class="lead">Keine Schlagzeilen — der Wirtschaftskalender. Das sind die Ereignisse,
+  von denen man <strong>vorher</strong> weiß, dass sie Kurse bewegen. ${kommend.length}
+  Termine in den nächsten drei Tagen, davon ${hoch.length} mit hoher Wirkung.</p>
+  ${kopf}
+  <div class="tw"><table class="mtf">
+    <tr><th>Wann</th><th>Land</th><th>Termin</th><th>Wirkung</th><th></th></tr>
+    ${kommend.slice(0,40).map(zeile).join('')}
+  </table></div>
+  <p class="leer">Nachrichten gehen <strong>nicht</strong> in den Score ein. Sie ändern
+  das Risiko, nicht die Richtung — und wer eine Zinsentscheidung handelt, handelt nicht
+  den Chart, sondern eine Münze.</p>`;
+}
 
 function makroKasten(){
   const M = S && S.makro;
@@ -2378,6 +2539,7 @@ function zeichneAlarme(){
       jedem Kurs. Es steht also nicht immer dasselbe da.</p>
   </div>`;
 
+  h += terminWarnung();
   h += `<h2>Jetzt einsteigen</h2>`;
   h += jetzt.length ? jetzt.map(signalKarte).join('')
     : `<div class="alarm"><div class="ah"><span>Gerade kein Einstieg erreicht</span></div>
@@ -2688,6 +2850,12 @@ function chatLage(){
               `${Math.round(q[k].stop*100)} % Stop, Schnitt ${q[k].schnitt_r} R`);
     if (zeilen.length) teile.push('TREFFERQUOTEN NACH GRUPPE:\n' + zeilen.join('\n'));
   }
+  const term = ((S && S.makro && S.makro.termine) || [])
+    .map(x=>({...x, ts:Date.parse(x.zeitpunkt)}))
+    .filter(x=>x.wirkung==='High' && isFinite(x.ts) && x.ts>Date.now() && x.ts<Date.now()+72*3600*1000)
+    .sort((a,b)=>a.ts-b.ts).slice(0,6);
+  if (term.length) teile.push('WICHTIGE TERMINE (naechste 3 Tage):\n' + term.map(x =>
+    `- ${new Date(x.ts).toISOString().slice(0,16)} ${x.land} ${x.titel}`).join('\n'));
   teile.push(`AUSFUEHRUNG: Krypto ueber Bybit oder Kraken in USDT, Gebuehr rund 0,1 % je Seite. ` +
     `Einzelaktien nur ueber Trade Republic in EURO, 1 Euro pro Ausfuehrung — bei kleinen ` +
     `Positionen frisst das den Gewinn, das gehoert in jede Aktienantwort.` +
@@ -2870,6 +3038,46 @@ function lokaleAntwort(frage){
       return `**${name(p.sym)}** — ${schritt ? schritt.titel + ': ' + schritt.text : 'kein Ausstiegsplan hinterlegt'}`;
     }).join('\n\n');
   }
+  // Begriffe erklaeren. Das ist der haeufigste Teil einer echten Unterhaltung: nicht
+  // „kauf oder nicht", sondern „was heisst das eigentlich". Dafuer braucht es kein Modell.
+  const LEXIKON = [
+    [/\bstop|stoploss|stop-loss/, 'Der **Stop** ist der Kurs, an dem die Idee widerlegt ist — nicht der Kurs, an dem es weh tut. Er gehört hinter den letzten Strukturpunkt, nicht knapp unter den Einstieg. Ohne Stop ist ein Trade keine Position, sondern eine Hoffnung. In deinem eigenen Buch brachten Stops ab 4 % Abstand −0,38 R, die engeren −0,11 R.'],
+    [/\bcrv\b|chance.?risiko|risk.?reward|\brr\b/, 'Das **CRV** ist Gewinn geteilt durch Risiko: 1:2 heißt, du riskierst 1 € um 2 € zu verdienen. Unter 1:1,5 lohnt es sich nicht. Aber Vorsicht — ein sehr hohes CRV kommt meistens daher, dass das Ziel weit weg ist, und genau die Trades liefen bei dir am schlechtesten (CRV 3–5: −0,57 R).'],
+    [/\br.?multiple|\bwas ist r\b|\bin r\b/, '**R** ist dein Risiko als Maßeinheit. Riskierst du 6 € und gewinnst 12 €, sind das +2 R. Der Vorteil: Bitcoin und eine Aktie werden vergleichbar, egal wie teuer sie sind. Deshalb steht in der Bilanz alles in R und nicht in Euro.'],
+    [/\batr\b/, '**ATR** ist die durchschnittliche Tagesspanne — wie weit sich ein Wert normalerweise bewegt. 2 % sind bei Bitcoin Rauschen und bei einer Aktie eine Bewegung. Deshalb wird alles in ATR gemessen und nicht in Prozent.'],
+    [/\bbos\b|choch|struktur/, 'Ein Trend ist eine Folge höherer Hochs und Tiefs. **BOS** heißt, diese Folge wird in Trendrichtung bestätigt. **CHoCH** heißt, sie bricht gegen den Trend — der erste Hinweis auf eine Wende, noch nicht die Wende selbst.'],
+    [/\bfvg\b|fair value|order block|\bob\b/, 'Eine **Fair Value Gap** ist eine Lücke, die der Kurs oft noch einmal anläuft — ein möglicher Einstiegsbereich, kein Signal für sich. Ein **Order Block** ist die letzte Kerze vor einer starken Bewegung; dort saßen die großen Orders.'],
+    [/liquidit|sweep|docht/, '**Liquidität** liegt da, wo die Stops liegen: über alten Hochs, unter alten Tiefs. Ein Docht durch ein altes Tief mit sofortiger Rückkehr darüber ist ein **Sweep** — dort wurde eingesammelt, und das ist das Gegenteil von einem Bruch.'],
+    [/wie viel.*(kauf|position|gross)|positionsgr/, 'Die **Positionsgröße** ist Risikobetrag geteilt durch Stopabstand, nie Bauchgefühl. Bei 0,5 % Risiko auf 1.200 € sind das 6 € Risiko; liegt der Stop 2 % entfernt, sind das 300 € Position. Auf jeder Signalkarte steht die Rechnung schon fertig.'],
+    [/gebühr|gebuehr|kosten|spread/, 'Bybit nimmt 0,10 % je Seite, Kraken Pro 0,40 % (Limit) bis 0,80 % (Market), die einfache Kraken-App 1–1,5 %. Trade Republic 1 € je Ausführung. Bei 4 % erwartetem Gewinn ist der Unterschied zwischen 0,2 % und 1,6 % Rundlauf der Unterschied zwischen lohnt sich und lohnt sich nicht.'],
+    [/no.?trade|nicht handeln|abwarten/, '**Kein Trade ist ein Ergebnis**, kein Versagen. Unklare Struktur, zu weit gelaufen, schlechtes CRV, Klumpen im Depot, wichtiger Termin gleich — dann ist Nichtstun die richtige Arbeit.'],
+    [/termin|news|nachricht|fed|zins|cpi/, () => {
+      const t = (S && S.makro && S.makro.termine) || [];
+      const jetzt = Date.now();
+      const naechste = t.map(x=>({...x, ts:Date.parse(x.zeitpunkt)}))
+        .filter(x=>x.wirkung==='High' && isFinite(x.ts) && x.ts>jetzt)
+        .sort((a,b)=>a.ts-b.ts).slice(0,3);
+      if (!naechste.length) return 'In den nächsten Tagen steht nichts Großes an.';
+      return 'Die nächsten wichtigen Termine:\n\n' + naechste.map(x =>
+        `**${x.titel}** (${x.land}) — ${new Date(x.ts).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'})}`
+      ).join('\n') + '\n\nNews gehen nicht in den Score ein. Sie ändern das Risiko, nicht die Richtung — '
+        + 'kurz vor so einem Termin macht man nichts Neues auf. Alles steht im Reiter News.';
+    }],
+    [/verkauf|exit|aussteig|wann raus/, () => {
+      const pos = ladePositionen();
+      if (!pos.length) return 'Du hast nichts im Depot eingetragen. Sobald eine Position drin ist, '
+        + 'sagt die App bei jedem Kurs, was als Nächstes zu tun ist — halten, Teilverkauf oder raus.';
+      return pos.map(p => {
+        const b = bewertePosition(p);
+        const sch = naechsterSchritt(p, b.kurs);
+        return `**${name(p.sym)}** — ${sch ? sch.titel + ': ' + sch.text : 'kein Ausstiegsplan hinterlegt'}`;
+      }).join('\n\n');
+    }],
+  ];
+  for (const [muster, antwort] of LEXIKON){
+    if (muster.test(t)) return typeof antwort === 'function' ? antwort() : antwort;
+  }
+
   return 'Nenn mir einen Wert beim Namen — zum Beispiel „soll ich bei Bitcoin rein?" oder '
     + '„was ist mit NVIDIA?". Dann sage ich dir, was das System gerade dazu sieht: Note, Setup, '
     + 'Einstieg, Stop, Ziele, was dagegen spricht und wie oft so etwas bisher aufging.\n\n'
@@ -3297,6 +3505,12 @@ function quotenKasten(){
   </table></div>`;
 }
 
+function zeichneNews(){
+  const el = $('news');
+  if (!el) return;
+  el.innerHTML = terminKasten() || `<p class="leer">Der Terminkalender ist gerade nicht geladen.</p>`;
+}
+
 function zeichneBilanz(){
   let h = bilanzKasten();
   h += quotenKasten();
@@ -3379,6 +3593,7 @@ function start(){
   $('built').textContent = 'Gebaut: ' + (D.built_at || '—') +
     ' · Setup ' + (D.setup||'') + ' · ' + (D.params_version||'');
   zeichnePlan(); zeichneAlarme(); zeichnePortfolio(); zeichneSystem(); zeichneBilanz();
+  zeichneNews();
   $('chartansicht').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
   $('analyse').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
   const t = parseInt((location.hash||'').replace('#',''), 10);
