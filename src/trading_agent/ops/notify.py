@@ -322,11 +322,47 @@ class GitHubIssueSink(Sink):
         )
         return "\n\n".join(teile)
 
+    def _kopf(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self._token.reveal()}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+
+    def _schon_offen(self, titel: str) -> bool:
+        """Gibt es zu dieser Meldung schon ein offenes Issue?
+
+        Ohne diese Pruefung entstand fuer dieselbe Lage in jedem Lauf ein neues Issue —
+        „STOP FFUSDT" stand zweimal da, „STOP CRVUSDT" auch. Auf dem Telefon ist das
+        kein Schoenheitsfehler: es ist genau die Wiederholung, die dazu fuehrt, dass man
+        die Meldungen abschaltet. Ein Ereignis, ein Issue; solange es offen ist, kommt
+        nichts Neues dazu.
+        """
+        try:  # pragma: no cover - echter Netzwerkpfad
+            import httpx
+
+            antwort = httpx.get(
+                f"https://api.github.com/repos/{self._repo}/issues",
+                params={"state": "open", "labels": "signal", "per_page": 100},
+                headers=self._kopf(),
+                timeout=15.0,
+            )
+            antwort.raise_for_status()
+            daten = antwort.json()
+        except Exception as exc:  # pragma: no cover
+            # Im Zweifel melden: eine verpasste Meldung ist schlimmer als eine doppelte.
+            self.fehler.append(f"Dubletten-Pruefung fehlgeschlagen: {type(exc).__name__}")
+            return False
+        return any(str(row.get("title") or "") == titel for row in daten if isinstance(row, dict))
+
     def deliver(self, note: Notification) -> None:
         if not self.available() or note.severity < self.min_severity:
             return
+        titel = self._titel(note)
+        if self._transport is None and self._schon_offen(titel):
+            return
         url = f"https://api.github.com/repos/{self._repo}/issues"
-        payload = {"title": self._titel(note), "body": self._text(note), "labels": ["signal"]}
+        payload = {"title": titel, "body": self._text(note), "labels": ["signal"]}
         if self._transport is not None:
             self._transport(url, payload)  # type: ignore[operator]
             self.sent += 1
@@ -334,16 +370,7 @@ class GitHubIssueSink(Sink):
         try:  # pragma: no cover - echter Netzwerkpfad
             import httpx
 
-            antwort = httpx.post(
-                url,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {self._token.reveal()}",
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                timeout=15.0,
-            )
+            antwort = httpx.post(url, json=payload, headers=self._kopf(), timeout=15.0)
             antwort.raise_for_status()
             self.sent += 1
         except Exception as exc:  # pragma: no cover - echter Netzwerkpfad
