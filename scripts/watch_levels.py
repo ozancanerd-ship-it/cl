@@ -62,6 +62,44 @@ def _laden(pfad: str) -> dict[str, Any] | None:
     return d if isinstance(d, dict) else None
 
 
+#: So lange darf eine offene Wache ohne Kurs bleiben, bevor sie geschlossen wird.
+#: Grosszuegig, weil ein einzelner Ausfall der Boerse keine Position beenden soll.
+OHNE_KURS_STUNDEN = 30.0
+
+
+def _raeume_zombies(liste: Any, kurse: dict[str, dict[str, float]], jetzt: datetime) -> int:
+    """Offene Wachen schliessen, fuer die es seit Tagen keinen Kurs mehr gibt.
+
+    Ohne das entstehen Karteileichen: als der Scan von Binance-USDT auf Kraken-EURO
+    umgestellt wurde, gab es fuer ``SOLUSDT`` schlagartig keine Kurse mehr. Die Wache
+    haette dort bis in alle Ewigkeit gestanden — offen, unbewegt, und in jeder Statistik
+    als laufender Trade mitgezaehlt. Eine Position, die niemand mehr beobachten kann,
+    ist keine offene Position, sondern eine Luecke in der Buchfuehrung.
+
+    Geschlossen wird als ``abgelaufen`` (also mit 0 R, nicht als Verlust): was nie
+    einen Kurs bekam, hat auch nichts gekostet.
+    """
+    zu = 0
+    for w in list(getattr(liste, "wachen", {}).values()):
+        if w.zustand in ("stop", "ziel_erreicht", "invalidiert", "abgelaufen"):
+            continue
+        if w.instrument in kurse:
+            continue
+        try:
+            zuletzt = datetime.fromisoformat(str(w.zuletzt))
+        except (TypeError, ValueError):
+            continue
+        if (jetzt - zuletzt).total_seconds() / 3600.0 < OHNE_KURS_STUNDEN:
+            continue
+        w.zustand = "abgelaufen"
+        w.zuletzt = jetzt.isoformat()
+        zu += 1
+        print(f"  {w.instrument:<14} geschlossen — seit ueber {OHNE_KURS_STUNDEN:.0f} h kein Kurs")
+    if zu:
+        print(f"  {zu} Karteileiche(n) geschlossen")
+    return zu
+
+
 async def _extrema(
     namen_je_klasse: dict[str, list[str]], seit: datetime, bis: datetime
 ) -> tuple[dict[str, dict[str, float]], dict[str, list[Any]]]:
@@ -199,10 +237,25 @@ async def main() -> int:
         kurse, reihen = await _extrema(je_klasse, seit, jetzt)
         print(f"Kurse fuer {len(kurse)} von {len(offen)} Werten")
         ereignisse += liste.pruefen(kurse, jetzt=jetzt, kerzen=reihen)
+        _raeume_zombies(liste, kurse, jetzt)
 
-    # Neue Setups unterhalb von A− landen auf der Wachliste und in der App, aber nicht
-    # aufs Telefon. Alles, was einen laufenden Trade betrifft, geht immer raus.
-    zu_senden = [e for e in ereignisse if e.art != "NEUES_SETUP" or e.dringend or args.alle_setups]
+    # WAS AUFS TELEFON DARF — und was nicht.
+    #
+    # Ozans Einwand, woertlich: „mein Handy kriegt die ganze Zeit Nachrichten, wenn er
+    # sich neu aktualisiert hat. Ich will nur Alarme bekommen, wo ich reingehen kann."
+    # Er hat recht. Vorher ging fast alles raus: jede neue Wache, jeder angepasste Plan,
+    # jede abgelaufene Idee. Das sind Zustandsaenderungen eines Programms, keine
+    # Handlungsaufforderungen — und ein Telefon, das bei jeder davon summt, wird
+    # stummgeschaltet. Dann kommt auch das Wichtige nicht mehr an.
+    #
+    # Auf dem Telefon landen nur noch die drei Momente, in denen wirklich etwas zu tun
+    # oder zu wissen ist:
+    #   EINSTIEG — der Kurs ist da UND bestaetigt. Jetzt oder nie.
+    #   TP       — ein Ziel ist erreicht, Teilverkauf und Stop nachziehen.
+    #   STOP     — die Position ist raus.
+    # Alles andere steht in der App, wo man es nachliest, wenn man hinsieht.
+    AUFS_TELEFON = {"EINSTIEG", "TP", "STOP"}
+    zu_senden = [e for e in ereignisse if e.art in AUFS_TELEFON or args.alle_setups]
     still = len(ereignisse) - len(zu_senden)
 
     print(
