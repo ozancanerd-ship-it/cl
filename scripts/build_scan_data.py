@@ -97,9 +97,22 @@ AKTIEN = [
     "CRM",
 ]
 
-#: Gold ueber Binance-Spot: 1:1 physisch hinterlegt und mit Ozans Konten kaufbar.
-#: Der Yahoo-Weg ueber GC=F liefert den Future — ein Signal ohne Ausfuehrungsmoeglichkeit.
-GOLD = ["PAXGUSDT", "XAUTUSDT"]
+#: Gold ueber Kraken in EURO: PAXG ist 1:1 physisch hinterlegt und bei Kraken direkt
+#: in Euro handelbar. Der Yahoo-Weg ueber GC=F liefert den Future — ein Signal ohne
+#: Ausfuehrungsmoeglichkeit.
+GOLD = ["PAXGEUR"]
+
+#: Die Schwellen fuer das Krypto-Universum bei Kraken, in EURO.
+#:
+#: Die Zahlen sind niedriger als frueher, und das ist kein Nachlassen: der Euro-Markt
+#: bei Kraken ist kleiner als der USDT-Markt bei Binance. 300.000 € Tagesumsatz klingt
+#: wenig, ist es fuer eine Position von 50 bis 200 € aber nicht — dort ist sie ein
+#: Tropfen. Gleichzeitig bleibt die Pruefung auf die Zahl der Abschluesse, weil viel
+#: Umsatz aus wenigen Grossorders keine Tiefe ist.
+KRYPTO_QUOTE = "EUR"
+KRYPTO_MIN_UMSATZ = 300_000.0
+KRYPTO_MIN_TRADES = 300
+KRYPTO_IMMER = ("BTCEUR", "ETHEUR")
 
 #: Fenster fuer Yahoo: kein natives H4, also muss M5 lang genug sein, damit die
 #: MTF-Schicht H4 daraus bilden kann (55 Tage M5 ≈ 330 H4-Kerzen).
@@ -161,11 +174,29 @@ def _bewerter_mit_makro(lage: MacroLage | None, klasse: str) -> Any:
 async def _krypto(
     profil: Profil, limit: int, verarbeite: Any, lage: MacroLage | None
 ) -> tuple[list[Any], dict[str, Any], str | None]:
-    from trading_agent.data.providers.binance import BinancePublicDataProvider
+    # Kraken statt Binance — und in Euro.
+    #
+    # Ozan handelt bei Bybit, Kraken und Trade Republic. Binance ist keins davon. Ein
+    # Signal auf ein Paar, das es bei seinen Boersen nicht gibt, ist kein Signal,
+    # sondern Arbeit fuer nichts — und genau das war der Scan bisher zu einem guten
+    # Teil. Bybit waere die erste Wahl (0,1 % statt 0,4 % Gebuehr), ist aus der CI
+    # aber per CloudFront gesperrt (HTTP 403); dieselben Coins liegen dort ohnehin als
+    # USDT-Paar. Also: Kraken als Quelle, Euro als Waehrung, Bybit als Alternative
+    # beim Ausfuehren.
+    from trading_agent.data.providers.kraken import KrakenDataProvider
 
-    prov = BinancePublicDataProvider(market="spot")
+    prov = KrakenDataProvider()
     try:
-        eintraege, bericht = await hole_universum(prov, UniversumFilter(max_symbole=limit))
+        eintraege, bericht = await hole_universum(
+            prov,
+            UniversumFilter(
+                quote=KRYPTO_QUOTE,
+                max_symbole=limit,
+                min_umsatz=KRYPTO_MIN_UMSATZ,
+                min_trades=KRYPTO_MIN_TRADES,
+                immer_dabei=KRYPTO_IMMER,
+            ),
+        )
         namen = [e.instrument for e in eintraege]
         zusatz = {e.instrument: e.as_dict() for e in eintraege}
         print(
@@ -202,10 +233,12 @@ async def _krypto(
 async def _gold(
     profil: Profil, verarbeite: Any, lage: MacroLage | None
 ) -> tuple[list[Any], dict[str, Any], str | None]:
-    from trading_agent.data.providers.binance import BinancePublicDataProvider
+    from trading_agent.data.providers.kraken import KrakenDataProvider
 
-    prov = BinancePublicDataProvider(market="spot")
+    prov = KrakenDataProvider()
     try:
+        # Kraken braucht die Paarliste einmal, um BTCEUR -> XXBTZEUR aufloesen zu koennen.
+        await prov.list_symbol_info(quote=KRYPTO_QUOTE)
         erg = await scanne(
             prov,
             GOLD,

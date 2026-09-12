@@ -94,10 +94,16 @@ async def _extrema(
 
     krypto = namen_je_klasse.get("krypto", []) + namen_je_klasse.get("gold", [])
     if krypto:
-        from trading_agent.data.providers.binance import BinancePublicDataProvider
+        # Kraken, nicht Binance: die Wachliste muss dieselben Kurse sehen wie der
+        # Scan, sonst wird eine Marke auf einer Boerse getroffen und auf der anderen
+        # nicht — und die Bilanz misst danach etwas, das niemand haette handeln koennen.
+        from trading_agent.data.providers.kraken import KrakenDataProvider
 
-        prov = BinancePublicDataProvider(market="spot")
+        prov = KrakenDataProvider()
         try:
+            # Einmal die Paarliste holen, damit BTCEUR -> XXBTZEUR aufgeloest wird.
+            with contextlib.suppress(Exception):
+                await prov.list_symbol_info(quote="EUR")
             await sammle(prov, krypto)
         finally:
             with contextlib.suppress(Exception):
