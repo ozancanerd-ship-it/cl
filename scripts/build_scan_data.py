@@ -331,6 +331,13 @@ async def _aktien(
     from trading_agent.data.providers.yahoo_finance import YahooFinanceProvider
 
     prov = YahooFinanceProvider()
+    # Ein Limit unter der Listenlaenge schneidet hinten ab — und zwar lautlos. Genau so
+    # sind TSM und NFLX aus dem Scan gefallen, kaum dass sie drin standen: die Liste hatte
+    # 42 Eintraege, der Lauf holte 40. In der App stand dann bei den Turbos auf TSMC und
+    # Netflix weiter „keine Bewertung", ohne dass irgendwo ein Fehler zu sehen war.
+    if limit < len(AKTIEN):
+        fehlt = ", ".join(AKTIEN[limit:])
+        print(f"::warning::Aktienlimit {limit} < {len(AKTIEN)} — nicht gescannt: {fehlt}")
     try:
         erg = await scanne(
             prov,
