@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-13T19:52:09.531567+00:00",
+  "stand": "2026-09-13T20:07:14.787773+00:00",
   "wachen": {
     "AMD": {
       "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
@@ -260,7 +260,7 @@
       "tp2": 752.91,
       "tp3": 777.48,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "BOMEUSDT": {
@@ -312,7 +312,7 @@
       "tp2": 78484.50000000003,
       "tp3": 80206.7,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "CAT": {
@@ -497,7 +497,7 @@
       "tp2": 0.3867,
       "tp3": 0.40859,
       "trigger": "Der Kurs muss ueber 0.3304 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "aktiv"
     },
     "CRWD": {
@@ -793,10 +793,10 @@
     },
     "HYPEUSD": {
       "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
-      "bestes_r": 0.0,
+      "bestes_r": 0.04,
       "einstieg": 77.93,
       "einstieg_art": "Ruecklauf in FVG M15",
-      "einstiegskurs": null,
+      "einstiegskurs": 78.1,
       "erreicht": [],
       "erwartet_pct": 11.37,
       "instrument": "HYPEUSD",
@@ -805,7 +805,7 @@
       "richtung": "long",
       "rr": 3.13,
       "rs": 42.0,
-      "schlechtestes_r": 0.0,
+      "schlechtestes_r": -0.1,
       "score": 59.4,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 75.09676292307188,
@@ -814,8 +814,8 @@
       "tp2": 86.79,
       "tp3": 88.35,
       "trigger": "Der Kurs muss ueber 78.1500 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
+      "zustand": "aktiv"
     },
     "ICPUSD": {
       "aufgenommen": "2026-09-13T18:22:43.002459+00:00",
@@ -840,7 +840,7 @@
       "tp2": 3.1454999999999997,
       "tp3": 3.320499999999999,
       "trigger": "Der Kurs muss ueber 2.6940 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "aktiv"
     },
     "ICPUSDT": {
@@ -996,7 +996,7 @@
       "tp2": 57.400000000000006,
       "tp3": 59.53,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 54.5500 — nicht beim Antippen.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "aktiv"
     },
     "LUNAUSDT": {
@@ -1397,7 +1397,7 @@
       "tp2": 69.87,
       "tp3": 71.28499999999997,
       "trigger": "",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "aktiv"
     },
     "RAYUSDT": {
@@ -1609,7 +1609,7 @@
       "tp3": 0.4152,
       "trigger": "Der Kurs muss ueber 0.3512 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
       "zuletzt": "2026-09-13T19:52:03.546933+00:00",
-      "zustand": "aktiv"
+      "zustand": "invalidiert"
     },
     "TRUMPUSDT": {
       "aufgenommen": "2026-09-10T09:04:08.672304+00:00",
@@ -1636,35 +1636,6 @@
       "trigger": "",
       "zuletzt": "2026-09-13T17:37:12.768172+00:00",
       "zustand": "abgelaufen"
-    },
-    "TRXUSDT": {
-      "aufgenommen": "2026-09-06T13:35:29.080066+00:00",
-      "bestes_r": 2.87,
-      "einstieg": 0.3342,
-      "einstieg_art": "sofort",
-      "einstiegskurs": 0.3342,
-      "erreicht": [
-        "TP1",
-        "TP2"
-      ],
-      "erwartet_pct": 1.5,
-      "instrument": "TRXUSDT",
-      "klasse": "krypto",
-      "note": "B",
-      "richtung": "long",
-      "rr": 2.08,
-      "rs": null,
-      "schlechtestes_r": -0.17,
-      "score": 36.1,
-      "setup": "",
-      "stop": 0.3318,
-      "these": "",
-      "tp1": 0.3377,
-      "tp2": 0.3392,
-      "tp3": 0.342,
-      "trigger": "",
-      "zuletzt": "2026-09-12T01:47:16.983761+00:00",
-      "zustand": "invalidiert"
     },
     "TSLA": {
       "aufgenommen": "2026-09-09T14:39:28.989737+00:00",
@@ -1848,7 +1819,7 @@
       "tp2": 565.76,
       "tp3": 596.105,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-13T19:52:03.546933+00:00",
+      "zuletzt": "2026-09-13T20:07:08.431055+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "XOM": {
