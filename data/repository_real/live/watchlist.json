@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-13T17:59:51.063362+00:00",
+  "stand": "2026-09-13T18:22:49.782389+00:00",
   "wachen": {
     "AMD": {
       "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
@@ -260,7 +260,7 @@
       "tp2": 752.91,
       "tp3": 777.48,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "BOMEUSDT": {
@@ -312,7 +312,7 @@
       "tp2": 78484.50000000003,
       "tp3": 80206.7,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "CAT": {
@@ -497,7 +497,7 @@
       "tp2": 0.3867,
       "tp3": 0.40859,
       "trigger": "Der Kurs muss ueber 0.3304 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
       "zustand": "aktiv"
     },
     "CRWD": {
@@ -814,7 +814,33 @@
       "tp2": 86.79,
       "tp3": 88.35,
       "trigger": "Der Kurs muss ueber 78.1500 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
+      "zustand": "wartet_auf_einstieg"
+    },
+    "ICPUSD": {
+      "aufgenommen": "2026-09-13T18:22:43.002459+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 2.792,
+      "einstieg_art": "sofort",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 9.96,
+      "instrument": "ICPUSD",
+      "klasse": "krypto",
+      "note": "B+",
+      "richtung": "long",
+      "rr": 2.34,
+      "rs": 61.9,
+      "schlechtestes_r": 0.0,
+      "score": 43.5,
+      "setup": "Rueckeroberung nach Liquiditaetsgriff",
+      "stop": 2.641,
+      "these": "Dort lagen die Stops. Sie wurden geholt, und der Kurs kam sofort zurueck — das ist die Stelle, an der eine Bewegung oft beginnt, weil die Gegenseite gerade ausgestoppt wurde.",
+      "tp1": 3.07,
+      "tp2": 3.1454999999999997,
+      "tp3": 3.320499999999999,
+      "trigger": "Der Kurs muss ueber 2.6940 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ICPUSDT": {
@@ -949,10 +975,10 @@
     },
     "LTCUSD": {
       "aufgenommen": "2026-09-13T17:49:23.467881+00:00",
-      "bestes_r": 0.0,
+      "bestes_r": 0.05,
       "einstieg": 54.64,
       "einstieg_art": "sofort",
-      "einstiegskurs": null,
+      "einstiegskurs": 54.75,
       "erreicht": [],
       "erwartet_pct": 2.96,
       "instrument": "LTCUSD",
@@ -961,7 +987,7 @@
       "richtung": "long",
       "rr": 2.0,
       "rs": 47.4,
-      "schlechtestes_r": 0.0,
+      "schlechtestes_r": -0.12,
       "score": 50.3,
       "setup": "Ausbruch aus der Basis",
       "stop": 53.26,
@@ -970,8 +996,8 @@
       "tp2": 57.400000000000006,
       "tp3": 59.53,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 54.5500 — nicht beim Antippen.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
+      "zustand": "aktiv"
     },
     "LUNAUSDT": {
       "aufgenommen": "2026-09-07T22:36:02.809148+00:00",
@@ -1535,10 +1561,10 @@
     },
     "TIAUSD": {
       "aufgenommen": "2026-09-13T17:49:23.467881+00:00",
-      "bestes_r": 0.0,
+      "bestes_r": 0.01,
       "einstieg": 0.3594,
       "einstieg_art": "sofort",
-      "einstiegskurs": null,
+      "einstiegskurs": 0.3615,
       "erreicht": [],
       "erwartet_pct": 7.46,
       "instrument": "TIAUSD",
@@ -1547,7 +1573,7 @@
       "richtung": "long",
       "rr": 2.21,
       "rs": 14.2,
-      "schlechtestes_r": 0.0,
+      "schlechtestes_r": -0.13,
       "score": 50.0,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 0.3437,
@@ -1556,8 +1582,8 @@
       "tp2": 0.39405,
       "tp3": 0.4152,
       "trigger": "Der Kurs muss ueber 0.3512 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
+      "zustand": "aktiv"
     },
     "TRUMPUSDT": {
       "aufgenommen": "2026-09-10T09:04:08.672304+00:00",
@@ -1796,7 +1822,7 @@
       "tp2": 565.76,
       "tp3": 596.105,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-13T17:59:46.105459+00:00",
+      "zuletzt": "2026-09-13T18:22:43.002459+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "XOM": {
