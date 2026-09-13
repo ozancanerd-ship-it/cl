@@ -309,7 +309,19 @@ jobs:
     timeout-minutes: 10
     concurrency:
       group: pages
-      cancel-in-progress: true   # die neuere Seite ist immer die richtige
+      # NICHT abbrechen — das war der zweite Fehler an diesem Tag.
+      #
+      # Erst dachte ich: die neuere Seite ist immer die richtige, also darf ein neuer
+      # Lauf den alten Deploy abschiessen. In der Praxis startet hier alle paar Minuten
+      # ein Lauf. Jeder hat den Deploy des vorigen abgebrochen und wurde selbst vom
+      # naechsten abgebrochen — veroeffentlicht wurde gar nichts mehr. Der Scan lief,
+      # die Daten waren frisch, und die Seite blieb trotzdem stehen.
+      #
+      # Warteschlange ist hier richtig. Gegen das Haengen hilft nicht der Abbruch,
+      # sondern die Zeitgrenze oben und die getrennte Sperre: der Scan liegt in einer
+      # eigenen Gruppe und kann von einem klemmenden Deploy nicht mehr aufgehalten
+      # werden.
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
