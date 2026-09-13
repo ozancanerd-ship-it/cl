@@ -63,9 +63,20 @@ on:
       # steht es nochmal ausdruecklich — eine Endlosschleife waere teuer und peinlich.
       - "data/repository_real/live/**"
 
-concurrency:
-  group: taeglicher-tagesplan
-  cancel-in-progress: false   # ein laufender Schreibvorgang wird nicht abgebrochen
+# KEINE Sperre auf Workflow-Ebene mehr — die hat am 12.09. den ganzen Scan lahmgelegt.
+#
+# Vorher lagen Scan und Veroeffentlichung in EINER Gruppe (`taeglicher-tagesplan`) mit
+# `cancel-in-progress: false`. Die Veroeffentlichung haengt an der Umgebung `github-pages`,
+# und eine Umgebung kann beliebig lange auf ihre Freigabe warten — diese Wartezeit zaehlt
+# nicht gegen `timeout-minutes`. Ein einziger haengender Deploy hat damit jeden folgenden
+# Lauf in die Warteschlange gestellt: 17 Stunden lang kein Scan, keine Alarme, und in der
+# App stand weiter eine Analyse von gestern Abend, als waere sie aktuell.
+#
+# Jetzt hat jeder Job seine eigene Sperre:
+#   * Scan: weiter ohne Abbruch — ein laufender Schreibvorgang darf nicht zerrissen werden.
+#     Der Job hat ein hartes Zeitlimit, kann also nicht ewig stehen.
+#   * Veroeffentlichung: mit Abbruch. Eine Seite neu zu bauen ist wiederholbar; die
+#     neuere Fassung ist immer die richtige. Dazu ein eigenes Zeitlimit.
 
 permissions:
   contents: write   # Journalzeile zurueckschreiben
@@ -77,6 +88,9 @@ jobs:
   tagesplan:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    concurrency:
+      group: scan
+      cancel-in-progress: false   # ein laufender Schreibvorgang wird nicht abgebrochen
     steps:
       - uses: actions/checkout@v4
 
@@ -292,9 +306,20 @@ jobs:
     needs: tagesplan
     if: github.event.schedule != '*/5 * * * *'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: pages
+      cancel-in-progress: true   # die neuere Seite ist immer die richtige
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # Nicht ewig auf die Pages-Umgebung warten. Ohne Grenze steht der Job in
+          # „Waiting", das Zeitlimit oben greift dort nicht, und der naechste Lauf
+          # stellt sich dahinter an. Lieber ein fehlgeschlagener Deploy als eine
+          # Warteschlange, die den Scan mitnimmt.
+          timeout: 300000
+          error_count: 5
