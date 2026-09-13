@@ -4209,8 +4209,8 @@ function dauerKasten(){
       ).join('')}</div>`:''}
     ${(kurzeste && laengste && kurzeste[0] !== laengste[0])?`
     <p style="margin:9px 0 0;font-size:13px"><strong>Die kurzen Trades gibt es schon —
-      es sind die Coins.</strong> ${esc(NAME_KLASSE[kurzeste[0]]||kurzeste[0])} sind im Median nach
-      ${dauerText(kurzeste[1].median_h)} entschieden, ${esc(NAME_KLASSE[laengste[0]]||laengste[0])} brauchen
+      es sind die Coins.</strong> ${esc(NAME_KLASSE[kurzeste[0]]||kurzeste[0])} brauchen im Median
+      ${dauerText(kurzeste[1].median_h)} bis zur Entscheidung, ${esc(NAME_KLASSE[laengste[0]]||laengste[0])}
       ${dauerText(laengste[1].median_h)}. Wer kurz will, filtert also nicht nach einem neuen
       Signaltyp, sondern nimmt die Krypto-Seite.</p>`:''}
     <p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">
