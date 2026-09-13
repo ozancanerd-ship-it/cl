@@ -908,9 +908,51 @@ function frischeAuf(){
   // Laeuft IMMER, nicht nur wenn der Depot-Reiter offen ist. Ein Verkaufssignal, das
   // man nur sieht, wenn man ohnehin gerade hinschaut, ist kein Signal.
   pruefeDepotAlarme();
+  pruefeAktionsAlarme();
   pruefeUrteilWechsel();
   pruefeTerminAlarme();
   pruefeStillstand();
+}
+
+/* ============================== ALARM FUER DIE HANDLUNG IM DEPOT
+
+   „Ich will auch Alarme bekommen, wenn er sagt verkauf das aus meinem Depot oder geh
+   mehr rein."
+
+   Das ist etwas anderes als die Alarme darunter. Die melden feste Marken: Stop gerissen,
+   Ziel erreicht. Hier meldet sich die EINSCHAETZUNG, sobald sie eine Handlung verlangt —
+   ein Wert, der zum Schlusslicht seiner Klasse geworden ist, ein Klumpen, der zu gross
+   geworden ist, ein Wert, der stark ist und gerade ein Setup hat.
+
+   Drei Regeln gegen Laerm, weil Ozan zu Recht empfindlich darauf ist:
+     * „Halten" meldet sich nie. Nichtstun ist keine Nachricht.
+     * Jede Handlung meldet sich einmal je Wert, und der Schluessel enthaelt die Art —
+       aus Beobachten wird Verkaufen, das ist eine neue Nachricht; zweimal dasselbe
+       nicht. Die Sperre liegt auf der Platte und ueberlebt jeden Neustart.
+     * Aus einem toten Scan kommt gar nichts. Eine Handlungsaufforderung auf Basis von
+       Zahlen von gestern Abend ist schlimmer als keine. */
+function pruefeAktionsAlarme(){
+  if (!S || scanTot()) return;
+  const stand = depotStand();
+  if (!stand || !stand.bew.length) return;
+  for (const b of stand.bew){
+    let a;
+    try { a = positionsAktion(b, stand); } catch(e){ continue; }
+    if (!a || a.art === 'halten') continue;
+    // Stop und Ziel meldet bereits pruefeDepotAlarme — nicht zweimal fuer dieselbe Sache.
+    if (a.art === 'raus' || (a.art === 'teilverkauf' && /erreicht/.test(a.titel))) continue;
+    const key = 'aktion:' + b.pos.sym + ':' + a.art;
+    if (gemeldetLaden()[key]) continue;
+    gemeldetMerken(key);
+    try {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
+      const wieviel = (a.menge != null)
+        ? `${a.art==='nachlegen'?'Kaufen':'Verkaufen'}: ${num(a.menge, a.menge<1?4:2)} ≈ ${num(a.euro,0)} €. `
+        : '';
+      new Notification(`${AKTION_WORT[a.art]} · ${name(b.pos.sym)}`,
+        {body: wieviel + a.titel, tag: key});
+    } catch(e){}
+  }
 }
 
 /* ================================================ STILLSTAND — ALARM
@@ -2554,6 +2596,199 @@ function basisKasten(b){
       <span style="color:var(--ink-3)"> — gilt für ${esc(name(ba.sym))}, nicht für den Schein.</span></p>`;
 }
 
+/* ============================================ WAS JETZT ZU TUN IST
+
+   „Er soll mir bei den Sachen im Portfolio sagen: jetzt nochmal rein, oder jetzt ein
+   wenig verkaufen. Er sieht ja auch, wie viel ich drin bin."
+
+   Bisher stand auf der Karte ein Urteil („Beobachten") und ein Ausstiegsplan („bis TP1
+   sind es 4 %"). Beides richtig, beides keine Handlung. Zwischen „die Struktur trägt
+   nicht mehr" und „verkauf 0,6 Solana für 53 €" liegt genau der Schritt, den man morgens
+   um sieben nicht selbst rechnen will.
+
+   Hier wird er gerechnet. Die Regeln, in dieser Reihenfolge — die erste, die greift,
+   gewinnt:
+
+     1. Stop gerissen            → alles raus. Keine Diskussion, das ist der Zweck eines Stops.
+     2. Ziel erreicht            → ein Drittel raus, Stop auf Einstand.
+     3. Analyse zeigt nach unten → die Hälfte raus. Man hält gegen das, was man selbst misst.
+     4. Schlusslicht der Klasse  → ein Drittel raus. Relative Schwäche bleibt eher, als dass
+                                   sie dreht; genau hier liegt totes Kapital am längsten.
+     5. Klumpen über 25 %        → auf 25 % zurückschneiden. Ein Depot, das an einem Wert
+                                   hängt, ist kein Depot.
+     6. Führender Wert MIT einem
+        frischen Setup und Stop  → nachlegen, auf 0,5 % Risiko gerechnet.
+     7. sonst                    → halten.
+
+   Was hier ausdrücklich NICHT passiert: nachlegen, weil eine Position im Minus steht.
+   Verbilligen fühlt sich nach Handeln an und ist das Gegenteil davon — es vergrössert
+   genau die Position, die schon nicht funktioniert. Nachgelegt wird nur in Stärke, und
+   nur, wenn es einen Stop gibt, gegen den sich die Grösse rechnen lässt. */
+const ZIEL_GEWICHT = 12;    // Prozent des Depots, die ein Einzelwert anstrebt
+const MAX_GEWICHT  = 25;    // darüber wird zurückgeschnitten
+const NACHKAUF_RISIKO_PCT = 0.5;
+/* Unter diesem Betrag lohnt keine Order. Bei Trade Republic kostet jede Ausführung 1 €:
+   ein Teilverkauf über 11 € zahlt neun Prozent Gebühr, um elf Euro zu bewegen. Solche
+   Vorschläge sind schlimmer als keine — sie sehen nach Handeln aus und verbrennen Geld.
+   Fällt ein Teilverkauf darunter, wird stattdessen die ganze (kleine) Position geschlossen
+   oder die Menge auf eine sinnvolle Ordergrösse angehoben. */
+const MIN_ORDER_EUR = 25;
+
+function depotStand(){
+  let positionen;
+  try { positionen = ladePositionen(); } catch(e){ return null; }
+  const bew = positionen.map(bewertePosition);
+  const kursEU = (S && S.eurusd) || null;
+  const inEuro = (b, wert) => {
+    if (wert == null) return null;
+    return (b.w === 'EUR' || !kursEU) ? wert : wert / kursEU;
+  };
+  const gesamt = bew.reduce((s,b)=>s + (inEuro(b, b.wert)||0), 0);
+  return {bew, gesamt, kursEU, inEuro};
+}
+
+function positionsAktion(b, stand){
+  const pos = b.pos, r = b.row;
+  const wertEU = stand ? stand.inEuro(b, b.wert) : null;
+  const anteil = (stand && stand.gesamt && wertEU != null) ? wertEU / stand.gesamt * 100 : null;
+  const d = digits(b.kurs || 1);
+  const z = waehrungsZeichen(b.w);
+  const basis = {anteil, wertEU};
+
+  // Ohne Kurs lässt sich keine Stückzahl rechnen — dann bleibt es beim Urteil.
+  if (b.kurs == null || !pos.menge){
+    return {...basis, art:'halten', dringend:false, titel:'Nichts zu tun',
+      text:'Für diesen Posten gibt es keinen laufenden Kurs, also auch keine Stückzahl, '
+         + 'die sich ausrechnen liesse.'};
+  }
+
+  const teil = (anteilMenge, grund, art, dringend, titel) => {
+    let menge = pos.menge * anteilMenge;
+    const jeStueckEU = (stand && stand.kursEU && b.w !== 'EUR') ? b.kurs / stand.kursEU : b.kurs;
+    let euro = menge * jeStueckEU;
+    let zusatz = '';
+    // Zu kleine Order: entweder ganz raus oder auf eine sinnvolle Grösse anheben.
+    if (art !== 'nachlegen' && anteilMenge < 1 && euro < MIN_ORDER_EUR && wertEU != null){
+      if (wertEU <= MIN_ORDER_EUR * 2){
+        menge = pos.menge; euro = wertEU; art = 'raus';
+        zusatz = ` Die ganze Position ist nur ${num(wertEU,0)} € wert — ein Teilverkauf davon `
+               + 'würde in Gebühren untergehen. Dann lieber ganz raus oder ganz lassen.';
+      } else {
+        menge = MIN_ORDER_EUR / jeStueckEU; euro = MIN_ORDER_EUR;
+        zusatz = ` Auf ${MIN_ORDER_EUR} € angehoben — darunter frisst die Gebühr den Sinn der Order.`;
+      }
+    }
+    return {...basis, art, dringend, titel, menge, euro, text: grund + zusatz};
+  };
+
+  // 1 + 2 — was der Ausstiegsplan sagt, hat Vorrang. Feste Marken schlagen Einschätzungen.
+  const schritt = naechsterSchritt(pos, b.kurs);
+  if (schritt && schritt.stufe === 'stop'){
+    return teil(1.0, `Der Kurs steht bei ${num(b.kurs,d)}${z}, dein Stop lag bei `
+      + `${num(pos.plan.stop,d)}${z}. Die Idee ist widerlegt — hier wird nicht nachverhandelt.`,
+      'raus', true, 'Alles verkaufen — Stop gerissen');
+  }
+  if (schritt && schritt.stufe === 'ziel'){
+    return teil(1/3, `${schritt.marke} ist erreicht. Ein Drittel raus, den Stop auf deinen `
+      + 'Einstieg ziehen — ab da kann der Trade nichts mehr kosten.',
+      'teilverkauf', true, `${schritt.marke} erreicht — ein Drittel verkaufen`);
+  }
+
+  const rs = b.halt && b.halt.rs;
+  const klasseName = r && r.klasse === 'aktien' ? 'Aktien' : 'Coins';
+
+  /* 3 — die eigene Analyse zeigt in die Gegenrichtung.
+
+     Mit zwei Bedingungen, die beim Test am echten Depot dazukamen: das Short-Setup muss
+     die Qualitätsschwelle bestehen (sonst reicht irgendein schwaches Gegenbild, um eine
+     laufende Position zu halbieren), und der Wert darf nicht zu den stärkeren seiner
+     Klasse gehören. Sonst hätte Solana bei +26 % und relativer Stärke 59 halbiert werden
+     sollen, nur weil der Scanner kurzfristig nach unten zeigt. Ein Setup ist eine Aussage
+     über die nächsten Tage; eine Position, die über Wochen trägt, wirft man dafür nicht weg. */
+  if (r && r.richtung === 'short' && r.handelbar && (rs == null || rs < RS_MITTE)){
+    return teil(0.5, 'Die Analyse sieht hier gerade ein handelbares Setup nach UNTEN, du '
+      + `hältst long — und der Wert gehört auch nicht zu den stärkeren seiner Klasse `
+      + `(relative Stärke ${rs != null ? rs.toFixed(0) : '—'}). Das ist kein Verkaufsbefehl, `
+      + 'aber der Moment, die Position zu halbieren statt sie auszusitzen.',
+      'teilverkauf', true, 'Gegen die These — Hälfte verkaufen');
+  }
+
+  // 4 — Schlusslicht der eigenen Klasse.
+  if (rs != null && rs < RS_SCHWACH){
+    return teil(1/3, `${name(pos.sym)} ist schwächer als ${(100-rs).toFixed(0)} % der `
+      + `gescannten ${klasseName}. Relative Schwäche hält über Wochen eher an, als dass sie `
+      + `dreht${b.gvPct!=null&&b.gvPct<0?`. Du liegst hier ${b.gvPct.toFixed(0)} % im Minus — `
+      + `das ist kein Grund zu warten, sondern der Grund, warum es weh tut`:''}. Ein Drittel `
+      + 'raus setzt das Kapital frei, ohne die These ganz aufzugeben.',
+      'teilverkauf', false, 'Schlusslicht — ein Drittel verkaufen');
+  }
+
+  // 5 — Klumpenrisiko.
+  if (anteil != null && anteil > MAX_GEWICHT){
+    const runter = (anteil - MAX_GEWICHT) / anteil;
+    return teil(runter, `Diese eine Position ist ${anteil.toFixed(0)} % deines Depots. `
+      + `Ab ${MAX_GEWICHT} % entscheidet ein einzelner Wert über dein Ergebnis — das ist kein `
+      + 'Depot mehr, sondern eine Wette mit Beiwerk. Zurück auf ' + MAX_GEWICHT + ' %.',
+      'trimmen', false, 'Klumpen abbauen');
+  }
+
+  // 6 — nachlegen. Nur in Stärke, nur mit Setup, nur mit Stop.
+  const stop = (pos.plan && pos.plan.stop != null) ? pos.plan.stop
+             : (r && r.invalidierung != null ? inPositionsWaehrung(r, r.invalidierung, pos) : null);
+  const setzt = r && r.handelbar && r.score >= 52 && r.richtung !== 'short';
+  if (rs != null && rs >= RS_FUEHRER && setzt && stop != null && stop < b.kurs
+      && anteil != null && anteil < ZIEL_GEWICHT && stand && stand.gesamt){
+    const risikoJeStueck = b.kurs - stop;
+    const ausRisiko = stand.gesamt * (NACHKAUF_RISIKO_PCT/100) / risikoJeStueck
+                    * (b.w === 'EUR' ? 1 : (stand.kursEU || 1));
+    const platzEU = (ZIEL_GEWICHT - anteil)/100 * stand.gesamt;
+    const kursEUJeStueck = b.w === 'EUR' ? b.kurs : b.kurs / (stand.kursEU || 1);
+    const ausPlatz = platzEU / kursEUJeStueck;
+    const menge = Math.min(ausRisiko, ausPlatz);
+    const euro = menge * kursEUJeStueck;
+    if (euro >= MIN_ORDER_EUR){
+      return {...basis, art:'nachlegen', dringend:false, menge, euro,
+        titel:'Nachlegen — Stärke mit frischem Setup',
+        text:`${name(pos.sym)} gehört zu den stärksten ${(100-rs).toFixed(0)} % der `
+          + `${klasseName} und hat gerade ein handelbares Setup (Score ${r.score.toFixed(0)}, `
+          + `Note ${r.note}). Die Position ist erst ${anteil.toFixed(0)} % deines Depots. `
+          + `Gerechnet auf ${NACHKAUF_RISIKO_PCT} % Risiko bei Stop ${num(stop,d)}${z}.`};
+    }
+  }
+
+  // 7 — halten.
+  const wohin = schritt && schritt.stufe === 'halten' ? ' ' + schritt.text : '';
+  return {...basis, art:'halten', dringend:false, titel:'Halten — nichts zu tun',
+    text:(rs != null ? `Relative Stärke ${rs.toFixed(0)} von 100, kein Anlass zu handeln.`
+        : 'Kein Anlass zu handeln.') + wohin};
+}
+
+const AKTION_FARBE = {raus:'bad', teilverkauf:'warn', trimmen:'warn', nachlegen:'', halten:''};
+const AKTION_WORT  = {raus:'VERKAUFEN', teilverkauf:'TEILVERKAUF', trimmen:'TRIMMEN',
+                      nachlegen:'NACHLEGEN', halten:'HALTEN'};
+
+function aktionsKasten(b, stand){
+  const a = positionsAktion(b, stand);
+  if (!a) return '';
+  const d = digits(b.kurs || 1);
+  const farbe = AKTION_FARBE[a.art] || '';
+  const zahl = (a.menge != null && a.euro != null)
+    ? `<div class="kpi" style="margin-top:8px">
+         <span>${a.art==='nachlegen'?'kaufen':'verkaufen'} <b>${num(a.menge, a.menge<1?6:4)} Stück</b></span>
+         <span>≈ <b>${num(a.euro,2)} €</b></span>
+         ${a.anteil!=null?`<span>Anteil am Depot <b>${a.anteil.toFixed(1)} %</b></span>`:''}
+       </div>` : (a.anteil!=null?`<div class="kpi" style="margin-top:8px">
+         <span>Anteil am Depot <b>${a.anteil.toFixed(1)} %</b></span></div>`:'');
+  return `<div class="note-box ${farbe}" style="margin:10px 0 0">
+    <span class="nt">${a.art==='halten'?'Was jetzt zu tun ist':'HANDELN · '+AKTION_WORT[a.art]}</span>
+    <p style="font-size:14.5px;margin:0 0 4px"><strong>${esc(a.titel)}</strong></p>
+    <p style="margin:0">${esc(a.text)}</p>${zahl}
+    ${a.art!=='halten'?`<p style="margin:8px 0 0;font-size:11.5px;color:var(--ink-3)">
+      Vorschlag mit Begründung, keine Anweisung — und nichts passiert automatisch.
+      Die Stückzahl ist gerechnet, nicht geschätzt.</p>`:''}
+  </div>`;
+}
+
 function ratKasten(b){
   const rat = positionsRat(b);
   const farbe = rat.stufe === 'bad' ? 'bad' : (rat.stufe === 'warn' ? 'warn' : '');
@@ -2564,18 +2799,13 @@ function ratKasten(b){
 }
 
 function zeichnePortfolio(){
-  const positionen = ladePositionen();
-  const bew = positionen.map(bewertePosition);
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
-     sein Geld tatsaechlich hat. */
-  const kursEU = (S && S.eurusd) || null;
-  const inEuro = (b, wert) => {
-    if (wert == null) return null;
-    if (b.w === 'EUR' || !kursEU) return wert;
-    return wert / kursEU;
-  };
-  const gesamt = bew.reduce((s,b)=>s + (inEuro(b, b.wert)||0), 0);
+     sein Geld tatsaechlich hat. Der Stand kommt aus derselben Funktion, die auch die
+     Alarme benutzen; zwei Rechenwege fuer dieselbe Zahl waeren zwei Wahrheiten. */
+  const stand = depotStand();
+  if (!stand){ $('portfolio').innerHTML = `<p class="leer">Depot nicht lesbar.</p>`; return; }
+  const {bew, kursEU, inEuro, gesamt} = stand;
   const gv = bew.reduce((s,b)=>s + (inEuro(b, b.gv)||0), 0);
   const einstand = bew.reduce((s,b)=>s + (inEuro(b, b.einstand)||0), 0);
   const jeKlasse = {};
@@ -2608,6 +2838,30 @@ function zeichnePortfolio(){
       Neu bewertet: ${new Date().toLocaleTimeString('de-DE')} — das läuft weiter, auch
       wenn dieser Reiter zu ist.</p>`;
 
+    /* Die Handlungsliste ganz oben. Wer das Depot aufmacht, will nicht vierzehn Karten
+       lesen, sondern wissen, ob heute etwas zu tun ist — und wenn ja, was und wie viel. */
+    const aktionen = bew.map(b => ({b, a: positionsAktion(b, stand)}))
+                        .filter(x => x.a && x.a.art !== 'halten')
+                        .sort((x,y) => (y.a.dringend?1:0) - (x.a.dringend?1:0));
+    h += `<h2>Was jetzt zu tun ist</h2>`;
+    h += aktionen.length ? aktionen.map(({b,a})=>{
+      const farbe = AKTION_FARBE[a.art] || '';
+      return `<div class="karte ${farbe}" style="margin-bottom:8px">
+        <h3>${a.dringend?'🔴 ':''}${esc(AKTION_WORT[a.art])} · ${esc(name(b.pos.sym))}
+          <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">${esc(b.pos.konto||'')}</span></h3>
+        <p style="margin:4px 0 0;font-size:14px"><strong>${esc(a.titel)}</strong></p>
+        ${(a.menge!=null)?`<div class="kpi" style="margin-top:6px">
+          <span>${a.art==='nachlegen'?'kaufen':'verkaufen'} <b>${num(a.menge, a.menge<1?6:4)}</b></span>
+          <span>≈ <b>${num(a.euro,2)} €</b></span>
+          <span>Anteil <b>${a.anteil!=null?a.anteil.toFixed(1)+' %':'—'}</b></span></div>`:''}
+        <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(a.text)}</p>
+      </div>`;
+    }).join('')
+    : `<div class="karte gut"><h3>Nichts zu tun</h3>
+       <p style="margin:4px 0 0;font-size:13px">Keine Position verlangt gerade eine Handlung.
+       Kein Stop gerissen, kein Ziel erreicht, kein Schlusslicht, kein Klumpen — und nichts,
+       wo sich Nachlegen rechnen würde. Nichtstun ist hier das Ergebnis, nicht die Lücke.</p></div>`;
+
     h += `<h2>Positionen</h2>`;
     h += bew.map(b=>{
       const d = digits(b.kurs||1);
@@ -2633,6 +2887,7 @@ function zeichnePortfolio(){
         </div>
         <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.headline||'')}</p>`
         : basisKasten(b)}
+        ${aktionsKasten(b, stand)}
         ${ratKasten(b)}
         ${ausstiegsKasten(b)}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
