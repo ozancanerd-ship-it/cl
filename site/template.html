@@ -910,6 +910,34 @@ function frischeAuf(){
   pruefeDepotAlarme();
   pruefeUrteilWechsel();
   pruefeTerminAlarme();
+  pruefeStillstand();
+}
+
+/* ================================================ STILLSTAND — ALARM
+
+   Der Lauf stand am 12. September siebzehn Stunden still, und gemerkt hat es Ozan
+   selbst — beim Draufschauen. Das ist der falsche Weg herum: ein System, das sich nur
+   meldet, wenn es etwas gefunden hat, ist von einem System, das kaputt ist, nicht zu
+   unterscheiden. Beide sind still.
+
+   Also meldet sich jetzt auch das Schweigen. Einmal je Stillstand, nicht laufend — und
+   erst ab vier Stunden, damit ein verspaeteter Lauf nicht gleich Alarm ausloest. */
+let _stillstandGemeldet = false;
+function pruefeStillstand(){
+  if (!S) return;
+  if (!scanTot()){ _stillstandGemeldet = false; return; }
+  if (_stillstandGemeldet) return;
+  const key = 'stillstand:' + String(S.erzeugt || '');
+  if (gemeldetLaden()[key]) { _stillstandGemeldet = true; return; }
+  gemeldetMerken(key);
+  _stillstandGemeldet = true;
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    new Notification('Die Analyse steht — seit ' + altersText(), {
+      body: 'Der Scan läuft normalerweise alle zehn Minuten. Solange er steht, zeigt die '
+          + 'App keine Einstiege mehr an. Dein Depot wird mit Live-Kursen weiter bewertet.',
+      tag: key});
+  } catch(e){}
 }
 
 /* =========================================== VERKAUFEN — ALARM FUERS DEPOT
@@ -1368,6 +1396,7 @@ function zeichneStatus(){
   const alter = vorMin(S.erzeugt);
   const fehler = Object.keys(S.fehler||{}).length;
   $('marktstatus').innerHTML = `
+    ${altersBanner()}
     ${stoerungsBanner()}
     <div class="status">
       <div><div class="k">Gescannt</div><div class="v">${g.length}</div>
@@ -1389,8 +1418,12 @@ function zeichneStatus(){
   if (top) top.addEventListener('click', ()=>waehle(top.dataset.sym));
   const dz = $('depotzeile');
   if (dz) dz.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); });
-  $('stempel').textContent = `${g.length} Instrumente · Scan ${zeit(S.erzeugt)}` +
-    (alter != null ? ` (vor ${alter} Min.)` : '');
+  // Das Alter steht in der Kopfzeile. Ist es zu hoch, steht es dort auch in Farbe —
+  // graue Kleinschrift hat siebzehn Stunden Stillstand nicht auffallen lassen.
+  const kopfzeile = $('stempel');
+  kopfzeile.textContent = `${g.length} Instrumente · Scan ${zeit(S.erzeugt)}` +
+    (alter != null ? ` (vor ${altersText()})` : '');
+  kopfzeile.style.color = scanTot() ? 'var(--bad)' : (scanVeraltet() ? 'var(--warn)' : '');
 }
 
 /* ================================================ DEPOT AUF DER STARTSEITE
@@ -2895,6 +2928,9 @@ function gemeldetMerken(key){
   } catch(e){}
 }
 function benachrichtige(x){
+  // Aus einem toten Scan kommt keine Meldung. Eine Kaufaufforderung mit Marken von
+  // gestern Abend ist genau die Art Alarm, die Geld kostet.
+  if (scanTot()) return;
   const key = x.w.instrument + ':' + x.w.aufgenommen;
   if (gemeldetLaden()[key]) return;
   gemeldetMerken(key);
@@ -2953,6 +2989,41 @@ function ausRanking(){
    erreicht). Deshalb steht bei der zweiten immer die Zahl der Faelle daneben und
    darunter der Satz, dass es Vergangenheit ist. Ohne den liest man eine Quote als
    Versprechen. */
+/* =================================================== WIE LANGE LÄUFT DAS?
+
+   „Mir fehlen noch ein, zwei kurze Trades. Die nicht über Wochen hinweg gehen."
+
+   Die Frage war bisher unbeantwortbar, weil nirgends stand, wie lange ein Signal
+   tatsächlich gelaufen ist. Jetzt wird es gemessen: von der Aufnahme auf die Wachliste
+   bis zum Ausgang, über alle 60 abgeschlossenen Signale.
+
+   Das Ergebnis ist selbst eine Antwort: der Median liegt bei rund anderthalb Tagen,
+   knapp sechs von zehn Signalen sind binnen zwei Tagen entschieden. Was sich nach
+   „wochenlang" anfühlt, sind meist die Kandidaten unter „Kaufen ab …", die auf ihren
+   Einstieg warten — nicht die Trades selbst. Deshalb steht die Zahl ab jetzt auf der
+   Karte, statt dass man sie sich zusammenreimen muss.
+
+   Geschätzt wird hier nichts. Fehlen die Fälle, steht nichts da. */
+function dauerText(h){
+  if (h == null) return '—';
+  if (h < 24) return `${Math.round(h)} Std.`;
+  const t = h / 24;
+  if (t < 10) return `${t.toFixed(1).replace('.',',')} Tage`;
+  return `${Math.round(t)} Tage`;
+}
+function dauerFuer(note){
+  const D = PF && PF.dauer;
+  if (!D || !D.median_h) return null;
+  const je = (D.je_note || {})[note];
+  if (je && je.faelle >= 3) return {median_h: je.median_h, faelle: je.faelle, eigen: true, note};
+  return {median_h: D.median_h, faelle: D.faelle, eigen: false};
+}
+function istKurz(note){
+  const d = dauerFuer(note);
+  const grenze = (PF && PF.dauer && PF.dauer.kurz_bis_h) || 48;
+  return d ? d.median_h <= grenze : null;
+}
+
 function erwartungsKasten(o){
   const e = o && o.erwartung; if (!e) return '';
   const q = e.quote;
@@ -2962,11 +3033,16 @@ function erwartungsKasten(o){
   if (e.risiko_pct != null) teile.push(`<span>bis Stop <b class="dn">−${num(e.risiko_pct,1)} %</b></span>`);
   if (q) teile.push(`<span>traf bisher <b>${Math.round(q.tp1*100)} %</b>
     <span style="color:var(--ink-3)">von ${q.n} Fällen</span></span>`);
+  const dd = dauerFuer(o.note);
+  if (dd) teile.push(`<span>lief im Median <b>${dauerText(dd.median_h)}</b>
+    <span style="color:var(--ink-3)">${dd.eigen?`Note ${esc(dd.note)}, `:''}${dd.faelle} Fälle</span></span>`);
   return `<div class="erw">
     <span class="nt">Was es bringen kann — und wie oft es bisher aufging</span>
     <div class="kpi">${teile.join('')}</div>
     ${q?`<div class="qbar"><i style="width:${Math.max(2,Math.round(q.tp1*100))}%"></i></div>`:''}
-    <p>${(e.saetze||[]).map(esc).join(' ')}</p>
+    <p>${(e.saetze||[]).map(esc).join(' ')}${dd?` Bis zur Entscheidung vergingen bei
+      vergleichbaren Signalen im Median ${dauerText(dd.median_h)} — das ist keine Prognose,
+      sondern gemessen an ${dd.faelle} abgeschlossenen Fällen.`:''}</p>
   </div>`;
 }
 
@@ -3000,6 +3076,10 @@ function signalKarte(x){
     <div class="ah">
       <span>${esc(name(w.instrument))}</span>
       <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
+      ${(()=>{ const k = istKurz(w.note); const dd = dauerFuer(w.note);
+        if (k == null) return '';
+        return `<span class="note ${k?'gut':''}" title="gemessen an ${dd.faelle} abgeschlossenen Signalen"
+          >${k?'kurz':'länger'} · ${dauerText(dd.median_h)}</span>`; })()}
       <span class="d">${o.score!=null?`${o.score.toFixed(0)}/100`:''}${
         o.rs!=null?` · RS ${Math.round(o.rs)}`:''}</span>
     </div>
@@ -3044,12 +3124,13 @@ function zeichneAlarme(){
   const rang = a => [-(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
   signale.sort((a,b)=>{ const [ra,da]=rang(a), [rb,db]=rang(b); return ra!==rb ? ra-rb : da-db; });
 
-  const jetzt = signale.filter(x=>x.stufe==='jetzt');
+  const tot = scanTot();
+  const jetzt = tot ? [] : signale.filter(x=>x.stufe==='jetzt');
   const imTrade = signale.filter(x=>x.stufe==='im_trade'||x.stufe==='stop');
-  const warten = signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
+  const warten = tot ? [] : signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
 
-  let h = stoerungsBanner() + pushBlock();
+  let h = altersBanner() + stoerungsBanner() + pushBlock();
   h += `<div class="note-box" style="border-color:rgba(0,229,255,.28)">
     <span class="nt" style="color:var(--accent)">Hier wird gekauft</span>
     <p style="font-size:13.5px"><strong>Diese Seite ist die Handlungsliste.</strong> Was unter
@@ -3122,6 +3203,55 @@ function zeichneAlarme(){
   bindePush();
 }
 
+
+/* ============================================ VERALTETE ANALYSE — SPERRE
+
+   Am 12. September blieb der Lauf um 21:00 Uhr stehen (eine haengende Veroeffentlichung
+   hat die ganze Warteschlange blockiert). Die App hat das siebzehn Stunden lang nur in
+   grauer Kleinschrift vermerkt: „Scan 12.09., 22:59 (vor 1034 Min.)". Darunter standen
+   Einstiege, Stops und Ziele wie immer — scharf, anklickbar, als waeren sie von eben.
+
+   Das ist der gefaehrlichste Zustand, den diese App haben kann. Ein Kurs von gestern
+   Abend als Einstiegsmarke ist schlimmer als gar keine Marke: die Zahl sieht aus wie
+   Information und ist keine mehr. Ein Stop, der seit siebzehn Stunden nicht nachgezogen
+   wurde, liegt irgendwo, nur nicht dort, wo er hingehoert.
+
+   Also: ab zwei Stunden wird gewarnt, ab vier Stunden verschwindet die Handlungsliste.
+   Nicht ausgegraut, nicht kleingedruckt — weg. Was weiter funktioniert, steht daneben:
+   die Kurse kommen live von der Boerse, das Depot wird damit weiter bewertet, und ein
+   Stop, den du selbst gesetzt hast, wird weiter ueberwacht. Nur neue Einstiege gibt es
+   nicht, denn die kaemen aus alten Zahlen. */
+const SCAN_ALT_MIN = 120;
+const SCAN_TOT_MIN = 240;
+function scanAlterMin(){ return vorMin(S && S.erzeugt); }
+function scanVeraltet(){ const a = scanAlterMin(); return a != null && a >= SCAN_ALT_MIN; }
+function scanTot(){ const a = scanAlterMin(); return a != null && a >= SCAN_TOT_MIN; }
+function altersText(){
+  const a = scanAlterMin();
+  if (a == null) return '';
+  if (a < 90) return `${a} Min.`;
+  const std = Math.floor(a / 60);
+  return std >= 24 ? `${Math.floor(std/24)} Tag${Math.floor(std/24)===1?'':'e'} ${std%24} Std.`
+                   : `${std} Std. ${a % 60} Min.`;
+}
+function altersBanner(){
+  if (!S || !scanVeraltet()) return '';
+  const tot = scanTot();
+  return `<div class="${tot ? 'stoerung' : 'note-box warn'}" ${tot?'':'style="margin-bottom:10px"'}>
+    ${tot ? `<h3>Die Analyse ist ${altersText()} alt — hier steht nichts zum Handeln</h3>`
+          : `<span class="nt">Analyse ${altersText()} alt</span>`}
+    <p>Der Scan läuft normalerweise alle zehn Minuten. Er steht seit
+    <strong>${zeit(S.erzeugt)}</strong>. Einstiege, Stops und Ziele aus diesem Scan beziehen
+    sich auf einen Markt, den es so nicht mehr gibt${tot ? ' — deshalb sind sie ausgeblendet' : ''}.</p>
+    ${tot ? `<p><strong>Was trotzdem stimmt:</strong> die Kurse oben und im Depot kommen live
+      von der Börse, nicht aus dem Scan. Dein Depot wird damit weiter bewertet, und ein Stop,
+      den du selbst gesetzt hast, wird weiter überwacht. Was fehlt, sind neue Einstiege.</p>
+      <p><strong>Woran es liegt:</strong> der Lauf bei GitHub hängt. Unter
+      <span class="mono">Actions</span> im Repo steht der wartende Lauf; ein Klick auf
+      <em>Cancel workflow</em> und danach <em>Run workflow</em> startet ihn neu.</p>`
+    : `<p>Wenn das nicht in der nächsten halben Stunde wieder frisch wird, hängt der Lauf.</p>`}
+  </div>`;
+}
 
 /* Warum das ganz oben steht, in Rot, mit Schritten:
    Am 11. September hat Ozan gemeldet, dass kein einziges Signal ankam. Das System
@@ -4042,8 +4172,43 @@ function zeichneNews(){
   el.innerHTML = terminKasten() || `<p class="leer">Der Terminkalender ist gerade nicht geladen.</p>`;
 }
 
+/* Wie lange die Signale wirklich laufen — die Antwort auf „ich will auch kurze Trades".
+   Die Zahl überrascht: die meisten SIND kurz. Was sich lang anfühlt, ist die Wartezeit
+   auf den Einstieg und das, was im Depot liegt. */
+function dauerKasten(){
+  const D = PF && PF.dauer;
+  if (!D || !D.median_h) return '';
+  const kurz = Math.round((D.kurz_anteil || 0) * 100);
+  const noten = Object.entries(D.je_note || {})
+    .sort((a,b)=>a[1].median_h - b[1].median_h);
+  return `<h2>Wie lange ein Signal läuft</h2>
+  <div class="karte">
+    <div class="kpi">
+      <span>Median <b>${dauerText(D.median_h)}</b></span>
+      <span>binnen ${dauerText(D.kurz_bis_h)} entschieden <b class="${kurz>=50?'up':''}">${kurz} %</b></span>
+      ${D.median_verlust_h!=null?`<span>Verluste nach <b class="dn">${dauerText(D.median_verlust_h)}</b></span>`:''}
+      ${D.median_gewinn_h!=null?`<span>Gewinne nach <b class="up">${dauerText(D.median_gewinn_h)}</b></span>`:''}
+      <span>gemessen an <b>${D.faelle}</b> Signalen</span>
+    </div>
+    ${noten.length?`<div class="zt" style="margin-top:8px">${noten.map(([n,v])=>
+      `<span>${esc(n)} <b>${dauerText(v.median_h)}</b> <span style="color:var(--ink-3)">${v.faelle}×</span></span>`
+      ).join('')}</div>`:''}
+    <p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">
+      Gemessen von dem Moment, in dem ein Signal auf die Wachliste kommt, bis es
+      entschieden ist — Wartezeit auf den Einstieg eingerechnet, weil sie dazugehört.
+      <strong>${kurz} % sind binnen ${dauerText(D.kurz_bis_h)} durch.</strong> Was sich nach
+      „läuft wochenlang" anfühlt, sind meist die Kandidaten unter „Kaufen ab …", die auf
+      ihren Einstieg warten, und die Positionen im Depot — nicht die Signale selbst.</p>
+    ${D.median_gewinn_h==null?`<p style="margin:7px 0 0;font-size:12.5px;color:var(--warn)">
+      Für Gewinne steht hier nichts, weil es noch keinen abgeschlossenen Gewinner gibt.
+      Das ist die ehrliche Version — eine Zahl stünde hier sonst nur der Vollständigkeit
+      halber.</p>`:''}
+  </div>`;
+}
+
 function zeichneBilanz(){
   let h = bilanzKasten();
+  h += dauerKasten();
   h += quotenKasten();
   h += historieKasten();
   if (!PF) h += `<div class="note-box"><span class="nt">Noch keine Auswertung</span>
