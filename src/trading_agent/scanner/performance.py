@@ -73,6 +73,10 @@ class Ergebnis:
     beendet: str
     r_ganz: float
     r_drittel: float
+    #: Wann das Signal auf die Wachliste kam, und wie viele Stunden bis zum Ausgang
+    #: vergangen sind. ``None``, wenn eine der beiden Zeiten fehlt.
+    begonnen: str = ""
+    dauer_h: float | None = None
 
 
 def _r_ganz(zustand: str, erreicht: tuple[str, ...], mfe: float) -> float:
@@ -109,6 +113,37 @@ def _r_drittel(zustand: str, erreicht: tuple[str, ...]) -> float:
     return gewinn
 
 
+def _stunden(von: str, bis: str) -> float | None:
+    """Abstand zweier ISO-Zeitstempel in Stunden. ``None``, wenn etwas fehlt oder krumm ist.
+
+    Gemessen wird von der AUFNAHME auf die Wachliste bis zum Ausgang — nicht vom
+    Einstieg, denn wann der Kurs die Marke berührt hat, wird nirgends festgehalten. Das
+    ist die ehrlichere Zahl für Ozans Frage („wie lange läuft so ein Trade?"): sie sagt,
+    wie lange es vom angezeigten Signal bis zum Ergebnis gedauert hat, Wartezeit auf den
+    Einstieg eingeschlossen. Und genau diese Wartezeit gehört dazu — sie ist Zeit, in der
+    Geld gebunden oder Aufmerksamkeit verbraucht wird.
+    """
+    if not von or not bis:
+        return None
+    try:
+        a = datetime.fromisoformat(von)
+        b = datetime.fromisoformat(bis)
+    except ValueError:
+        return None
+    stunden = (b - a).total_seconds() / 3600.0
+    return stunden if stunden >= 0 else None
+
+
+def median(werte: list[float]) -> float | None:
+    """Median. Bei Haltedauern der richtige Mittelwert: ein einziger Wert, der drei
+    Wochen offen stand, zieht den Durchschnitt sonst weit über alles Typische."""
+    if not werte:
+        return None
+    s = sorted(werte)
+    m = len(s) // 2
+    return float(s[m]) if len(s) % 2 else float((s[m - 1] + s[m]) / 2.0)
+
+
 def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
     """Abgeschlossene Trades aus dem gespeicherten Wachlisten-Zustand."""
     if not daten:
@@ -125,6 +160,8 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
             continue
         erreicht = tuple(str(x) for x in (w.get("erreicht") or []))
         mfe = float(w.get("bestes_r") or 0.0)
+        begonnen = str(w.get("aufgenommen") or "")
+        beendet = str(w.get("zuletzt") or "")
         aus.append(
             Ergebnis(
                 instrument=str(w.get("instrument") or "?"),
@@ -135,9 +172,11 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
                 erreicht=erreicht,
                 mfe=mfe,
                 mae=float(w.get("schlechtestes_r") or 0.0),
-                beendet=str(w.get("zuletzt") or ""),
+                beendet=beendet,
                 r_ganz=_r_ganz(zustand, erreicht, mfe),
                 r_drittel=_r_drittel(zustand, erreicht),
+                begonnen=begonnen,
+                dauer_h=_stunden(begonnen, beendet),
             )
         )
     aus.sort(key=lambda e: e.beendet)
@@ -232,6 +271,11 @@ class Bericht:
     #: Anteil der Trades, die nie nennenswert ins Plus kamen. Die aussagekräftigste
     #: Einzelzahl: sie trennt ein Ziel-Problem von einem Einstiegs-Problem.
     nie_im_plus: float | None
+    #: Wie lange die Signale tatsächlich gelaufen sind, in Stunden — Median, und
+    #: getrennt danach, wie sie ausgegangen sind. Ozan fragt danach ausdrücklich: er
+    #: will wissen, ob ein Signal Tage oder Wochen bindet, bevor er einsteigt. Gemessen,
+    #: nicht geschätzt; ``None``, solange es zu wenige Fälle sind.
+    dauer: dict[str, Any] = field(default_factory=dict)
     #: Jeder abgeschlossene Trade einzeln, jüngster zuerst. Ozan hat ausdrücklich danach
     #: gefragt: er will nicht nur die Summe sehen, sondern nachlesen können, wie die
     #: Signale ausgegangen sind, die ihm angezeigt wurden. Eine Kennzahl, die man nicht
@@ -251,6 +295,7 @@ class Bericht:
             "mfe_schnitt": round(self.mfe_schnitt, 2) if self.mfe_schnitt is not None else None,
             "mae_schnitt": round(self.mae_schnitt, 2) if self.mae_schnitt is not None else None,
             "nie_im_plus": round(self.nie_im_plus, 3) if self.nie_im_plus is not None else None,
+            "dauer": dict(self.dauer),
             "trades": [dict(t) for t in self.trades],
             "saetze": list(self.saetze),
         }
@@ -350,6 +395,56 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
     return aus
 
 
+#: Unter so vielen gemessenen Fällen wird eine Haltedauer nicht ausgewiesen. Ein Median
+#: aus drei Trades ist keine Erfahrung, sondern eine Anekdote mit Nachkommastelle.
+DAUER_MIN_FAELLE = 8
+#: Bis hierher gilt ein Trade als kurz. Zwei Tage: was über ein Wochenende hinausläuft,
+#: ist für Ozans Frage („ein, zwei kurze Trades") keiner mehr.
+KURZ_BIS_H = 48.0
+
+
+def _dauern(ergebnisse: list[Ergebnis]) -> dict[str, Any]:
+    """Gemessene Haltedauern — insgesamt, nach Ausgang, nach Klasse und nach Note.
+
+    Die Frage dahinter ist praktisch, nicht akademisch: bindet dieses Signal einen
+    Nachmittag oder drei Wochen? Beantwortet wird sie aus dem, was tatsächlich passiert
+    ist, nicht aus dem Abstand zum Ziel geteilt durch irgendeine Durchschnittsbewegung.
+    """
+    mit = [e for e in ergebnisse if e.dauer_h is not None]
+    if len(mit) < DAUER_MIN_FAELLE:
+        return {"faelle": len(mit), "belastbar": False}
+
+    alle = [float(e.dauer_h or 0.0) for e in mit]
+    gewonnen = [float(e.dauer_h or 0.0) for e in mit if e.zustand == "ziel_erreicht"]
+    verloren = [float(e.dauer_h or 0.0) for e in mit if e.zustand == "stop"]
+
+    def gruppe(schluessel: Any) -> dict[str, Any]:
+        eimer: dict[str, list[float]] = {}
+        for e in mit:
+            k = str(schluessel(e) or "")
+            if not k or k == "?":
+                continue
+            eimer.setdefault(k, []).append(float(e.dauer_h or 0.0))
+        return {
+            k: {"median_h": round(median(v) or 0.0, 1), "faelle": len(v)}
+            for k, v in sorted(eimer.items())
+            if len(v) >= 3
+        }
+
+    kurz = sum(1 for d in alle if d <= KURZ_BIS_H)
+    return {
+        "faelle": len(mit),
+        "belastbar": len(mit) >= GENUG,
+        "median_h": round(median(alle) or 0.0, 1),
+        "median_gewinn_h": round(median(gewonnen), 1) if gewonnen else None,
+        "median_verlust_h": round(median(verloren), 1) if verloren else None,
+        "kurz_anteil": round(kurz / len(alle), 3),
+        "kurz_bis_h": KURZ_BIS_H,
+        "je_klasse": gruppe(lambda e: e.klasse),
+        "je_note": gruppe(lambda e: e.note),
+    }
+
+
 def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) -> Bericht:
     """Die vollständige Auswertung aus dem gespeicherten Wachlisten-Zustand."""
     from datetime import UTC
@@ -368,6 +463,7 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
     }
     mfe = [e.mfe for e in ergebnisse]
     mae = [e.mae for e in ergebnisse]
+    dauer = _dauern(ergebnisse)
 
     return Bericht(
         erzeugt=(jetzt or datetime.now(UTC)).isoformat(),
@@ -380,6 +476,7 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
         mfe_schnitt=(sum(mfe) / len(mfe)) if mfe else None,
         mae_schnitt=(sum(mae) / len(mae)) if mae else None,
         nie_im_plus=(sum(1 for m in mfe if m < IM_PLUS_AB) / len(mfe) if mfe else None),
+        dauer=dauer,
         trades=tuple(
             {
                 "instrument": e.instrument,
@@ -393,6 +490,8 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
                 "mfe": round(e.mfe, 2),
                 "mae": round(e.mae, 2),
                 "beendet": e.beendet,
+                "begonnen": e.begonnen,
+                "dauer_h": round(e.dauer_h, 1) if e.dauer_h is not None else None,
             }
             for e in reversed(ergebnisse)
         ),
