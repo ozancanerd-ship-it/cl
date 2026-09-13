@@ -3011,15 +3011,22 @@ function dauerText(h){
   if (t < 10) return `${t.toFixed(1).replace('.',',')} Tage`;
   return `${Math.round(t)} Tage`;
 }
-function dauerFuer(note){
+/* Die Anlageklasse trennt schärfer als die Note — und genau das ist die Antwort auf
+   „ich will auch kurze Trades": Krypto ist im Median nach EINEM Tag entschieden, eine
+   Aktie braucht VIER. Die kurzen Trades gibt es also längst, sie stehen nur nicht dran.
+   Deshalb zählt hier zuerst die Klasse, dann die Note, dann der Gesamtschnitt. */
+function dauerFuer(note, klasse){
   const D = PF && PF.dauer;
   if (!D || !D.median_h) return null;
-  const je = (D.je_note || {})[note];
-  if (je && je.faelle >= 3) return {median_h: je.median_h, faelle: je.faelle, eigen: true, note};
-  return {median_h: D.median_h, faelle: D.faelle, eigen: false};
+  const jk = klasse ? (D.je_klasse || {})[klasse] : null;
+  if (jk && jk.faelle >= 5)
+    return {median_h: jk.median_h, faelle: jk.faelle, quelle: klasse === 'aktien' ? 'Aktien' : 'Coins'};
+  const jn = (D.je_note || {})[note];
+  if (jn && jn.faelle >= 5) return {median_h: jn.median_h, faelle: jn.faelle, quelle: 'Note ' + note};
+  return {median_h: D.median_h, faelle: D.faelle, quelle: 'alle'};
 }
-function istKurz(note){
-  const d = dauerFuer(note);
+function istKurz(note, klasse){
+  const d = dauerFuer(note, klasse);
   const grenze = (PF && PF.dauer && PF.dauer.kurz_bis_h) || 48;
   return d ? d.median_h <= grenze : null;
 }
@@ -3033,9 +3040,9 @@ function erwartungsKasten(o){
   if (e.risiko_pct != null) teile.push(`<span>bis Stop <b class="dn">−${num(e.risiko_pct,1)} %</b></span>`);
   if (q) teile.push(`<span>traf bisher <b>${Math.round(q.tp1*100)} %</b>
     <span style="color:var(--ink-3)">von ${q.n} Fällen</span></span>`);
-  const dd = dauerFuer(o.note);
+  const dd = dauerFuer(o.note, o.klasse);
   if (dd) teile.push(`<span>lief im Median <b>${dauerText(dd.median_h)}</b>
-    <span style="color:var(--ink-3)">${dd.eigen?`Note ${esc(dd.note)}, `:''}${dd.faelle} Fälle</span></span>`);
+    <span style="color:var(--ink-3)">${esc(dd.quelle)}, ${dd.faelle} Fälle</span></span>`);
   return `<div class="erw">
     <span class="nt">Was es bringen kann — und wie oft es bisher aufging</span>
     <div class="kpi">${teile.join('')}</div>
@@ -3076,9 +3083,9 @@ function signalKarte(x){
     <div class="ah">
       <span>${esc(name(w.instrument))}</span>
       <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
-      ${(()=>{ const k = istKurz(w.note); const dd = dauerFuer(w.note);
+      ${(()=>{ const k = istKurz(w.note, o.klasse); const dd = dauerFuer(w.note, o.klasse);
         if (k == null) return '';
-        return `<span class="note ${k?'gut':''}" title="gemessen an ${dd.faelle} abgeschlossenen Signalen"
+        return `<span class="note ${k?'gut':''}" title="gemessen an ${dd.faelle} abgeschlossenen Signalen (${dd.quelle})"
           >${k?'kurz':'länger'} · ${dauerText(dd.median_h)}</span>`; })()}
       <span class="d">${o.score!=null?`${o.score.toFixed(0)}/100`:''}${
         o.rs!=null?` · RS ${Math.round(o.rs)}`:''}</span>
@@ -4181,6 +4188,10 @@ function dauerKasten(){
   const kurz = Math.round((D.kurz_anteil || 0) * 100);
   const noten = Object.entries(D.je_note || {})
     .sort((a,b)=>a[1].median_h - b[1].median_h);
+  const kl = D.je_klasse || {};
+  const NAME_KLASSE = {krypto:'Coins', aktien:'Aktien', gold:'Gold'};
+  const klassen = Object.entries(kl).sort((a,b)=>a[1].median_h - b[1].median_h);
+  const kurzeste = klassen[0], laengste = klassen[klassen.length-1];
   return `<h2>Wie lange ein Signal läuft</h2>
   <div class="karte">
     <div class="kpi">
@@ -4190,13 +4201,22 @@ function dauerKasten(){
       ${D.median_gewinn_h!=null?`<span>Gewinne nach <b class="up">${dauerText(D.median_gewinn_h)}</b></span>`:''}
       <span>gemessen an <b>${D.faelle}</b> Signalen</span>
     </div>
-    ${noten.length?`<div class="zt" style="margin-top:8px">${noten.map(([n,v])=>
+    ${klassen.length?`<div class="zt" style="margin-top:8px">${klassen.map(([n,v])=>
+      `<span>${esc(NAME_KLASSE[n]||n)} <b>${dauerText(v.median_h)}</b> <span style="color:var(--ink-3)">${v.faelle}×</span></span>`
+      ).join('')}</div>`:''}
+    ${noten.length?`<div class="zt" style="margin-top:6px">${noten.map(([n,v])=>
       `<span>${esc(n)} <b>${dauerText(v.median_h)}</b> <span style="color:var(--ink-3)">${v.faelle}×</span></span>`
       ).join('')}</div>`:''}
+    ${(kurzeste && laengste && kurzeste[0] !== laengste[0])?`
+    <p style="margin:9px 0 0;font-size:13px"><strong>Die kurzen Trades gibt es schon —
+      es sind die Coins.</strong> ${esc(NAME_KLASSE[kurzeste[0]]||kurzeste[0])} sind im Median nach
+      ${dauerText(kurzeste[1].median_h)} entschieden, ${esc(NAME_KLASSE[laengste[0]]||laengste[0])} brauchen
+      ${dauerText(laengste[1].median_h)}. Wer kurz will, filtert also nicht nach einem neuen
+      Signaltyp, sondern nimmt die Krypto-Seite.</p>`:''}
     <p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">
       Gemessen von dem Moment, in dem ein Signal auf die Wachliste kommt, bis es
       entschieden ist — Wartezeit auf den Einstieg eingerechnet, weil sie dazugehört.
-      <strong>${kurz} % sind binnen ${dauerText(D.kurz_bis_h)} durch.</strong> Was sich nach
+      ${kurz} % sind binnen ${dauerText(D.kurz_bis_h)} durch. Was sich nach
       „läuft wochenlang" anfühlt, sind meist die Kandidaten unter „Kaufen ab …", die auf
       ihren Einstieg warten, und die Positionen im Depot — nicht die Signale selbst.</p>
     ${D.median_gewinn_h==null?`<p style="margin:7px 0 0;font-size:12.5px;color:var(--warn)">
