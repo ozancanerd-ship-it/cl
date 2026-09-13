@@ -766,6 +766,12 @@ async function ladeScan(){
   sicher('News', zeichneNews);
   sicher('Bilanz', zeichneBilanz);
   sicher('Alarme', zeichneAlarme);
+  /* Das Depot MUSS hier nochmal gezeichnet werden. Beim Start laeuft zeichnePortfolio()
+     bevor der Scan da ist — dann steht bei jeder Position „keine Bewertung" und, viel
+     schlimmer, ueber der Handlungsliste „Nichts zu tun". Eine Entwarnung, die nur
+     bedeutet, dass die Daten noch unterwegs sind, ist die gefaehrlichste Falschaussage,
+     die diese App machen kann. */
+  sicher('Depot', zeichnePortfolio);
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
   if (start && !AKTIV) waehle(start.instrument, false);
   starteLive();
@@ -2856,7 +2862,10 @@ function zeichnePortfolio(){
                         .filter(x => x.a && x.a.art !== 'halten')
                         .sort((x,y) => (y.a.dringend?1:0) - (x.a.dringend?1:0));
     h += `<h2>Was jetzt zu tun ist</h2>`;
-    h += aktionen.length ? aktionen.map(({b,a})=>{
+    h += !S ? `<div class="karte warn"><h3>Analyse noch nicht geladen</h3>
+       <p style="margin:4px 0 0;font-size:13px">Hier steht erst etwas, wenn der Scan da ist.
+       „Nichts zu tun" wäre jetzt keine Entwarnung, sondern eine Behauptung ohne Grundlage.</p></div>`
+    : aktionen.length ? aktionen.map(({b,a})=>{
       const farbe = AKTION_FARBE[a.art] || '';
       return `<div class="karte ${farbe}" style="margin-bottom:8px">
         <h3>${a.dringend?'🔴 ':''}${esc(AKTION_WORT[a.art])} · ${esc(posName(b))}
