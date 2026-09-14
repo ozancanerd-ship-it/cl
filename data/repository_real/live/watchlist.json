@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-14T13:45:01.874715+00:00",
+  "stand": "2026-09-14T14:06:36.084874+00:00",
   "wachen": {
     "AMD": {
       "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
@@ -24,7 +24,7 @@
       "tp2": 502.80999755859375,
       "tp3": 491.1199951171875,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ANET": {
@@ -234,7 +234,7 @@
       "tp2": 752.91,
       "tp3": 777.48,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "aktiv"
     },
     "BOMEUSDT": {
@@ -312,7 +312,7 @@
       "tp2": 822.9601873930044,
       "tp3": 798.5399780273438,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "CATIUSDT": {
@@ -471,7 +471,7 @@
       "tp2": 0.3867,
       "tp3": 0.40859,
       "trigger": "Der Kurs muss ueber 0.3304 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "aktiv"
     },
     "CRWD": {
@@ -715,11 +715,13 @@
     },
     "HYPEUSD": {
       "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
-      "bestes_r": 0.95,
+      "bestes_r": 0.97,
       "einstieg": 77.93,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 78.1,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 11.37,
       "instrument": "HYPEUSD",
       "klasse": "krypto",
@@ -736,7 +738,7 @@
       "tp2": 86.79,
       "tp3": 88.35,
       "trigger": "Der Kurs muss ueber 78.1500 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "aktiv"
     },
     "ICPUSD": {
@@ -918,7 +920,7 @@
       "tp2": 57.400000000000006,
       "tp3": 59.53,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 54.5500 — nicht beim Antippen.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "aktiv"
     },
     "LUNAUSDT": {
@@ -1104,7 +1106,7 @@
       "tp2": 78.45999908447266,
       "tp3": 77.74499893188477,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "NEWTUSDT": {
@@ -1663,32 +1665,6 @@
       "zuletzt": "2026-09-13T16:52:25.817022+00:00",
       "zustand": "abgelaufen"
     },
-    "WMT": {
-      "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
-      "bestes_r": 0.0,
-      "einstieg": 105.69499969482422,
-      "einstieg_art": "Ruecklauf in FVG H4",
-      "einstiegskurs": null,
-      "erreicht": [],
-      "erwartet_pct": 4.55,
-      "instrument": "WMT",
-      "klasse": "aktien",
-      "note": "B+",
-      "richtung": "long",
-      "rr": 2.32,
-      "rs": 16.8,
-      "schlechtestes_r": 0.0,
-      "score": 63.3,
-      "setup": "",
-      "stop": 102.1500015258789,
-      "these": "",
-      "tp1": 110.5,
-      "tp2": 113.91999816894531,
-      "tp3": 118.10249328613281,
-      "trigger": "",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
-      "zustand": "wartet_auf_einstieg"
-    },
     "XAUTUSDT": {
       "aufgenommen": "2026-09-11T00:48:51.732907+00:00",
       "bestes_r": 1.24,
@@ -1741,7 +1717,7 @@
       "tp2": 565.76,
       "tp3": 596.105,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-14T13:44:57.829033+00:00",
+      "zuletzt": "2026-09-14T14:06:31.670710+00:00",
       "zustand": "aktiv"
     },
     "XOM": {
