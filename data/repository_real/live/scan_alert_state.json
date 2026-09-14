@@ -63,7 +63,6 @@
     "setup:INJUSD:A_MINUS:long": "2026-09-14T07:09:20.460914+00:00",
     "setup:JASMYUSD:B:short": "2026-09-14T01:08:42.246434+00:00",
     "setup:JASMYUSD:B_PLUS:short": "2026-09-14T02:28:10.262242+00:00",
-    "setup:LTCEUR:B_PLUS:long": "2026-09-12T11:29:05.382309+00:00",
     "setup:LTCUSD:B:long": "2026-09-13T17:49:23.348392+00:00",
     "setup:LTCUSD:B_PLUS:long": "2026-09-13T14:56:21.744810+00:00",
     "setup:MORPHOUSD:B_PLUS:long": "2026-09-14T07:28:42.755029+00:00",
@@ -93,6 +92,7 @@
     "setup:XMRUSD:A:long": "2026-09-14T02:28:10.262242+00:00",
     "setup:XMRUSD:A_MINUS:long": "2026-09-13T14:56:21.744810+00:00",
     "setup:XMRUSD:B_PLUS:long": "2026-09-14T08:07:43.539834+00:00",
+    "setup:ZECUSD:A_MINUS:long": "2026-09-14T11:43:09.830659+00:00",
     "weg:AVAXUSD:B": "2026-09-14T00:48:59.756493+00:00",
     "weg:BCHUSD:B": "2026-09-13T22:39:46.353800+00:00",
     "weg:BCHUSD:B_PLUS": "2026-09-12T18:26:56.653020+00:00",
@@ -216,18 +216,18 @@
       "urteil": "WATCH"
     },
     "ASTERUSD": {
-      "richtung": null,
-      "score": 7.3,
-      "urteil": "NO_TRADE"
+      "richtung": "long",
+      "score": 35.2,
+      "urteil": "WATCH"
     },
     "ATOMUSD": {
       "richtung": "long",
-      "score": 49.0,
+      "score": 47.7,
       "urteil": "WATCH"
     },
     "AUDUSD": {
       "richtung": "short",
-      "score": 38.4,
+      "score": 37.9,
       "urteil": "WATCH"
     },
     "AVAUSD": {
@@ -295,6 +295,11 @@
       "score": 85.6,
       "urteil": "B_PLUS"
     },
+    "CCDUSD": {
+      "richtung": null,
+      "score": 0.0,
+      "urteil": "NO_TRADE"
+    },
     "CCUSD": {
       "richtung": null,
       "score": 3.0,
@@ -343,7 +348,7 @@
     "DASHUSD": {
       "richtung": "long",
       "score": 62.7,
-      "urteil": "A_MINUS"
+      "urteil": "WATCH"
     },
     "DCRUSD": {
       "richtung": null,
@@ -372,7 +377,7 @@
     },
     "ENAUSD": {
       "richtung": "short",
-      "score": 52.2,
+      "score": 50.8,
       "urteil": "WATCH"
     },
     "ETCUSD": {
@@ -492,7 +497,7 @@
     },
     "LSKUSD": {
       "richtung": "long",
-      "score": 42.7,
+      "score": 42.8,
       "urteil": "WATCH"
     },
     "LTCUSD": {
@@ -560,6 +565,11 @@
       "score": 70.1,
       "urteil": "A_MINUS"
     },
+    "NFLX": {
+      "richtung": "long",
+      "score": 68.1,
+      "urteil": "WATCH"
+    },
     "NIGHTUSD": {
       "richtung": "short",
       "score": 50.7,
@@ -602,7 +612,7 @@
     },
     "PAXGUSD": {
       "richtung": "short",
-      "score": 59.9,
+      "score": 55.6,
       "urteil": "B_PLUS"
     },
     "PENDLEUSD": {
@@ -612,7 +622,7 @@
     },
     "PENGUUSD": {
       "richtung": "short",
-      "score": 44.9,
+      "score": 44.5,
       "urteil": "WATCH"
     },
     "PG": {
@@ -727,7 +737,7 @@
     },
     "TONUSD": {
       "richtung": "short",
-      "score": 43.0,
+      "score": 45.4,
       "urteil": "WATCH"
     },
     "TRUMPUSD": {
@@ -746,6 +756,11 @@
       "urteil": "NO_TRADE"
     },
     "TSLA": {
+      "richtung": null,
+      "score": 7.1,
+      "urteil": "NO_TRADE"
+    },
+    "TSM": {
       "richtung": null,
       "score": 7.1,
       "urteil": "NO_TRADE"
@@ -782,7 +797,7 @@
     },
     "VETUSD": {
       "richtung": "long",
-      "score": 41.7,
+      "score": 42.0,
       "urteil": "WATCH"
     },
     "VTHOUSD": {
@@ -802,7 +817,7 @@
     },
     "WLDUSD": {
       "richtung": "short",
-      "score": 43.5,
+      "score": 39.5,
       "urteil": "WATCH"
     },
     "WLFIUSD": {
@@ -858,7 +873,7 @@
     "ZECUSD": {
       "richtung": "long",
       "score": 76.9,
-      "urteil": "WATCH"
+      "urteil": "A_MINUS"
     },
     "ZROUSD": {
       "richtung": null,
@@ -950,6 +965,7 @@
     "CAPUSD": "krypto",
     "CAT": "aktien",
     "CATIUSDT": "krypto",
+    "CCDUSD": "krypto",
     "CCUSD": "krypto",
     "CFGUSD": "krypto",
     "CFGUSDT": "krypto",
@@ -1306,6 +1322,6 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "MSTR",
-  "stand": "2026-09-14T11:27:36.062292+00:00",
+  "stand": "2026-09-14T11:43:09.830659+00:00",
   "stumme_klassen": []
 }
