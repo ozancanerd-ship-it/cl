@@ -128,6 +128,7 @@
     "setup:PG:B_PLUS:long": "2026-09-14T15:42:43.674299+00:00",
     "setup:PYTHUSD:A_MINUS:long": "2026-09-14T05:05:45.933110+00:00",
     "setup:PYTHUSD:B:long": "2026-09-13T22:20:42.351199+00:00",
+    "setup:QNTUSD:B:short": "2026-09-15T13:07:40.523760+00:00",
     "setup:QNTUSD:B_PLUS:long": "2026-09-14T09:07:30.538967+00:00",
     "setup:QNTUSD:B_PLUS:short": "2026-09-14T01:08:42.246434+00:00",
     "setup:SEIUSD:B:short": "2026-09-15T08:28:33.387039+00:00",
@@ -165,6 +166,7 @@
     "weg:ARM:A_MINUS": "2026-09-14T14:06:31.543002+00:00",
     "weg:ATOMUSD:B_PLUS": "2026-09-15T09:44:58.974717+00:00",
     "weg:AUTUSD:B": "2026-09-14T14:26:21.442864+00:00",
+    "weg:AUTUSD:B_PLUS": "2026-09-15T13:07:40.523760+00:00",
     "weg:AVAXUSD:B": "2026-09-14T00:48:59.756493+00:00",
     "weg:BCHUSD:B": "2026-09-15T06:59:04.381334+00:00",
     "weg:BCHUSD:B_PLUS": "2026-09-15T08:28:33.387039+00:00",
@@ -275,7 +277,7 @@
     "AKEUSD": {
       "richtung": "long",
       "score": 22.5,
-      "urteil": "WATCH"
+      "urteil": "NO_TRADE"
     },
     "AKTUSD": {
       "richtung": "short",
@@ -313,9 +315,9 @@
       "urteil": "WATCH"
     },
     "ARBUSD": {
-      "richtung": null,
-      "score": 4.8,
-      "urteil": "NO_TRADE"
+      "richtung": "long",
+      "score": 37.7,
+      "urteil": "WATCH"
     },
     "ARM": {
       "richtung": null,
@@ -334,7 +336,7 @@
     },
     "ATOMUSD": {
       "richtung": "long",
-      "score": 52.7,
+      "score": 46.4,
       "urteil": "WATCH"
     },
     "AUDUSD": {
@@ -343,9 +345,9 @@
       "urteil": "NO_TRADE"
     },
     "AUTUSD": {
-      "richtung": "short",
-      "score": 51.8,
-      "urteil": "B_PLUS"
+      "richtung": null,
+      "score": 4.3,
+      "urteil": "NO_TRADE"
     },
     "AVAXUSD": {
       "richtung": null,
@@ -404,7 +406,7 @@
     },
     "CHIPUSD": {
       "richtung": "long",
-      "score": 52.1,
+      "score": 50.7,
       "urteil": "WATCH"
     },
     "COIN": {
@@ -454,7 +456,7 @@
     },
     "DCRUSD": {
       "richtung": "long",
-      "score": 56.5,
+      "score": 56.2,
       "urteil": "WATCH"
     },
     "DIS": {
@@ -494,7 +496,7 @@
     },
     "ETHFIUSD": {
       "richtung": "short",
-      "score": 45.0,
+      "score": 41.9,
       "urteil": "WATCH"
     },
     "ETHUSD": {
@@ -514,7 +516,7 @@
     },
     "FILUSD": {
       "richtung": "short",
-      "score": 36.9,
+      "score": 35.7,
       "urteil": "WATCH"
     },
     "FLRUSD": {
@@ -529,7 +531,7 @@
     },
     "GOOGL": {
       "richtung": "long",
-      "score": 59.6,
+      "score": 59.3,
       "urteil": "A_MINUS"
     },
     "GRTUSD": {
@@ -544,7 +546,7 @@
     },
     "HNTUSD": {
       "richtung": "short",
-      "score": 16.1,
+      "score": 17.1,
       "urteil": "WATCH"
     },
     "HON": {
@@ -583,14 +585,14 @@
       "urteil": "NO_TRADE"
     },
     "KASUSD": {
-      "richtung": "short",
-      "score": 37.5,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 5.0,
+      "urteil": "NO_TRADE"
     },
     "KAVAUSD": {
-      "richtung": "short",
-      "score": 49.1,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 6.6,
+      "urteil": "NO_TRADE"
     },
     "KO": {
       "richtung": null,
@@ -650,7 +652,7 @@
     "MINAUSD": {
       "richtung": "long",
       "score": 22.5,
-      "urteil": "NO_TRADE"
+      "urteil": "WATCH"
     },
     "MONUSD": {
       "richtung": null,
@@ -686,11 +688,6 @@
       "richtung": "short",
       "score": 67.8,
       "urteil": "A_PLUS"
-    },
-    "NFLX": {
-      "richtung": "long",
-      "score": 74.5,
-      "urteil": "B_PLUS"
     },
     "NIGHTUSD": {
       "richtung": "long",
@@ -734,8 +731,8 @@
     },
     "PAXGUSD": {
       "richtung": "short",
-      "score": 74.7,
-      "urteil": "B_PLUS"
+      "score": 72.2,
+      "urteil": "WATCH"
     },
     "PENDLEUSD": {
       "richtung": null,
@@ -768,13 +765,13 @@
       "urteil": "NO_TRADE"
     },
     "PROUSD": {
-      "richtung": "short",
-      "score": 43.3,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 3.5,
+      "urteil": "NO_TRADE"
     },
     "PUMPUSD": {
-      "richtung": "short",
-      "score": 26.8,
+      "richtung": null,
+      "score": 4.3,
       "urteil": "NO_TRADE"
     },
     "PYTHUSD": {
@@ -783,13 +780,13 @@
       "urteil": "WATCH"
     },
     "QNTUSD": {
-      "richtung": null,
-      "score": 1.6,
-      "urteil": "NO_TRADE"
+      "richtung": "short",
+      "score": 39.1,
+      "urteil": "B"
     },
     "RAYUSD": {
       "richtung": "long",
-      "score": 51.8,
+      "score": 54.6,
       "urteil": "WATCH"
     },
     "RENDERUSD": {
@@ -819,7 +816,7 @@
     },
     "SKYUSD": {
       "richtung": "short",
-      "score": 38.7,
+      "score": 38.1,
       "urteil": "WATCH"
     },
     "SMCI": {
@@ -853,13 +850,13 @@
       "urteil": "NO_TRADE"
     },
     "SUSHIUSD": {
-      "richtung": null,
-      "score": 0.0,
-      "urteil": "NO_TRADE"
+      "richtung": "short",
+      "score": 45.0,
+      "urteil": "WATCH"
     },
     "TAOUSD": {
       "richtung": "long",
-      "score": 63.1,
+      "score": 64.5,
       "urteil": "WATCH"
     },
     "TIAUSD": {
@@ -885,11 +882,6 @@
     "TSLA": {
       "richtung": null,
       "score": 3.8,
-      "urteil": "NO_TRADE"
-    },
-    "TSM": {
-      "richtung": null,
-      "score": 2.3,
       "urteil": "NO_TRADE"
     },
     "TUSD": {
@@ -929,7 +921,7 @@
     },
     "VTHOUSD": {
       "richtung": "long",
-      "score": 53.6,
+      "score": 54.8,
       "urteil": "WATCH"
     },
     "VVVUSD": {
@@ -939,7 +931,7 @@
     },
     "WIFUSD": {
       "richtung": "short",
-      "score": 41.4,
+      "score": 41.5,
       "urteil": "WATCH"
     },
     "WLDUSD": {
@@ -959,7 +951,7 @@
     },
     "XDCUSD": {
       "richtung": "long",
-      "score": 39.4,
+      "score": 43.3,
       "urteil": "WATCH"
     },
     "XLMUSD": {
@@ -1451,6 +1443,6 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "MSTR",
-  "stand": "2026-09-15T12:47:06.319273+00:00",
+  "stand": "2026-09-15T13:07:40.523760+00:00",
   "stumme_klassen": []
 }
