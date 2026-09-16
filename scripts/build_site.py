@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import subprocess
 import sys
@@ -239,7 +240,23 @@ def main() -> int:
     # Template zu stehen — so gibt es genau eine Quelle dafuer (den Code), und ein
     # Schluesselwechsel muss nicht an zwei Stellen nachgezogen werden.
     seite = tpl.replace("__DATA__", blob).replace("__VAPID__", VAPID_PUBLIC)
+
+    # Eine Kennung der AUSGELIEFERTEN Seite — und zwar nur aus der Vorlage, nicht aus
+    # den Scandaten. Sie aendert sich also genau dann, wenn sich der Programmcode
+    # aendert, und nicht alle zehn Minuten.
+    #
+    # Warum es das braucht: Ozan hatte auf dem Mac eine andere Fassung der App als auf
+    # dem iPhone und daraufhin Bitcoin verkauft, weil das Handy ein Signal zeigte, das
+    # der Laptop nicht kannte. Ein Browser haelt eine einmal geladene Seite fest; ohne
+    # ein Signal von aussen merkt er nie, dass es eine neue gibt. Die Seite legt ihre
+    # Kennung deshalb daneben ab und vergleicht sie im Betrieb mit der eigenen.
+    kennung = hashlib.sha256(tpl.encode("utf-8")).hexdigest()[:12]
+    seite = seite.replace("__BAUKENNUNG__", kennung)
     (out / "index.html").write_text(seite, encoding="utf-8")
+    (out / "version.json").write_text(
+        json.dumps({"bau": kennung, "gebaut": payload["built_at"]}, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     # Der Service Worker macht die Meldungen bei geschlossener App moeglich. Er wird
     # unveraendert kopiert — er darf keine gebauten Daten enthalten, sonst muesste er
