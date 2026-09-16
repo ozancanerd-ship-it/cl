@@ -532,12 +532,13 @@ a{color:var(--accent); text-underline-offset:3px}
       <button class="tab" role="tab" aria-selected="false" aria-controls="p1" id="t1">Chart</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p2" id="t2">Analyse</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p3" id="t3">Portfolio</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Plan</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Alarme</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">News</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p7" id="t7">Bilanz</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p8" id="t8">Chat</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p9" id="t9">System</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p4" id="t4">Sync</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p5" id="t5">Plan</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p6" id="t6">Alarme</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p7" id="t7">News</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p8" id="t8">Bilanz</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p9" id="t9">Chat</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p10" id="t10">System</button>
     </div>
   </div>
 </header>
@@ -562,26 +563,30 @@ a{color:var(--accent); text-underline-offset:3px}
   </section>
 
   <section class="panel" id="p4" role="tabpanel" aria-labelledby="t4" hidden>
-    <div id="plan"></div>
+    <div id="sync"></div>
   </section>
 
   <section class="panel" id="p5" role="tabpanel" aria-labelledby="t5" hidden>
-    <div id="alarme"></div>
+    <div id="plan"></div>
   </section>
 
   <section class="panel" id="p6" role="tabpanel" aria-labelledby="t6" hidden>
-    <div id="news"></div>
+    <div id="alarme"></div>
   </section>
 
   <section class="panel" id="p7" role="tabpanel" aria-labelledby="t7" hidden>
-    <div id="bilanz"></div>
+    <div id="news"></div>
   </section>
 
   <section class="panel" id="p8" role="tabpanel" aria-labelledby="t8" hidden>
-    <div id="chat"></div>
+    <div id="bilanz"></div>
   </section>
 
   <section class="panel" id="p9" role="tabpanel" aria-labelledby="t9" hidden>
+    <div id="chat"></div>
+  </section>
+
+  <section class="panel" id="p10" role="tabpanel" aria-labelledby="t10" hidden>
     <div id="system"></div>
   </section>
 </main>
@@ -699,7 +704,7 @@ function gebuehrSatz(o, positionswert){
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
-const TITEL = ['Markt','Chart','Analyse','Portfolio','Plan','Alarme','News','Bilanz','Chat','System'];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System'];
 function zeigeTab(i){
   TABS.forEach((t,k)=>{
     t.setAttribute('aria-selected', k===i ? 'true':'false');
@@ -707,7 +712,8 @@ function zeigeTab(i){
   });
   $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
   if (i===1) requestAnimationFrame(()=>chart.groesse());
-  if (i===8) zeichneChat();
+  if (i===4) zeichneSync();
+  if (i===9) zeichneChat();
   try { history.replaceState(null,'','#'+i); } catch(e){}
 }
 TABS.forEach((t,i)=>t.addEventListener('click',()=>zeigeTab(i)));
@@ -908,7 +914,7 @@ function frischeAuf(){
   aktualisiereRadarKurse();
   aktualisiereChartKurs();
   aktualisierePortfolioKurse();
-  if (!$('p5').hidden && Date.now() - _alarmZuletzt > 2500){
+  if (!$('p6').hidden && Date.now() - _alarmZuletzt > 2500){
     _alarmZuletzt = Date.now();
     zeichneAlarme();
   }
@@ -2918,9 +2924,11 @@ function zeigeDepotVergleich(v, d, ziel){
       <button class="link" id="pf_code_replace" style="margin-left:14px">Ersetzen</button></p>
   </div>`;
   const fertig = (text) => { zeichnePortfolio();
-    const z = $('pf_code_diff'); if (z) z.innerHTML =
-      `<div class="note-box gut" style="margin:10px 0 0"><span class="nt">Übernommen</span>
-       <p>${esc(text)}</p></div>`; };
+    ziel.innerHTML = `<div class="note-box gut" style="margin:10px 0 0">
+      <span class="nt">Übernommen</span><p>${esc(text)}</p>
+      <p style="margin:8px 0 0"><button class="btn" id="sy_zum_depot">Depot ansehen</button></p></div>`;
+    const b = $('sy_zum_depot');
+    if (b) b.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); }); };
   const m = $('pf_code_merge');
   if (m) m.addEventListener('click',()=>{ depotZusammenfuehren(d.liste);
     fertig(`${v.neu.length} neu, ${v.geaendert.length} geändert, ${v.nurHier.length} unangetastet.`); });
@@ -2937,10 +2945,115 @@ function depotAusLink(){
   const d = ausDepotCode(h);
   history.replaceState(null, '', location.pathname + location.search);
   if (!d) return;
-  zeigeTab(3);
-  zeichnePortfolio();
+  // Der Vergleich lebt jetzt auf der Sync-Seite — dort ist auch das Feld dafuer.
+  zeichneSync();
+  zeigeTab(4);
   const ziel = $('pf_code_diff');
   if (ziel){ zeigeDepotVergleich(depotVergleich(d.liste), d, ziel); ziel.scrollIntoView({block:'center'}); }
+}
+
+/* ======================================================= SYNC-SEITE
+
+   „Ich komme nicht rein auf dem Handy, nur auf dem Mac — mach das extra so ordnermaessig,
+   dass ich einfach draufzugehen kann."
+
+   Der Grund, warum der Link nicht gereicht hat, ist unangenehm und muss dastehen: eine
+   Seite, die auf dem iPhone ueber „Zum Home-Bildschirm" installiert wurde, hat einen
+   EIGENEN Speicher, getrennt von Safari. Tippt man den Link in einer Nachricht an, oeffnet
+   iOS ihn in Safari — und das Depot landet dort, wo die App es nie sieht. Auf dem Mac
+   faellt das nicht auf, weil es dort denselben Browser trifft.
+
+   Also wird nicht mehr ueber einen Link uebertragen, sondern ueber die Zwischenablage,
+   INNERHALB der App. Und weil Mac und iPhone am selben Apple-Konto haengen, reicht dafuer
+   meistens die Universal-Zwischenablage: auf dem Mac kopieren, auf dem iPhone einsetzen —
+   ohne den Umweg ueber eine Nachricht an sich selbst. */
+function zeichneSync(){
+  const pos = ladePositionen();
+  const code = pos.length ? depotCode() : '';
+  const h = `
+  <div class="note-box" style="border-color:rgba(0,229,255,.28)">
+    <span class="nt" style="color:var(--accent)">Wofür diese Seite da ist</span>
+    <p style="font-size:13.5px">Dein Depot liegt im Speicher dieses Geräts — auf dem Mac ein
+    anderer als auf dem iPhone. Hier schiebst du es von einem zum anderen. <strong>Analyse,
+    Signale und Alarme sind auf beiden Geräten ohnehin gleich</strong>, die kommen aus
+    derselben Datei; nur die Positionen müssen einmal mitwandern.</p>
+    <p style="color:var(--ink-3)">Warum kein Link: die App vom iPhone-Home-Bildschirm hat
+    einen eigenen Speicher. Ein angetippter Link öffnet Safari, und dort landet das Depot
+    dann — die App sieht es nie. Über die Zwischenablage bleibt alles in der App.</p>
+  </div>
+
+  <h2>1 · Auf dem Gerät mit dem aktuellen Stand</h2>
+  <div class="karte">
+    <p style="margin:0 0 10px;font-size:13.5px">Hier stehen gerade
+    <strong>${pos.length} Position(en)</strong>. Kopier sie — auf dem Mac landet der Text in
+    der Zwischenablage, und wenn iPhone und Mac am selben Apple-Konto hängen, kannst du ihn
+    drüben direkt einsetzen.</p>
+    <p style="margin:0"><button class="btn" id="sy_copy" style="font-size:16px;padding:14px 20px">
+      Depot kopieren</button></p>
+    <div id="sy_copy_hint"></div>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--ink-3)">Klappt die
+    Universal-Zwischenablage nicht, schick dir den Text selbst — Notizen, Nachrichten,
+    AirDrop. Hauptsache, du kannst ihn auf dem anderen Gerät einfügen.</p>
+    <textarea id="sy_out" rows="3" spellcheck="false" readonly
+      style="margin-top:10px">${esc(code)}</textarea>
+  </div>
+
+  <h2>2 · Auf dem anderen Gerät</h2>
+  <div class="karte">
+    <p style="margin:0 0 10px;font-size:13.5px">App öffnen, hierher gehen, einsetzen.
+    <strong>Nichts wird sofort überschrieben</strong> — du siehst erst, was sich ändert.</p>
+    <p style="margin:0 0 10px"><button class="btn" id="sy_paste" style="font-size:16px;padding:14px 20px">
+      Aus Zwischenablage einsetzen</button></p>
+    <p style="margin:0 0 6px;font-size:12.5px;color:var(--ink-2)">oder von Hand einfügen:</p>
+    <textarea id="sy_in" rows="3" spellcheck="false" placeholder="Depot-Text hier einfügen"></textarea>
+    <p style="margin:10px 0 0"><button class="btn" id="sy_check">Vergleichen</button></p>
+    <div id="pf_code_diff"></div>
+  </div>
+
+  <div class="note-box"><span class="nt">Was übertragen wird</span>
+    <p>Alles, was zu einer Position gehört: Menge, Einstieg, Konto, Hebel und Knock-out,
+    dein Stop und die Ziele, abgehakte Teilverkäufe. Nicht übertragen werden die Kurse und
+    die Analyse — die holt sich jedes Gerät selbst und hat damit dieselben.</p></div>`;
+  $('sync').innerHTML = h;
+
+  const melde = (el, text, gut) => { el.innerHTML = `<p style="margin:8px 0 0;font-size:13px;
+    color:${gut?'var(--up)':'var(--warn)'}">${esc(text)}</p>`; };
+
+  const c = $('sy_copy');
+  if (c) c.addEventListener('click', async ()=>{
+    const t = $('sy_out');
+    if (!t.value){ melde($('sy_copy_hint'), 'Hier steht noch kein Depot.', false); return; }
+    t.removeAttribute('readonly'); t.select(); t.setSelectionRange(0, 999999);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){}
+    try { if (navigator.clipboard){ await navigator.clipboard.writeText(t.value); ok = true; } } catch(e){}
+    t.setAttribute('readonly','');
+    melde($('sy_copy_hint'), ok
+      ? `Kopiert — ${ladePositionen().length} Positionen. Jetzt auf dem anderen Gerät hier herkommen und einsetzen.`
+      : 'Der Text ist markiert — mit ⌘C bzw. langem Tippen kopieren.', ok);
+  });
+
+  const v = $('sy_paste');
+  if (v) v.addEventListener('click', async ()=>{
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch(e){}
+    if (!text){ $('sy_in').focus();
+      melde($('pf_code_diff'), 'Die Zwischenablage ließ sich nicht lesen — füg den Text unten von Hand ein.', false);
+      return; }
+    $('sy_in').value = text;
+    pruefeSync();
+  });
+  const k = $('sy_check');
+  if (k) k.addEventListener('click', pruefeSync);
+}
+
+function pruefeSync(){
+  const ziel = $('pf_code_diff');
+  const d = ausDepotCode(($('sy_in')||{}).value || '');
+  if (!d){ ziel.innerHTML = `<div class="note-box bad" style="margin:10px 0 0">
+    <span class="nt">Das war kein Depot-Text</span><p>Auf dem anderen Gerät oben auf
+    <em>Depot kopieren</em> tippen und den ganzen Text herbringen.</p></div>`; return; }
+  zeigeDepotVergleich(depotVergleich(d.liste), d, ziel);
 }
 
 /* Der ausgeschriebene Name einer Position. „OPEUR" steht so im Depot, weil Ozan es dort
@@ -3349,24 +3462,10 @@ function zeichnePortfolio(){
 
     <h2>Mac und iPhone gleich halten</h2>
     <div class="karte">
-      <p style="margin:0 0 9px;font-size:13px;color:var(--ink-2)">Das Depot liegt in
-      jedem Browser einzeln — deshalb steht auf dem Handy etwas anderes als hier. Mit
-      diesem Code schickst du den ganzen Stand von einem Gerät zum anderen: Menge,
-      Einstieg, Konto, Stop, Ziele, abgehakte Ziele. <strong>Wo du zuletzt etwas
-      eingetragen hast, dort erzeugst du den Code</strong> — und setzt ihn auf dem anderen
-      Gerät ein.</p>
-      <p style="margin:0 0 9px">
-        <button class="btn" id="pf_code_zeigen">Code von diesem Gerät erzeugen</button>
-        <button class="link" id="pf_code_link" style="margin-left:14px">als Link</button></p>
-      <textarea id="pf_code_aus" rows="3" spellcheck="false" style="display:none"
-        placeholder="hier erscheint der Code"></textarea>
-      <div id="pf_code_hinweis"></div>
-      <p style="margin:14px 0 6px;font-size:13px;color:var(--ink-2)">Code vom anderen
-      Gerät einsetzen:</p>
-      <textarea id="pf_code_ein" rows="3" spellcheck="false"
-        placeholder="Code oder Link hier einfügen"></textarea>
-      <p style="margin:10px 0 0"><button class="btn" id="pf_code_pruefen">Vergleichen</button></p>
-      <div id="pf_code_diff"></div>
+      <p style="margin:0 0 10px;font-size:13.5px">Dein Depot liegt im Speicher dieses Geräts.
+      Damit auf dem iPhone dasselbe steht wie hier, gibt es den eigenen Reiter
+      <strong>Sync</strong> — kopieren, drüben einsetzen, fertig.</p>
+      <p style="margin:0"><button class="btn" id="pf_zum_sync">Zum Sync-Reiter</button></p>
     </div>
 
     <h2>Ganzes Depot auf einmal</h2>
@@ -3442,33 +3541,8 @@ function zeichnePortfolio(){
   const clear = $('pf_clear');
   if (clear) clear.addEventListener('click',()=>{ speicherePositionen([]); zeichnePortfolio(); });
 
-  /* Depot von Geraet zu Geraet — erzeugen, vergleichen, zusammenfuehren. */
-  const zeigeCode = (alsLink) => {
-    const code = depotCode();
-    const feld = $('pf_code_aus');
-    const wert = alsLink ? (location.origin + location.pathname + '#depot=' + code) : code;
-    feld.style.display = ''; feld.value = wert; feld.select();
-    let kopiert = false;
-    try { kopiert = document.execCommand('copy'); } catch(e){}
-    if (navigator.clipboard) { navigator.clipboard.writeText(wert).then(()=>{}, ()=>{}); kopiert = true; }
-    $('pf_code_hinweis').innerHTML = `<p style="margin:8px 0 0;font-size:12.5px;color:${kopiert?'var(--up)':'var(--ink-2)'}">
-      ${kopiert ? 'Kopiert' : 'Markiert'} — ${ladePositionen().length} Position(en).
-      ${alsLink ? 'Schick dir den Link selbst (Nachricht, AirDrop) und öffne ihn auf dem anderen Gerät.'
-                : 'Auf dem anderen Gerät unten einsetzen und vergleichen.'}</p>`;
-  };
-  const cz = $('pf_code_zeigen'); if (cz) cz.addEventListener('click',()=>zeigeCode(false));
-  const cl = $('pf_code_link');   if (cl) cl.addEventListener('click',()=>zeigeCode(true));
-  const cp = $('pf_code_pruefen');
-  if (cp) cp.addEventListener('click',()=>{
-    const d = ausDepotCode($('pf_code_ein').value || '');
-    const ziel = $('pf_code_diff');
-    if (!d){ ziel.innerHTML = `<div class="note-box bad" style="margin:10px 0 0">
-      <span class="nt">Kein gültiger Code</span><p>Das war weder ein Depot-Code noch ein
-      Link daraus. Auf dem anderen Gerät oben „Code erzeugen" drücken und den ganzen Text
-      kopieren.</p></div>`; return; }
-    const v = depotVergleich(d.liste);
-    zeigeDepotVergleich(v, d, ziel);
-  });
+  const zs = $('pf_zum_sync');
+  if (zs) zs.addEventListener('click', ()=>{ zeichneSync(); zeigeTab(4); });
 
   const imp = $('pf_import');
   if (imp) imp.addEventListener('click',()=>{
