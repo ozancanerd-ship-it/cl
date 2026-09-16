@@ -1863,13 +1863,23 @@ function handelsreif(o){
 
 /* Die EINE Liste. Beide Reiter, die Startkarte und der Zaehler lesen hier.
    Zwischengespeichert, weil ``oppZeile`` sie fuer jede der 200+ Zeilen braucht. */
-let _rangKarte = null, _rangZeit = 0;
+let _rangKarte = null, _rangZeit = 0, _rangStand = '';
 function rangLagen(){
+  /* Der Zwischenspeicher haengt NICHT nur an der Zeit, sondern am Datenstand.
+
+     Beim ersten Test live stand unter Alarme „Der letzte Scan hat kein handelbares Setup
+     gefunden" — bei 16 handelbaren Werten. Grund: beim Seitenaufbau zeichnet die App
+     einmal, bevor der Scan geladen ist. Damals war das Ergebnis leer, das war richtig;
+     nur wurde es in den Zwischenspeicher gelegt und beim Neuzeichnen direkt nach dem
+     Laden wiederverwendet. Ein Zwischenspeicher, der eine Antwort von VOR den Daten
+     ueberlebt, ist keine Beschleunigung, sondern ein Fehler mit Gedaechtnis. */
+  const stand = (S ? String(S.erzeugt) : 'ohne') + '|' +
+                ((WL && WL.wachen) ? WL.wachen.length : -1) + '|' + L.size;
   const t = Date.now();
-  if (!_rangKarte || t - _rangZeit > 800){
+  if (!_rangKarte || _rangStand !== stand || t - _rangZeit > 800){
     try { _rangKarte = new Map(ausRanking().map(x => [x.w.instrument, x])); }
     catch(e){ _rangKarte = new Map(); }
-    _rangZeit = t;
+    _rangZeit = t; _rangStand = stand;
   }
   return _rangKarte;
 }
