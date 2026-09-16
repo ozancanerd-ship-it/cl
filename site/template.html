@@ -2727,6 +2727,164 @@ function stopVorschlag(b){
           vomBasiswert: !b.row && !!(b.basis && b.basis.row)};
 }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   STOPS, DIE DIE APP SELBST SETZT — UND SELBST NACHZIEHT
+
+   Ozan: „die Stopps sollst du auch selber erst mal analysieren und danach selber sagen,
+   und er soll auch nachgezogen werden — meine eigenen Portfolio-Stops habe ich nie
+   gesetzt."
+
+   Das war der wahre Zustand: zehn Positionen ohne Stop. Die App hatte einen Vorschlag,
+   aber er stand hinter einem Knopf, den niemand drueckte. Ein Vorschlag, den keiner
+   annimmt, schuetzt nichts.
+
+   Ab jetzt setzt die App den Stop selbst, sobald die Analyse einen hergibt, und zieht
+   ihn nach. Zwei Regeln, die nie gebrochen werden:
+
+     * Ein Stop wandert NUR nach oben (bei Short nur nach unten). Ein nachgebender Stop
+       ist kein Stop, sondern eine Ausrede.
+     * Die App rueckt nie an einen selbst gesetzten Stop, ohne es zu sagen. Was sie
+       aendert, steht oben im Depot als Liste — denn beim Broker liegt die Order, nicht
+       hier, und die muss Ozan von Hand nachziehen.
+
+   Die Ehrlichkeit dazu: diese App fuehrt keine Orders aus. Ein Stop hier ist eine
+   Ueberwachung mit Alarm, keine Order an der Boerse. Deshalb sagt die Liste nicht
+   „erledigt", sondern „beim Broker nachziehen". */
+
+// Unter diesem Schritt lohnt das Nachziehen die Ordergebuehr nicht.
+const TRAIL_MIN_SCHRITT_PCT = 0.4;
+
+function stopRichtungLang(pos){
+  if (pos && pos.plan && pos.plan.richtung === 'short') return false;
+  if (pos && pos.hebel_richtung === 'short') return false;
+  return true;
+}
+
+/* Was mit dem Stop dieser Position zu geschehen hat — ohne etwas zu schreiben. */
+function stopPflege(b){
+  const pos = b.pos, kurs = b.kurs;
+  if (kurs == null || !isFinite(kurs)) return {art:'ohne_kurs'};
+  if (istBar(pos)) return {art:'bar'};
+  const lang = stopRichtungLang(pos);
+  const v = stopVorschlag(b);
+  const pl = pos.plan || null;
+  const hat = pl && pl.stop != null && isFinite(pl.stop);
+
+  if (!hat){
+    if (!v) return {art:'keiner'};
+    return {art:'neu', stop:v.stop, tp1:v.tp1, tp2:v.tp2, tp3:v.tp3,
+            vomBasiswert:v.vomBasiswert,
+            grund:'die Analyse gibt eine Invalidierung her — die App setzt sie als Stop'};
+  }
+
+  const besser = (a, c) => lang ? a > c : a < c;   // „weiter in Sicherheit"
+  let ziel = null, grund = '';
+
+  // Ziel 1 durch → auf den Einstieg. Ab da kann der Trade nichts mehr kosten.
+  const erledigt = new Set(pos.erledigt || []);
+  if (erledigt.has('TP1') && pos.einstieg != null && besser(pos.einstieg, pl.stop)){
+    ziel = pos.einstieg;
+    grund = 'Ziel 1 ist abgehakt — ab dem Einstieg kann die Position nichts mehr kosten';
+  }
+  // Die Analyse hat ihre Invalidierung nachgezogen.
+  if (v && besser(v.stop, ziel != null ? ziel : pl.stop)){
+    ziel = v.stop;
+    grund = 'die laufende Analyse hat ihre Invalidierung nachgezogen';
+  }
+  if (ziel == null) return {art:'steht', stop:pl.stop};
+  // Niemals auf oder ueber den aktuellen Kurs — das waere ein sofortiger Verkauf.
+  if (lang ? ziel >= kurs : ziel <= kurs) return {art:'steht', stop:pl.stop};
+  if (Math.abs(ziel - pl.stop) / kurs * 100 < TRAIL_MIN_SCHRITT_PCT)
+    return {art:'steht', stop:pl.stop};
+  return {art:'nachziehen', von:pl.stop, stop:ziel, grund,
+          selbst: pl.quelle === 'selbst'};
+}
+
+/* Einmal je Zeichendurchgang: setzen und nachziehen, und zurueckgeben, was passiert ist.
+   Geschrieben wird nur, wenn sich wirklich etwas aendert — sonst wuerde der Speicher
+   alle fuenf Sekunden ohne Not neu beschrieben. */
+function stopsPflegen(bew){
+  let a;
+  try { a = ladePositionen(); } catch(e){ return []; }
+  const geschehen = [];
+  let geaendert = false;
+  for (const b of bew){
+    const p = stopPflege(b);
+    if (!p || (p.art !== 'neu' && p.art !== 'nachziehen')) continue;
+    const pos = a.find(x => posSchluessel(x) === posSchluessel(b.pos));
+    if (!pos) continue;
+    const alt = pos.plan && pos.plan.stop != null ? pos.plan.stop : null;
+    pos.plan = {
+      ...(pos.plan || {}),
+      richtung: (pos.plan && pos.plan.richtung) || (stopRichtungLang(pos) ? 'long' : 'short'),
+      waehrung: (pos.plan && pos.plan.waehrung) || posWaehrung(pos),
+      stop: p.stop,
+      // Ziele nur beim ERSTEN Setzen dazu — spaeter wuerden sie einen abgehakten
+      // Teilverkauf wieder auferstehen lassen.
+      ...(p.art === 'neu' ? {tp1:p.tp1 ?? null, tp2:p.tp2 ?? null, tp3:p.tp3 ?? null} : {}),
+      quelle: (pos.plan && pos.plan.quelle === 'selbst') ? 'selbst_nachgezogen' : 'app',
+      gesetzt: Date.now(),
+      /* Offen, bis Ozan sagt, dass die Order beim Broker liegt.
+
+         Zuerst stand die Liste nur in dem einen Zeichendurchgang da, in dem die Aenderung
+         passierte. Das Depot zeichnet sich aber alle fuenf Sekunden neu und auch im
+         Hintergrund — der Stop konnte also laengst gesetzt sein, bevor Ozan den Reiter
+         ueberhaupt aufmacht. Dann haette die App brav einen Stop ueberwacht, den es beim
+         Broker nie gab. Der Merker bleibt deshalb stehen, bis er abgehakt wird. */
+      broker_offen: {von: alt, stop: p.stop, grund: p.grund || '', zeit: Date.now()},
+    };
+    geaendert = true;
+    geschehen.push({b, art:p.art, von:alt, stop:p.stop, grund:p.grund, selbst:!!p.selbst});
+  }
+  if (geaendert) speicherePositionen(a);
+  return geschehen;
+}
+
+/* Die Liste oben im Depot. Sie ist die Handlungsanweisung an den Broker — ohne sie
+   waere der schoenste nachgezogene Stop eine Zahl, die nur in dieser App existiert. */
+function stopKasten(geschehen, bew){
+  const offen = bew.filter(b => {
+    const p = stopPflege(b);
+    return p && p.art === 'keiner';
+  });
+  // Nicht aus ``geschehen`` — sondern aus dem, was noch nicht abgehakt ist.
+  const broker = bew.filter(b => b.pos.plan && b.pos.plan.broker_offen);
+  if (!broker.length && !offen.length) return '';
+  let h = '';
+  if (broker.length){
+    h += `<div class="note-box warn" style="margin:10px 0 0">
+      <span class="nt">Beim Broker eintragen</span>
+      <p style="font-size:13.5px"><strong>Die App hat ${broker.length}
+      ${broker.length===1?'Stop':'Stops'} gesetzt beziehungsweise nachgezogen.</strong>
+      Sie überwacht sie ab sofort und meldet sich, wenn einer fällt — <strong>aber die
+      Order liegt bei deinem Broker, nicht hier.</strong> Solange sie dort nicht liegt,
+      schützt nur der Alarm, und der braucht dich. Diese Marken gehören eingetragen:</p>
+      ${broker.map(b => {
+        const o = b.pos.plan.broker_offen;
+        const d = digits(b.kurs || o.stop || 1);
+        const z = waehrungsZeichen(b.w);
+        return `<p style="margin:8px 0 0;font-size:13px">
+          <strong>${esc(posName(b))}</strong> — Stop ${o.von != null
+            ? `von ${num(o.von,d)}${z} auf <strong>${num(o.stop,d)}${z}</strong> nachziehen`
+            : `neu auf <strong>${num(o.stop,d)}${z}</strong>`}
+          <span style="color:var(--ink-3)">· ${esc(o.grund||'')}</span>
+          <button class="btn" data-brokerok="${esc(posSchluessel(b.pos))}"
+                  style="margin-left:8px;padding:3px 9px;font-size:12px">eingetragen</button></p>`;
+      }).join('')}
+      <p style="margin:10px 0 0"><button class="btn" id="pf_broker_alle">Alle eingetragen</button></p>
+    </div>`;
+  }
+  if (offen.length){
+    h += `<div class="note-box" style="margin:10px 0 0">
+      <span class="nt">Ohne Stop — und die App kann hier keinen ableiten</span>
+      <p style="font-size:13px">${offen.map(b=>esc(posName(b))).join(', ')}.
+      Für diese Werte gibt die Analyse gerade keine Invalidierung her, also erfindet die
+      App auch keine. Trag unten auf der Karte selbst eine Marke ein — ein eigener Stop,
+      den die App überwacht, ist unendlich viel mehr wert als ein ausgedachter.</p></div>`;
+  }
+  return h;
+}
+
 function ausstiegsKasten(b){
   const schritt = naechsterSchritt(b.pos, b.kurs);
   if (!schritt){
@@ -3914,8 +4072,13 @@ function zeichnePortfolio(){
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
      sein Geld tatsaechlich hat. Der Stand kommt aus derselben Funktion, die auch die
      Alarme benutzen; zwei Rechenwege fuer dieselbe Zahl waeren zwei Wahrheiten. */
-  const stand = depotStand();
+  let stand = depotStand();
   if (!stand){ $('portfolio').innerHTML = `<p class="leer">Depot nicht lesbar.</p>`; return; }
+  /* Zuerst die Stops, dann zeichnen. Aus einer toten Analyse wird nichts gesetzt — ein
+     Stop aus Marken von gestern Abend ist schlechter als keiner. Aendert sich etwas,
+     wird das Depot neu bewertet, sonst zeichnete die Seite den Stand von davor. */
+  const stopLauf = (S && !scanTot()) ? stopsPflegen(stand.bew) : [];
+  if (stopLauf.length) stand = depotStand() || stand;
   const {bew, kursEU, inEuro, gesamt} = stand;
   const gv = bew.reduce((s,b)=>s + (inEuro(b, b.gv)||0), 0);
   const einstand = bew.reduce((s,b)=>s + (inEuro(b, b.einstand)||0), 0);
@@ -3949,6 +4112,8 @@ function zeichnePortfolio(){
       Neu bewertet: ${new Date().toLocaleTimeString('de-DE')} — das läuft weiter, auch
       wenn dieser Reiter zu ist.</p>`;
 
+    h += stopKasten(stopLauf, bew);
+
     /* Die Handlungsliste ganz oben. Wer das Depot aufmacht, will nicht vierzehn Karten
        lesen, sondern wissen, ob heute etwas zu tun ist — und wenn ja, was und wie viel. */
     const aktionen = bew.map(b => ({b, a: positionsAktion(b, stand)}))
@@ -3969,6 +4134,15 @@ function zeichnePortfolio(){
           <span>≈ <b>${num(a.euro,2)} €</b></span>
           <span>Anteil <b>${a.anteil!=null?a.anteil.toFixed(1)+' %':'—'}</b></span></div>`:''}
         <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(a.text)}</p>
+        ${(a.menge!=null && b.pos.menge)?`<p style="margin:9px 0 0">
+          <button class="btn" data-mengeschl="${esc(posSchluessel(b.pos))}"
+                  data-mengeart="${esc(a.art)}" data-mengewert="${a.menge}"
+                  data-mengekurs="${b.kurs!=null?b.kurs:''}">${
+            a.art==='nachlegen' ? 'Gekauft — ins Depot übernehmen'
+                                : (a.art==='raus' ? 'Verkauft — Position schliessen'
+                                                  : 'Verkauft — Menge anpassen')}</button>
+          <span style="font-size:12px;color:var(--ink-3);margin-left:8px">rechnet danach
+            sofort neu</span></p>`:''}
       </div>`;
     }).join('')
     : `<div class="karte gut"><h3>Nichts zu tun</h3>
@@ -4114,6 +4288,61 @@ function zeichnePortfolio(){
     const ziel = zf && zf.value !== '' ? Number(zf.value) : null;
     planSetzen(sym, {stop, tp1: isFinite(ziel) ? ziel : null, quelle:'selbst'});
   }));
+  // Einen nachgezogenen Stop abhaken: die Order liegt beim Broker, der Merker darf weg.
+  const brokerAbhaken = (filter) => {
+    const a = ladePositionen();
+    let was = false;
+    for (const p of a){
+      if (p.plan && p.plan.broker_offen && filter(p)){ delete p.plan.broker_offen; was = true; }
+    }
+    if (was){ speicherePositionen(a); zeichnePortfolio(); }
+  };
+  $('portfolio').querySelectorAll('[data-brokerok]').forEach(btn=>btn.addEventListener('click',()=>
+    brokerAbhaken(p => posSchluessel(p) === btn.dataset.brokerok)));
+  const alleOk = $('pf_broker_alle');
+  if (alleOk) alleOk.addEventListener('click', ()=> brokerAbhaken(()=>true));
+
+  /* Die Handlung wirklich vollziehen — nicht nur lesen.
+
+     Ozan: „wenn ich da jetzt was reduziere, soll da auch so ein Knopf sein, wo ich dann
+     reduzieren kann und er dann wieder neu analysiert."
+
+     Genau das passiert hier: die Menge wird angepasst, gespeichert, und die Seite rechnet
+     danach alles neu — Anteil, Klumpen, Gleichlauf, Tagesrisiko, die naechste Handlung.
+     Der Knopf fuehrt KEINE Order aus; er haelt fest, was Ozan beim Broker getan hat.
+     Deshalb heisst er „Verkauft", nicht „Verkaufen". */
+  $('portfolio').querySelectorAll('[data-mengeschl]').forEach(btn=>btn.addEventListener('click',()=>{
+    const a = ladePositionen();
+    const i = a.findIndex(p => posSchluessel(p) === btn.dataset.mengeschl);
+    if (i < 0) return;
+    const pos = a[i];
+    const art = btn.dataset.mengeart;
+    const wert = Number(btn.dataset.mengewert);
+    const kurs = btn.dataset.mengekurs === '' ? null : Number(btn.dataset.mengekurs);
+    if (!isFinite(wert) || wert <= 0) return;
+
+    if (art === 'nachlegen'){
+      // Einstand mischen, sonst stimmt jede Gewinnanzeige danach nicht mehr.
+      const alt = Number(pos.menge) || 0;
+      const neu = alt + wert;
+      if (pos.einstieg != null && kurs != null && neu > 0)
+        pos.einstieg = (alt * pos.einstieg + wert * kurs) / neu;
+      pos.menge = neu;
+    } else {
+      const rest = (Number(pos.menge) || 0) - wert;
+      // Ein Rest unter einem Promille ist Rundung, keine Position.
+      if (art === 'raus' || rest <= (Number(pos.menge) || 0) * 0.001){
+        a.splice(i, 1);
+      } else {
+        pos.menge = rest;
+        // Nach einem Teilverkauf ist der alte Plan nicht falsch, aber der Stop gehoert
+        // neu geprueft — das macht stopsPflegen beim naechsten Zeichnen von selbst.
+      }
+    }
+    speicherePositionen(a);
+    zeichnePortfolio();
+  }));
+
   // Ein erreichtes Ziel abhaken: danach zeigt der Plan den naechsten Schritt statt
   // denselben nochmal. Ohne das stuende bei jedem Aufruf wieder "TP1 verkaufen".
   $('portfolio').querySelectorAll('[data-erledigt]').forEach(b=>b.addEventListener('click',()=>{
