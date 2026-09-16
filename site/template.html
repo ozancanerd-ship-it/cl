@@ -1530,14 +1530,36 @@ function depotZeile(){
    Masterplan: "TOP OPPORTUNITY — Entry, SL, TP1/2/3, R:R, Score, Confidence".
    Es kommt aus derselben Rangliste wie der Alarme-Tab, damit nirgends zwei
    verschiedene "beste Chancen" stehen. */
+/* Das CRV kam an drei Stellen aus zwei verschiedenen Quellen — und stand deshalb auf
+   Ozans Bildschirm zweimal verschieden am selben Wert: im Markt „CRV 1:2.0", unter
+   Alarme „CRV 1:1.25", gleicher Coin, gleiche Minute.
+
+   Richtig ist die Zahl aus dem HANDELSPLAN. Der Plan legt Stop und Ziele so, dass Ziel 1
+   nie naeher liegt als der Stop entfernt ist; genau diese Marken stehen auf der Karte.
+   ``o.rr`` ist das rohe Verhaeltnis aus der Liquiditaetsrechnung davor — eine andere
+   Groesse, die zu den angezeigten Marken nicht passt. Ab hier fragt jede Stelle hier. */
+function crvVon(o){
+  if (o && o.plan && o.plan.crv != null && isFinite(o.plan.crv)) return o.plan.crv;
+  if (o && o.rr != null && isFinite(o.rr)) return o.rr;
+  return null;
+}
+
 function topSignal(){
-  const kand = ausRanking();
+  const kand = [...rangLagen().values()];
   if (!kand.length) return '';
   const rang = a => [-(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
   kand.sort((a,b)=>{ const [ra,da]=rang(a), [rb,db]=rang(b); return ra!==rb ? ra-rb : da-db; });
   const x = kand[0], w = x.w, o = x.o || {}, d = digits(w.einstieg);
   const seite = x.lang ? 'KAUFEN' : 'VERKAUFEN';
-  const jetzt = x.stufe === 'jetzt' || x.stufe === 'im_trade';
+  /* Hier stand ``x.stufe === 'jetzt' || x.stufe === 'im_trade'`` — und damit las eine
+     laufende Position wie eine Kaufaufforderung. Auf Ozans Bildschirm stand oben
+     „BNB KAUFEN — JETZT, Einstieg 720,15" und zwei Zeilen tiefer in derselben Liste
+     „noch 0,5 %, Einstieg 707,86": oben der eingefrorene Vertrag des laufenden Trades,
+     unten der frische Vorschlag aus dem Scan. Beides richtig gerechnet, zusammen eine
+     Aufforderung, etwas zu kaufen, das laengst laeuft.
+     Ein laufender Trade ist kein Einstieg. Er bekommt jetzt sein eigenes Wort. */
+  const jetzt = x.stufe === 'jetzt';
+  const laeuft = x.stufe === 'im_trade' || x.stufe === 'stop';
   const ziele = [w.tp1, w.tp2, w.tp3].filter(v=>v!=null);
   const st = o.setup || null, pl = o.plan || null;
   // Die grosse Karte ist das Erste, was beim Öffnen im Blick ist. Sie beantwortet
@@ -1545,23 +1567,34 @@ function topSignal(){
   return `<div class="hero ${x.lang?'lang':'kurz'} ${jetzt?'jetzt':''}"
       data-sym="${esc(w.instrument)}" id="topsignal">
     <div class="hero-k">
-      <span class="mono lbl">Beste Chance</span>
+      <span class="mono lbl">${laeuft ? 'Läuft gerade' : 'Beste Chance'}</span>
       <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
       ${st?`<span class="mono lbl2">${esc(st.name)}</span>`:''}
       <span class="mono sc">${o.score!=null?`${o.score.toFixed(0)}`:''}</span>
     </div>
     <div class="hero-t">${esc(name(w.instrument))}
-      <span class="akt">${jetzt?`${seite} — JETZT`:`${seite} ab ${num(w.einstieg,d)}`}</span></div>
+      <span class="akt">${
+        x.stufe==='stop' ? 'STOP BERÜHRT'
+        : laeuft ? `${x.lang?'LONG':'SHORT'} — läuft seit Einstieg`
+        : jetzt ? `${seite} — JETZT`
+        : `${seite} ab ${num(w.einstieg,d)}`}</span></div>
     ${x.kurs!=null?`<p class="hero-p">Kurs <strong>${num(x.kurs,d)}</strong>${
-      x.live?' <span class="up mono" style="font-size:10px">LIVE</span>':''}${
-      !jetzt&&x.abstand!=null?` · noch <strong>${Math.abs(x.abstand).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}</p>`:''}
+      x.live?' <span class="up mono" style="font-size:10px">LIVE</span>'
+            :' <span class="mono" style="font-size:10px;color:var(--ink-3)">Kurs aus dem letzten Scan</span>'}${
+      laeuft&&x.r!=null?` · Stand <strong class="${x.r>=0?'up':'dn'}">${x.r>=0?'+':''}${x.r.toFixed(2)} R</strong>`:''}${
+      !jetzt&&!laeuft&&x.abstand!=null?` · noch <strong>${Math.abs(x.abstand).toFixed(2).replace('.',',')} %</strong> bis zum Einstieg`:''}</p>`:''}
+    ${laeuft?`<p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Diese Position
+      läuft bereits — die Marken darunter sind der Vertrag aus dem Einstieg und bleiben
+      fest. <strong>Das ist keine Aufforderung nachzukaufen.</strong> Ein frischer
+      Einstiegsvorschlag zu demselben Wert kann andere Zahlen haben; er steht im Markt
+      in der Zeile zu diesem Wert.</p>`:''}
     ${st?`<p class="hero-these">${esc(st.these)}</p>`:''}
     <div class="zt" style="border-top:0;padding-top:0">
       <span>Einstieg <b>${num(w.einstieg,d)}</b></span>
       <span>Stop <b>${num(w.stop,d)}</b></span>
       ${ziele.map((v,i)=>`<span>Ziel ${i+1} <b>${num(v,d)}</b></span>`).join('')}
-      ${pl?`<span>CRV <b>1:${pl.crv.toFixed(1)}</b></span><span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`
-          :(o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:'')}
+      ${(()=>{ const c = crvVon(o); return c!=null?`<span>CRV <b>1:${c.toFixed(1)}</b></span>`:''; })()}
+      ${pl?`<span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`:''}
       ${o.rs!=null?`<span>Rel. Stärke <b>${Math.round(o.rs)}</b></span>`:''}
     </div>
     ${st&&st.trigger?`<p class="hero-trig"><b>Auslöser</b> ${esc(st.trigger)}</p>`:''}
@@ -1769,15 +1802,108 @@ function gefiltert(){
 
      JETZT       — der Kurs ist in der Einstiegszone. Das ist der Moment.
      noch X %    — gutes Setup, aber der Kurs muss erst dorthin. Limit-Order legen.
-     kein Einstieg — es gibt keine Marke, also gibt es nichts zu kaufen.  */
+     kein Einstieg — es gibt keine Marke, also gibt es nichts zu kaufen.
+
+
+   ================= 16.09.: WARUM MARKT UND ALARME VERSCHIEDENES SAGTEN
+
+   Ozan: „Beim Markt steht jetzt, was man einsteigen soll. Aber wenn ich dann auf Alarme
+   klicke, ist dieses Jetzt nicht mehr da."
+
+   Er hat recht, und es waren ZWEI Rechnungen fuer dieselbe Frage:
+
+   * Der Markt-Reiter nahm den Livekurs und fiel, wenn es keinen gibt, auf den Kurs aus
+     dem Scan zurueck.
+   * Der Alarme-Reiter (``lage``) verlangte einen LIVEKURS. Ohne ihn blieb der Zustand
+     auf „beobachten" stehen.
+
+   Einen Livestream gibt es nur fuer Krypto und Gold — fuer Aktien gibt es keinen frei
+   zugaenglichen Feed, den ein Browser abfragen darf. Damit konnte **keine einzige Aktie
+   jemals unter „Jetzt einsteigen" stehen**, egal wie gut das Setup war. Auf dem Markt
+   leuchtete sie gruen, unter Alarme war sie nicht da. Fuer jemanden, der gerade die
+   Aktienseite ausgebaut haben wollte, ist das nicht nur inkonsistent, sondern der halbe
+   Nutzen weg.
+
+   Ab hier gibt es genau EINE Rechnung. ``einstiegErreicht`` entscheidet, ``kursStand``
+   liefert den Kurs, und beide Reiter lesen dasselbe Ergebnis aus ``rangLagen()``. Zwei
+   Antworten auf dieselbe Frage sind strukturell nicht mehr moeglich.
+
+   Dafuer wird ueberall dazugesagt, WOHER der Kurs kommt: „live" oder „Kurs aus dem
+   letzten Scan". Ein JETZT auf Scanbasis ist eine schwaechere Aussage als eines auf
+   Livebasis — das darf man nicht verschweigen, aber es ist allemal besser, als die
+   Aktie gar nicht erst anzuzeigen.  */
+
+// Die Einstiegszone ist keine Linie, sondern ein schmales Band: auf den Cent genau
+// trifft ein Kurs eine Marke nie. 0,4 % ist eng genug, dass man noch das kauft, was
+// bewertet wurde. Diese Zahl steht EINMAL hier und wird nirgends wiederholt.
+const EINSTIEG_TOLERANZ_PCT = 0.4;
+
+/* Der beste verfuegbare Kurs — und die ehrliche Auskunft, woher er kommt.
+   Krypto und Gold laufen live ueber Kraken; alles andere kommt aus dem letzten Scan. */
+function kursStand(instrument, ausScan){
+  const live = L.get(instrument);
+  if (live && live.p != null && isFinite(live.p)) return {kurs: live.p, live: true};
+  if (ausScan != null && isFinite(ausScan)) return {kurs: ausScan, live: false};
+  return {kurs: null, live: false};
+}
+
+function einstiegErreicht(lang, einstieg, kurs){
+  if (kurs == null || einstieg == null || !isFinite(kurs) || !isFinite(einstieg)) return false;
+  const t = EINSTIEG_TOLERANZ_PCT / 100;
+  return lang ? kurs <= einstieg * (1 + t) : kurs >= einstieg * (1 - t);
+}
+
+/* Ein Wert taucht unter Alarme nur auf, wenn er handelbar ist UND eine Einstiegsmarke
+   und eine Invalidierung hat. Genau dieselbe Bedingung entscheidet im Markt darueber,
+   ob das Zustandsfeld gezeigt wird — sonst stuende dort ein JETZT fuer einen Wert, den
+   die Alarmseite gar nicht kennt. */
+function handelsreif(o){
+  return !!(o && o.handelbar && o.einstieg != null && o.invalidierung != null);
+}
+
+/* Die EINE Liste. Beide Reiter, die Startkarte und der Zaehler lesen hier.
+   Zwischengespeichert, weil ``oppZeile`` sie fuer jede der 200+ Zeilen braucht. */
+let _rangKarte = null, _rangZeit = 0;
+function rangLagen(){
+  const t = Date.now();
+  if (!_rangKarte || t - _rangZeit > 800){
+    try { _rangKarte = new Map(ausRanking().map(x => [x.w.instrument, x])); }
+    catch(e){ _rangKarte = new Map(); }
+    _rangZeit = t;
+  }
+  return _rangKarte;
+}
+
+/* Die eine Liste der einsteigbaren Werte — mit der Altersregel drin.
+
+   Beim Test fiel auf, dass die Regel bisher nur an EINER Stelle hing: ``zeichneAlarme``
+   leerte die Liste bei einer toten Analyse, der Markt-Reiter nicht. Ergebnis waere
+   wieder genau Ozans Bild gewesen: im Markt leuchtet JETZT, unter Alarme steht „gerade
+   kein Einstieg erreicht". Also gehoert die Regel dorthin, wo beide sie lesen. */
+function amEinstiegListe(){
+  if (scanTot()) return [];
+  return [...rangLagen().values()].filter(x => x.stufe === 'jetzt');
+}
+
 function einstiegsLage(o, kurs){
-  if (!o || o.einstieg == null || kurs == null || !isFinite(kurs))
-    return {stufe:'keiner', text:'kein Einstieg'};
+  if (!o || o.einstieg == null) return {stufe:'keiner', text:'kein Einstieg'};
+  // Aus einer toten Analyse kommt kein JETZT — auf keiner Seite. Die Marken sind Stunden
+  // alt; ein gruenes Feld daneben waere eine Kaufaufforderung auf Basis von gestern.
+  if (scanTot()) return {stufe:'veraltet', text:'Analyse zu alt'};
+  // Zuerst der gemeinsame Stand — damit hier nie etwas anderes herauskommt als unter Alarme.
+  const x = handelsreif(o) ? rangLagen().get(o.instrument) : null;
+  if (x){
+    if (x.stufe === 'im_trade') return {stufe:'im_trade', abstand:x.abstand, live:x.live, text:'im Trade'};
+    if (x.stufe === 'stop')     return {stufe:'stop', abstand:x.abstand, live:x.live, text:'Stop'};
+    if (x.stufe === 'jetzt')    return {stufe:'jetzt', abstand:x.abstand, live:x.live, text:'JETZT'};
+    if (x.abstand != null)
+      return {stufe:'warten', abstand:x.abstand, live:x.live,
+              text:`noch ${Math.abs(x.abstand).toFixed(1).replace('.',',')} %`};
+  }
+  if (kurs == null || !isFinite(kurs)) return {stufe:'keiner', text:'kein Einstieg'};
   const lang = o.richtung !== 'short';
   const abstand = (kurs - o.einstieg) / o.einstieg * 100;
-  // In der Zone: der Kurs hat die Marke erreicht oder ueberschritten (long: von unten).
-  const drin = lang ? kurs <= o.einstieg * 1.004 : kurs >= o.einstieg * 0.996;
-  if (drin) return {stufe:'jetzt', abstand, text:'JETZT'};
+  if (einstiegErreicht(lang, o.einstieg, kurs)) return {stufe:'jetzt', abstand, text:'JETZT'};
   return {stufe:'warten', abstand,
           text:`noch ${Math.abs(abstand).toFixed(1).replace('.',',')} %`};
 }
@@ -1789,6 +1915,16 @@ function oppZeile(o, rang){
   const d = digits(kurs);
   const st = o.setup || null;
   const pl = o.plan || null;
+  /* Laeuft zu diesem Wert schon ein Trade, gelten SEINE Marken — die aus dem Einstieg,
+     nicht die aus dem letzten Scan. Vorher zeigte die Zeile den frischen Vorschlag,
+     waehrend die Startkarte oben den laufenden Vertrag zeigte: zwei Einstiegspreise
+     fuer denselben Wert auf einem Bildschirm. Ab hier zeigt die Zeile, was gilt. */
+  const rl = handelsreif(o) ? rangLagen().get(o.instrument) : null;
+  const imTrade = !!(rl && (rl.stufe === 'im_trade' || rl.stufe === 'stop'));
+  const M = imTrade
+    ? {einstieg: rl.w.einstieg, stop: rl.w.stop, tp1: rl.w.tp1, tp2: rl.w.tp2, tp3: rl.w.tp3}
+    : {einstieg: o.einstieg, stop: pl?pl.stop:o.invalidierung,
+       tp1: pl?pl.tp1:o.ziel, tp2: pl?pl.tp2:o.tp2, tp3: pl?pl.tp3:o.tp3};
   // Die Zeile fuehrt mit dem NAMEN des Setups, nicht mit dem Score. Wer die Liste
   // ueberfliegt, soll sehen, WAS da ist ("Ruecksetzer im Trend"), und erst danach,
   // wie gut es bewertet ist. Score allein sagt einem Trader nichts.
@@ -1800,12 +1936,20 @@ function oppZeile(o, rang){
       <span class="kl">${esc(o.klasse||'')}</span>
       ${o.richtung?`<span class="dir ${o.richtung}">${o.richtung==='long'?'LONG':'SHORT'}</span>`:''}
       <span class="note ${nk}">${esc(o.note)}</span>
-      ${(()=>{ const e = einstiegsLage(o, kurs);
-        if (!o.handelbar) return '';
+      ${(()=>{ if (!handelsreif(o)) return '';
+        const e = einstiegsLage(o, kurs);
         const farbe = e.stufe === 'jetzt' ? 'background:var(--long);color:#03130F'
+                    : e.stufe === 'im_trade' ? 'background:var(--accent);color:#03130F'
+                    : e.stufe === 'stop' ? 'background:var(--bad);color:#fff'
+                    : e.stufe === 'veraltet' ? 'background:var(--bad);color:#fff'
                     : e.stufe === 'warten' ? 'background:var(--warn-bg);color:var(--warn)'
                     : 'background:transparent;color:var(--ink-3)';
-        return `<span class="note" style="${farbe}">${esc(e.text)}</span>`; })()}
+        // Woher der Kurs kommt, gehoert an dieselbe Stelle wie der Zustand. Ein JETZT
+        // auf Basis eines Scankurses ist eine schwaechere Aussage als eines auf Basis
+        // eines Livekurses — wer das nicht sieht, haelt beides fuer dasselbe.
+        const quelle = (e.stufe === 'jetzt' && e.live === false)
+          ? ` <span class="note" style="background:transparent;color:var(--ink-3)">Kurs vom Scan</span>` : '';
+        return `<span class="note" style="${farbe}">${esc(e.text)}</span>${quelle}`; })()}
       <span class="sc">${(o.score||0).toFixed(0)}</span>
     </div>
     <div class="opp-b">
@@ -1816,17 +1960,20 @@ function oppZeile(o, rang){
       <div class="kpi">
         <span data-px="${esc(o.instrument)}">Kurs <b>${preis(o,'kurs',kurs,d)}</b>${
           live?` <span class="${live.pct>=0?'up':'dn'}">${pct(live.pct,2)}</span>`:''}</span>
-        ${pl?`<span>CRV <b>1:${pl.crv.toFixed(1)}</b></span>`:(o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:'')}
+        ${(()=>{ const c = crvVon(o); return c!=null?`<span>CRV <b>1:${c.toFixed(1)}</b></span>`:''; })()}
         ${pl?`<span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`:''}
         ${o.rs!=null?`<span>Rel. Stärke <b class="${o.rs>=70?'up':o.rs<=30?'dn':''}">${Math.round(o.rs)}</b></span>`:''}
         ${o.confidence?`<span>Klarheit <b>${Math.round(o.confidence*100)} %</b></span>`:''}
       </div>
+      ${imTrade?`<div class="muz" style="margin-top:6px;color:var(--accent)">Zu diesem Wert
+        läuft bereits ein Trade — die Marken unten sind die aus dem Einstieg und bleiben
+        fest, bis er beendet ist.</div>`:''}
       <div class="kpi">
-        ${o.einstieg!=null?`<span>Einstieg <b>${preis(o,'einstieg',o.einstieg,d)}</b></span>`:''}
-        ${(pl?pl.stop:o.invalidierung)!=null?`<span>Stop <b>${preis(o,'stop',pl?pl.stop:o.invalidierung,d)}</b></span>`:''}
-        ${(pl?pl.tp1:o.ziel)!=null?`<span>Ziel 1 <b>${preis(o,'tp1',pl?pl.tp1:o.ziel,d)}</b></span>`:''}
-        ${(pl?pl.tp2:o.tp2)!=null?`<span>Ziel 2 <b>${preis(o,'tp2',pl?pl.tp2:o.tp2,d)}</b></span>`:''}
-        ${(pl?pl.tp3:o.tp3)!=null?`<span>Ziel 3 <b>${preis(o,'tp3',pl?pl.tp3:o.tp3,d)}</b></span>`:''}
+        ${M.einstieg!=null?`<span>Einstieg <b>${preis(o,'einstieg',M.einstieg,d)}</b></span>`:''}
+        ${M.stop!=null?`<span>Stop <b>${preis(o,'stop',M.stop,d)}</b></span>`:''}
+        ${M.tp1!=null?`<span>Ziel 1 <b>${preis(o,'tp1',M.tp1,d)}</b></span>`:''}
+        ${M.tp2!=null?`<span>Ziel 2 <b>${preis(o,'tp2',M.tp2,d)}</b></span>`:''}
+        ${M.tp3!=null?`<span>Ziel 3 <b>${preis(o,'tp3',M.tp3,d)}</b></span>`:''}
       </div>
       ${o.broker?`<div class="muz" style="margin-top:6px">Kaufen bei <strong>${esc(o.broker)}</strong>${
         istAktie(o) ? (eurWert(o,'kurs')?' · EUR':' · <span style="color:var(--warn)">USD — Eurokurs fehlt gerade</span>')
@@ -1860,7 +2007,13 @@ function zeichneRadar(){
   const g = gefiltert();
   // Ozan hat gefragt, ob er hier oder unter Alarme kauft. Die Frage gehoert einmal
   // beantwortet, und zwar da, wo sie entsteht — nicht in einem Hilfetext irgendwo.
-  const jetzt = g.filter(o => o.handelbar && einstiegsLage(o, (L.get(o.instrument)||{}).p ?? o.kurs).stufe === 'jetzt').length;
+  /* Derselbe Zaehler, dieselbe Quelle wie unter Alarme. Vorher rechnete diese Zeile
+     selbst — und kam damit auf eine andere Zahl als die Seite, auf die sie verweist. */
+  const amEinstieg = amEinstiegListe();
+  const jetztListe = amEinstieg.filter(x => (NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG);
+  const jetzt = jetztListe.length;
+  const knappe = amEinstieg.length - jetzt;
+  const jetztAktien = jetztListe.filter(x => (x.o && x.o.klasse) === 'aktien').length;
   const kopf = `<div class="note-box"><span class="nt">Zwei verschiedene Fragen</span>
     <p style="font-size:13.5px"><strong>Note und Score sagen, wie GUT ein Setup ist.
     Das grüne Feld sagt, ob der Kurs schon DA ist.</strong> Beides muss stimmen — ein A−,
@@ -1868,14 +2021,35 @@ function zeichneRadar(){
     anderes als das, was bewertet wurde.</p>
     <p>Diese Seite ist die vollständige Rangliste zum Nachsehen. Gekauft wird unter
     <strong>Alarme</strong> — dort steht genau das, was hier gerade <em>JETZT</em> zeigt,
-    und sonst nichts. ${jetzt ? `Aktuell sind das <strong>${jetzt}</strong>.`
-      : 'Aktuell ist das <strong>keiner</strong> — dann ist nichts zu tun.'}</p>
+    und sonst nichts. ${jetzt ? `Aktuell sind das <strong>${jetzt}</strong>${
+      jetztAktien ? ` (davon ${jetztAktien} Aktien)` : ''}.`
+      : 'Aktuell ist das <strong>keiner</strong> — dann ist nichts zu tun.'}${
+      knappe ? ` Dazu ${knappe} Wert${knappe===1?'':'e'} am Einstieg, aber unter A− —
+      ${knappe===1?'er steht':'sie stehen'} drüben in einem eigenen Abschnitt und
+      ${knappe===1?'klingelt':'klingeln'} nicht.` : ''}
+    Beide Seiten rechnen seit dem 16.09. mit <em>derselben</em> Funktion; dieselben Zahlen
+    stehen drüben im Kopf.</p>
     <p style="color:var(--ink-3)">Bei <em>noch X %</em> gehört eine <strong>Limit-Order</strong>
     hin: du legst sie zum Einstiegskurs, und wenn der Kurs kommt, wird sie ausgeführt —
     ohne dass du dabei sein musst, und bei Kraken zum günstigeren Gebührensatz.</p></div>`;
   if (!g.length){ $('radar').innerHTML = kopf + `<p class="leer">Kein Wert in dieser Auswahl.</p>`; return; }
-  $('radar').innerHTML = kopf + g.slice(0,60).map((o,i)=>oppZeile(o,i+1)).join('') +
-    (g.length>60?`<p class="leer">… und ${g.length-60} weitere.</p>`:'');
+  /* Die Liste wird bei 60 Zeilen abgeschnitten, sonst scrollt man ewig. Ein Wert, der
+     GERADE einsteigbar ist, darf aber nie unter diesen Schnitt fallen — sonst steht er
+     unter Alarme und im Markt nicht, und wir haetten die Ungereimtheit nur umgedreht. */
+  const aktiv = new Set([...rangLagen().values()]
+    .filter(x => x.stufe === 'jetzt' || x.stufe === 'im_trade' || x.stufe === 'stop')
+    .map(x => x.w.instrument));
+  // Der Rang bleibt der echte Platz in der Rangliste, auch wenn eine Zeile nachgezogen
+  // wurde — sonst stuende „#7" an einem Wert, der in Wahrheit auf Platz 83 liegt.
+  const zeigen = g.map((o, i) => ({o, rang: i + 1}))
+                  .filter(({o, rang}) => rang <= 60 || aktiv.has(o.instrument));
+  const nachgezogen = zeigen.length - Math.min(60, g.length);
+  const rest = g.length - zeigen.length;
+  $('radar').innerHTML = kopf + zeigen.map(({o, rang})=>oppZeile(o, rang)).join('') +
+    (rest?`<p class="leer">… und ${rest} weitere${nachgezogen > 0
+      ? `. ${nachgezogen} Wert${nachgezogen===1?' steht':'e stehen'} weiter hinten in der
+         Rangliste, ${nachgezogen===1?'ist':'sind'} aber gerade einsteigbar —
+         ${nachgezogen===1?'er ist':'sie sind'} deshalb oben mit aufgeführt` : ''}.</p>`:'');
   $('radar').querySelectorAll('.opp').forEach(el=>
     el.addEventListener('click',()=>waehle(el.dataset.sym)));
 }
@@ -4082,9 +4256,13 @@ const OFFEN = ['wartet_auf_einstieg','aktiv'];
 const NOTE_RANG = {'A+':6,'A':5,'A−':4,'B+':3,'B':2,'WATCH':1,'—':0};
 
 /* Der Live-Zustand eines Setups: was gilt JETZT, bei diesem Kurs? */
-function lage(w){
-  const live = L.get(w.instrument);
-  const kurs = live ? live.p : null;
+function lage(w, ausScan){
+  /* ``ausScan`` ist der Kurs aus dem letzten Scan. Er ist der Grund, warum Aktien hier
+     ueberhaupt einen Zustand bekommen: fuer sie gibt es keinen Livestream, und vorher
+     blieb deshalb jede Aktie auf „beobachten" stehen — auch die, die im Markt-Reiter
+     gruen als JETZT leuchtete. */
+  const st = kursStand(w.instrument, ausScan);
+  const kurs = st.kurs;
   const lang = w.richtung === 'long';
   const risiko = Math.abs(w.einstieg - w.stop);
   const eingestiegen = w.zustand === 'aktiv';
@@ -4094,7 +4272,7 @@ function lage(w){
     abstand = (lang ? (kurs / w.einstieg - 1) : (w.einstieg / kurs - 1)) * 100;
     const basis = w.einstiegskurs ?? w.einstieg;
     if (risiko > 0) r = (lang ? kurs - basis : basis - kurs) / risiko;
-    const erreicht = lang ? kurs <= w.einstieg : kurs >= w.einstieg;
+    const erreicht = einstiegErreicht(lang, w.einstieg, kurs);
     const raus = lang ? kurs <= w.stop : kurs >= w.stop;
     if (eingestiegen && raus) stufe = 'stop';
     else if (eingestiegen) stufe = 'im_trade';
@@ -4102,7 +4280,7 @@ function lage(w){
     else if (Math.abs(abstand) <= 1.5) stufe = 'bald';
   } else if (eingestiegen) stufe = 'im_trade';
 
-  return {w, kurs, lang, risiko, abstand, r, stufe, live: !!live};
+  return {w, kurs, lang, risiko, abstand, r, stufe, live: st.live};
 }
 
 /* Lokale Benachrichtigung, wenn ein Setup live auf "jetzt" springt.
@@ -4135,10 +4313,21 @@ function gemeldetMerken(key){
     localStorage.setItem(GEMELDET_KEY, JSON.stringify(a));
   } catch(e){}
 }
+/* Ab welcher Note ein neues Setup aufs Handy darf.
+
+   Unter den Alarmen stand schon immer der Satz „Neue Setups nur ab A−. B und B+ stehen
+   hier, klingeln aber nicht." — und er stimmte nicht: es gab nirgends eine Notenpruefung,
+   gemeldet wurde jedes erreichte Setup. Ozans Vorgabe ist eindeutig ("nur den einen
+   perfekten Alarm bei gutem Einstieg, nicht viele"), also gilt jetzt, was dasteht.
+   Laufende Trades sind davon nicht betroffen: Stop, Ziel und Ungueltigkeit melden sich
+   unabhaengig von der Note, weil dort Geld im Feuer steht. */
+const MELDE_AB_RANG = 4;   // A−
+
 function benachrichtige(x){
   // Aus einem toten Scan kommt keine Meldung. Eine Kaufaufforderung mit Marken von
   // gestern Abend ist genau die Art Alarm, die Geld kostet.
   if (scanTot()) return;
+  if ((NOTE_RANG[x.w.note] || 0) < MELDE_AB_RANG) return;
   const key = x.w.instrument + ':' + x.w.aufgenommen;
   if (gemeldetLaden()[key]) return;
   gemeldetMerken(key);
@@ -4146,8 +4335,11 @@ function benachrichtige(x){
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     const d = digits(x.w.einstieg);
     new Notification(`${x.lang?'KAUFEN':'VERKAUFEN'} ${name(x.w.instrument)} · ${x.w.note}`, {
-      body: `Einstieg ${num(x.w.einstieg,d)} erreicht\nStop ${num(x.w.stop,d)}` +
-            (x.w.tp1!=null?` · Ziel ${num(x.w.tp1,d)}`:''),
+      body: `Einstieg ${num(x.w.einstieg,d)} erreicht\nStop ${num(x.w.stop,d)}`
+            + (x.w.tp1!=null?` · Ziel ${num(x.w.tp1,d)}`:'')
+            // Ohne diesen Zusatz sieht ein Alarm auf Scanbasis aus wie einer auf
+            // Livebasis. Bei Aktien ist er bis zu einer halben Stunde alt.
+            + (x.live ? '' : '\nKurs aus dem letzten Scan — vor dem Kauf im Broker prüfen'),
       tag: key,
     });
   } catch(e){}
@@ -4159,7 +4351,7 @@ function benachrichtige(x){
    Rankings die besten Alarme ... nicht immer die gleiche Dings". */
 function ausRanking(){
   const wachen = new Map(((WL && WL.wachen) || []).map(w=>[w.instrument, w]));
-  const rows = (S?.gesamt||[]).filter(o=>o.handelbar && o.einstieg!=null && o.invalidierung!=null);
+  const rows = (S?.gesamt||[]).filter(handelsreif);
   return rows.map(o=>{
     const w = wachen.get(o.instrument);
     /* Vor dem Einstieg ist der Plan ein VORSCHLAG und muss aktuell sein: es gelten die
@@ -4185,7 +4377,7 @@ function ausRanking(){
       aufgenommen: w ? w.aufgenommen : (S?.erzeugt || ''),
       frisch: !imTrade,
     };
-    return {...lage(basis), o};
+    return {...lage(basis, o.kurs), o};
   }).filter(x=>OFFEN.includes(x.w.zustand));
 }
 
@@ -4266,8 +4458,16 @@ function signalKarte(x){
   const lang = x.lang;
   const seite = lang ? 'KAUFEN' : 'VERKAUFEN';
   const farbe = lang ? 'var(--long)' : 'var(--bad)';
+  /* Woher der Kurs kommt, steht auf der Karte — nicht im Kleingedruckten. Bei Krypto
+     laeuft ein Livestream, bei Aktien nicht; ein JETZT auf Scanbasis kann bis zu einer
+     halben Stunde alt sein. Das ist immer noch die beste verfuegbare Auskunft, aber es
+     ist eine andere Auskunft. */
+  const quelle = x.kurs == null ? ''
+    : x.live ? ` <span class="up mono" style="font-size:10px">LIVE</span>`
+    : ` <span class="mono" style="font-size:10px;color:var(--ink-3)">Kurs aus dem letzten Scan${
+        S && S.erzeugt ? ', ' + zeit(S.erzeugt) : ''}</span>`;
   let urteil, klasse = '';
-  if (x.stufe === 'jetzt'){ urteil = `<strong style="color:${farbe}">${seite} — JETZT</strong>`; klasse = 'hot'; }
+  if (x.stufe === 'jetzt'){ urteil = `<strong style="color:${farbe}">${seite} — JETZT</strong>${quelle}`; klasse = 'hot'; }
   else if (x.stufe === 'im_trade'){ urteil = `<strong>im Trade</strong>`; klasse = 'hot'; }
   else if (x.stufe === 'stop'){ urteil = `<strong style="color:var(--bad)">Stop erreicht</strong>`; }
   else urteil = `${seite} ab <strong>${num(w.einstieg,d)}</strong>${
@@ -4309,7 +4509,7 @@ function signalKarte(x){
     </div>
     <div class="kpi">
       ${x.kurs!=null?`<span>Kurs <b>${num(x.kurs,d)}</b>${x.live?' <span class="up">live</span>':''}</span>`:''}
-      ${o.rr?`<span>CRV <b>1:${o.rr.toFixed(2)}</b></span>`:''}
+      ${(()=>{ const c = crvVon(o); return c!=null?`<span>CRV <b>1:${c.toFixed(1)}</b></span>`:''; })()}
       ${o.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${o.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(o.erwartete_bewegung_pct,1)}</b></span>`:''}
       ${x.r!=null&&(x.stufe==='im_trade'||x.stufe==='stop')?`<span>Stand <b class="${x.r>=0?'up':'dn'}">${x.r>=0?'+':''}${x.r.toFixed(2)}R</b></span>`:''}
       ${(w.erreicht||[]).length?`<span>erreicht <b>${w.erreicht.join(', ')}</b></span>`:''}
@@ -4335,12 +4535,22 @@ function signalKarte(x){
 }
 
 function zeichneAlarme(){
-  const signale = ausRanking();
+  // Dieselbe Quelle wie der Markt-Reiter — nicht dieselbe Rechnung noch einmal.
+  const signale = [...rangLagen().values()];
   const rang = a => [-(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
   signale.sort((a,b)=>{ const [ra,da]=rang(a), [rb,db]=rang(b); return ra!==rb ? ra-rb : da-db; });
 
   const tot = scanTot();
-  const jetzt = tot ? [] : signale.filter(x=>x.stufe==='jetzt');
+  /* „Jetzt einsteigen" ist die Seite, auf der steht: das kaufst du. Dann darf dort auch
+     nur stehen, was die Qualitaetsschwelle besteht. Auf Ozans Screenshot war die oberste
+     Karte ein B mit Score 45, relativer Staerke 27, Klarheit 11 % und drei Warnungen,
+     die das Setup selbst bestreiten ("keine Kontraktion — das ist keine Basis").
+     Formal am Einstieg, ja. Aber nicht das, was ganz oben auf einer Handlungsliste
+     gehoert — und genau dafuer stand unten schon die Zusage "nur ab A−".
+     Weggeworfen wird nichts: die schwaecheren stehen darunter, mit dem Grund. */
+  const amEinstieg = amEinstiegListe();
+  const jetzt   = amEinstieg.filter(x=>(NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG);
+  const knapp   = amEinstieg.filter(x=>(NOTE_RANG[x.w.note]||0) <  MELDE_AB_RANG);
   const imTrade = signale.filter(x=>x.stufe==='im_trade'||x.stufe==='stop');
   const warten = tot ? [] : signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
@@ -4356,6 +4566,12 @@ function zeichneAlarme(){
     <p>Der Reiter <strong>Markt</strong> ist etwas anderes: die vollständige Rangliste zum
     Nachsehen. „Handelbar" heißt dort nur, dass das Setup gut genug ist — <strong>nicht</strong>,
     dass der Kurs schon am Einstieg steht. Kurz: <strong>Markt = lesen, Alarme = handeln.</strong></p>
+    <p><strong>Es steht hier genau das, was im Markt <em>JETZT</em> zeigt — ${jetzt.length}
+    ${jetzt.length===1?'Wert':'Werte'} ab A−${knapp.length?`, dazu ${knapp.length} schwächere
+    weiter unten`:''}.</strong> Beide Seiten benutzen seit dem 16.09. dieselbe Funktion;
+    vorher waren es zwei Rechnungen, und Aktien konnten hier gar nicht auftauchen, weil
+    sie keinen Livekurs haben. Sie tun es jetzt — mit dem Vermerk <em>Kurs aus dem letzten
+    Scan</em>, damit du den Unterschied siehst.</p>
     <p>Ist „Jetzt einsteigen" leer, ist gerade nichts zu tun. Das ist ein Ergebnis, kein Fehler.</p>
   </div>
   <div class="note-box">
@@ -4367,14 +4583,27 @@ function zeichneAlarme(){
   </div>`;
 
   h += terminWarnung();
-  h += `<h2>Jetzt einsteigen</h2>`;
+  h += `<h2>Jetzt einsteigen ${jetzt.length?`<span class="mono" style="font-size:12px;color:var(--ink-3)">${
+    jetzt.length} — dieselbe Zahl wie im Markt${
+    (()=>{ const a = jetzt.filter(x=>(x.o&&x.o.klasse)==='aktien').length;
+           return a ? `, davon ${a} Aktien` : ''; })()}</span>`:''}</h2>`;
   h += jetzt.length ? jetzt.map(signalKarte).join('')
     : `<div class="alarm"><div class="ah"><span>Gerade kein Einstieg erreicht</span></div>
        <p>Kein Kurs steht in seiner Einstiegszone. Die Kandidaten stehen unten mit dem
        Preis, ab dem eingestiegen wird — dort kannst du eine Limit-Order legen, dann
        brauchst du gar keinen Alarm.</p></div>`;
 
-  if (imTrade.length) h += `<h2>Laufende Trades</h2>` + imTrade.map(signalKarte).join('');
+  if (knapp.length){
+    h += `<h2>Auch am Einstieg — aber unter A− <span class="mono" style="font-size:12px;color:var(--ink-3)">${knapp.length}</span></h2>
+      <div class="note-box warn"><p style="font-size:13px">Der Kurs steht hier ebenfalls
+      an der Marke, aber die Setups sind B oder B+: weniger Zeitebenen ziehen mit, die
+      Klarheit ist niedriger, oft widerspricht eine Warnung dem Setup selbst. Sie stehen
+      hier vollständig, damit nichts verschwindet — sie klingeln nicht aufs Handy, und
+      sie gehören nicht in dieselbe Zeile wie ein A.</p></div>`;
+    h += knapp.map(signalKarte).join('');
+  }
+
+  if (imTrade.length) h += `<h2>Laufende Trades <span class="mono" style="font-size:12px;color:var(--ink-3)">kein Einstieg — die laufen schon</span></h2>` + imTrade.map(signalKarte).join('');
 
   if (warten.length){
     h += `<h2>Kaufen ab … <span class="mono" style="font-size:12px;color:var(--ink-3)">${warten.length} Kandidaten, nach Note sortiert</span></h2>`;
@@ -4404,9 +4633,11 @@ function zeichneAlarme(){
   }
 
   h += `<div class="note-box warn" style="margin-top:22px"><span class="nt">Was aufs Handy geht — und was nicht</span>
-    <p><strong>Immer:</strong> Einstieg erreicht, Ziel erreicht, Stop berührt, Setup
-    ungültig — unabhängig von der Note, sobald es um einen laufenden Trade geht.</p>
-    <p><strong>Neue Setups nur ab A−.</strong> B und B+ stehen hier, klingeln aber nicht.</p>
+    <p><strong>Immer:</strong> Ziel erreicht, Stop berührt, Setup ungültig — unabhängig
+    von der Note, sobald es um einen laufenden Trade geht. Dort steht Geld im Feuer.</p>
+    <p><strong>Neue Setups nur ab A−.</strong> B und B+ stehen hier, klingeln aber nicht.
+    <span style="color:var(--ink-3)">Das stand hier schon vorher — seit dem 16.09. stimmt
+    es auch: vorher gab es keine Notenprüfung, es klingelte jedes erreichte Setup.</span></p>
     <p>Scan alle 30 Minuten, Wächter alle 5 Minuten, diese Seite rechnet dazwischen live weiter.</p></div>`;
 
   $('alarme').innerHTML = h;
