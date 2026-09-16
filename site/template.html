@@ -1764,7 +1764,13 @@ function makroKasten(){
 }
 
 function zeichneFilter(){
+  /* „Oder du machst eine extra Spalte, wo jetzt einsteigen kommt." — genau das ist
+     dieser erste Schalter. Er zeigt exakt die Werte, die drüben unter Alarme in
+     „Jetzt einsteigen" stehen, und nichts sonst. Mit Zahl dran, damit man von hier aus
+     sieht, ob es überhaupt etwas zu tun gibt. */
+  const nJetzt = amEinstiegListe().filter(x => (NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG).length;
   const f = [
+    ['jetzt', `Jetzt einsteigen${nJetzt ? ' · ' + nJetzt : ''}`],
     ['handelbar','Handelbar'], ['alle','Alles'], ['krypto','Krypto'],
     ['aktien','Aktien'], ['gold','Gold'], ['long','Long'], ['short','Short'],
   ];
@@ -1778,6 +1784,13 @@ function zeichneFilter(){
 function gefiltert(){
   const g = (S?.gesamt || []).slice();
   switch (FILTER){
+    case 'jetzt': {
+      // Dieselbe Liste wie unter Alarme — nicht „auch am Einstieg", sondern kaufbar.
+      const drin = new Set(amEinstiegListe()
+        .filter(x => (NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG)
+        .map(x => x.w.instrument));
+      return g.filter(o => drin.has(o.instrument));
+    }
     case 'handelbar': return g.filter(o=>o.handelbar);
     case 'krypto': case 'aktien': case 'gold': return g.filter(o=>o.klasse===FILTER);
     case 'long': return g.filter(o=>o.richtung==='long');
@@ -1954,12 +1967,28 @@ function oppZeile(o, rang){
       <span class="note ${nk}">${esc(o.note)}</span>
       ${(()=>{ if (!handelsreif(o)) return '';
         const e = einstiegsLage(o, kurs);
-        const farbe = e.stufe === 'jetzt' ? 'background:var(--long);color:#03130F'
+        /* Ozan: „wenn ich beim Markt gehe, steht da manchmal JETZT EINSTEIGEN, dann steht
+           es aber nicht bei den Alarmen. Soll das so sein?"
+
+           Nein. Ein grünes JETZT hiess bisher nur „der Kurs ist an der Marke" — unter
+           Alarme landet der Wert aber erst ab Note A− auf der Kaufliste. Beides richtig,
+           zusammen ein Widerspruch auf zwei Bildschirmen.
+
+           Ab hier bedeutet das grüne Feld GENAU EINE Sache: dieser Wert steht drüben
+           unter „Jetzt einsteigen". Ist der Kurs zwar da, das Setup aber schwächer als
+           A−, steht dort blass „am Einstieg · B" — sichtbar, aber nicht als Kaufsignal
+           verkleidet. */
+        const schwach = e.stufe === 'jetzt' && (NOTE_RANG[o.note]||0) < MELDE_AB_RANG;
+        const farbe = (e.stufe === 'jetzt' && !schwach) ? 'background:var(--long);color:#03130F'
+                    : schwach ? 'background:var(--warn-bg);color:var(--ink-2);opacity:.85'
                     : e.stufe === 'im_trade' ? 'background:var(--accent);color:#03130F'
                     : e.stufe === 'stop' ? 'background:var(--bad);color:#fff'
                     : e.stufe === 'veraltet' ? 'background:var(--bad);color:#fff'
                     : e.stufe === 'warten' ? 'background:var(--warn-bg);color:var(--warn)'
                     : 'background:transparent;color:var(--ink-3)';
+        if (schwach) return `<span class="note" style="${farbe}"
+          title="Kurs ist an der Einstiegsmarke, aber das Setup ist unter A− — deshalb steht es unter Alarme nicht auf der Kaufliste"
+          >am Einstieg · ${esc(o.note)}</span>`;
         // Woher der Kurs kommt, gehoert an dieselbe Stelle wie der Zustand. Ein JETZT
         // auf Basis eines Scankurses ist eine schwaechere Aussage als eines auf Basis
         // eines Livekurses — wer das nicht sieht, haelt beides fuer dasselbe.
@@ -2031,10 +2060,13 @@ function zeichneRadar(){
   const knappe = amEinstieg.length - jetzt;
   const jetztAktien = jetztListe.filter(x => (x.o && x.o.klasse) === 'aktien').length;
   const kopf = `<div class="note-box"><span class="nt">Zwei verschiedene Fragen</span>
-    <p style="font-size:13.5px"><strong>Note und Score sagen, wie GUT ein Setup ist.
-    Das grüne Feld sagt, ob der Kurs schon DA ist.</strong> Beides muss stimmen — ein A−,
-    das noch 8 % von seinem Einstieg entfernt ist, kauft man nicht, sonst kauft man etwas
-    anderes als das, was bewertet wurde.</p>
+    <p style="font-size:13.5px"><strong>Ein grünes <em>JETZT</em> heisst: dieser Wert steht
+    drüben unter Alarme in „Jetzt einsteigen".</strong> Nichts anderes. Der Filter
+    <em>Jetzt einsteigen</em> oben zeigt genau diese Werte.</p>
+    <p style="font-size:13.5px">Blass <em>am Einstieg · B</em> heisst: der Kurs ist zwar an
+    der Marke, aber das Setup ist schwächer als A−. Solche stehen unter Alarme in einem
+    eigenen Abschnitt und klingeln nicht. <em>noch X %</em> heisst: gutes Setup, Kurs noch
+    nicht da — dort gehört eine Limit-Order hin, nicht ein Kauf zum Marktpreis.</p>
     <p>Diese Seite ist die vollständige Rangliste zum Nachsehen. Gekauft wird unter
     <strong>Alarme</strong> — dort steht genau das, was hier gerade <em>JETZT</em> zeigt,
     und sonst nichts. ${jetzt ? `Aktuell sind das <strong>${jetzt}</strong>${
@@ -5537,13 +5569,16 @@ function zeichneChat(){
   const key = chatSchluessel();
   let h = '';
   if (!key){
-    h = `<div class="note-box" style="margin-top:0"><span class="nt">Der Chat läuft — auch ohne Schlüssel</span>
-      <p>Frag einfach: <em>„soll ich bei Bitcoin rein?"</em>, <em>„was ist gerade gut?"</em>,
-      <em>„wie steht mein Depot?"</em>. Die Antwort kommt aus denselben Daten, die auf den
-      anderen Reitern stehen — Note, Setup, Einstieg, Stop, Ziele, Trefferquote, Gebühren.
-      Sofort und kostenlos.</p>
-      <p style="margin-top:8px">Mit eigenem API-Schlüssel wird daraus ein echtes Gespräch:
-      Rückfragen, Vergleiche, Begründungen. Das kostet dann Geld pro Frage — siehe unten.</p></div>
+    h = `<div class="note-box warn" style="margin-top:0"><span class="nt">Gerade: vorbereitete Antworten</span>
+      <p><strong>Frei sprechen geht — aber erst mit deinem eigenen Schlüssel.</strong>
+      Ohne ihn erkennt die App nur Muster: <em>„wie steht Solana?"</em>,
+      <em>„was ist gerade gut?"</em>, <em>„wie steht mein Depot?"</em>. Die Zahlen darin
+      stimmen — sie kommen aus denselben Daten wie die anderen Reiter. Aber sie kann keine
+      Rückfrage stellen, nichts vergleichen und nicht auf deine letzte Antwort eingehen.</p>
+      <p style="margin-top:8px"><strong>Mit Schlüssel ist es ein richtiges Gespräch:</strong>
+      du fragst frei, sie fragt zurück, sie begründet, sie kennt deinen Depotstand und den
+      laufenden Scan. Einrichten dauert zwei Minuten — Feld weiter unten. Es kostet je
+      Frage ein paar Cent über dein eigenes Konto.</p></div>
     <div class="karte">
       <h3 style="margin-top:0">Optional: richtiges Gespräch einrichten</h3>
       <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">Dieser Chat laeuft ueber
@@ -5689,7 +5724,20 @@ async function chatSenden(){
   // Das ist der Unterschied zwischen einem Chat, der manchmal geht, und einem, der
   // immer eine Antwort auf „soll ich rein oder nicht" hat.
   if (!key){
-    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content: lokaleAntwort(frage)};
+    /* Ozan: „ich hätte gern, dass er nicht so fertige Antworten hat, sondern dass man
+       wirklich frei mit ihm sprechen kann."
+
+       Frei sprechen KANN er — dafür braucht es den eigenen Schlüssel ein Feld weiter
+       unten. Ohne ihn antwortet die App aus ihren eigenen Daten, und zwar nach Mustern:
+       sie kann „wie steht Solana" und „was ist gerade gut", aber keine Rückfrage und
+       keinen Vergleich. Das gehört an JEDE dieser Antworten drangeschrieben, nicht nur
+       in einen Kasten weiter oben, den man einmal liest und dann nie wieder. */
+    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content:
+      lokaleAntwort(frage)
+      + '\n\n---\n*Das ist eine vorbereitete Antwort aus deinen eigenen Daten — sie kann '
+      + 'keine Rückfrage stellen und nicht frei mit dir reden. Dafür fehlt der eigene '
+      + 'Schlüssel; das Feld dafür steht unter diesem Chat. Danach kannst du hier alles '
+      + 'fragen wie in einem normalen Gespräch.*'};
     chatMalen();
     return;
   }
