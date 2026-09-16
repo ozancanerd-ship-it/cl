@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from trading_agent.analysis.macro_context import MacroLage, warnungen_fuer
 from trading_agent.core.enums import AssetClass, Timeframe
 from trading_agent.scanner import erwartung as erw
+from trading_agent.scanner import gleichlauf as gl
 from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnung
 from trading_agent.scanner.chart_score import bewerte_chart
 from trading_agent.scanner.grading import NOTE_KURZ, NOTEN, Profil
@@ -612,6 +613,9 @@ async def main() -> int:
 
     muster_je: dict[str, list[Any]] = {}
     klasse_je: dict[str, str] = {}
+    # Tagesschlusskurse fuer die Gleichlauf-Rechnung. Nur Datum und Kurs, kein
+    # Kerzenobjekt — der Lauf ist schon einmal am Speicher gestorben.
+    kurse_je: dict[str, dict[Any, float]] = {}
 
     def schreiber(klasse: str) -> Any:
         """Detaildatei sofort schreiben, solange der Kontext noch lebt.
@@ -623,6 +627,10 @@ async def main() -> int:
 
         def schreibe(chance: Any, mtf: Any) -> None:
             per_tf = dict(getattr(mtf, "per_tf", {}) or {})
+            d1 = per_tf.get(Timeframe.D1)
+            reihe = gl.sammle(getattr(d1, "bars", ()) if d1 is not None else ())
+            if len(reihe) >= gl.MIN_TAGE:
+                kurse_je[chance.instrument] = reihe
             muster = muster_ueber_zeitebenen(per_tf, (Timeframe.D1, Timeframe.H4, Timeframe.H1))
             muster_je[chance.instrument] = muster
             klasse_je[chance.instrument] = klasse
@@ -800,6 +808,34 @@ async def main() -> int:
         },
         "gesamt": sorted(kompakt_neu, key=_rang),
     }
+
+    # Gleichlauf: die gemessenen Tagesrenditen, standardisiert und auf ein Byte je Tag
+    # quantisiert. Damit rechnet die App im Browser jede Korrelation selbst — zwischen
+    # zwei Depotpositionen und zwischen einer neuen Chance und dem, was schon da ist.
+    #
+    # Bei einem Teillauf (--nur krypto, alle zehn Minuten) fehlen die Aktien. Einen
+    # halben Block zu schreiben waere schlechter als der alte: die App saehe fuer die
+    # Aktien gar keinen Gleichlauf mehr und meldete faelschlich ein breites Depot.
+    # 90-Tage-Korrelationen aendern sich in einer halben Stunde nicht — also bleibt in
+    # dem Fall der Block des letzten vollen Laufs stehen.
+    neuer_gl = gl.baue(kurse_je) if kurse_je else None
+    alter_gl = alt_doc.get("gleichlauf") if alt_doc else None
+    gesamt_universum = len(kompakt_alle) or 1
+    if neuer_gl and len(neuer_gl["z"]) >= gesamt_universum * 0.6:
+        doc["gleichlauf"] = neuer_gl
+        print(
+            f"Gleichlauf: {len(neuer_gl['z'])} Reihen ueber {neuer_gl['tage']} Handelstage "
+            f"bis {neuer_gl['bis']}"
+        )
+    elif alter_gl:
+        doc["gleichlauf"] = alter_gl
+        print(
+            f"Gleichlauf: aus dem letzten vollen Lauf uebernommen "
+            f"({len(alter_gl.get('z') or {})})"
+        )
+    elif neuer_gl:
+        doc["gleichlauf"] = neuer_gl
+        print(f"Gleichlauf: nur {len(neuer_gl['z'])} Reihen — mehr gibt es gerade nicht")
     (out / "scan.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
     )
