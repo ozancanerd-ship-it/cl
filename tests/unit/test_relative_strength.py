@@ -58,20 +58,38 @@ def test_zu_kleine_klasse_bekommt_keine_bewertung() -> None:
     assert all(z["rs"] is None for z in zeilen)
 
 
-def test_long_im_nachzuegler_wird_gedeckelt() -> None:
+def test_long_im_nachzuegler_ist_nicht_mehr_handelbar() -> None:
+    """Der Riegel, nicht mehr der Deckel.
+
+    Vorher wurde ein Nachzuegler-Long auf A_MINUS gedeckelt — und A_MINUS ist handelbar.
+    Der Scanner rief damit Werte zum Kauf aus, die die Depotseite im selben Moment zum
+    Verkauf vorschlug: die eine misst das Chartbild, die andere die relative Staerke.
+    Ozan hat genau das erlebt — Alarm gedrueckt, gekauft, sofort "verkaufen" im Depot.
+    """
     z = _zeile("SCHWACH", -30.0, urteil="A_PLUS")
     z["rs"] = 5.0
     urteil_anpassen(z)
-    assert z["urteil"] == "A_MINUS"
+    assert z["urteil"] == "WATCH"
+    assert z["handelbar"] is False
     assert z["deckel"]
     assert any("Nachzuegler" in w for w in z["warnungen"])
 
 
-def test_short_im_marktfuehrer_wird_gedeckelt() -> None:
+def test_short_im_marktfuehrer_ist_nicht_mehr_handelbar() -> None:
     z = _zeile("STARK", 90.0, richtung="short", urteil="A")
     z["rs"] = 95.0
     urteil_anpassen(z)
-    assert z["urteil"] == "A_MINUS"
+    assert z["urteil"] == "WATCH"
+    assert z["handelbar"] is False
+
+
+def test_mittelfeld_bleibt_unangetastet() -> None:
+    """Gegenprobe: der Riegel darf nur das schwaechste Viertel treffen."""
+    z = _zeile("MITTE", 5.0, urteil="A")
+    z["rs"] = 50.0
+    urteil_anpassen(z)
+    assert z["urteil"] == "A"
+    assert z.get("handelbar") is not False
 
 
 def test_staerke_hebt_die_note_nicht_an() -> None:
