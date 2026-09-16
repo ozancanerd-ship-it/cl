@@ -2255,6 +2255,32 @@ function haltUrteil(row){
 const KO_PUFFER_ENG = 12;     // Prozent — darunter wird es ernst
 const KO_PUFFER_KRITISCH = 6; // Prozent — darunter ist es eine Handlung, keine Warnung
 
+/* Margin statt Schein: kein Knock-out, aber eine Liquidationsschwelle.
+
+   Bei einer gehebelten Position auf Bybit gibt es kein Zertifikat mit Schwelle — die
+   Boerse schliesst die Position, wenn die Sicherheit aufgebraucht ist. Bei 5× ist das
+   ungefaehr 20 % unter dem Einstieg, bei 10× rund 10 %. Genau ist es das nicht: Gebuehren
+   und Erhaltungsmarge verschieben die Marke etwas nach oben, und ein Nachschuss verschiebt
+   sie nach unten. Als Warnschwelle taugt die Rechnung trotzdem — und sie ist ehrlicher
+   als gar keine Zahl.
+
+   Was hier NICHT passiert: den Gewinn mit dem Hebel multiplizieren. Ozans App zeigt den
+   Gewinn in Euro und Dollar, und der haengt an der Stueckzahl, nicht am Hebel. Der Hebel
+   entscheidet, wie viel EIGENES Geld dahintersteckt — und damit, wie schnell es weg ist. */
+function margenLage(pos, kurs){
+  const h = Number(pos && pos.hebel);
+  if (!isFinite(h) || h <= 1 || kurs == null || !pos.einstieg) return null;
+  const lang = (pos.hebel_richtung || 'long') === 'long';
+  const liq = lang ? pos.einstieg * (1 - 1/h) : pos.einstieg * (1 + 1/h);
+  const abstand = lang ? kurs - liq : liq - kurs;
+  return {
+    art: 'margin', hebel: h, liquidation: liq, lang,
+    ausgeknockt: abstand <= 0,
+    puffer_pct: abstand / kurs * 100,
+    einsatz: (pos.menge * pos.einstieg) / h,
+  };
+}
+
 function hebelLage(pos, basisRow, eurusd){
   if (!pos || pos.ko == null || !basisRow) return null;
   const basisKurs = basisRow.kurs;
@@ -2288,6 +2314,11 @@ function bewertePosition(pos){
   /* Ein Schein mit Knock-out wird aus seinem Basiswert gerechnet, nicht geschaetzt.
      Der Basiswert hat einen Livekurs — damit hat der Schein auch einen. */
   let hebel = null;
+  // Gehebelt ohne Schein: die Boerse liquidiert, statt dass ein Zertifikat verfaellt.
+  if (pos.ko == null && pos.hebel){
+    hebel = margenLage(pos, kurs);
+    if (hebel) hebel.basisName = posName({pos, row});
+  }
   if (pos.ko != null){
     const bv = basisVon(pos);
     const brow = bv && bv.sym ? scanRow(bv.sym) : null;
@@ -2650,6 +2681,26 @@ function positionsRat(b){
 function hebelKasten(b){
   const h = b.hebel;
   if (!h) return '';
+  if (h.art === 'margin'){
+    const eng = h.puffer_pct < KO_PUFFER_ENG;
+    const d = digits(h.liquidation || 1);
+    const z = waehrungsZeichen(b.w);
+    return `<div class="note-box ${h.ausgeknockt ? 'bad' : (h.puffer_pct < KO_PUFFER_KRITISCH ? 'bad' : (eng ? 'warn' : ''))}"
+      style="margin:10px 0 0">
+      <span class="nt">Gehebelt · ${h.hebel.toFixed(0)}×</span>
+      <div class="kpi">
+        <span>Hebel <b>${h.hebel.toFixed(0)}×</b></span>
+        <span>Puffer bis Liquidation <b class="${eng?'dn':'up'}">${h.puffer_pct.toFixed(1).replace('.',',')} %</b></span>
+        <span>rechnerisch bei <b>${num(h.liquidation,d)}${z}</b></span>
+        ${h.einsatz?`<span>eigener Einsatz <b>${num(h.einsatz,2)}${z}</b></span>`:''}
+      </div>
+      <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">Bei ${h.hebel.toFixed(0)}×
+      reicht eine Bewegung von rund ${(100/h.hebel).toFixed(0)} % gegen dich, um den Einsatz
+      aufzubrauchen — die Börse schließt dann selbst. Die Marke ist gerechnet, nicht von Bybit
+      abgelesen: Gebühren und Erhaltungsmarge schieben sie etwas nach oben, ein Nachschuss nach
+      unten. <strong>Der Gewinn in Dollar hängt an der Stückzahl, das Risiko am Hebel.</strong></p>
+    </div>`;
+  }
   if (h.ausgeknockt) return `<div class="note-box bad" style="margin:10px 0 0">
     <span class="nt">Knock-out berührt</span>
     <p>${esc(h.basisName)} steht bei ${num(h.basisKurs, digits(h.basisKurs))}, die Schwelle
@@ -2912,7 +2963,14 @@ function positionsAktion(b, stand){
      Ein Stop schützt vor Verlusten; gegen eine Knock-out-Schwelle schützt er nicht. Wird
      sie berührt — auch nachts, auch für eine Sekunde — ist der Schein weg, nicht im
      Minus. Deshalb steht diese Regel vor Stop und Ziel. */
-  if (b.hebel && b.hebel.ausgeknockt){
+  if (b.hebel && b.hebel.art === 'margin' && b.hebel.puffer_pct < KO_PUFFER_KRITISCH){
+    return teil(1.0, `Bis zur rechnerischen Liquidation sind es nur noch `
+      + `${b.hebel.puffer_pct.toFixed(1).replace('.',',')} %. Bei ${b.hebel.hebel.toFixed(0)}× `
+      + 'ist das eine normale Tagesbewegung — und dann schliesst die Börse selbst, zum '
+      + 'schlechtesten Kurs. Selbst schliessen ist fast immer billiger als liquidiert werden.',
+      'raus', true, 'Liquidation zu nah — raus');
+  }
+  if (b.hebel && b.hebel.ausgeknockt && b.hebel.art !== 'margin'){
     return {...basis, art:'raus', dringend:true, menge:pos.menge, euro:0,
       titel:'Knock-out berührt — der Schein ist wertlos',
       text:`${b.hebel.basisName} steht bei ${num(b.hebel.basisKurs, digits(b.hebel.basisKurs))}, `
