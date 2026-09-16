@@ -188,7 +188,7 @@ jobs:
             # --aktien muss mindestens so gross sein wie die Liste in build_scan_data.py,
             # sonst faellt hinten etwas ab, ohne dass es jemand merkt. Der Lauf meldet
             # das inzwischen als ::warning::.
-            python scripts/build_scan_data.py --out web --krypto 110 --aktien 60 --detail 60
+            python scripts/build_scan_data.py --out web --krypto 110 --aktien 120 --detail 60
           fi
 
       # Marktweite Aenderungen: weggebrochenes Setup, neue Nummer 1, ein Chart der
