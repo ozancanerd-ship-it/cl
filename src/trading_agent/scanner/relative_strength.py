@@ -141,12 +141,26 @@ def urteil_anpassen(zeile: dict[str, Any]) -> None:
         if satz not in warnungen:
             warnungen.insert(0, satz)
         zeile["warnungen"] = warnungen
-        # Deckel: hoechstens A_MINUS.
-        rang = ("A_PLUS", "A")
-        if zeile.get("urteil") in rang:
-            zeile["urteil"] = "A_MINUS"
-            zeile["note"] = "A−"
-            zeile["deckel"] = "relative Schwaeche gegenueber der eigenen Klasse"
+        # KEIN Deckel mehr, sondern ein Riegel.
+        #
+        # Vorher war relative Schwaeche nur eine Notenbremse: aus A wurde A_MINUS, und
+        # A_MINUS ist handelbar. Damit konnte der Scanner einen Wert zum Kauf ausrufen,
+        # den die Depotseite im selben Moment zum Verkauf vorschlug — die eine Seite
+        # bewertet das Chartbild, die andere die relative Staerke, und bei einem
+        # Nachzuegler mit huebschem Chart widersprechen die sich.
+        #
+        # Ozan ist genau da hineingelaufen: Alarm gedrueckt, gekauft, und in derselben
+        # Sekunde stand im Depot "verkaufen". Ein System, das sich selbst widerspricht,
+        # ist schlimmer als eines, das schweigt.
+        #
+        # Aufgeloest wird der Widerspruch an der Wurzel: ein Long im schwaechsten Viertel
+        # seiner Klasse ist kein handelbares Signal mehr, sondern eine Beobachtung. Damit
+        # sagen beide Seiten dasselbe. Es kostet Signale — aber genau die, die auch in der
+        # eigenen Bilanz am schlechtesten abgeschnitten haben.
+        zeile["urteil"] = "WATCH"
+        zeile["note"] = "WATCH"
+        zeile["handelbar"] = False
+        zeile["deckel"] = "relative Schwaeche gegenueber der eigenen Klasse"
     elif stark:
         zusatz = (
             f"gehoert zu den staerksten {100 - rs:.0f} % seiner Klasse"
