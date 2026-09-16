@@ -30,7 +30,7 @@ import httpx
 from trading_agent.core.clock import Clock, SystemClock
 from trading_agent.core.enums import DataKind, Timeframe
 from trading_agent.core.models import OHLCV
-from trading_agent.core.time import bar_close_time, ensure_utc, is_aligned
+from trading_agent.core.time import align_down, bar_close_time, ensure_utc, is_aligned
 from trading_agent.data.health import HealthTracker
 from trading_agent.data.interfaces import AsyncOHLCVSource, ProviderStatus
 from trading_agent.data.quality import sort_ohlcv
@@ -46,6 +46,12 @@ _INTERVAL: dict[Timeframe, str] = {
     Timeframe.M30: "30m",
     Timeframe.H1: "60m",
     Timeframe.D1: "1d",
+    # Wochenkerzen. Yahoo stempelt sie auf den ERSTEN Handelstag der Woche zur
+    # Eroeffnung — meist Montag 13:30 UTC, nach einem Feiertag aber Dienstag. Die
+    # Konvention hier ist Montag 00:00 UTC; darauf rundet der Zweig weiter unten ab,
+    # der ohnehin jede nicht ausgerichtete Zeit abrundet (``_align_down``). Ein Feiertag
+    # am Wochenanfang verschiebt die Kerze damit nicht in die Vorwoche.
+    Timeframe.W1: "1wk",
 }
 
 # kanonisch → Yahoo-Symbol
@@ -221,8 +227,16 @@ class YahooFinanceProvider(AsyncOHLCVSource):
 
 
 def _align_down(ts: datetime, tf: Timeframe) -> datetime:
-    epoch = int(ts.timestamp())
-    return datetime.fromtimestamp(epoch - (epoch % tf.seconds), tz=UTC)
+    """Auf die Timeframe-Grenze abrunden — ueber die Kernfunktion, nicht selbst gerechnet.
+
+    Hier stand ``epoch - (epoch % tf.seconds)``. Fuer alle Intraday-Ebenen ist das
+    richtig. Fuer W1 ist es falsch: der 1.1.1970 war ein DONNERSTAG, eine reine
+    Modulo-Rechnung legt Wochenkerzen also auf Donnerstag 00:00. Das OHLCV-Modell
+    verlangt Montag 00:00 und haette jede Wochenkerze von Yahoo verworfen — lautlos,
+    als haette der Anbieter keine Daten. ``core.time.align_down`` kennt den
+    Montagsversatz und rechnet alle Ebenen richtig.
+    """
+    return align_down(ensure_utc(ts), tf)
 
 
 def _range_for(tf: Timeframe, span_days: int) -> str:
