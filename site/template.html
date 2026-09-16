@@ -1747,6 +1747,35 @@ function gefiltert(){
   }
 }
 
+/* ============================ QUALITAET IST NICHT ZEITPUNKT
+
+   Ozan fragt das zum dritten Mal, und das ist kein Missverstaendnis auf seiner Seite,
+   sondern ein Fehler in der Darstellung: „Soll ich beim Markt das Beste kaufen oder nur
+   bei den Alarmen, wenn da jetzt einsteigen steht?"
+
+   Die Liste beantwortet bisher nur die halbe Frage. Note und Score sagen, wie gut das
+   Setup IST — nicht, ob der Kurs schon dort steht, wo man einsteigen wollte. Ein A− kann
+   noch acht Prozent von seinem Einstieg entfernt sein. Wer es danach kauft, kauft etwas
+   anderes als das, was bewertet wurde.
+
+   Also steht der Zeitpunkt ab jetzt in derselben Zeile wie die Note. Drei Zustaende,
+   mehr gibt es nicht:
+
+     JETZT       — der Kurs ist in der Einstiegszone. Das ist der Moment.
+     noch X %    — gutes Setup, aber der Kurs muss erst dorthin. Limit-Order legen.
+     kein Einstieg — es gibt keine Marke, also gibt es nichts zu kaufen.  */
+function einstiegsLage(o, kurs){
+  if (!o || o.einstieg == null || kurs == null || !isFinite(kurs))
+    return {stufe:'keiner', text:'kein Einstieg'};
+  const lang = o.richtung !== 'short';
+  const abstand = (kurs - o.einstieg) / o.einstieg * 100;
+  // In der Zone: der Kurs hat die Marke erreicht oder ueberschritten (long: von unten).
+  const drin = lang ? kurs <= o.einstieg * 1.004 : kurs >= o.einstieg * 0.996;
+  if (drin) return {stufe:'jetzt', abstand, text:'JETZT'};
+  return {stufe:'warten', abstand,
+          text:`noch ${Math.abs(abstand).toFixed(1).replace('.',',')} %`};
+}
+
 function oppZeile(o, rang){
   const nk = NOTE_KLASSE[o.note] || '';
   const live = L.get(o.instrument);
@@ -1765,6 +1794,12 @@ function oppZeile(o, rang){
       <span class="kl">${esc(o.klasse||'')}</span>
       ${o.richtung?`<span class="dir ${o.richtung}">${o.richtung==='long'?'LONG':'SHORT'}</span>`:''}
       <span class="note ${nk}">${esc(o.note)}</span>
+      ${(()=>{ const e = einstiegsLage(o, kurs);
+        if (!o.handelbar) return '';
+        const farbe = e.stufe === 'jetzt' ? 'background:var(--long);color:#03130F'
+                    : e.stufe === 'warten' ? 'background:var(--warn-bg);color:var(--warn)'
+                    : 'background:transparent;color:var(--ink-3)';
+        return `<span class="note" style="${farbe}">${esc(e.text)}</span>`; })()}
       <span class="sc">${(o.score||0).toFixed(0)}</span>
     </div>
     <div class="opp-b">
@@ -1806,10 +1841,19 @@ function zeichneRadar(){
   const g = gefiltert();
   // Ozan hat gefragt, ob er hier oder unter Alarme kauft. Die Frage gehoert einmal
   // beantwortet, und zwar da, wo sie entsteht — nicht in einem Hilfetext irgendwo.
-  const kopf = `<div class="note-box"><span class="nt">Diese Seite ist zum Nachsehen</span>
-    <p>Das ist die vollständige Rangliste. <strong>„Handelbar" heißt: das Setup taugt</strong> —
-    nicht, dass der Kurs schon am Einstieg steht. Gekauft wird im Reiter
-    <strong>Alarme</strong> unter „Jetzt einsteigen".</p></div>`;
+  const jetzt = g.filter(o => o.handelbar && einstiegsLage(o, (L.get(o.instrument)||{}).p ?? o.kurs).stufe === 'jetzt').length;
+  const kopf = `<div class="note-box"><span class="nt">Zwei verschiedene Fragen</span>
+    <p style="font-size:13.5px"><strong>Note und Score sagen, wie GUT ein Setup ist.
+    Das grüne Feld sagt, ob der Kurs schon DA ist.</strong> Beides muss stimmen — ein A−,
+    das noch 8 % von seinem Einstieg entfernt ist, kauft man nicht, sonst kauft man etwas
+    anderes als das, was bewertet wurde.</p>
+    <p>Diese Seite ist die vollständige Rangliste zum Nachsehen. Gekauft wird unter
+    <strong>Alarme</strong> — dort steht genau das, was hier gerade <em>JETZT</em> zeigt,
+    und sonst nichts. ${jetzt ? `Aktuell sind das <strong>${jetzt}</strong>.`
+      : 'Aktuell ist das <strong>keiner</strong> — dann ist nichts zu tun.'}</p>
+    <p style="color:var(--ink-3)">Bei <em>noch X %</em> gehört eine <strong>Limit-Order</strong>
+    hin: du legst sie zum Einstiegskurs, und wenn der Kurs kommt, wird sie ausgeführt —
+    ohne dass du dabei sein musst, und bei Kraken zum günstigeren Gebührensatz.</p></div>`;
   if (!g.length){ $('radar').innerHTML = kopf + `<p class="leer">Kein Wert in dieser Auswahl.</p>`; return; }
   $('radar').innerHTML = kopf + g.slice(0,60).map((o,i)=>oppZeile(o,i+1)).join('') +
     (g.length>60?`<p class="leer">… und ${g.length-60} weitere.</p>`:'');
