@@ -1836,6 +1836,19 @@ function oppZeile(o, rang){
         ${o.erwartung.bis_tp1_pct!=null?`bis Ziel 1 <strong>${pct(o.erwartung.bis_tp1_pct,1)}</strong> · `:''}
         vergleichbare Signale trafen bisher <strong>${Math.round(o.erwartung.quote.tp1*100)} %</strong>
         <span style="color:var(--ink-3)">(${o.erwartung.quote.n} Fälle, Vergangenheit)</span></div>`:''}
+      ${(()=>{ /* Die Frage, die man sich vor dem Kauf stellen sollte und nie stellt:
+           ist das überhaupt eine neue Wette? Wer zu SOL noch INJ kauft, hat nicht
+           breiter gestreut, sondern dieselbe Position vergrössert — nur mit einem
+           zweiten Namen und zweimal Gebühren. Gemessen, nicht vermutet. */
+        const gg = glGegenDepot(o.instrument);
+        if (!gg) return '';
+        const stark = gg.r >= 0.7;
+        return `<div class="muz" style="margin-top:7px;color:${stark?'var(--warn)':'var(--ink-2)'}">
+          <span style="color:${stark?'var(--warn)':'var(--accent)'}">Schon im Depot:</span>
+          ${stark?'das ist im Kern dieselbe Wette wie':'läuft weitgehend zusammen mit'}
+          <strong>${esc(gg.name)}</strong> (${gg.r.toFixed(2).replace('.',',')} über
+          ${S.gleichlauf ? S.gleichlauf.tage : 90} Tage)${stark
+            ? ' — ein Kauf hier streut nicht, er verdoppelt.' : '.'}</div>`; })()}
       ${st&&st.trigger?`<div class="muz" style="margin-top:7px"><span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</div>`:''}
       ${(o.muster||[]).length?`<div class="muz">Muster: ${o.muster.map(m=>esc(m.name)+' ('+m.zeitebene+')').join(' · ')}</div>`:''}
       ${(o.warnungen||[]).length?`<div class="warnz">${o.warnungen.slice(0,3).map(esc).join('<br>')}</div>`:''}
@@ -2830,6 +2843,12 @@ function basisKasten(b){
    nur, wenn es einen Stop gibt, gegen den sich die Grösse rechnen lässt. */
 const ZIEL_GEWICHT = 12;    // Prozent des Depots, die ein Einzelwert anstrebt
 const MAX_GEWICHT  = 25;    // darüber wird zurückgeschnitten
+/* Und dasselbe eine Ebene höher: ein Bündel gemessen gleichlaufender Werte darf nicht
+   über die Hälfte der Marktbewegung ausmachen, ohne dass die App aufhört, dort zum
+   Nachlegen zu raten. 25 % für einen Einzelwert zu deckeln und gleichzeitig zehn Werte
+   zu empfehlen, die sich alle zusammen bewegen, wäre eine Regel, die sich selbst
+   aushebelt. */
+const BUENDEL_MAX  = 50;
 const NACHKAUF_RISIKO_PCT = 0.5;
 /* Unter diesem Betrag lohnt keine Order. Bei Trade Republic kostet jede Ausführung 1 €:
    ein Teilverkauf über 11 € zahlt neun Prozent Gebühr, um elf Euro zu bewegen. Solche
@@ -3248,6 +3267,24 @@ function positionsAktion(b, stand){
     const menge = Math.min(ausRisiko, ausPlatz);
     const euro = menge * kursEUJeStueck;
     if (euro >= MIN_ORDER_EUR){
+      /* Bevor die App zum Nachlegen raet: ist das ueberhaupt eine Erhoehung der
+         Chance — oder nur eine Erhoehung derselben Wette? Wenn dieser Wert in einem
+         Buendel liegt, das schon ueber die Haelfte der Marktbewegung ausmacht, dann
+         sieht ein Zukauf nach Staerke aus und ist in Wahrheit Konzentration. Der
+         Einzelposten bleibt unter seinem Deckel, das Buendel nicht. */
+      const gl = glAnteilFuer(b, stand);
+      if (gl && gl.anzahl > 1 && gl.anteil > BUENDEL_MAX){
+        return {...basis, art:'halten', dringend:false,
+          titel:'Nachlegen wäre hier keine neue Chance, sondern dieselbe Wette',
+          text:`Das Setup traegt — ${posName(b)} gehoert zu den staerksten `
+            + `${(100-rs).toFixed(0)} % der ${klasseName}. Aber dieser Wert liegt in einem `
+            + `Buendel aus ${gl.anzahl} Positionen, die sich gemessen gemeinsam bewegen `
+            + `(${gl.zusammenhalt != null ? gl.zusammenhalt.toFixed(2).replace('.',',') : '—'}) `
+            + `und zusammen schon ${gl.anteil.toFixed(0)} % deiner Marktbewegung ausmachen. `
+            + `Ein Zukauf hier vergroessert nicht die Streuung, sondern den Klumpen. `
+            + `Wenn du dieses Setup handeln willst, dann als Tausch innerhalb des `
+            + `Buendels — nicht obendrauf.`};
+      }
       return {...basis, art:'nachlegen', dringend:false, menge, euro,
         titel:'Nachlegen — Stärke mit frischem Setup',
         text:`${posName(b)} gehört zu den stärksten ${(100-rs).toFixed(0)} % der `
@@ -3306,6 +3343,380 @@ function ratKasten(b){
     <span class="nt">Was das System dazu sagt</span>
     <p style="font-size:14px;margin:0 0 4px"><strong>${esc(rat.kopf)}</strong></p>
     ${rat.saetze.map(x=>`<p style="margin:0 0 4px">${esc(x)}</p>`).join('')}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════
+   GLEICHLAUF — wie viele Wetten ein Depot wirklich ist
+
+   Das Depot zeigte bisher "Konzentration: grösste Position 14 %" und sah damit breit
+   aus. Es besteht aus zehn Altcoins, zwei US-Tech-Aktien und drei Turbos auf US-Tech.
+   Das sind keine vierzehn Wetten, das sind zwei — und eine davon läuft gehebelt.
+
+   Die Grundlage ist keine Behauptung ("Krypto läuft halt zusammen"), sondern die
+   gemessene Korrelation der Tagesrenditen der letzten 90 Handelstage. Der Scan schickt
+   dafür je Instrument eine standardisierte Renditereihe mit, ein Byte je Tag. Die
+   Korrelation ist hier unten ein Skalarprodukt — jedes Paar, jederzeit, auch gegen eine
+   Chance, die noch gar nicht im Depot ist.
+   ══════════════════════════════════════════════════════════════════════════════════ */
+
+// Ab hier gilt zwei Werte als dieselbe Wette. 0,5 über 90 Tage ist kein Zufall mehr;
+// darunter beginnt der Bereich, in dem zwei Werte manchmal zusammenlaufen und manchmal
+// nicht — und den als "ein Bündel" zu verkaufen wäre schon wieder eine Behauptung.
+const GL_SCHWELLE = 0.5;
+// Ein normaler Tag ist eine Standardabweichung, ein schlechter das 95-%-Quantil.
+const GL_SCHLECHT = 1.645;
+
+let _glCache = null, _glStand = null;
+
+function glVektoren(){
+  const g = S && S.gleichlauf;
+  if (!g || !g.z) return null;
+  const stand = `${g.bis}:${g.tage}:${Object.keys(g.z).length}`;
+  if (_glCache && _glStand === stand) return _glCache;
+  const mitte = (g.mitte != null) ? g.mitte : 128;
+  const raus = new Map();
+  for (const name in g.z){
+    let roh;
+    try { roh = atob(g.z[name]); } catch(e){ continue; }
+    const n = roh.length;
+    if (n < 30) continue;
+    const v = new Float64Array(n);
+    let summe = 0;
+    for (let i=0;i<n;i++){ v[i] = roh.charCodeAt(i) - mitte; summe += v[i]; }
+    const m = summe/n;
+    let q = 0;
+    for (let i=0;i<n;i++){ v[i] -= m; q += v[i]*v[i]; }
+    const laenge = Math.sqrt(q);
+    if (!(laenge > 0)) continue;
+    for (let i=0;i<n;i++) v[i] /= laenge;
+    raus.set(name, v);
+  }
+  _glCache = raus; _glStand = stand;
+  return raus;
+}
+
+/* Korrelation zweier Instrumente, oder null, wenn für eines davon nichts gemessen
+   wurde. null ist hier wichtig: es heisst "unbekannt", nicht "unabhängig". Wer das
+   verwechselt, baut sich ein Depot schön. */
+function glKorr(a, b){
+  if (!a || !b) return null;
+  if (a === b) return 1;
+  const v = glVektoren(); if (!v) return null;
+  const x = v.get(a), y = v.get(b);
+  if (!x || !y || x.length !== y.length) return null;
+  let s = 0;
+  for (let i=0;i<x.length;i++) s += x[i]*y[i];
+  return Math.max(-1, Math.min(1, s));
+}
+
+// Tagesschwankung in Prozent, wie gemessen.
+function glVola(name){
+  const g = S && S.gleichlauf;
+  const v = g && g.sd ? g.sd[name] : null;
+  return (v != null && isFinite(v)) ? v : null;
+}
+
+/* Unter welchem Namen ein Depotposten in der Messung steht. Ein Turbo bewegt sich mit
+   seinem Basiswert, nicht mit sich selbst — für den Gleichlauf zählt der Basiswert. */
+function glNameFuer(b){
+  if (b.hebel && b.hebel.basisSym){
+    const br = scanRow(b.hebel.basisSym);
+    if (br) return br.instrument;
+  }
+  if (b.row) return b.row.instrument;
+  const r = scanRow(b.pos.sym);
+  return r ? r.instrument : null;
+}
+
+/* Bargeld ist keine Position ohne Messreihe, sondern eine Position ohne Risiko.
+   Der Unterschied gehoert benannt: USDC unter "dafuer fehlen uns Daten" einzusortieren
+   sieht aus wie eine Luecke, ist aber genau der Teil des Depots, der absichtlich nichts
+   tut. Cash zaehlt beim eigenen Geld mit und beim bewegten Markt nicht. */
+const BAR = /^(USDC|USDT|USD|EUR|BUSD|DAI|FDUSD|TUSD|EURC)$/i;
+function istBar(pos){
+  if (!pos) return false;
+  if (BAR.test(String(pos.sym||'').trim())) return true;
+  return /\bcash\b|bargeld|guthaben/i.test(String(pos.konto||''));
+}
+
+/* Was eine Position am Markt bewegt, und was sie an eigenem Geld bindet.
+
+   Der Unterschied ist bei Ozans Depot kein Detail. Ein Turbo für 63 € mit Hebel 9
+   bewegt 567 € Marktwert. Eine Margin-Position steht schon mit ihrem vollen
+   Nominalwert im Depot, ihr eigenes Geld ist aber nur ein Fünftel davon. Wer beides
+   gleichsetzt, unterschätzt entweder sein Risiko oder überschätzt sein Vermögen. */
+function glGewicht(b, stand){
+  const wertEU = stand ? stand.inEuro(b, b.wert) : null;
+  if (wertEU == null) return null;
+  const h = b.hebel;
+  if (h && h.art === 'margin' && h.hebel > 1){
+    return {markt: wertEU, kapital: wertEU / h.hebel, hebel: h.hebel, art: 'margin'};
+  }
+  if (h && !h.ausgeknockt && h.hebel > 1){
+    return {markt: wertEU * h.hebel, kapital: wertEU, hebel: h.hebel, art: 'schein'};
+  }
+  return {markt: wertEU, kapital: wertEU, hebel: 1, art: 'direkt'};
+}
+
+/* Die eigentliche Rechnung. Agglomerativ mit mittlerer Verknüpfung: das nächste Paar
+   zusammenlegen, solange die mittlere Korrelation zwischen zwei Gruppen über der
+   Schwelle liegt. Bei zwanzig Positionen ist das in Mikrosekunden fertig. */
+function glBuendel(bew, stand){
+  const g = S && S.gleichlauf;
+  if (!g || !glVektoren()) return null;
+
+  const teile = [];
+  let ohneMessung = 0, ohneMessungEU = 0, bar = 0;
+  for (const b of bew){
+    const gw = glGewicht(b, stand);
+    if (!gw || !(gw.markt > 0)) continue;
+    if (istBar(b.pos)){ bar += gw.kapital; continue; }
+    const nm = glNameFuer(b);
+    const vola = nm ? glVola(nm) : null;
+    // Short zählt mit umgekehrtem Vorzeichen: eine Short-Position gegen eine Long-
+    // Position im selben Wert ist keine doppelte Wette, sondern gar keine.
+    const richtung = (b.hebel && b.hebel.lang === false) ? -1
+                   : (b.pos.hebel_richtung === 'short' ? -1 : 1);
+    if (!nm || vola == null || !glVektoren().has(nm)){
+      ohneMessung++; ohneMessungEU += gw.markt; continue;
+    }
+    teile.push({b, nm, vola, richtung, markt: gw.markt, kapital: gw.kapital,
+                hebel: gw.hebel, art: gw.art});
+  }
+  if (teile.length < 2) return null;
+
+  const n = teile.length;
+  const K = [];
+  for (let i=0;i<n;i++){
+    K.push(new Float64Array(n));
+    for (let j=0;j<n;j++){
+      const r = (i===j) ? 1 : glKorr(teile[i].nm, teile[j].nm);
+      // Richtung einrechnen: zwei Longs auf dasselbe sind +, Long gegen Short ist −.
+      K[i][j] = (r == null ? 0 : r) * teile[i].richtung * teile[j].richtung;
+    }
+  }
+
+  let gruppen = teile.map((_,i)=>[i]);
+  for(;;){
+    let besteA = -1, besteB = -1, bester = GL_SCHWELLE;
+    for (let a=0;a<gruppen.length;a++){
+      for (let b2=a+1;b2<gruppen.length;b2++){
+        let s = 0;
+        for (const i of gruppen[a]) for (const j of gruppen[b2]) s += K[i][j];
+        const mittel = s / (gruppen[a].length * gruppen[b2].length);
+        if (mittel > bester){ bester = mittel; besteA = a; besteB = b2; }
+      }
+    }
+    if (besteA < 0) break;
+    gruppen[besteA] = gruppen[besteA].concat(gruppen[besteB]);
+    gruppen.splice(besteB, 1);
+  }
+
+  const marktGesamt = teile.reduce((s,t)=>s+t.markt, 0);
+  const kapitalGesamt = teile.reduce((s,t)=>s+t.kapital, 0);
+
+  const b_ = gruppen.map(idx => {
+    const markt = idx.reduce((s,i)=>s+teile[i].markt, 0);
+    let paare = 0, summe = 0;
+    for (let x=0;x<idx.length;x++) for (let y=x+1;y<idx.length;y++){ summe += K[idx[x]][idx[y]]; paare++; }
+    return {
+      idx, markt, anteil: marktGesamt ? markt/marktGesamt*100 : 0,
+      zusammenhalt: paare ? summe/paare : null,
+      mitglieder: idx.map(i=>teile[i]).sort((a,b2)=>b2.markt-a.markt)
+    };
+  }).sort((a,b2)=>b2.markt-a.markt);
+
+  // Effektive Anzahl Wetten: der Kehrwert der Summe der quadrierten Bündelanteile.
+  // Vierzehn gleich grosse, unabhängige Positionen ergäben 14; vierzehn Positionen,
+  // die alle dasselbe tun, ergeben 1.
+  const hh = b_.reduce((s,x)=>s + Math.pow(x.anteil/100, 2), 0);
+  const effektiv = hh > 0 ? 1/hh : null;
+
+  /* Tagesrisiko in Euro. Nicht aus einer Faustregel, sondern aus denselben Zahlen:
+     Gewichte, gemessene Schwankungsbreiten, gemessene Korrelationen. */
+  let varianz = 0;
+  for (let i=0;i<n;i++) for (let j=0;j<n;j++){
+    varianz += teile[i].markt * teile[j].markt
+             * (teile[i].vola/100) * (teile[j].vola/100) * K[i][j];
+  }
+  const tagesRisiko = varianz > 0 ? Math.sqrt(varianz) : null;
+
+  return {
+    teile, buendel: b_, effektiv, marktGesamt, kapitalGesamt, tagesRisiko, bar,
+    hebelFaktor: kapitalGesamt ? marktGesamt/kapitalGesamt : 1,
+    ohneMessung, ohneMessungEU,
+    tage: g.tage, bis: g.bis
+  };
+}
+
+/* Wie sehr eine neue Chance dasselbe ist, was schon im Depot liegt. Genau die Frage,
+   die man sich vor dem Kauf stellen sollte und nie stellt. */
+let _glDepot = null, _glDepotZeit = 0;
+function glGegenDepot(instrument){
+  if (!instrument) return null;
+  /* Die Marktliste ruft das fuer jede der 206 Zeilen auf. Ohne diesen Zwischenspeicher
+     wuerde das Depot 206-mal aus dem localStorage gelesen, geparst und neu bewertet —
+     das kostet beim Zeichnen eine halbe Sekunde, jedes Mal. Eine Sekunde Haltbarkeit
+     reicht fuer einen Zeichendurchgang und ist kurz genug, dass eine Aenderung am
+     Depot sofort durchschlaegt. */
+  const jetzt = Date.now();
+  if (!_glDepot || jetzt - _glDepotZeit > 1000){
+    try { _glDepot = depotStand(); } catch(e){ _glDepot = null; }
+    _glDepotZeit = jetzt;
+  }
+  const stand = _glDepot;
+  if (!stand || !stand.bew.length) return null;
+  let beste = null;
+  for (const b of stand.bew){
+    if (istBar(b.pos)) continue;
+    const nm = glNameFuer(b);
+    if (!nm || nm === instrument) continue;
+    const gw = glGewicht(b, stand);
+    if (!gw || !(gw.markt > 0)) continue;
+    const r = glKorr(instrument, nm);
+    if (r == null) continue;
+    if (!beste || r > beste.r) beste = {r, name: posName(b), markt: gw.markt};
+  }
+  return (beste && beste.r >= GL_SCHWELLE) ? beste : null;
+}
+
+/* In welchem Buendel eine einzelne Position liegt — und wie schwer dieses Buendel
+   schon wiegt. Die Rechnung haengt am ``stand`` statt an einer globalen Variablen,
+   damit sie je Zeichendurchgang genau einmal passiert. */
+function glAnteilFuer(b, stand){
+  if (!stand) return null;
+  if (stand._gl === undefined){
+    try { stand._gl = glBuendel(stand.bew, stand); } catch(e){ stand._gl = null; }
+  }
+  const a = stand._gl;
+  if (!a) return null;
+  const nm = glNameFuer(b);
+  if (!nm) return null;
+  for (const x of a.buendel){
+    if (x.mitglieder.some(m => m.nm === nm)){
+      return {anteil: x.anteil, anzahl: x.mitglieder.length, zusammenhalt: x.zusammenhalt,
+              markt: x.markt, namen: x.mitglieder.map(m=>posName(m.b))};
+    }
+  }
+  return null;
+}
+
+function glText(x){
+  if (x >= 0.85) return 'praktisch derselbe Wert';
+  if (x >= 0.7)  return 'läuft fast immer zusammen';
+  if (x >= 0.5)  return 'läuft überwiegend zusammen';
+  if (x >= 0.3)  return 'läuft oft zusammen';
+  if (x > -0.3)  return 'läuft eigenständig';
+  return 'läuft gegenläufig';
+}
+
+function glKasten(stand){
+  const g = S && S.gleichlauf;
+  if (!g) return `<div class="note-box"><span class="nt">Gleichlauf</span>
+    <p>Der laufende Scan hat noch keine Messreihen mitgeschickt. Sobald der nächste
+    volle Lauf durch ist, steht hier, aus wie vielen Wetten dein Depot wirklich
+    besteht.</p></div>`;
+  const a = glBuendel(stand.bew, stand);
+  if (!a) return '';
+
+  const proz = (x) => x.toFixed(0).replace('.',',');
+  /* Ein Einzelwert mit 31 % unter der Ueberschrift "laeuft eigenstaendig" zu fuehren
+     waere eine beruhigende Aussage ueber einen Klumpen. Wer allein ein Fuenftel des
+     Depots bewegt, ist keine Streuung, sondern eine eigene Wette — und bekommt eine
+     eigene Karte. */
+  const EINZEL_GROSS = 20;
+  const echte = a.buendel.filter(x=>x.mitglieder.length > 1);
+  const gross = a.buendel.filter(x=>x.mitglieder.length === 1 && x.anteil >= EINZEL_GROSS);
+  const eins  = a.buendel.filter(x=>x.mitglieder.length === 1 && x.anteil <  EINZEL_GROSS);
+
+  let h = `<h2>Wie viele Wetten das wirklich ist</h2>
+  <div class="status">
+    <div><div class="k">Effektive Wetten</div>
+      <div class="v ${a.effektiv < 2.5 ? 'aus' : a.effektiv < 4 ? 'mittel' : 'gut'}">${
+        a.effektiv != null ? a.effektiv.toFixed(1).replace('.',',') : '—'}</div>
+      <div class="n">aus ${a.teile.length} Positionen</div></div>
+    <div><div class="k">Bewegter Markt</div>
+      <div class="v">${num(a.marktGesamt,0)} €</div>
+      <div class="n">mit ${num(a.kapitalGesamt,0)} € eigenem Geld${
+        a.hebelFaktor > 1.05 ? ` · Faktor ${a.hebelFaktor.toFixed(1).replace('.',',')}` : ''}</div></div>
+    <div><div class="k">Normaler Tag</div>
+      <div class="v">${a.tagesRisiko != null ? '±'+num(a.tagesRisiko,0)+' €' : '—'}</div>
+      <div class="n">${a.tagesRisiko != null && a.kapitalGesamt
+        ? (a.tagesRisiko/a.kapitalGesamt*100).toFixed(1).replace('.',',')+' % deines Geldes' : ''}</div></div>
+    <div><div class="k">Schlechter Tag</div>
+      <div class="v ${a.tagesRisiko != null && a.kapitalGesamt
+          && (a.tagesRisiko*GL_SCHLECHT/a.kapitalGesamt) > 0.06 ? 'aus' : 'mittel'}">${
+        a.tagesRisiko != null ? '−'+num(a.tagesRisiko*GL_SCHLECHT,0)+' €' : '—'}</div>
+      <div class="n">einer von zwanzig</div></div>
+  </div>
+  <p class="leer" style="padding:6px 0">Gemessen an den Tagesrenditen der letzten
+    ${a.tage} Handelstage bis ${esc(a.bis)} — nicht geschätzt und nicht angenommen.
+    Der schlechte Tag ist das übliche 95-%-Quantil; an echten Paniktagen fällt mehr an,
+    weil Kurse dann stärker springen, als eine Normalverteilung kennt.${
+    a.bar > 0 ? ` ${num(a.bar,0)} € Cash sind nicht dabei — das ist der Sinn von Cash:
+    es bewegt sich nicht mit.` : ''}${
+    a.ohneMessung ? ` ${a.ohneMessung} Position(en) über ${num(a.ohneMessungEU,0)} €
+    fehlen in der Rechnung — für sie gibt es keine Messreihe (ETF, ausgelisteter Coin,
+    Schein ohne erkannten Basiswert). Das Risiko darunter ist nicht null, es ist
+    ungemessen.` : ''}</p>`;
+
+  if (echte.length){
+    h += echte.map((x,i)=>{
+      const farbe = x.anteil > 55 ? 'bad' : x.anteil > 35 ? 'warn' : '';
+      return `<div class="karte ${farbe}" style="margin-bottom:8px">
+        <h3>Bündel ${i+1} · ${proz(x.anteil)} % des bewegten Marktes
+          <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">${
+            x.zusammenhalt != null ? esc(glText(x.zusammenhalt)) + ' (' +
+            x.zusammenhalt.toFixed(2).replace('.',',') + ')' : ''}</span></h3>
+        <div class="kpi" style="margin-top:6px">${x.mitglieder.map(m=>
+          `<span>${esc(posName(m.b))}${m.hebel>1?` <b>${m.hebel.toFixed(m.hebel<10?1:0)}×</b>`:''}
+           <b>${num(m.markt,0)} €</b></span>`).join('')}</div>
+        <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Diese ${
+          x.mitglieder.length} Positionen bewegen sich gemeinsam. Für dein Ergebnis
+          zählen sie wie <strong>eine</strong> Position von ${num(x.markt,0)} € —
+          ein schlechter Tag trifft sie alle am selben Tag.</p>
+      </div>`;
+    }).join('');
+  }
+  if (gross.length){
+    h += gross.map(x=>{
+      const m = x.mitglieder[0];
+      return `<div class="karte ${x.anteil>35?'bad':'warn'}" style="margin-bottom:8px">
+        <h3>Einzelwette · ${proz(x.anteil)} % des bewegten Marktes
+          <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">${
+            esc(posName(m.b))}${m.hebel>1?` · ${m.hebel.toFixed(m.hebel<10?1:0)}×`:''}</span></h3>
+        <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Dieser eine Wert
+          bewegt ${num(x.markt,0)} € und läuft zu keinem anderen Posten messbar parallel.
+          Eigenständig heisst hier aber nicht ungefährlich: er ist gross genug, um allein
+          über dein Ergebnis zu entscheiden. Eine schlechte Nachricht zu diesem einen
+          Unternehmen kostet dich ${proz(x.anteil)} % deiner Marktbewegung — unabhängig
+          davon, was der Rest tut.</p>
+      </div>`;
+    }).join('');
+  }
+  if (eins.length){
+    h += `<div class="karte gut" style="margin-bottom:8px">
+      <h3>Läuft eigenständig · ${proz(eins.reduce((s,x)=>s+x.anteil,0))} %</h3>
+      <div class="kpi" style="margin-top:6px">${eins.map(x=>
+        `<span>${esc(posName(x.mitglieder[0].b))} <b>${num(x.markt,0)} €</b></span>`).join('')}</div>
+      <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Zu keinem anderen
+        Posten im Depot messbar gleichlaufend. Das ist der Teil, der Diversifikation
+        tatsächlich leistet.</p></div>`;
+  }
+
+  // Der Satz, um den es geht.
+  const groesst = [...echte, ...gross].sort((x,y)=>y.anteil-x.anteil)[0];
+  if (groesst && groesst.anteil > 45){
+    h += `<div class="note-box bad"><span class="nt">Worauf das hinausläuft</span>
+      <p>${proz(groesst.anteil)} % von allem, was du am Markt bewegst, hängen an
+      <strong>einer</strong> Bewegung. ${a.effektiv != null
+        ? `Rechnerisch hast du ${a.effektiv.toFixed(1).replace('.',',')} Wetten laufen,
+           nicht ${a.teile.length}.` : ''} Das ist keine Fehlentscheidung — aber es ist
+      eine andere Wette als die, die eine Liste aus ${a.teile.length} Zeilen suggeriert.
+      Wenn du das Risiko senken willst, hilft es nicht, innerhalb des Bündels
+      umzuschichten; es hilft nur, das Bündel kleiner zu machen.</p></div>`;
+  }
+  return h;
 }
 
 function zeichnePortfolio(){
@@ -3374,6 +3785,8 @@ function zeichnePortfolio(){
        <p style="margin:4px 0 0;font-size:13px">Keine Position verlangt gerade eine Handlung.
        Kein Stop gerissen, kein Ziel erreicht, kein Schlusslicht, kein Klumpen — und nichts,
        wo sich Nachlegen rechnen würde. Nichtstun ist hier das Ergebnis, nicht die Lücke.</p></div>`;
+
+    h += glKasten(stand);
 
     h += `<h2>Positionen</h2>`;
     h += bew.map(b=>{
