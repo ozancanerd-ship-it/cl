@@ -60,6 +60,17 @@ def _passt(objekt_richtung: Any, wette: Direction) -> bool:
 # Ausfuehrungsebene bestaetigt nur — bei einem Swing-Trade darf M15 die Richtung
 # nicht gegen D1 drehen.
 TF_GEWICHT: dict[Timeframe, float] = {
+    # Die Wochenebene steht nur bei Aktien zur Verfuegung (Krypto bekommt sie nicht
+    # geliefert, siehe _OPTIONAL_HIGHER in analysis/mtf.py). Fehlende Ebenen werden in
+    # ``_bias`` uebersprungen und zaehlen auch nicht in den Nenner — die Kryptobewertung
+    # bleibt deshalb Zeile fuer Zeile dieselbe wie vorher.
+    #
+    # Warum die Woche bei Aktien so schwer wiegt: eine Aktie im Wochenabwaertstrend
+    # dreht selten, weil der Tageschart eine huebsche Kerze zeigt. Wer sie dort long
+    # kauft, handelt gegen die Ebene, die ueber Wochen entscheidet — und genau ueber
+    # Wochen sollen die Aktienpositionen hier laufen. 0,35 macht die Woche zur
+    # zweitschwersten Stimme hinter dem Tag, nicht zum Alleinentscheider.
+    Timeframe.W1: 0.35,
     Timeframe.D1: 0.40,
     Timeframe.H4: 0.30,
     Timeframe.H1: 0.20,

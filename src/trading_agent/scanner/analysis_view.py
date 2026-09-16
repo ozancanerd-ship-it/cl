@@ -28,7 +28,17 @@ from trading_agent.analysis.indicators import berechne as indikatoren_berechnen
 from trading_agent.core.enums import Direction, Timeframe
 
 #: Reihenfolge, in der die Zeitebenen ueberall auftauchen: gross nach klein.
-EBENEN: tuple[Timeframe, ...] = (Timeframe.D1, Timeframe.H4, Timeframe.H1, Timeframe.M15)
+#: Die Woche steht VOR dem Tag: sie ist die langsamste Ebene und damit die, gegen die
+#: man am wenigsten handeln will. Sie erscheint nur, wenn es sie gibt — geliefert wird
+#: sie derzeit fuer Aktien, nicht fuer Krypto (siehe ``_OPTIONAL_HIGHER`` in
+#: ``analysis/mtf.py``). Fehlt sie, sieht die Tabelle aus wie immer.
+EBENEN: tuple[Timeframe, ...] = (
+    Timeframe.W1,
+    Timeframe.D1,
+    Timeframe.H4,
+    Timeframe.H1,
+    Timeframe.M15,
+)
 
 _REGIME_TEXT = {
     "trend_up": "Aufwaertstrend",
