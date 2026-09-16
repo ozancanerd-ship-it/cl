@@ -1900,6 +1900,12 @@ function einstiegsLage(o, kurs){
       return {stufe:'warten', abstand:x.abstand, live:x.live,
               text:`noch ${Math.abs(x.abstand).toFixed(1).replace('.',',')} %`};
   }
+  /* Handelsreif, aber nicht in der Rangliste: dann liegt zu diesem Wert ein BEENDETES
+     Signal auf der Wachliste (Ziel erreicht, ausgestoppt, ungueltig geworden). Unter
+     Alarme steht es dann im Verlauf. Wuerde hier weitergerechnet, stuende im Markt ein
+     frisches JETZT an einem Wert, den die Handlungsseite als erledigt fuehrt — wieder
+     zwei Antworten. Also sagt die Zeile, was gilt: das Signal ist durch. */
+  if (handelsreif(o)) return {stufe:'beendet', text:'Signal beendet'};
   if (kurs == null || !isFinite(kurs)) return {stufe:'keiner', text:'kein Einstieg'};
   const lang = o.richtung !== 'short';
   const abstand = (kurs - o.einstieg) / o.einstieg * 100;
