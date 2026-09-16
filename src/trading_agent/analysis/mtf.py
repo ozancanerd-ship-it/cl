@@ -92,6 +92,25 @@ MTF_TF_ORDER: tuple[Timeframe, ...] = (
 _HTF: tuple[Timeframe, ...] = (Timeframe.D1, Timeframe.H4)
 _HIGHER: tuple[Timeframe, ...] = (Timeframe.M15, Timeframe.H1, Timeframe.H4, Timeframe.D1)
 
+#: Zeitebenen, die NUR mitlaufen, wenn echte Bars dafuer geliefert werden.
+#:
+#: Ozan zur Aktienseite: "fuer die Aktien reicht nicht nur M, H und D — schau auf Wochen
+#: und Jahr, fuer Aktien ist das wichtig, fuer Krypto eher weniger." Das ist fachlich
+#: richtig: eine Aktie, die im Wochenchart abwaerts laeuft, dreht selten, weil der
+#: Tageschart eine huebsche Kerze zeigt — und Aktienpositionen hier sollen ohnehin
+#: laenger laufen.
+#:
+#: Die Wochenebene wird NIE aus M5 hochgerechnet. Aus 55 Tagen M5 liesse sich eine
+#: Wochenkerze zwar bilden, aber es waeren acht Stueck — daraus einen Wochentrend zu
+#: lesen waere eine Zahl ohne Deckung. Kommen keine echten Wochenbars (Krypto, oder ein
+#: Anbieter ohne Wochenintervall), fehlt die Ebene einfach, und alles rechnet wie bisher.
+_OPTIONAL_HIGHER: tuple[Timeframe, ...] = (Timeframe.W1,)
+
+#: Mindestzahl echter Bars, bevor eine optionale Ebene ueberhaupt mitgerechnet wird.
+#: 52 Wochenkerzen sind ein Jahr — das ist die kuerzeste Strecke, auf der sich ueber
+#: einen Wochentrend reden laesst, ohne dass ein einzelner Ausschlag ihn bestimmt.
+MIN_OPTIONAL_BARS = 52
+
 
 class MtfError(ValueError):
     pass
@@ -248,13 +267,30 @@ def build_mtf_context(
         else:
             series[tf] = resample_ohlcv(m5, Timeframe.M5, tf, require_complete=True, horizon=cutoff)
 
+    for tf in _OPTIONAL_HIGHER:
+        native = None if native_higher is None else native_higher.get(tf)
+        if not native:
+            continue
+        gefiltert = [
+            b for b in sort_ohlcv(list(native)) if b.timeframe is tf and b.close_time <= cutoff
+        ]
+        # Eine Handvoll Wochenkerzen traegt keinen Trend. Unter diesem Wert bleibt die
+        # Ebene weg, statt eine Aussage zu liefern, die auf zehn Kerzen beruht.
+        if len(gefiltert) >= MIN_OPTIONAL_BARS:
+            series[tf] = gefiltert
+
     d1_bars = series[Timeframe.D1]
     session_windows = completed_sessions(m5, list(p.session_specs)) if p.session_specs else []
 
     d1_key = (d1_bars[0].open_time, d1_bars[-1].open_time, len(d1_bars)) if d1_bars else ()
     per_tf: dict[Timeframe, TimeframeContext] = {}
     issues: list[str] = []
-    for tf in MTF_TF_ORDER:
+    # Die optionalen Ebenen laufen hinten mit — aber nur die, fuer die es Bars gibt.
+    ebenen: tuple[Timeframe, ...] = (
+        *MTF_TF_ORDER,
+        *(t for t in _OPTIONAL_HIGHER if t in series),
+    )
+    for tf in ebenen:
         bars_tf = series[tf]
         ctx: TimeframeContext | None = None
         key: tuple[object, ...] | None = None
