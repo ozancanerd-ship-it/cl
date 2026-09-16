@@ -87,7 +87,7 @@ permissions:
 jobs:
   tagesplan:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 32
     concurrency:
       group: scan
       cancel-in-progress: false   # ein laufender Schreibvorgang wird nicht abgebrochen
@@ -178,7 +178,7 @@ jobs:
         id: scan
         if: github.event.schedule != '*/5 * * * *'
         continue-on-error: true
-        timeout-minutes: 14
+        timeout-minutes: 18
         env:
           PYTHONPATH: src
         run: |
