@@ -220,8 +220,15 @@ FENSTER_YAHOO = {
     Timeframe.M15: timedelta(days=55),
     Timeframe.H1: timedelta(days=90),
     Timeframe.D1: timedelta(days=730),
+    # Vier Jahre Wochenkerzen — rund 208 Stueck. Ozan: "fuer Aktien reicht nicht nur M, H
+    # und D, schau auf Wochen und Jahr." Vier Jahre decken einen kompletten Zyklus ab,
+    # ohne dass eine Kursspanne von 2019 die heutige Struktur mitbestimmt.
+    Timeframe.W1: timedelta(days=1460),
 }
-EBENEN_YAHOO = (Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1)
+#: Nur Aktien bekommen die Wochenebene. Krypto laeuft durchgehend und in kuerzeren
+#: Wellen; dort waere die Woche eine traege Stimme ohne Mehrwert — und sie wuerde die
+#: Bewertung aller Coins veraendern, ohne dass dafuer ein Grund vorliegt.
+EBENEN_YAHOO = (Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1)
 
 
 def _nur_krypto(name: str, reihen: dict[Any, Any]) -> str | None:
