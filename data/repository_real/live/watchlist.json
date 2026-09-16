@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-16T04:07:06.980714+00:00",
+  "stand": "2026-09-16T04:27:05.640370+00:00",
   "wachen": {
     "AMD": {
       "aufgenommen": "2026-09-13T17:04:35.069884+00:00",
@@ -79,32 +79,6 @@
       "zuletzt": "2026-09-13T17:37:12.768172+00:00",
       "zustand": "abgelaufen"
     },
-    "AVGO": {
-      "aufgenommen": "2026-09-08T17:36:11.977383+00:00",
-      "bestes_r": 0.15,
-      "einstieg": 367.1300048828125,
-      "einstieg_art": "Ruecklauf in FVG H1",
-      "einstiegskurs": 367.1300048828125,
-      "erreicht": [],
-      "erwartet_pct": 8.68,
-      "instrument": "AVGO",
-      "klasse": "aktien",
-      "note": "A",
-      "richtung": "long",
-      "rr": 1.87,
-      "rs": null,
-      "schlechtestes_r": -0.55,
-      "score": 63.8,
-      "setup": "",
-      "stop": 350.07000732421875,
-      "these": "",
-      "tp1": 375.1300048828125,
-      "tp2": 399.0,
-      "tp3": 406.7300109863281,
-      "trigger": "",
-      "zuletzt": "2026-09-13T14:56:21.843904+00:00",
-      "zustand": "abgelaufen"
-    },
     "BANKUSDT": {
       "aufgenommen": "2026-09-09T22:36:35.603625+00:00",
       "bestes_r": 0.0,
@@ -156,7 +130,7 @@
       "tp2": 210.73,
       "tp3": 201.10000000000008,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-16T04:07:02.613430+00:00",
+      "zuletzt": "2026-09-16T04:27:00.026117+00:00",
       "zustand": "aktiv"
     },
     "BCHUSDT": {
@@ -208,7 +182,7 @@
       "tp2": 752.91,
       "tp3": 777.48,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-16T04:07:02.613430+00:00",
+      "zuletzt": "2026-09-16T04:27:00.026117+00:00",
       "zustand": "aktiv"
     },
     "BOMEUSDT": {
@@ -505,12 +479,14 @@
     },
     "DRVUSD": {
       "aufgenommen": "2026-09-15T13:59:35.560403+00:00",
-      "bestes_r": 1.47,
+      "bestes_r": 3.42,
       "einstieg": 0.13982,
       "einstieg_art": "sofort",
       "einstiegskurs": 0.14039,
       "erreicht": [
-        "TP1"
+        "TP1",
+        "TP2",
+        "TP3"
       ],
       "erwartet_pct": 5.37,
       "instrument": "DRVUSD",
@@ -528,8 +504,8 @@
       "tp2": 0.15543,
       "tp3": 0.15985307698618179,
       "trigger": "Der Kurs muss ueber 0.1391 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-16T04:07:02.613430+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-09-16T04:27:00.026117+00:00",
+      "zustand": "ziel_erreicht"
     },
     "EGLDUSDT": {
       "aufgenommen": "2026-09-11T00:48:51.732907+00:00",
@@ -740,7 +716,7 @@
       "tp2": 86.79,
       "tp3": 88.35,
       "trigger": "Der Kurs muss ueber 78.1500 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-16T04:07:02.613430+00:00",
+      "zuletzt": "2026-09-16T04:27:00.026117+00:00",
       "zustand": "aktiv"
     },
     "ICPUSD": {
@@ -1823,7 +1799,7 @@
       "tp2": 1224.38,
       "tp3": 1297.96,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-16T04:07:02.613430+00:00",
+      "zuletzt": "2026-09-16T04:27:00.026117+00:00",
       "zustand": "aktiv"
     },
     "ZROUSDT": {
