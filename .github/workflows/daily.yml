@@ -232,6 +232,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/watch_levels.py --send --vollstaendig
 
+      # Ozans EIGENE Positionen. Bisher lief diese Pruefung ausschliesslich im Browser —
+      # war die App zu, meldete sich niemand, auch wenn ein Stop fiel. Das Depot kommt
+      # als Geheimnis DEPOT_CODE herein (derselbe Text wie im Sync-Reiter der App);
+      # ohne das Geheimnis bleibt der Schritt einfach still.
+      #
+      # Gemeldet wird nur Stop, Ziel und ein bedrohlicher Knock-out-Puffer. Keine
+      # Kursbewegung, kein Notenwechsel, kein "Scan erfolgreich".
+      - name: Depot bewachen
+        id: depot
+        if: github.event.schedule != '*/5 * * * *'
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+          DEPOT_CODE: ${{ secrets.DEPOT_CODE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/depot_wache.py --scan web/scan.json --send
+
       # Die eigene Bilanz. Laeuft nach der Wachliste und schreibt sie in die App —
       # ein Scanner, der nie nachrechnet, ob die alten Chancen aufgegangen sind,
       # erzeugt Zuversicht statt Wissen.
@@ -274,7 +295,8 @@ jobs:
           git add -f data/repository_real/live/tsmom_forward.jsonl \
                      data/repository_real/live/tsmom_forward_corrections.jsonl \
                      data/repository_real/live/scan_alert_state.json \
-                     data/repository_real/live/watchlist.json || true
+                     data/repository_real/live/watchlist.json \
+                     data/repository_real/live/depot_alarme.json || true
           if git diff --cached --quiet; then
             echo "kein neuer Stand — nichts zu sichern"
             exit 0
