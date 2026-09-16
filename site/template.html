@@ -772,6 +772,7 @@ async function ladeScan(){
      bedeutet, dass die Daten noch unterwegs sind, ist die gefaehrlichste Falschaussage,
      die diese App machen kann. */
   sicher('Depot', zeichnePortfolio);
+  pruefeFassung();
   const start = (S.gesamt||[]).find(o=>o.handelbar) || (S.gesamt||[])[0];
   if (start && !AKTIV) waehle(start.instrument, false);
   starteLive();
@@ -2225,12 +2226,80 @@ function haltUrteil(row){
   return {urteil, kl, rs, ren, gegen};
 }
 
+/* ======================================================= HEBEL / TURBO
+
+   „Ich arbeite mit Hebel — gib mir an, was für einen Hebel ich drin habe, den Knock-out,
+   und dann schätzt du das alles besser ein. Ich habe weniger Kapital als andere."
+
+   Ein Turbo ist kein eigener Markt, sondern eine einfache Formel auf seinen Basiswert:
+
+       Scheinpreis ≈ (Kurs des Basiswerts − Knock-out-Schwelle) / Bezugsverhältnis
+
+   Daraus folgt alles Weitere von selbst — und zwar ohne Schätzung:
+
+       Hebel       = Basiskurs / (Basiskurs − Schwelle)
+       Puffer      = (Basiskurs − Schwelle) / Basiskurs
+
+   Der Puffer ist die wichtigste Zahl, die es bei einem Schein gibt: er sagt, wie weit
+   der Basiswert fallen darf, bevor das Papier **wertlos verfällt**. Nicht „im Minus" —
+   weg. Ein Stop nützt dagegen nichts, wenn die Schwelle über Nacht gerissen wird.
+
+   Deshalb bekommt der Puffer die höchste Priorität unter allen Depotregeln: vor Stop,
+   vor Ziel, vor allem. Und deshalb werden die drei Turbos jetzt echt bewertet, statt mit
+   einem von Hand eingetragenen Wert dazustehen.
+
+   Die Umrechnung in Euro ist bewusst schlicht (Kurs des Basiswerts geteilt durch den
+   Eurokurs). Ein Emittent rechnet mit Aufgeld, Finanzierungskosten und manchmal
+   Währungssicherung; das steht so auch auf der Karte. Für die Frage „wie nah bin ich an
+   der Schwelle" ist die Rechnung trotzdem richtig — und das ist die Frage, die zählt. */
+const KO_PUFFER_ENG = 12;     // Prozent — darunter wird es ernst
+const KO_PUFFER_KRITISCH = 6; // Prozent — darunter ist es eine Handlung, keine Warnung
+
+function hebelLage(pos, basisRow, eurusd){
+  if (!pos || pos.ko == null || !basisRow) return null;
+  const basisKurs = basisRow.kurs;
+  if (basisKurs == null || !isFinite(basisKurs)) return null;
+  const ko = Number(pos.ko);
+  if (!isFinite(ko) || ko <= 0) return null;
+  const lang = (pos.hebel_richtung || 'long') === 'long';
+  const abstand = lang ? basisKurs - ko : ko - basisKurs;
+  if (abstand <= 0) return {ausgeknockt: true, basisKurs, ko, lang};
+  const ratio = (pos.ratio != null && Number(pos.ratio) > 0) ? Number(pos.ratio) : 1;
+  const scheinBasis = abstand / ratio;          // in der Währung des Basiswerts
+  const rw = basisRow.waehrung === 'EUR' ? 'EUR' : 'USD';
+  const pw = posWaehrung(pos);
+  let schein = scheinBasis;
+  if (pw !== rw && eurusd) schein = pw === 'EUR' ? scheinBasis / eurusd : scheinBasis * eurusd;
+  return {
+    ausgeknockt: false, basisKurs, ko, lang, ratio,
+    schein,
+    hebel: basisKurs / abstand,
+    puffer_pct: abstand / basisKurs * 100,
+  };
+}
+
 function bewertePosition(pos){
   const row = scanRow(pos.sym);
   const live = L.get(pos.sym) || (row ? L.get(row.instrument) : null);
   const roh = live ? live.p : (row ? row.kurs : null);
-  const kurs = inPositionsWaehrung(row, roh, pos);
+  let kurs = inPositionsWaehrung(row, roh, pos);
   const w = posWaehrung(pos);
+
+  /* Ein Schein mit Knock-out wird aus seinem Basiswert gerechnet, nicht geschaetzt.
+     Der Basiswert hat einen Livekurs — damit hat der Schein auch einen. */
+  let hebel = null;
+  if (pos.ko != null){
+    const bv = basisVon(pos);
+    const brow = bv && bv.sym ? scanRow(bv.sym) : null;
+    if (brow){
+      const bl = L.get(brow.instrument);
+      const browLive = bl ? {...brow, kurs: bl.p} : brow;
+      hebel = hebelLage(pos, browLive, (brow.eurusd || (S && S.eurusd)));
+      if (hebel && !hebel.ausgeknockt) kurs = hebel.schein;
+      if (hebel) hebel.basisName = brow.name || bv.sym;
+      if (hebel) hebel.basisSym = bv.sym;
+    }
+  }
   /* Nicht alles im Depot steht im Scan: ein ETF, ein Turbo-Zertifikat, ein
      ausgelisteter Coin. Fuer die gibt es keinen Kurs — und ohne Kurs stand die Position
      vorher mit leerem Wert da, als waere sie nichts wert. Deshalb duerfen Wert und
@@ -2281,7 +2350,7 @@ function bewertePosition(pos){
     }
   }
   return {pos, row, kurs, wert, einstand, gv, gvPct, r, score, urteil, kl,
-          live: !!live, w, basis, halt};
+          live: !!live, w, basis, halt, hebel};
 }
 
 /* ================================================== AUSSTIEGSPLAN
@@ -2576,6 +2645,34 @@ function positionsRat(b){
 
 /* Die Zahlen des Basiswerts — sichtbar getrennt von den Zahlen der Position, damit
    niemand den Stop von TSMC fuer den Stop seines Scheins haelt. */
+/* Die Zahlen, die bei einem Schein wirklich zaehlen: Hebel und Puffer. Der Scheinpreis
+   ist Rechnung, kein Kurs vom Emittenten — das steht auch so da. */
+function hebelKasten(b){
+  const h = b.hebel;
+  if (!h) return '';
+  if (h.ausgeknockt) return `<div class="note-box bad" style="margin:10px 0 0">
+    <span class="nt">Knock-out berührt</span>
+    <p>${esc(h.basisName)} steht bei ${num(h.basisKurs, digits(h.basisKurs))}, die Schwelle
+    lag bei ${num(h.ko, digits(h.ko))}. Der Schein ist damit verfallen.</p></div>`;
+  const eng = h.puffer_pct < KO_PUFFER_ENG;
+  const d = digits(h.basisKurs);
+  return `<div class="note-box ${h.puffer_pct < KO_PUFFER_KRITISCH ? 'bad' : (eng ? 'warn' : '')}"
+    style="margin:10px 0 0">
+    <span class="nt">Hebel · ${esc(h.basisName)}</span>
+    <div class="kpi">
+      <span>Hebel <b>${h.hebel.toFixed(1)}×</b></span>
+      <span>Puffer bis Knock-out <b class="${eng?'dn':'up'}">${h.puffer_pct.toFixed(1).replace('.',',')} %</b></span>
+      <span>Basiswert <b>${num(h.basisKurs,d)}</b></span>
+      <span>Schwelle <b>${num(h.ko,d)}</b></span>
+    </div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">Der Puffer sagt, wie weit
+    ${esc(h.basisName)} fallen darf, bevor der Schein <strong>wertlos verfällt</strong> — nicht
+    ins Minus läuft, sondern weg ist. Ein Stop hilft dagegen nicht, die Schwelle greift auch
+    nachts. Der Scheinpreis hier ist aus Basiswert und Schwelle gerechnet; der Emittent rechnet
+    zusätzlich Aufgeld und Finanzierungskosten, dein Depot zeigt also ein paar Cent daneben.</p>
+  </div>`;
+}
+
 function basisKasten(b){
   const ba = b.basis;
   if (!ba) return `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">
@@ -2640,6 +2737,117 @@ const NACHKAUF_RISIKO_PCT = 0.5;
    oder die Menge auf eine sinnvolle Ordergrösse angehoben. */
 const MIN_ORDER_EUR = 25;
 
+/* ================================== DEPOT AUF BEIDEN GERAETEN GLEICH
+
+   „Das Portfolio, das ich hier auf dem Mac habe, habe ich nicht auf dem Handy. Auf dem
+   Handy habe ich auch noch neue Sachen hinzugefügt. Die müssen verknüpft sein."
+
+   Das Depot liegt bewusst nur im Browser — das Repo ist öffentlich, echte Depotdaten
+   gehören da nicht hin. Der Preis dafür ist genau dieses Problem: zwei Geräte, zwei
+   Speicher, zwei Wahrheiten. Ohne Server lässt sich das nicht automatisch auflösen.
+
+   Was ohne Server geht: den ganzen Stand in einen Code packen, den man von einem Gerät
+   zum anderen schickt — als Text oder als Link. Der Code enthält ALLES, was zu einer
+   Position gehört: Menge, Einstieg, Konto, der gespeicherte Plan mit Stop und Zielen,
+   abgehakte Ziele, von Hand eingetragene Werte. Der alte Text-Export konnte das nicht,
+   er kannte nur vier Spalten.
+
+   Und er überschreibt nicht blind. Beim Einsetzen wird zuerst verglichen und gezeigt,
+   was neu ist und was sich ändert — sonst löscht ein Import vom Mac die Positionen, die
+   nur auf dem Handy stehen. Genau das wäre hier passiert. */
+const DEPOT_CODE_VERSION = 1;
+function depotCode(){
+  const daten = {v: DEPOT_CODE_VERSION, t: Date.now(), p: ladePositionen()};
+  const roh = JSON.stringify(daten);
+  try { return btoa(unescape(encodeURIComponent(roh))); } catch(e){ return roh; }
+}
+function ausDepotCode(text){
+  let s = String(text||'').trim();
+  if (!s) return null;
+  // Auch einen ganzen Link akzeptieren — wer ihn sich selbst schickt, kopiert oft alles.
+  const m = s.match(/[#?&]depot=([^&\s]+)/);
+  if (m) s = decodeURIComponent(m[1]);
+  let roh = s;
+  if (!s.startsWith('{')){
+    try { roh = decodeURIComponent(escape(atob(s.replace(/\s+/g,'')))); } catch(e){ return null; }
+  }
+  let d;
+  try { d = JSON.parse(roh); } catch(e){ return null; }
+  const liste = Array.isArray(d) ? d : (Array.isArray(d.p) ? d.p : null);
+  if (!liste) return null;
+  const sauber = liste.filter(x => x && typeof x.sym === 'string' && x.sym);
+  return sauber.length ? {liste: sauber, zeit: d.t || null} : null;
+}
+/* Schlüssel einer Position: Kürzel UND Konto. Denselben Coin auf zwei Börsen zu halten
+   ist normal, und beim Zusammenführen dürfen die sich nicht gegenseitig auffressen. */
+const posSchluessel = p => String(p.sym||'').toUpperCase() + '|' + String(p.konto||'').toLowerCase();
+function depotVergleich(eingehend){
+  const alt = new Map(ladePositionen().map(p => [posSchluessel(p), p]));
+  const neu = [], geaendert = [], gleich = [];
+  for (const p of eingehend){
+    const vorher = alt.get(posSchluessel(p));
+    if (!vorher) neu.push(p);
+    else if (JSON.stringify(vorher) !== JSON.stringify(p)) geaendert.push(p);
+    else gleich.push(p);
+  }
+  const nurHier = ladePositionen().filter(p =>
+    !eingehend.some(q => posSchluessel(q) === posSchluessel(p)));
+  return {neu, geaendert, gleich, nurHier};
+}
+function depotZusammenfuehren(eingehend){
+  const map = new Map(ladePositionen().map(p => [posSchluessel(p), p]));
+  for (const p of eingehend) map.set(posSchluessel(p), p);
+  speicherePositionen([...map.values()]);
+}
+
+/* Der Vergleich vor dem Einsetzen. Ohne ihn wuerde ein Import vom Mac genau die
+   Positionen loeschen, die nur auf dem Handy stehen — und das ist der Fall, um den es
+   hier ueberhaupt geht. */
+function zeigeDepotVergleich(v, d, ziel){
+  const zeile = (titel, liste, farbe) => liste.length
+    ? `<p style="margin:4px 0 0;font-size:13px"><strong style="color:${farbe}">${titel}
+       (${liste.length})</strong> — ${liste.map(p=>esc(p.sym)).join(', ')}</p>` : '';
+  const alter = d.zeit ? new Date(d.zeit).toLocaleString('de-DE') : 'unbekannt';
+  ziel.innerHTML = `<div class="note-box" style="margin:10px 0 0">
+    <span class="nt">Vergleich · Code vom ${esc(alter)}</span>
+    ${zeile('neu', v.neu, 'var(--up)')}
+    ${zeile('geändert', v.geaendert, 'var(--warn)')}
+    ${zeile('unverändert', v.gleich, 'var(--ink-3)')}
+    ${zeile('nur auf DIESEM Gerät', v.nurHier, 'var(--accent)')}
+    <p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">
+      <strong>Zusammenführen</strong> übernimmt neue und geänderte Positionen und lässt
+      stehen, was es nur hier gibt — das ist fast immer das Richtige.
+      <strong>Ersetzen</strong> macht dieses Gerät exakt zum Abbild des Codes; alles, was
+      hier zusätzlich steht, ist dann weg.</p>
+    <p style="margin:10px 0 0"><button class="btn" id="pf_code_merge">Zusammenführen</button>
+      <button class="link" id="pf_code_replace" style="margin-left:14px">Ersetzen</button></p>
+  </div>`;
+  const fertig = (text) => { zeichnePortfolio();
+    const z = $('pf_code_diff'); if (z) z.innerHTML =
+      `<div class="note-box gut" style="margin:10px 0 0"><span class="nt">Übernommen</span>
+       <p>${esc(text)}</p></div>`; };
+  const m = $('pf_code_merge');
+  if (m) m.addEventListener('click',()=>{ depotZusammenfuehren(d.liste);
+    fertig(`${v.neu.length} neu, ${v.geaendert.length} geändert, ${v.nurHier.length} unangetastet.`); });
+  const r = $('pf_code_replace');
+  if (r) r.addEventListener('click',()=>{ speicherePositionen(d.liste);
+    fertig(`Dieses Gerät führt jetzt genau die ${d.liste.length} Positionen aus dem Code.`); });
+}
+
+/* Ein Link mit #depot=… bringt das Depot direkt mit. Nicht stillschweigend einsetzen —
+   erst zeigen, was sich ändert, dann fragen. */
+function depotAusLink(){
+  const h = String(location.hash || '');
+  if (!h.includes('depot=')) return;
+  const d = ausDepotCode(h);
+  history.replaceState(null, '', location.pathname + location.search);
+  if (!d) return;
+  zeigeTab(3);
+  zeichnePortfolio();
+  const ziel = $('pf_code_diff');
+  if (ziel){ zeigeDepotVergleich(depotVergleich(d.liste), d, ziel); ziel.scrollIntoView({block:'center'}); }
+}
+
 /* Der ausgeschriebene Name einer Position. „OPEUR" steht so im Depot, weil Ozan es dort
    in Euro hält; der Scan kennt denselben Wert als OPUSD und hat den Klarnamen dazu. Ein
    Vorschlag, der „OPEUR ist schwächer als 89 % …" sagt, liest sich wie eine Fehlermeldung. */
@@ -2699,6 +2907,35 @@ function positionsAktion(b, stand){
     return {...basis, art, dringend, titel, menge, euro, text: grund + zusatz};
   };
 
+  /* 0 — der Knock-out. Vor allem anderen.
+
+     Ein Stop schützt vor Verlusten; gegen eine Knock-out-Schwelle schützt er nicht. Wird
+     sie berührt — auch nachts, auch für eine Sekunde — ist der Schein weg, nicht im
+     Minus. Deshalb steht diese Regel vor Stop und Ziel. */
+  if (b.hebel && b.hebel.ausgeknockt){
+    return {...basis, art:'raus', dringend:true, menge:pos.menge, euro:0,
+      titel:'Knock-out berührt — der Schein ist wertlos',
+      text:`${b.hebel.basisName} steht bei ${num(b.hebel.basisKurs, digits(b.hebel.basisKurs))}, `
+        + `die Schwelle lag bei ${num(b.hebel.ko, digits(b.hebel.ko))}. Damit ist das Papier `
+        + 'verfallen. Prüf das im Depot deines Brokers und trag die Position hier aus.'};
+  }
+  if (b.hebel && b.hebel.puffer_pct < KO_PUFFER_KRITISCH){
+    return teil(1.0, `Bis zur Knock-out-Schwelle sind es nur noch `
+      + `${b.hebel.puffer_pct.toFixed(1).replace('.',',')} % im Basiswert `
+      + `(${b.hebel.basisName} bei ${num(b.hebel.basisKurs, digits(b.hebel.basisKurs))}, `
+      + `Schwelle ${num(b.hebel.ko, digits(b.hebel.ko))}). Bei ${b.hebel.hebel.toFixed(1)}× Hebel `
+      + 'ist das eine normale Tagesbewegung. Hier geht es nicht um Gewinn oder Verlust, '
+      + 'sondern um Totalverlust — und dagegen hilft kein Stop, die Schwelle greift auch nachts.',
+      'raus', true, 'Knock-out zu nah — raus');
+  }
+  if (b.hebel && b.hebel.puffer_pct < KO_PUFFER_ENG){
+    return teil(0.5, `Der Puffer bis zur Schwelle ist auf `
+      + `${b.hebel.puffer_pct.toFixed(1).replace('.',',')} % geschmolzen. Bei `
+      + `${b.hebel.hebel.toFixed(1)}× Hebel reicht ein schlechter Tag im Basiswert. Die Hälfte `
+      + 'rausnehmen halbiert das, was ein Knock-out kosten kann, und lässt die These am Leben.',
+      'teilverkauf', true, 'Puffer wird eng — Hälfte raus');
+  }
+
   // 1 + 2 — was der Ausstiegsplan sagt, hat Vorrang. Feste Marken schlagen Einschätzungen.
   const schritt = naechsterSchritt(pos, b.kurs);
   if (schritt && schritt.stufe === 'stop'){
@@ -2715,6 +2952,37 @@ function positionsAktion(b, stand){
   const rs = b.halt && b.halt.rs;
   const klasseName = r && r.klasse === 'aktien' ? 'Aktien' : 'Coins';
 
+  /* ================================================== SCHONFRIST
+
+     „Manchmal gibt es Alarme, wo ich jetzt einsteigen drücke, und dann sagt er in der
+     gleichen Sekunde, ich soll es wieder verkaufen. Sowas geht gar nicht."
+
+     Er hat vollkommen recht, und der Fehler lag hier. Zwei Teile des Systems haben
+     verschiedene Dinge gemessen: das Signal bewertet das Chartbild, das Depot die
+     relative Stärke. Ein Nachzügler mit hübschem Chart bekam ein Kaufsignal — und war
+     im Depot sofort ein Verkaufskandidat.
+
+     An der Wurzel ist das im Scanner behoben: ein Long im schwächsten Viertel seiner
+     Klasse ist gar kein handelbares Signal mehr. Hier kommt der zweite Riegel dazu.
+
+     Eine frisch gekaufte Position mit gültigem Plan wird von der Rangliste in Ruhe
+     gelassen. Was sie begrenzt, ist ihr Stop — dafür ist er da. Erst wenn der Plan
+     durch ist oder die Schonfrist abläuft, redet die Depotbewertung wieder mit.
+
+     Wie lang? Nicht geraten, sondern aus der eigenen Bilanz: das Doppelte der
+     gemessenen Haltedauer dieser Anlageklasse, mindestens drei Tage. Damit bekommen
+     Aktien von selbst mehr Zeit als Coins — was Ozan zu Recht angemahnt hat: „bei
+     Aktien passiert das nicht in zwei, drei Tagen, das dauert länger." */
+  const SCHONFRIST_MIN_H = 72;
+  const schonfristEnde = (() => {
+    if (!pos.seit) return null;                       // vor dieser Änderung eingetragen
+    if (!pos.plan || pos.plan.stop == null) return null; // ohne Plan kein Schutz
+    const dd = dauerFuer(r && r.note, r && r.klasse);
+    const stunden = Math.max(SCHONFRIST_MIN_H, dd ? dd.median_h * 2 : SCHONFRIST_MIN_H);
+    return pos.seit + stunden * 3600 * 1000;
+  })();
+  const inSchonfrist = schonfristEnde != null && Date.now() < schonfristEnde;
+
   /* 3 — die eigene Analyse zeigt in die Gegenrichtung.
 
      Mit zwei Bedingungen, die beim Test am echten Depot dazukamen: das Short-Setup muss
@@ -2723,7 +2991,7 @@ function positionsAktion(b, stand){
      Klasse gehören. Sonst hätte Solana bei +26 % und relativer Stärke 59 halbiert werden
      sollen, nur weil der Scanner kurzfristig nach unten zeigt. Ein Setup ist eine Aussage
      über die nächsten Tage; eine Position, die über Wochen trägt, wirft man dafür nicht weg. */
-  if (r && r.richtung === 'short' && r.handelbar && (rs == null || rs < RS_MITTE)){
+  if (!inSchonfrist && r && r.richtung === 'short' && r.handelbar && (rs == null || rs < RS_MITTE)){
     return teil(0.5, 'Die Analyse sieht hier gerade ein handelbares Setup nach UNTEN, du '
       + `hältst long — und der Wert gehört auch nicht zu den stärkeren seiner Klasse `
       + `(relative Stärke ${rs != null ? rs.toFixed(0) : '—'}). Das ist kein Verkaufsbefehl, `
@@ -2732,7 +3000,7 @@ function positionsAktion(b, stand){
   }
 
   // 4 — Schlusslicht der eigenen Klasse.
-  if (rs != null && rs < RS_SCHWACH){
+  if (!inSchonfrist && rs != null && rs < RS_SCHWACH){
     return teil(1/3, `${posName(b)} ist schwächer als ${(100-rs).toFixed(0)} % der `
       + `gescannten ${klasseName}. Relative Schwäche hält über Wochen eher an, als dass sie `
       + `dreht${b.gvPct!=null&&b.gvPct<0?`. Du liegst hier ${b.gvPct.toFixed(0)} % im Minus — `
@@ -2742,7 +3010,7 @@ function positionsAktion(b, stand){
   }
 
   // 5 — Klumpenrisiko.
-  if (anteil != null && anteil > MAX_GEWICHT){
+  if (!inSchonfrist && anteil != null && anteil > MAX_GEWICHT){
     const runter = (anteil - MAX_GEWICHT) / anteil;
     return teil(runter, `Diese eine Position ist ${anteil.toFixed(0)} % deines Depots. `
       + `Ab ${MAX_GEWICHT} % entscheidet ein einzelner Wert über dein Ergebnis — das ist kein `
@@ -2754,7 +3022,7 @@ function positionsAktion(b, stand){
   const stop = (pos.plan && pos.plan.stop != null) ? pos.plan.stop
              : (r && r.invalidierung != null ? inPositionsWaehrung(r, r.invalidierung, pos) : null);
   const setzt = r && r.handelbar && r.score >= 52 && r.richtung !== 'short';
-  if (rs != null && rs >= RS_FUEHRER && setzt && stop != null && stop < b.kurs
+  if (!inSchonfrist && rs != null && rs >= RS_FUEHRER && setzt && stop != null && stop < b.kurs
       && anteil != null && anteil < ZIEL_GEWICHT && stand && stand.gesamt){
     const risikoJeStueck = b.kurs - stop;
     const ausRisiko = stand.gesamt * (NACHKAUF_RISIKO_PCT/100) / risikoJeStueck
@@ -2776,6 +3044,15 @@ function positionsAktion(b, stand){
 
   // 7 — halten.
   const wohin = schritt && schritt.stufe === 'halten' ? ' ' + schritt.text : '';
+  if (inSchonfrist){
+    const restH = Math.max(1, Math.round((schonfristEnde - Date.now())/3600000));
+    return {...basis, art:'halten', dringend:false, titel:'Halten — der Plan läuft',
+      text:`Frisch gekauft, der Stop steht. Solange der Plan gilt, redet die Rangliste hier `
+        + `nicht rein — sonst würde dir dieselbe App im selben Atemzug Kaufen und Verkaufen `
+        + `sagen. Begrenzt wird das Risiko durch deinen Stop, nicht durch eine Meinung. `
+        + `Noch ${restH < 48 ? restH + ' Stunden' : Math.round(restH/24) + ' Tage'}, `
+        + `dann wird wieder normal bewertet.` + wohin};
+  }
   return {...basis, art:'halten', dringend:false, titel:'Halten — nichts zu tun',
     text:(rs != null ? `Relative Stärke ${rs.toFixed(0)} von 100, kein Anlass zu handeln.`
         : 'Kein Anlass zu handeln.') + wohin};
@@ -2908,6 +3185,7 @@ function zeichnePortfolio(){
         </div>
         <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.headline||'')}</p>`
         : basisKasten(b)}
+        ${hebelKasten(b)}
         ${aktionsKasten(b, stand)}
         ${ratKasten(b)}
         ${ausstiegsKasten(b)}
@@ -2954,8 +3232,39 @@ function zeichnePortfolio(){
         <input id="pf_einstieg" class="val" inputmode="decimal" placeholder="61000" style="width:52%"></div>
       <div class="rowx"><span class="lab">Konto</span>
         <input id="pf_konto" class="val" placeholder="Bybit / Trade Republic" style="width:52%"></div>
+      <div class="rowx"><span class="lab">Basiswert <span style="color:var(--ink-3)">nur bei Schein</span></span>
+        <input id="pf_basis" class="val" placeholder="TSM, NFLX, BTCUSD …" style="width:52%"></div>
+      <div class="rowx"><span class="lab">Knock-out <span style="color:var(--ink-3)">Schwelle im Basiswert</span></span>
+        <input id="pf_ko" class="val" inputmode="decimal" placeholder="148,20" style="width:52%"></div>
+      <div class="rowx"><span class="lab">Bezugsverhältnis</span>
+        <input id="pf_ratio" class="val" inputmode="decimal" placeholder="1" style="width:52%"></div>
+      <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Bei einem Turbo reichen
+      <strong>Basiswert und Knock-out</strong> — Hebel, Scheinpreis und der Puffer bis zur
+      Schwelle werden daraus gerechnet. Den Hebel musst du nicht eintragen, er ergibt sich.</p>
       <p style="margin:11px 0 0"><button class="btn" id="pf_add">Hinzufügen</button>
         ${bew.length?` <button class="link" id="pf_clear" style="margin-left:12px">alle löschen</button>`:''}</p>
+    </div>
+
+    <h2>Mac und iPhone gleich halten</h2>
+    <div class="karte">
+      <p style="margin:0 0 9px;font-size:13px;color:var(--ink-2)">Das Depot liegt in
+      jedem Browser einzeln — deshalb steht auf dem Handy etwas anderes als hier. Mit
+      diesem Code schickst du den ganzen Stand von einem Gerät zum anderen: Menge,
+      Einstieg, Konto, Stop, Ziele, abgehakte Ziele. <strong>Wo du zuletzt etwas
+      eingetragen hast, dort erzeugst du den Code</strong> — und setzt ihn auf dem anderen
+      Gerät ein.</p>
+      <p style="margin:0 0 9px">
+        <button class="btn" id="pf_code_zeigen">Code von diesem Gerät erzeugen</button>
+        <button class="link" id="pf_code_link" style="margin-left:14px">als Link</button></p>
+      <textarea id="pf_code_aus" rows="3" spellcheck="false" style="display:none"
+        placeholder="hier erscheint der Code"></textarea>
+      <div id="pf_code_hinweis"></div>
+      <p style="margin:14px 0 6px;font-size:13px;color:var(--ink-2)">Code vom anderen
+      Gerät einsetzen:</p>
+      <textarea id="pf_code_ein" rows="3" spellcheck="false"
+        placeholder="Code oder Link hier einfügen"></textarea>
+      <p style="margin:10px 0 0"><button class="btn" id="pf_code_pruefen">Vergleichen</button></p>
+      <div id="pf_code_diff"></div>
     </div>
 
     <h2>Ganzes Depot auf einmal</h2>
@@ -3018,12 +3327,46 @@ function zeichnePortfolio(){
     const einstieg = parseFloat(($('pf_einstieg').value||'').replace(',','.'));
     if (!sym || !isFinite(menge) || menge <= 0) return;
     const a = ladePositionen().filter(p=>p.sym!==sym);
+    const zahl = (id) => { const v = parseFloat((($(id)||{}).value||'').replace(',','.'));
+                           return isFinite(v) ? v : null; };
+    const basisFeld = (($('pf_basis')||{}).value||'').trim().toUpperCase();
     a.push({sym, menge, einstieg: isFinite(einstieg)?einstieg:null,
-            konto: ($('pf_konto').value||'').trim()});
+            konto: ($('pf_konto').value||'').trim(), seit: Date.now(),
+            ...(basisFeld ? {basis: basisFeld} : {}),
+            ...(zahl('pf_ko') != null ? {ko: zahl('pf_ko')} : {}),
+            ...(zahl('pf_ratio') != null ? {ratio: zahl('pf_ratio')} : {})});
     speicherePositionen(a); zeichnePortfolio();
   });
   const clear = $('pf_clear');
   if (clear) clear.addEventListener('click',()=>{ speicherePositionen([]); zeichnePortfolio(); });
+
+  /* Depot von Geraet zu Geraet — erzeugen, vergleichen, zusammenfuehren. */
+  const zeigeCode = (alsLink) => {
+    const code = depotCode();
+    const feld = $('pf_code_aus');
+    const wert = alsLink ? (location.origin + location.pathname + '#depot=' + code) : code;
+    feld.style.display = ''; feld.value = wert; feld.select();
+    let kopiert = false;
+    try { kopiert = document.execCommand('copy'); } catch(e){}
+    if (navigator.clipboard) { navigator.clipboard.writeText(wert).then(()=>{}, ()=>{}); kopiert = true; }
+    $('pf_code_hinweis').innerHTML = `<p style="margin:8px 0 0;font-size:12.5px;color:${kopiert?'var(--up)':'var(--ink-2)'}">
+      ${kopiert ? 'Kopiert' : 'Markiert'} — ${ladePositionen().length} Position(en).
+      ${alsLink ? 'Schick dir den Link selbst (Nachricht, AirDrop) und öffne ihn auf dem anderen Gerät.'
+                : 'Auf dem anderen Gerät unten einsetzen und vergleichen.'}</p>`;
+  };
+  const cz = $('pf_code_zeigen'); if (cz) cz.addEventListener('click',()=>zeigeCode(false));
+  const cl = $('pf_code_link');   if (cl) cl.addEventListener('click',()=>zeigeCode(true));
+  const cp = $('pf_code_pruefen');
+  if (cp) cp.addEventListener('click',()=>{
+    const d = ausDepotCode($('pf_code_ein').value || '');
+    const ziel = $('pf_code_diff');
+    if (!d){ ziel.innerHTML = `<div class="note-box bad" style="margin:10px 0 0">
+      <span class="nt">Kein gültiger Code</span><p>Das war weder ein Depot-Code noch ein
+      Link daraus. Auf dem anderen Gerät oben „Code erzeugen" drücken und den ganzen Text
+      kopieren.</p></div>`; return; }
+    const v = depotVergleich(d.liste);
+    zeigeDepotVergleich(v, d, ziel);
+  });
 
   const imp = $('pf_import');
   if (imp) imp.addEventListener('click',()=>{
@@ -3583,6 +3926,39 @@ function stoerungsBanner(){
    scheitert es sonst, ohne dass irgendeine Fehlermeldung erscheint.
    ===================================================================== */
 const VAPID = '__VAPID__';
+
+/* ================================= BEIDE GERAETE, DIESELBE APP
+
+   „Auf meinem Laptop zeigt er mir andere Sachen an als auf meinem Handy. Auch andere
+   Alarme. Habe ich da jetzt einen Fehler gemacht, dass ich Bitcoin verkauft habe, weil
+   es auf dem Handy stand, aber auf dem Laptop gar nicht?"
+
+   Nein, den Fehler hatte die App. Ein Browser haelt eine einmal geladene Seite fest —
+   vom Home-Bildschirm aus oft tagelang. Auf dem einen Geraet lief damit eine Fassung
+   mit anderen Regeln als auf dem anderen, und beide zeigten ihre eigenen Alarme. Dass
+   daraus ein echter Verkauf wurde, ist der teuerste Ausfall dieses Projekts bisher.
+
+   Die gebaute Seite legt jetzt ihre Kennung daneben (``version.json``). Bei jedem Scan
+   vergleicht die App ihre eigene damit. Weichen sie ab, laedt sie sich einmal neu —
+   einmal, nicht in einer Schleife. Danach laufen beide Geraete auf demselben Code. */
+const BAUKENNUNG = '__BAUKENNUNG__';
+let _neuladeVersuch = false;
+async function pruefeFassung(){
+  try {
+    const r = await fetch('version.json?v=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) return;
+    const v = await r.json();
+    if (!v || !v.bau || v.bau === BAUKENNUNG) return;
+    if (_neuladeVersuch) return;
+    _neuladeVersuch = true;
+    // Der Service Worker haelt die alte Seite sonst weiter fest.
+    try {
+      if ('caches' in window) (await caches.keys()).forEach(k => caches.delete(k));
+    } catch(e){}
+    try { sessionStorage.setItem('desk.neugeladen', v.bau); } catch(e){}
+    location.reload();
+  } catch(e){}
+}
 
 function b64url(buf){
   const b = String.fromCharCode.apply(null, new Uint8Array(buf));
@@ -4365,7 +4741,7 @@ function kaufDialog(sym, mengeVorschlag, kursVorschlag){
     const a = ladePositionen().filter(p=>p.sym !== sym);
     a.push({sym, menge, einstieg: isFinite(kurs)?kurs:null,
             konto: (document.getElementById('k_konto').value||'').trim(),
-            plan, erledigt: []});
+            plan, erledigt: [], seit: Date.now()});
     speicherePositionen(a);
     zu();
     zeichnePortfolio();
@@ -4588,6 +4964,7 @@ function start(){
   zeichneNews();
   $('chartansicht').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
   $('analyse').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
+  depotAusLink();
   const t = parseInt((location.hash||'').replace('#',''), 10);
   zeigeTab(isFinite(t) && t>=0 && t<TABS.length ? t : 0);
   ladeScan();
