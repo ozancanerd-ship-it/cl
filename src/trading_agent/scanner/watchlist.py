@@ -254,11 +254,51 @@ class Wachliste:
         from trading_agent.scanner.exposure import Grenzen, pruefe
 
         neu: list[Ereignis] = []
-        # Wie viel darf ueberhaupt noch dazukommen? Am 11. September standen 40
-        # Positionen gleichzeitig offen, 22 davon dieselbe Krypto-Wette; am 9. wurden
-        # elf an einem Tag ausgestoppt. Der Deckel greift VOR der Aufnahme, nicht
-        # hinterher — hinterher ist er nur eine Statistik.
-        grenzen = Grenzen()
+        """Wie viel darf ueberhaupt noch dazukommen?
+
+        Am 11. September standen 40 Positionen gleichzeitig offen, 22 davon dieselbe
+        Krypto-Wette; am 9. wurden elf an einem Tag ausgestoppt. Der Deckel greift
+        deshalb VOR der Aufnahme, nicht hinterher.
+
+        ABER: hier stand bis zum 17.09. ``Grenzen()`` — also der Deckel fuer ein ECHTES
+        Depot: hoechstens acht offene Positionen. Die Wachliste ist aber kein Depot,
+        sondern die Beobachtungsliste, aus der die Kaufsignale entstehen. Der Effekt war
+        verheerend und hat lange niemand gesehen:
+
+        Am 17.09. standen sechs Wachen auf "aktiv" — seit dem 13. und 15. September, ohne
+        Stop und ohne Ziel zu treffen. Damit waren sechs der acht Plaetze belegt, bei
+        Long sogar fuenf von sechs. Der Scanner fand weiter Setups, nur aufgenommen
+        wurde fast keines mehr, und was nicht aufgenommen wird, kann auch nie einen
+        Einstiegsalarm ausloesen. Ozans Beobachtung "ich kriege keine Kaufsignale" war
+        also voellig richtig, und die Ursache war dieser Deckel — nicht die Zustellung.
+
+        Beobachten kostet nichts. Was Geld kostet, ist KAUFEN, und darueber entscheidet
+        Ozan; das Depot hat seine eigenen Grenzen im Portfolio-Reiter (Klumpen,
+        Buendel, Hebel). Die Beobachtungsliste bekommt deshalb eigene, weite Grenzen.
+        Gegen Flut schuetzt nicht der Deckel, sondern die Notenschwelle: gemeldet wird
+        erst ab A-, und das bleibt so.
+        """
+        grenzen = Grenzen(
+            max_offen=24,
+            max_je_klasse=14,
+            max_je_richtung=18,
+            # Zwoelf gleichgerichtete Setups derselben Klasse duerfen beobachtet werden.
+            # Dass zwoelf Kryptolongs im Kern EINE Wette sind, ist wahr — aber das ist
+            # eine Aussage ueber das Depot, und dort steht sie auch: der Portfolio-Reiter
+            # misst den Gleichlauf und raet vom Nachlegen ins selbe Buendel ab. Die
+            # Beobachtungsliste deshalb blind zu machen, hilft niemandem.
+            max_je_buendel=12,
+            max_risiko_pct=12.0,
+            # Die Regel, die tatsaechlich zugeschlagen hat. Mit den Depotwerten
+            # (25 % je Position, 100 % gesamt) ist die Liste schon bei VIER Wachen
+            # "voll investiert" — ab der fuenften lautete die Antwort woertlich:
+            # "Das Kapital ist ausgelastet. Mehr ginge nur auf Kredit." Fuer eine
+            # Beobachtungsliste ist das sinnlos: Beobachten bindet kein Kapital.
+            # 4 % je Wache mal 24 Plaetze ergibt 96 % — die Regel bindet damit nie,
+            # bevor einer der echten Deckel oben greift.
+            max_anteil_je_position=0.04,
+            max_anteil_gesamt=1.0,
+        )
         laufend: list[dict[str, Any]] = [
             {"klasse": v.klasse, "richtung": v.richtung}
             for v in self.wachen.values()
@@ -291,8 +331,9 @@ class Wachliste:
                 continue
             # Ein Setup, fuer das kein Platz mehr ist, wird gar nicht erst aufgenommen.
             # Es bleibt in der Rangliste sichtbar — es klingelt nur nicht.
-            if not pruefe({"klasse": z.get("klasse"), "richtung": z.get("richtung")},
-                          laufend, grenzen).ja:
+            if not pruefe(
+                {"klasse": z.get("klasse"), "richtung": z.get("richtung")}, laufend, grenzen
+            ).ja:
                 continue
             setup = z.get("setup") or {}
             # Die Ziele kommen aus dem Handelsplan, nicht roh aus der Liquiditaetsliste.
@@ -326,6 +367,12 @@ class Wachliste:
                 continue
             ersetzt = alt_einstieg.get(name)
             self.wachen[name] = w
+            # Was gerade aufgenommen wurde, zaehlt ab sofort mit. Vorher wurde
+            # ``laufend`` einmal VOR der Schleife gebaut und nie fortgeschrieben — der
+            # Deckel sah also nur die bereits aktiven Wachen und konnte einen einzelnen
+            # Scan-Durchgang gar nicht begrenzen. Zusammen mit der Kapitalregel ergab
+            # das die schlechteste aller Kombinationen: entweder alles oder nichts.
+            laufend.append({"klasse": w.klasse, "richtung": w.richtung})
             sofort = w.einstieg_art == "sofort"
             neu.append(
                 Ereignis(
