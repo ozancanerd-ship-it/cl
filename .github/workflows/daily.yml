@@ -292,11 +292,25 @@ jobs:
           git config user.email "trading-agent@users.noreply.github.com"
           # Der Alarm-Stand MUSS mit. Ohne ihn faengt jeder Lauf bei null an und meldet
           # alles neu — genau der Spam, den wir nicht wollen.
-          git add -f data/repository_real/live/tsmom_forward.jsonl \
-                     data/repository_real/live/tsmom_forward_corrections.jsonl \
-                     data/repository_real/live/scan_alert_state.json \
-                     data/repository_real/live/watchlist.json \
-                     data/repository_real/live/depot_alarme.json || true
+          # EINZELN hinzufuegen, nicht in einem Aufruf.
+          #
+          # Am 16.09. kam depot_alarme.json in diese Liste. Die Datei entsteht aber erst,
+          # wenn der Depot-Waechter das erste Mal etwas zu melden hat. Bis dahin brach
+          # `git add` mit "pathspec ... did not match any files" ab — und zwar KOMPLETT:
+          # keine der anderen Dateien wurde vorgemerkt. Danach meldete der Schritt brav
+          # "kein neuer Stand" und der Lauf blieb gruen.
+          #
+          # Die Folge war der schlimmste denkbare stille Ausfall: die Wachliste wurde
+          # sechzehn Stunden lang nicht mehr fortgeschrieben. Jeder Lauf startete wieder
+          # vom Stand des Vorabends, nahm nichts Neues auf und meldete nichts. Von aussen
+          # sah alles gruen aus.
+          for f in data/repository_real/live/tsmom_forward.jsonl \
+                   data/repository_real/live/tsmom_forward_corrections.jsonl \
+                   data/repository_real/live/scan_alert_state.json \
+                   data/repository_real/live/watchlist.json \
+                   data/repository_real/live/depot_alarme.json; do
+            if [ -f "$f" ]; then git add -f "$f"; else echo "  (noch nicht vorhanden: $f)"; fi
+          done
           if git diff --cached --quiet; then
             echo "kein neuer Stand — nichts zu sichern"
             exit 0
