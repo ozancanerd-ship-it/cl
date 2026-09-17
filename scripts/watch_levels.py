@@ -121,6 +121,13 @@ async def _extrema(
                 continue
             bars = [b for b in bars if b is not None]
             if not bars:
+                # Frueher ein stilles ``continue``. Im Lauf stand dann "Kurse fuer 2 von
+                # 6 Werten" und sonst nichts — vier ueberwachte Werte waren unbemerkt aus
+                # der Pruefung gefallen. Bei Aktien ausserhalb der Boersenzeit ist das
+                # normal (keine Umsaetze, keine Kerzen); bei Krypto ist es ein echter
+                # Ausfall. Beides gehoert ins Protokoll, sonst sieht ein blinder
+                # Waechter aus wie ein ruhiger Markt.
+                print(f"  {name:<14} keine Kerzen im Fenster — nicht geprueft")
                 continue
             aus[name] = {
                 "hoch": max(float(b.high) for b in bars),
@@ -255,7 +262,12 @@ async def main() -> int:
         seit = _seit(stand, jetzt)
         print(f"Fenster: {seit:%d.%m. %H:%M} – {jetzt:%H:%M} UTC")
         kurse, reihen = await _extrema(je_klasse, seit, jetzt)
+        fehlend = [w.instrument for w in offen if w.instrument not in kurse]
         print(f"Kurse fuer {len(kurse)} von {len(offen)} Werten")
+        if fehlend:
+            # Sichtbar, nicht versteckt: diese Werte haben in diesem Durchgang KEINE
+            # Ueberwachung bekommen. Ein Stop auf einem davon wuerde jetzt nicht melden.
+            print(f"::warning::ohne Kurs und damit ungeprueft: {', '.join(sorted(fehlend))}")
         ereignisse += liste.pruefen(kurse, jetzt=jetzt, kerzen=reihen)
         _raeume_zombies(liste, kurse, jetzt)
 
