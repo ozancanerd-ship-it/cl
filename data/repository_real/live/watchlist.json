@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-19T02:39:35.013933+00:00",
+  "stand": "2026-09-19T02:52:36.367604+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-09-17T13:59:12.818905+00:00",
@@ -29,13 +29,14 @@
     },
     "ADAUSD": {
       "aufgenommen": "2026-09-17T13:05:13.117819+00:00",
-      "bestes_r": 3.06,
+      "bestes_r": 3.47,
       "einstieg": 0.20006,
       "einstieg_art": "sofort",
       "einstiegskurs": 0.200687,
       "erreicht": [
         "TP1",
-        "TP2"
+        "TP2",
+        "TP3"
       ],
       "erwartet_pct": 7.66,
       "instrument": "ADAUSD",
@@ -53,8 +54,8 @@
       "tp2": 0.224821,
       "tp3": 0.2346749999999999,
       "trigger": "Der Kurs muss ueber 0.1922 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
+      "zustand": "ziel_erreicht"
     },
     "AEROUSD": {
       "aufgenommen": "2026-09-18T16:27:28.281411+00:00",
@@ -79,7 +80,7 @@
       "tp2": 0.7294,
       "tp3": 0.7867000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.6507 — nicht beim Antippen.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "aktiv"
     },
     "AMD": {
@@ -452,7 +453,7 @@
       "tp2": 752.91,
       "tp3": 777.48,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "aktiv"
     },
     "BNBUSDT": {
@@ -691,7 +692,7 @@
       "tp2": 0.3665,
       "tp3": 0.37987499999999996,
       "trigger": "Der Kurs muss ueber 0.3091 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "aktiv"
     },
     "DASHUSDT": {
@@ -734,7 +735,7 @@
       "richtung": "long",
       "rr": 2.99,
       "rs": 65.5,
-      "schlechtestes_r": -0.24,
+      "schlechtestes_r": -0.28,
       "score": 48.5,
       "setup": "Ausbruch aus der Basis",
       "stop": 17.052,
@@ -743,7 +744,7 @@
       "tp2": 19.708,
       "tp3": 20.044499999999996,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 17.4870 — nicht beim Antippen.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "aktiv"
     },
     "DCRUSDT": {
@@ -934,7 +935,7 @@
       "tp2": 2718.8,
       "tp3": 2763.7749999999996,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 2 613.9900 — nicht beim Antippen.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ETHUSDT": {
@@ -1252,7 +1253,7 @@
       "tp2": 60.58,
       "tp3": 61.32,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 55.9800 — nicht beim Antippen.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "aktiv"
     },
     "LUNAUSDT": {
@@ -1332,32 +1333,6 @@
       "trigger": "",
       "zuletzt": "2026-09-18T20:40:19.485526+00:00",
       "zustand": "wartet_auf_einstieg"
-    },
-    "MSFT": {
-      "aufgenommen": "2026-09-05T11:07:26.357698+00:00",
-      "bestes_r": 0.07,
-      "einstieg": 497.5,
-      "einstieg_art": "Ruecklauf in OB H1",
-      "einstiegskurs": 497.5,
-      "erreicht": [],
-      "erwartet_pct": 11.65,
-      "instrument": "MSFT",
-      "klasse": "aktien",
-      "note": "A+",
-      "richtung": "long",
-      "rr": 2.85,
-      "rs": null,
-      "schlechtestes_r": -0.57,
-      "score": 80.1,
-      "setup": "",
-      "stop": 477.1499938964844,
-      "these": "",
-      "tp1": 513.5,
-      "tp2": 555.4500122070312,
-      "tp3": null,
-      "trigger": "",
-      "zuletzt": "2026-09-13T14:56:21.843904+00:00",
-      "zustand": "abgelaufen"
     },
     "MSTR": {
       "aufgenommen": "2026-09-05T11:07:26.357698+00:00",
@@ -2394,7 +2369,7 @@
       "tp2": 581.7299999999999,
       "tp3": 616.0949999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 527.1700 — nicht beim Antippen.",
-      "zuletzt": "2026-09-19T02:39:19.248775+00:00",
+      "zuletzt": "2026-09-19T02:52:20.681698+00:00",
       "zustand": "aktiv"
     },
     "XOM": {
