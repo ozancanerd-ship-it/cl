@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-21T13:31:21.884849+00:00",
+  "stand": "2026-09-21T13:44:32.974967+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-09-17T13:59:12.818905+00:00",
@@ -102,7 +102,7 @@
       "tp2": 0.288532,
       "tp3": 0.2955235,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.2350 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "AEROUSD": {
@@ -128,7 +128,7 @@
       "tp2": 0.7294,
       "tp3": 0.7867000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.6507 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
     },
     "AMD": {
@@ -232,7 +232,7 @@
       "tp2": 1.9822000000000004,
       "tp3": 2.1373000000000006,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 1.7830 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
     },
     "ATOMUSDT": {
@@ -440,7 +440,7 @@
       "tp2": 824.24,
       "tp3": 862.6700000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 773.4000 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
     },
     "BNBUSDT": {
@@ -574,30 +574,30 @@
       "zustand": "abgelaufen"
     },
     "COP": {
-      "aufgenommen": "2026-09-17T13:05:13.117819+00:00",
-      "bestes_r": 0.74,
-      "einstieg": 131.10000610351562,
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 125.88999938964844,
       "einstieg_art": "Ruecklauf in FVG H4",
-      "einstiegskurs": 131.10000610351562,
+      "einstiegskurs": null,
       "erreicht": [],
-      "erwartet_pct": 8.02,
+      "erwartet_pct": 5.91,
       "instrument": "COP",
       "klasse": "aktien",
       "note": "A",
       "richtung": "long",
-      "rr": 3.39,
-      "rs": 91.2,
-      "schlechtestes_r": -0.04,
-      "score": 75.0,
+      "rr": 2.73,
+      "rs": 74.7,
+      "schlechtestes_r": 0.0,
+      "score": 87.4,
       "setup": "Ruecksetzer im Trend",
-      "stop": 128.0,
+      "stop": 123.84373640331461,
       "these": "Aufwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
-      "tp1": 136.32000732421875,
-      "tp2": 141.6199951171875,
-      "tp3": 143.1699981689453,
+      "tp1": 127.93626237598227,
+      "tp2": 131.47999572753906,
+      "tp3": 133.3300018310547,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T02:53:14.081808+00:00",
-      "zustand": "abgelaufen"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "COST": {
       "aufgenommen": "2026-09-20T07:43:36.742681+00:00",
@@ -622,8 +622,8 @@
       "tp2": 852.5,
       "tp3": 836.9774475097656,
       "trigger": "",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "CRVUSD": {
       "aufgenommen": "2026-09-17T14:29:53.427275+00:00",
@@ -651,8 +651,34 @@
       "tp2": 0.3665,
       "tp3": 0.37987499999999996,
       "trigger": "Der Kurs muss ueber 0.3091 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
+    },
+    "CVX": {
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 203.8354949951172,
+      "einstieg_art": "Ruecklauf in FVG H4",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 3.96,
+      "instrument": "CVX",
+      "klasse": "aktien",
+      "note": "B+",
+      "richtung": "long",
+      "rr": 2.0,
+      "rs": 77.8,
+      "schlechtestes_r": 0.0,
+      "score": 70.2,
+      "setup": "Ruecksetzer im Trend",
+      "stop": 197.82000732421875,
+      "these": "Aufwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
+      "tp1": 211.89999389648438,
+      "tp2": 215.86647033691406,
+      "tp3": 224.88970184326172,
+      "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "DCRUSD": {
       "aufgenommen": "2026-09-19T02:13:01.962063+00:00",
@@ -677,8 +703,34 @@
       "tp2": 19.708,
       "tp3": 20.044499999999996,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 17.4870 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
+    },
+    "DE": {
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 682.7899780273438,
+      "einstieg_art": "Ruecklauf in FVG M15",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 3.38,
+      "instrument": "DE",
+      "klasse": "aktien",
+      "note": "B+",
+      "richtung": "long",
+      "rr": 2.0,
+      "rs": 86.6,
+      "schlechtestes_r": 0.0,
+      "score": 74.0,
+      "setup": "Ruecksetzer im Trend",
+      "stop": 665.4500122070312,
+      "these": "Aufwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
+      "tp1": 705.8800048828125,
+      "tp2": 717.4699096679688,
+      "tp3": 743.4798583984375,
+      "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "DOTUSD": {
       "aufgenommen": "2026-09-21T10:57:24.820854+00:00",
@@ -703,7 +755,7 @@
       "tp2": 1.3447,
       "tp3": 1.37305,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 1.1715 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
     },
     "DRVUSD": {
@@ -785,7 +837,7 @@
       "tp2": 9.6515,
       "tp3": 9.980500000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 8.7660 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "aktiv"
     },
     "ETHUSD": {
@@ -811,7 +863,7 @@
       "tp2": 2718.8,
       "tp3": 2775.0,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 2 665.0000 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ETHUSDT": {
@@ -915,7 +967,33 @@
       "tp2": 281.80999755859375,
       "tp3": 267.51499938964844,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
+    },
+    "HON": {
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 208.22999572753906,
+      "einstieg_art": "Ruecklauf in FVG H4",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 5.94,
+      "instrument": "HON",
+      "klasse": "aktien",
+      "note": "A",
+      "richtung": "short",
+      "rr": 2.48,
+      "rs": 24.0,
+      "schlechtestes_r": 0.0,
+      "score": 85.0,
+      "setup": "Ruecksetzer im Trend",
+      "stop": 213.240917746793,
+      "these": "Abwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
+      "tp1": 198.2971649169922,
+      "tp2": 195.79170390736522,
+      "tp3": 189.90504455566406,
+      "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "HYPEUSD": {
@@ -993,8 +1071,8 @@
       "tp2": 243.67999267578125,
       "tp3": 258.2799987792969,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "ICPUSD": {
       "aufgenommen": "2026-09-13T18:22:43.002459+00:00",
@@ -1071,7 +1149,7 @@
       "tp2": 0.04928,
       "tp3": 0.050485,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.0409 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "LINKUSD": {
@@ -1153,32 +1231,30 @@
       "zustand": "wartet_auf_einstieg"
     },
     "LMT": {
-      "aufgenommen": "2026-09-17T14:45:01.976454+00:00",
-      "bestes_r": 0.88,
-      "einstieg": 537.3599853515625,
-      "einstieg_art": "Ruecklauf in FVG M15",
-      "einstiegskurs": 534.8150024414062,
-      "erreicht": [
-        "TP1"
-      ],
-      "erwartet_pct": 7.98,
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 534.5,
+      "einstieg_art": "Ruecklauf in FVG H4",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 7.49,
       "instrument": "LMT",
       "klasse": "aktien",
       "note": "A",
       "richtung": "short",
-      "rr": 2.63,
-      "rs": 27.9,
-      "schlechtestes_r": -0.27,
-      "score": 77.0,
+      "rr": 2.74,
+      "rs": 29.1,
+      "schlechtestes_r": 0.0,
+      "score": 71.7,
       "setup": "Ruecksetzer im Trend",
-      "stop": 553.6804583156999,
+      "stop": 552.3845821007717,
       "these": "Abwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
-      "tp1": 521.0395123874251,
-      "tp2": 494.4599914550781,
-      "tp3": 480.2383299770817,
+      "tp1": 494.4599914550781,
+      "tp2": 485.5177004046923,
+      "tp3": 471.90396264729907,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T02:53:14.081808+00:00",
-      "zustand": "abgelaufen"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "LTCUSD": {
       "aufgenommen": "2026-09-18T16:39:46.099583+00:00",
@@ -1523,8 +1599,8 @@
       "tp2": 50.53255081176758,
       "tp3": 49.16999816894531,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "QNTUSD": {
       "aufgenommen": "2026-09-20T05:38:59.398206+00:00",
@@ -1601,8 +1677,8 @@
       "tp2": 54.45000076293945,
       "tp3": 55.5432419646898,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "SOLUSD": {
       "aufgenommen": "2026-09-21T11:28:35.692597+00:00",
@@ -1627,7 +1703,7 @@
       "tp2": 124.00999999999999,
       "tp3": 130.67,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 114.3000 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "SPOT": {
@@ -1731,8 +1807,8 @@
       "tp2": 170.75,
       "tp3": 179.4837413469316,
       "trigger": "",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "TIAUSD": {
       "aufgenommen": "2026-09-21T13:19:44.174610+00:00",
@@ -1757,7 +1833,7 @@
       "tp2": 0.4932,
       "tp3": 0.5246,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.4334 — nicht beim Antippen.",
-      "zuletzt": "2026-09-21T13:31:08.247319+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "TMUS": {
@@ -1835,8 +1911,8 @@
       "tp2": 476.7900085449219,
       "tp3": 484.63002014160156,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "UNH": {
       "aufgenommen": "2026-09-20T07:43:36.742681+00:00",
@@ -1861,8 +1937,8 @@
       "tp2": 402.3999938964844,
       "tp3": 416.9904031319143,
       "trigger": "",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
     },
     "UNIUSD": {
       "aufgenommen": "2026-09-17T15:13:02.698739+00:00",
@@ -1917,60 +1993,60 @@
       "tp2": 267.3800048828125,
       "tp3": 256.8399963378906,
       "trigger": "",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
+      "zustand": "abgelaufen"
+    },
+    "UPS": {
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
+      "bestes_r": 0.0,
+      "einstieg": 99.5999984741211,
+      "einstieg_art": "Ruecklauf in FVG H1",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 3.63,
+      "instrument": "UPS",
+      "klasse": "aktien",
+      "note": "A",
+      "richtung": "short",
+      "rr": 2.5,
+      "rs": 41.9,
+      "schlechtestes_r": 0.0,
+      "score": 70.5,
+      "setup": "Ruecksetzer im Trend",
+      "stop": 101.05000305175781,
+      "these": "Abwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
+      "tp1": 96.95999908447266,
+      "tp2": 95.9800033569336,
+      "tp3": 94.52498245239258,
+      "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "VRTX": {
-      "aufgenommen": "2026-09-20T07:43:36.742681+00:00",
+      "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
       "bestes_r": 0.0,
-      "einstieg": 507.260009765625,
-      "einstieg_art": "Ruecklauf in FVG M15",
+      "einstieg": 489.9200134277344,
+      "einstieg_art": "Ruecklauf in FVG H4",
       "einstiegskurs": null,
       "erreicht": [],
-      "erwartet_pct": 4.92,
+      "erwartet_pct": 8.64,
       "instrument": "VRTX",
       "klasse": "aktien",
-      "note": "B+",
+      "note": "A+",
       "richtung": "long",
-      "rr": 2.89,
-      "rs": 53.6,
+      "rr": 2.0,
+      "rs": 37.5,
       "schlechtestes_r": 0.0,
-      "score": 68.0,
+      "score": 74.4,
       "setup": "Ruecksetzer im Trend",
-      "stop": 490.5290653416076,
+      "stop": 486.50745422294864,
       "these": "Aufwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
-      "tp1": 532.22998046875,
-      "tp2": 555.6900024414062,
-      "tp3": 565.818315249686,
+      "tp1": 493.3325726325201,
+      "tp2": 496.74513183730585,
+      "tp3": 501.8639706444844,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-20T07:43:36.742681+00:00",
+      "zuletzt": "2026-09-21T13:44:17.386326+00:00",
       "zustand": "wartet_auf_einstieg"
-    },
-    "VTHOUSDT": {
-      "aufgenommen": "2026-09-10T03:38:32.140782+00:00",
-      "bestes_r": 0.0,
-      "einstieg": 0.000434,
-      "einstieg_art": "sofort",
-      "einstiegskurs": null,
-      "erreicht": [],
-      "erwartet_pct": 5.99,
-      "instrument": "VTHOUSDT",
-      "klasse": "krypto",
-      "note": "B",
-      "richtung": "long",
-      "rr": 1.37,
-      "rs": null,
-      "schlechtestes_r": 0.0,
-      "score": 40.1,
-      "setup": "",
-      "stop": 0.000415,
-      "these": "",
-      "tp1": 0.00045,
-      "tp2": 0.00046,
-      "tp3": 0.000466,
-      "trigger": "",
-      "zuletzt": "2026-09-13T16:52:25.817022+00:00",
-      "zustand": "abgelaufen"
     },
     "VZ": {
       "aufgenommen": "2026-09-17T13:05:13.117819+00:00",
