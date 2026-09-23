@@ -1,5 +1,5 @@
 {
-  "stand": "2026-09-23T14:12:22.964625+00:00",
+  "stand": "2026-09-23T14:29:47.600235+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-09-21T16:22:53.113539+00:00",
@@ -24,7 +24,7 @@
       "tp2": 347.2799987792969,
       "tp3": 353.8099365234375,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "AAVEUSD": {
@@ -121,7 +121,7 @@
       "richtung": "long",
       "rr": 3.18,
       "rs": 45.6,
-      "schlechtestes_r": -0.36,
+      "schlechtestes_r": -0.66,
       "score": 37.5,
       "setup": "Ausbruch aus der Basis",
       "stop": 0.230029,
@@ -130,7 +130,7 @@
       "tp2": 0.288532,
       "tp3": 0.2955235,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.2350 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "AEROUSD": {
@@ -159,7 +159,7 @@
       "tp2": 0.7294,
       "tp3": 0.7867000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.6507 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "AMD": {
@@ -202,7 +202,7 @@
       "richtung": "long",
       "rr": 2.82,
       "rs": 41.5,
-      "schlechtestes_r": -0.67,
+      "schlechtestes_r": -0.83,
       "score": 63.8,
       "setup": "",
       "stop": 244.3000030517578,
@@ -211,7 +211,7 @@
       "tp2": 280.1400146484375,
       "tp3": 286.5099563598633,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "ATOMUSD": {
@@ -228,7 +228,7 @@
       "richtung": "long",
       "rr": 2.0,
       "rs": 40.3,
-      "schlechtestes_r": -0.52,
+      "schlechtestes_r": -0.58,
       "score": 50.4,
       "setup": "Ausbruch aus der Basis",
       "stop": 1.672,
@@ -237,7 +237,7 @@
       "tp2": 1.9822000000000004,
       "tp3": 2.1373000000000006,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 1.7830 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "ATOMUSDT": {
@@ -291,7 +291,7 @@
       "tp2": 4252.3,
       "tp3": 4237.05,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "AVGO": {
@@ -440,7 +440,7 @@
       "richtung": "long",
       "rr": 2.0,
       "rs": 37.5,
-      "schlechtestes_r": -0.49,
+      "schlechtestes_r": -0.6,
       "score": 78.1,
       "setup": "Ausbruch aus der Basis",
       "stop": 747.38,
@@ -449,7 +449,7 @@
       "tp2": 824.24,
       "tp3": 862.6700000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 773.4000 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "BNBUSDT": {
@@ -527,7 +527,7 @@
       "tp2": 754.4500122070312,
       "tp3": 717.6641398404079,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "CFGUSD": {
@@ -584,11 +584,13 @@
     },
     "COP": {
       "aufgenommen": "2026-09-21T13:44:17.386326+00:00",
-      "bestes_r": 0.87,
+      "bestes_r": 1.04,
       "einstieg": 125.88999938964844,
       "einstieg_art": "Ruecklauf in FVG H4",
       "einstiegskurs": 126.08000183105469,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 5.91,
       "instrument": "COP",
       "klasse": "aktien",
@@ -605,7 +607,7 @@
       "tp2": 131.47999572753906,
       "tp3": 133.3300018310547,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "COST": {
@@ -631,7 +633,7 @@
       "tp2": 852.5,
       "tp3": 836.9774475097656,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "CRVUSD": {
@@ -660,7 +662,7 @@
       "tp2": 0.3665,
       "tp3": 0.37987499999999996,
       "trigger": "Der Kurs muss ueber 0.3091 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "DCRUSD": {
@@ -688,7 +690,7 @@
       "tp2": 19.708,
       "tp3": 20.044499999999996,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 17.4870 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "DDOG": {
@@ -714,7 +716,7 @@
       "tp2": 228.2780161379169,
       "tp3": 211.8890245792452,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "DE": {
@@ -740,7 +742,7 @@
       "tp2": 717.4699096679688,
       "tp3": 743.4798583984375,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "DIS": {
@@ -848,7 +850,7 @@
       "tp2": 149.26389536057843,
       "tp3": 155.84806642324858,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "ETCUSD": {
@@ -877,7 +879,7 @@
       "tp2": 9.6515,
       "tp3": 9.980500000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 8.7660 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "ETCUSDT": {
@@ -1026,7 +1028,7 @@
       "richtung": "long",
       "rr": 3.42,
       "rs": 52.3,
-      "schlechtestes_r": -0.42,
+      "schlechtestes_r": -1.53,
       "score": 52.5,
       "setup": "Ausbruch aus der Basis",
       "stop": 0.09034,
@@ -1035,8 +1037,8 @@
       "tp2": 0.10998,
       "tp3": 0.1122,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.0935 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
+      "zustand": "stop"
     },
     "HD": {
       "aufgenommen": "2026-09-20T07:43:36.742681+00:00",
@@ -1300,7 +1302,7 @@
     },
     "LLY": {
       "aufgenommen": "2026-09-21T09:39:57.493151+00:00",
-      "bestes_r": 0.59,
+      "bestes_r": 0.67,
       "einstieg": 1174.550048828125,
       "einstieg_art": "Ruecklauf in FVG H4",
       "einstiegskurs": 1168.68505859375,
@@ -1321,7 +1323,7 @@
       "tp2": 1111.989990234375,
       "tp3": 1088.47998046875,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "LMT": {
@@ -1347,7 +1349,7 @@
       "tp2": 485.5177004046923,
       "tp3": 471.90396264729907,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "LTCUSD": {
@@ -1382,7 +1384,7 @@
     },
     "MDLZ": {
       "aufgenommen": "2026-09-21T17:11:51.979130+00:00",
-      "bestes_r": 0.06,
+      "bestes_r": 0.08,
       "einstieg": 61.0099983215332,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 60.9900016784668,
@@ -1403,7 +1405,7 @@
       "tp2": 55.83000183105469,
       "tp3": 53.99249458312988,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "META": {
@@ -1429,7 +1431,7 @@
       "tp2": 796.25,
       "tp3": 852.4934692382812,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "MNTUSD": {
@@ -1455,7 +1457,7 @@
       "tp2": 0.70955,
       "tp3": 0.7391499999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.6463 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "MONUSD": {
@@ -1535,7 +1537,7 @@
       "tp2": 154.02999877929688,
       "tp3": 156.9199981689453,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "MS": {
@@ -1669,7 +1671,7 @@
       "tp2": 241.69989013671875,
       "tp3": 252.9098358154297,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "OPUSD": {
@@ -1773,16 +1775,18 @@
       "tp2": 198.8800048828125,
       "tp3": 211.64498901367188,
       "trigger": "Der Kurs muss ueber 165.7100 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "POLUSD": {
       "aufgenommen": "2026-09-22T05:39:09.751950+00:00",
-      "bestes_r": 0.44,
+      "bestes_r": 1.33,
       "einstieg": 0.10869,
       "einstieg_art": "sofort",
       "einstiegskurs": 0.10848,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 6.78,
       "instrument": "POLUSD",
       "klasse": "krypto",
@@ -1799,7 +1803,7 @@
       "tp2": 0.09698999999999998,
       "tp3": 0.08821499999999996,
       "trigger": "Der Kurs muss unter 0.1095 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "PYPL": {
@@ -1981,7 +1985,7 @@
       "tp2": 170.75,
       "tp3": 178.87528316124911,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "TIAUSD": {
@@ -2085,7 +2089,7 @@
       "tp2": 435.25,
       "tp3": 444.55250549316406,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "TSM": {
@@ -2111,7 +2115,7 @@
       "tp2": 476.7900085449219,
       "tp3": 488.1099395751953,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "UNH": {
@@ -2193,12 +2197,12 @@
       "tp2": 246.8800048828125,
       "tp3": 242.41000366210938,
       "trigger": "",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "UPS": {
       "aufgenommen": "2026-09-21T18:17:16.430287+00:00",
-      "bestes_r": 0.05,
+      "bestes_r": 0.06,
       "einstieg": 95.7750015258789,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 95.72000122070312,
@@ -2210,7 +2214,7 @@
       "richtung": "short",
       "rr": 2.0,
       "rs": 41.8,
-      "schlechtestes_r": -0.1,
+      "schlechtestes_r": -0.15,
       "score": 81.6,
       "setup": "Ruecksetzer im Trend",
       "stop": 99.37999725341797,
@@ -2219,7 +2223,7 @@
       "tp2": 88.56501007080078,
       "tp3": 83.15751647949219,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "VRTX": {
@@ -2245,7 +2249,7 @@
       "tp2": 555.6900024414062,
       "tp3": 570.8665582463105,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "VZ": {
@@ -2288,7 +2292,7 @@
       "richtung": "long",
       "rr": 2.49,
       "rs": 43.8,
-      "schlechtestes_r": -0.71,
+      "schlechtestes_r": -2.1,
       "score": 53.7,
       "setup": "Ausbruch aus der Basis",
       "stop": 0.4289,
@@ -2297,8 +2301,8 @@
       "tp2": 0.5185500000000001,
       "tp3": 0.556,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.4577 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
+      "zustand": "stop"
     },
     "WMT": {
       "aufgenommen": "2026-09-15T13:59:35.560403+00:00",
@@ -2395,7 +2399,7 @@
       "richtung": "long",
       "rr": 2.46,
       "rs": 35.2,
-      "schlechtestes_r": -0.66,
+      "schlechtestes_r": -1.46,
       "score": 52.5,
       "setup": "Ausbruch aus der Basis",
       "stop": 0.205761,
@@ -2404,8 +2408,8 @@
       "tp2": 0.23620449999999998,
       "tp3": 0.251585,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.2131 — nicht beim Antippen.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
+      "zustand": "stop"
     },
     "XMRUSD": {
       "aufgenommen": "2026-09-20T04:40:15.144549+00:00",
@@ -2447,7 +2451,7 @@
       "richtung": "short",
       "rr": 2.3,
       "rs": 68.7,
-      "schlechtestes_r": -0.57,
+      "schlechtestes_r": -0.59,
       "score": 70.1,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 163.3699951171875,
@@ -2456,7 +2460,7 @@
       "tp2": 151.35000610351562,
       "tp3": 146.96754455566406,
       "trigger": "Der Kurs muss unter 168.4800 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-09-23T14:12:05.796334+00:00",
+      "zuletzt": "2026-09-23T14:29:27.389264+00:00",
       "zustand": "aktiv"
     },
     "XTZUSDT": {
