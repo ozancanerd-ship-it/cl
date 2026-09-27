@@ -185,14 +185,26 @@ jobs:
         timeout-minutes: 22
         env:
           PYTHONPATH: src
+        # 26.09.: ALLE liquiden Coins statt der 110 umsatzstaerksten (--krypto 200 ist ein
+        # Deckel, keine Zielgroesse — bei Kraken sind es derzeit rund 160).
+        #
+        # Und --vorlauf-url: der Zehn-Minuten-Lauf sollte die Aktien schon immer aus dem
+        # letzten Scan uebernehmen. Der lag aber nur in web/, und web/scan.json ist nicht
+        # im Repo — also scannte jeder dieser Laeufe stillschweigend ALLES neu, Aktien mit
+        # dem Standarddeckel 40 statt 101. Jetzt holt er den letzten veroeffentlichten
+        # Scan von der Seite. Ist die nicht erreichbar oder aelter als drei Stunden, wird
+        # wie bisher alles gescannt.
         run: |
           if [ "${{ github.event.schedule }}" = "2,12,22,32,42,52 * * * *" ]; then
-            python scripts/build_scan_data.py --out web --krypto 110 --detail 60 --nur krypto,gold
+            # --aktien 120 auch hier: greift nur, wenn die Uebernahme scheitert und doch
+            # alles gescannt wird — dann wenigstens mit der ganzen Aktienliste.
+            python scripts/build_scan_data.py --out web --krypto 200 --aktien 120 --detail 60 \
+              --nur krypto,gold --vorlauf-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           else
             # --aktien muss mindestens so gross sein wie die Liste in build_scan_data.py,
             # sonst faellt hinten etwas ab, ohne dass es jemand merkt. Der Lauf meldet
             # das inzwischen als ::warning::.
-            python scripts/build_scan_data.py --out web --krypto 110 --aktien 120 --detail 60
+            python scripts/build_scan_data.py --out web --krypto 200 --aktien 120 --detail 60
           fi
 
       # Marktweite Aenderungen: weggebrochenes Setup, neue Nummer 1, ein Chart der
