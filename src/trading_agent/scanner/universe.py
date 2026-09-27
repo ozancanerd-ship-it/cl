@@ -150,7 +150,18 @@ class UniversumFilter:
     #: sich schnell bewegen.
     min_umsatz: float = 3_000_000.0
     #: Mindestkurs — darunter ist die Preisstufe selbst schon ein spuerbarer Spread.
+    #: Gilt nur, wenn die Boerse die Preisstufe NICHT mitliefert. Kennt man sie, zaehlt
+    #: :attr:`max_tick_anteil` — das ist die eigentliche Frage, der Kurs war nur ein
+    #: grober Ersatz dafuer.
     min_kurs: float = 0.0005
+    #: Hoechster Anteil der kleinsten Preisstufe am Kurs. 0,25 % heisst: ein Tick ist
+    #: gegen einen Stop von drei bis fuenf Prozent Rauschen.
+    #:
+    #: Bis zum 26.09. entschied hier allein der Mindestkurs von 0,0005 — und warf damit
+    #: Pepe, Shiba Inu, Bonk und Terra aus dem Universum, obwohl Pepe bei Kraken mit
+    #: rund 8 Mio Dollar Tagesumsatz zu den liquidesten Coins gehoert und Ozan ihn
+    #: haelt. Bei Kraken ist die Preisstufe dort 0,000000001 — gemessen am Kurs 0,02 %.
+    max_tick_anteil: float = 0.0025
     #: Mindestzahl an Abschluessen. Viel Umsatz aus wenigen Grossorders ist keine Tiefe.
     min_trades: int = 3_000
     #: Wie viele Paare hoechstens ins Ranking gehen. Der Deckel ist eine Rechenzeit-,
@@ -279,8 +290,16 @@ def bilde_universum(
         umsatz = float(t.get("quote_volume") or 0.0)
         trades = int(t.get("trades") or 0)
         pflicht = name in f.immer_dabei
+        tick = float(s.get("tick") or 0.0)
         if not pflicht:
-            if kurs < f.min_kurs:
+            if kurs <= 0:
+                verworfen["kurs"] += 1
+                continue
+            if tick > 0:
+                if tick / kurs > f.max_tick_anteil:
+                    verworfen["kurs"] += 1
+                    continue
+            elif kurs < f.min_kurs:
                 verworfen["kurs"] += 1
                 continue
             if umsatz < f.min_umsatz:

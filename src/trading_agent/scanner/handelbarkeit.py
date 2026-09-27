@@ -206,6 +206,7 @@ AKTIEN_NAMEN: dict[str, str] = {
     "PEP": "PepsiCo",
     "DIS": "Disney",
     "NFLX": "Netflix",
+    "MELI": "Mercado Libre",
     "BA": "Boeing",
     "CAT": "Caterpillar",
     "GE": "General Electric",

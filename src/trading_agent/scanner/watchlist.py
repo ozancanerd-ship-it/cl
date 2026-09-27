@@ -109,6 +109,28 @@ class Wache:
     trigger: str = ""
     #: Relative Staerke innerhalb der eigenen Klasse, 0..100.
     rs: float | None = None
+    #: Ausgeschriebener Name und Handelsort aus dem Scan. Ozans Vorgabe: jeder Wert mit
+    #: vollem Namen und der App, in der er ihn findet — ein Alarm „LINKUSD" zwingt ihn,
+    #: erst nachzuschlagen, was das ist und wo er es kauft.
+    name: str = ""
+    broker: str = ""
+    #: Euro je Dollar zum Zeitpunkt der Aufnahme — fuer den Euro-Gegenwert im Alarm.
+    eurusd: float | None = None
+    #: Wann der Einstieg AUFS TELEFON ging (ISO-Zeit), leer = nie. Nur fuer diese Trades
+    #: klingeln danach Ziel, Stop und Ausstieg — fuer alle anderen hat Ozan nichts im Markt.
+    gemeldet: str = ""
+    #: Warum der Einstieg NICHT aufs Telefon ging — steht in der App, damit ein
+    #: ausbleibender Alarm erklaerbar ist.
+    tor_grund: str = ""
+    #: Der Schutz-Stop laut Plan: nach Ziel 1 der Einstieg, nach Ziel 2 das Ziel 1.
+    #: Der urspruengliche ``stop`` bleibt unveraendert — an ihm haengt das R, und eine
+    #: Statistik, deren Massstab wandert, misst nichts.
+    schutz: float | None = None
+    #: Die Position ist laut Plan draussen (Schutz-Stop oder Ausstieg). Ab dann klingelt
+    #: zu diesem Trade nichts mehr; beobachtet und gezaehlt wird trotzdem weiter.
+    raus: bool = False
+    #: Kurs beim vorzeitigen Ausstieg (Analyse gedreht).
+    ausstiegskurs: float | None = None
 
     @property
     def long(self) -> bool:
@@ -152,7 +174,25 @@ class Wache:
             "these": self.these,
             "trigger": self.trigger,
             "rs": self.rs,
+            "name": self.name,
+            "broker": self.broker,
+            "eurusd": self.eurusd,
+            "gemeldet": self.gemeldet,
+            "tor_grund": self.tor_grund,
+            "schutz": self.schutz,
+            "raus": self.raus,
+            "ausstiegskurs": self.ausstiegskurs,
         }
+
+    @property
+    def wer(self) -> str:
+        """„Chainlink (LINK)" — voller Name, Kuerzel in Klammern. Ohne Namen das Paar."""
+        from trading_agent.scanner.alarm_tor import basis
+
+        kurz = basis(self.instrument)
+        if self.name and self.name.upper() != kurz:
+            return f"{self.name} ({kurz})"
+        return self.instrument
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Wache:
@@ -164,7 +204,9 @@ class Wache:
 class Ereignis:
     """Ein Zustandsuebergang, der eine Meldung wert ist."""
 
-    art: str  # NEUES_SETUP | EINSTIEG | TP | STOP | INVALIDIERT | ABGELAUFEN
+    #: NEUES_SETUP | PLAN_AKTUALISIERT | EINSTIEG | TP | STOP | SCHUTZ | AUSSTIEG |
+    #: INVALIDIERT | ABGELAUFEN
+    art: str
     instrument: str
     dringend: bool
     titel: str
@@ -189,6 +231,73 @@ def _fmt(v: float | None) -> str:
     return f"{v:,.{n}f}".replace(",", " ")
 
 
+def _abstand(w: Wache, v: float | None) -> str:
+    """„(+6,2 %)" vom Einstieg aus gesehen — so liest man einen Plan auf dem Handy."""
+    if v is None or not w.einstieg:
+        return ""
+    return f"({(v - w.einstieg) / w.einstieg * 100:+.1f} %)".replace(".", ",")
+
+
+def _euro(w: Wache, v: float | None) -> str:
+    """Der Euro-Gegenwert zur Orientierung. Ohne Wechselkurs lieber nichts als geschaetzt."""
+    if v is None or not w.eurusd or w.eurusd <= 0:
+        return ""
+    if w.instrument.upper().endswith("EUR"):
+        return ""
+    e = v / w.eurusd
+    n = 2 if abs(e) >= 1 else 4 if abs(e) >= 0.01 else 8
+    return f"≈ {e:,.{n}f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def einstieg_text(
+    w: Wache, *, kurs: float | None = None, bestaetigt: str = "", warum: str = "", bilanz: str = ""
+) -> str:
+    """Der Kaufalarm — vollstaendig, weil er allein auf dem Handy steht.
+
+    Die Aufnahme auf die Wachliste klingelt nicht mehr (Ozan: nur Alarme, bei denen er
+    einsteigen kann). Also muss der Einstiegsalarm selbst alles enthalten: was, wo,
+    zu welchem Preis, wo raus, was es bringen kann — und warum gerade dieser Alarm
+    durchs Tor kam.
+    """
+    aktie = w.klasse == "aktien"
+    z = [
+        f"{w.wer} · {'LONG' if w.long else 'SHORT'} · {w.note}",
+        w.setup or ("Long-Setup" if w.long else "Short-Setup"),
+        "",
+    ]
+    if w.broker:
+        z.append(f"{'Kaufen' if w.long else 'Short'} bei: {w.broker}")
+    z.append(
+        f"Einstieg  {_fmt(w.einstieg)} {_euro(w, w.einstieg)}".rstrip()
+        + (f"   · Kurs jetzt {_fmt(kurs)}" if kurs else "")
+    )
+
+    # Bei Aktien ist der Euro-Wert der Ausfuehrungspreis (Trade Republic), also steht er
+    # an jeder Marke. Bei Coins reicht er am Einstieg — gekauft wird im Dollarmarkt.
+    def eur(v: float | None) -> str:
+        return f" {_euro(w, v)}" if aktie and _euro(w, v) else ""
+
+    z.append(f"Stop      {_fmt(w.stop)}{eur(w.stop)} {_abstand(w, w.stop)}")
+    for name, v, rat in (
+        ("Ziel 1", w.tp1, "  → ein Drittel verkaufen, Stop auf Einstieg"),
+        ("Ziel 2", w.tp2, "  → zweites Drittel"),
+        ("Ziel 3", w.tp3, ""),
+    ):
+        if v is not None:
+            z.append(f"{name}    {_fmt(v)}{eur(v)} {_abstand(w, v)}{rat}")
+    if w.rr:
+        z.append(f"Chance-Risiko 1:{w.rr:.1f}".replace(".", ","))
+    if aktie and w.eurusd:
+        z.append("Trade Republic handelt in Euro — die Euro-Werte sind umgerechnet.")
+    if bestaetigt:
+        z += ["", f"Bestaetigt: {bestaetigt}"]
+    if warum:
+        z += ["", f"Warum dieser Alarm: {warum}"]
+    if bilanz:
+        z += [f"Bisher: {bilanz}", "Das ist gezaehlte Vergangenheit, kein Versprechen."]
+    return "\n".join(z)
+
+
 def _plan_text(w: Wache) -> str:
     """Der Alarmtext. Er fuehrt mit dem Setup, nicht mit dem Score.
 
@@ -198,7 +307,7 @@ def _plan_text(w: Wache) -> str:
     """
     kopf = w.setup or ("Long-Setup" if w.long else "Short-Setup")
     zeilen = [
-        f"{w.instrument}  {'LONG' if w.long else 'SHORT'}  [{w.note}]",
+        f"{w.wer}  {'LONG' if w.long else 'SHORT'}  [{w.note}]",
         kopf,
         "",
         f"Einstieg  {_fmt(w.einstieg)}  ({w.einstieg_art})",
@@ -307,9 +416,21 @@ class Wachliste:
         alt_einstieg = {
             k: v.einstieg for k, v in self.wachen.items() if v.zustand == Zustand.WARTET.value
         }
+        from trading_agent.scanner.alarm_tor import basis as _basis
+
         for z in zeilen:
             name = str(z.get("instrument") or "")
             if not name or not z.get("handelbar"):
+                continue
+            # Derselbe Coin nur EINMAL. Am 20. und 21.09. standen LINKUSD und LINKUSDT,
+            # ETCUSD und ETCUSDT, ETHUSD und ETHUSDT, KASUSD und KASUSDT gleichzeitig auf
+            # der Liste — dieselbe Wette zweimal, mit zwei Alarmen. Wer zuerst da war,
+            # bleibt; das zweite Paar wird nicht aufgenommen.
+            b = _basis(name)
+            if any(
+                k != name and _basis(k) == b and v.zustand not in ENDZUSTAENDE
+                for k, v in self.wachen.items()
+            ):
                 continue
             vorhanden = self.wachen.get(name)
             if vorhanden is not None and vorhanden.zustand not in ENDZUSTAENDE:
@@ -360,6 +481,9 @@ class Wachliste:
                 these=str(setup.get("these") or ""),
                 trigger=str(setup.get("trigger") or ""),
                 rs=z.get("rs"),
+                name=str(z.get("name") or ""),
+                broker=str(z.get("broker") or ""),
+                eurusd=(float(z["eurusd"]) if z.get("eurusd") else None),
             )
             if w.risiko <= 0 or w.richtung not in ("long", "short"):
                 continue
@@ -485,14 +609,11 @@ class Wachliste:
                             art="EINSTIEG",
                             instrument=name,
                             dringend=True,
-                            titel=f"EINSTIEG BESTAETIGT  {name}  {'LONG' if w.long else 'SHORT'}",
-                            text=(
-                                f"{name} hat {_fmt(w.einstieg)} erreicht (Kurs jetzt {_fmt(letzter)})."
-                                + (f"\n{b.grund.capitalize()}." if b is not None else "")
-                                + "\n"
-                                f"Stop {_fmt(w.stop)} · Ziel 1 {_fmt(w.tp1)}"
-                                + (f" · Ziel 2 {_fmt(w.tp2)}" if w.tp2 else "")
-                                + (f"\nCRV 1:{w.rr:.2f}" if w.rr else "")
+                            titel=(f"{'KAUFEN' if w.long else 'SHORT'}  {w.wer}  {w.note}"),
+                            text=einstieg_text(
+                                w,
+                                kurs=letzter,
+                                bestaetigt=(b.grund.capitalize() + ".") if b is not None else "",
                             ),
                             dedup_key=f"einstieg:{name}:{w.aufgenommen}",
                         )
@@ -511,6 +632,40 @@ class Wachliste:
             if r_schlecht is not None:
                 w.schlechtestes_r = min(w.schlechtestes_r, r_schlecht)
 
+            # Der Schutz-Stop laut Plan (nach Ziel 1 der Einstieg, nach Ziel 2 das Ziel 1).
+            # Er wird VOR dem urspruenglichen Stop geprueft: wer dem Plan folgt, ist dort
+            # schon raus. Bis zum 26.09. meldete die Wachliste nach Ziel 1 nur noch den
+            # alten Stop — also einen Verlust von −1 R fuer eine Position, die laut
+            # eigenem Rat laengst bei ±0 geschlossen war (HBAR am 23.09.).
+            #
+            # Die Wache laeuft danach fuer die Statistik weiter (der Vergleich „ganz"
+            # gegen „drittel" in der Bilanz braucht den echten Verlauf); nur klingeln
+            # tut zu diesem Trade nichts mehr.
+            if w.schutz is not None and not w.raus:
+                schutz_beruehrt = tief <= w.schutz if w.long else hoch >= w.schutz
+                if schutz_beruehrt:
+                    w.raus = True
+                    nach_tp2 = "TP2" in w.erreicht
+                    ergebnis = (1.0 + 2.0 + 1.0) / 3.0 if nach_tp2 else 1.0 / 3.0
+                    ereignisse.append(
+                        Ereignis(
+                            art="SCHUTZ",
+                            instrument=name,
+                            dringend=True,
+                            titel=f"RAUS  {w.wer} — nachgezogener Stop",
+                            text=(
+                                f"{w.wer} ist zurueck bei {_fmt(w.schutz)} — dort liegt laut "
+                                f"Plan dein Stop seit {'Ziel 2' if nach_tp2 else 'Ziel 1'}.\n"
+                                f"Der Rest ist damit raus, "
+                                + ("bei Ziel 1." if nach_tp2 else "ohne Verlust.")
+                                + "\nErgebnis des ganzen Trades: rund "
+                                + f"{ergebnis:+.2f} R".replace(".", ",")
+                                + " (Teilverkaeufe eingerechnet)."
+                            ),
+                            dedup_key=f"schutz:{name}:{w.aufgenommen}",
+                        )
+                    )
+
             # Stop zuerst pruefen. Wenn im selben Fenster Ziel UND Stop beruehrt wurden,
             # ist nicht bekannt, was zuerst kam — und dann ist die pessimistische Annahme
             # die einzige, die eine Statistik nicht schoenrechnet.
@@ -522,9 +677,9 @@ class Wachliste:
                         art="STOP",
                         instrument=name,
                         dringend=True,
-                        titel=f"STOP  {name}",
+                        titel=f"STOP  {w.wer} — raus",
                         text=(
-                            f"{name} hat den Stop bei {_fmt(w.stop)} beruehrt.\n"
+                            f"{w.wer} hat den Stop bei {_fmt(w.stop)} beruehrt.\n"
                             f"Ergebnis {w.schlechtestes_r:.2f}R, bestes zwischendurch "
                             f"{w.bestes_r:+.2f}R.\nDie These ist damit beendet."
                         ),
@@ -541,20 +696,31 @@ class Wachliste:
                     continue
                 w.erreicht.append(marke)
                 letztes = marke == "TP3" or (marke == "TP2" and w.tp3 is None)
+                basis_kurs = w.einstiegskurs if w.einstiegskurs is not None else w.einstieg
+                if marke == "TP1":
+                    w.schutz = basis_kurs
+                elif marke == "TP2" and w.tp1 is not None:
+                    w.schutz = w.tp1
                 rat = {
-                    "TP1": "Teilgewinn nehmen und den Stop auf den Einstieg ziehen — ab hier "
-                    "kann der Trade nicht mehr verlieren.",
-                    "TP2": "Zweiter Teilgewinn. Rest laufen lassen, Stop unter das letzte "
-                    "hoehere Tief nachziehen.",
-                    "TP3": "Ziel erreicht. Das war der Plan.",
+                    "TP1": "Ein Drittel verkaufen und den Stop auf den Einstieg "
+                    f"({_fmt(basis_kurs)}) ziehen — ab hier kann der Trade nicht mehr "
+                    "verlieren.",
+                    "TP2": "Zweites Drittel verkaufen. Rest laufen lassen, Stop auf Ziel 1 "
+                    f"({_fmt(w.tp1)}) nachziehen.",
+                    "TP3": "Letztes Ziel erreicht — Rest verkaufen. Das war der Plan.",
                 }[marke]
+                nummer = marke[-1]
                 ereignisse.append(
                     Ereignis(
                         art="TP",
                         instrument=name,
                         dringend=marke != "TP3",
-                        titel=f"{marke} ERREICHT  {name}",
-                        text=(f"{name} hat {_fmt(ziel)} erreicht ({w.r_bei(ziel):+.2f}R).\n{rat}"),
+                        titel=f"ZIEL {nummer}  {w.wer} — "
+                        + ("Rest verkaufen" if marke == "TP3" else "Teil verkaufen"),
+                        text=(
+                            f"{w.wer} hat Ziel {nummer} bei {_fmt(ziel)} erreicht "
+                            f"({w.r_bei(ziel):+.2f}R).\n{rat}"
+                        ),
                         dedup_key=f"{marke.lower()}:{name}:{w.aufgenommen}",
                     )
                 )
@@ -598,13 +764,46 @@ class Wachliste:
                 continue
             richtung_neu = str(z.get("richtung") or "")
             if richtung_neu and richtung_neu != w.richtung:
+                # Vorher stand hier ``dringend=w.zustand == AKTIV`` — ausgewertet NACHDEM
+                # der Zustand schon auf „invalidiert" gesetzt war. Ein laufender Trade,
+                # dessen Analyse gedreht hat, war damit nie dringend und ging nie aufs
+                # Telefon: genau der Moment, in dem man raus sollte, blieb stumm.
+                lief = w.zustand == Zustand.AKTIV.value
                 w.zustand = Zustand.INVALIDIERT.value
+                if lief:
+                    kurs = z.get("kurs")
+                    w.ausstiegskurs = float(kurs) if kurs else None
+                    r = w.r_bei(float(kurs)) if kurs else None
+                    ereignisse.append(
+                        Ereignis(
+                            art="AUSSTIEG",
+                            instrument=name,
+                            dringend=True,
+                            titel=f"AUSSTEIGEN  {w.wer} — Analyse gedreht",
+                            text=(
+                                f"Die Analyse zu {w.wer} dreht auf {richtung_neu.upper()}, "
+                                f"der Trade laeuft {w.richtung.upper()}.\n"
+                                "Laut Plan heisst ein Strukturbruch gegen die Richtung: raus, "
+                                "auch wenn der Stop noch nicht erreicht ist."
+                                + (f"\nKurs {_fmt(float(kurs))}" if kurs else "")
+                                + (f", Stand {r:+.2f} R".replace(".", ",") if r is not None else "")
+                                + (
+                                    ""
+                                    if not w.erreicht
+                                    else f" (erreicht: {', '.join(w.erreicht)})"
+                                )
+                                + "."
+                            ),
+                            dedup_key=f"ausstieg:{name}:{w.aufgenommen}",
+                        )
+                    )
+                    continue
                 ereignisse.append(
                     Ereignis(
                         art="INVALIDIERT",
                         instrument=name,
-                        dringend=w.zustand == Zustand.AKTIV.value,
-                        titel=f"Setup ungueltig  {name}",
+                        dringend=False,
+                        titel=f"Setup ungueltig  {w.wer}",
                         text=(
                             f"Die Analyse dreht auf {richtung_neu.upper()}, die Wache lief auf "
                             f"{w.richtung.upper()}. Kein Einstieg mehr auf dieser Grundlage."
@@ -633,4 +832,5 @@ __all__ = [
     "Wache",
     "Wachliste",
     "Zustand",
+    "einstieg_text",
 ]
