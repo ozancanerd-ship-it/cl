@@ -1768,7 +1768,7 @@ function zeichneFilter(){
      dieser erste Schalter. Er zeigt exakt die Werte, die drüben unter Alarme in
      „Jetzt einsteigen" stehen, und nichts sonst. Mit Zahl dran, damit man von hier aus
      sieht, ob es überhaupt etwas zu tun gibt. */
-  const nJetzt = amEinstiegListe().filter(x => (NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG).length;
+  const nJetzt = amEinstiegListe().filter(alarmReif).length;
   const f = [
     ['jetzt', `Jetzt einsteigen${nJetzt ? ' · ' + nJetzt : ''}`],
     ['handelbar','Handelbar'], ['alle','Alles'], ['krypto','Krypto'],
@@ -1787,7 +1787,7 @@ function gefiltert(){
     case 'jetzt': {
       // Dieselbe Liste wie unter Alarme — nicht „auch am Einstieg", sondern kaufbar.
       const drin = new Set(amEinstiegListe()
-        .filter(x => (NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG)
+        .filter(alarmReif)
         .map(x => x.w.instrument));
       return g.filter(o => drin.has(o.instrument));
     }
@@ -1978,7 +1978,7 @@ function oppZeile(o, rang){
            unter „Jetzt einsteigen". Ist der Kurs zwar da, das Setup aber schwächer als
            A−, steht dort blass „am Einstieg · B" — sichtbar, aber nicht als Kaufsignal
            verkleidet. */
-        const schwach = e.stufe === 'jetzt' && (NOTE_RANG[o.note]||0) < MELDE_AB_RANG;
+        const schwach = e.stufe === 'jetzt' && !alarmReif(o);
         const farbe = (e.stufe === 'jetzt' && !schwach) ? 'background:var(--long);color:#03130F'
                     : schwach ? 'background:var(--warn-bg);color:var(--ink-2);opacity:.85'
                     : e.stufe === 'im_trade' ? 'background:var(--accent);color:#03130F'
@@ -1987,8 +1987,8 @@ function oppZeile(o, rang){
                     : e.stufe === 'warten' ? 'background:var(--warn-bg);color:var(--warn)'
                     : 'background:transparent;color:var(--ink-3)';
         if (schwach) return `<span class="note" style="${farbe}"
-          title="Kurs ist an der Einstiegsmarke, aber das Setup ist unter A− — deshalb steht es unter Alarme nicht auf der Kaufliste"
-          >am Einstieg · ${esc(o.note)}</span>`;
+          title="Kurs ist an der Einstiegsmarke, aber kein Alarm: ${esc(alarmGrund(o))}"
+          >am Einstieg · kein Alarm</span>`;
         // Woher der Kurs kommt, gehoert an dieselbe Stelle wie der Zustand. Ein JETZT
         // auf Basis eines Scankurses ist eine schwaechere Aussage als eines auf Basis
         // eines Livekurses — wer das nicht sieht, haelt beides fuer dasselbe.
@@ -2024,6 +2024,8 @@ function oppZeile(o, rang){
         istAktie(o) ? (eurWert(o,'kurs')?' · EUR':' · <span style="color:var(--warn)">USD — Eurokurs fehlt gerade</span>')
                     : (o.waehrung?` · ${esc(o.waehrung)}`:'')}${
         eurHinweis(o)?' · '+eurHinweis(o):''}</div>`:''}
+      ${o.aus_vorlauf?`<div class="muz" style="margin-top:5px;color:var(--ink-3)">Analyse
+        von ${zeit(o.aus_vorlauf)} — ${o.klasse==='aktien'?'Aktien werden alle 30 Minuten neu gescannt':'aus dem letzten Lauf übernommen'}</div>`:''}
       ${o.erwartung&&o.erwartung.quote?`<div class="muz" style="margin-top:5px">
         ${o.erwartung.bis_tp1_pct!=null?`bis Ziel 1 <strong>${pct(o.erwartung.bis_tp1_pct,1)}</strong> · `:''}
         vergleichbare Signale trafen bisher <strong>${Math.round(o.erwartung.quote.tp1*100)} %</strong>
@@ -2055,7 +2057,7 @@ function zeichneRadar(){
   /* Derselbe Zaehler, dieselbe Quelle wie unter Alarme. Vorher rechnete diese Zeile
      selbst — und kam damit auf eine andere Zahl als die Seite, auf die sie verweist. */
   const amEinstieg = amEinstiegListe();
-  const jetztListe = amEinstieg.filter(x => (NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG);
+  const jetztListe = amEinstieg.filter(alarmReif);
   const jetzt = jetztListe.length;
   const knappe = amEinstieg.length - jetzt;
   const jetztAktien = jetztListe.filter(x => (x.o && x.o.klasse) === 'aktien').length;
@@ -2063,16 +2065,18 @@ function zeichneRadar(){
     <p style="font-size:13.5px"><strong>Ein grünes <em>JETZT</em> heisst: dieser Wert steht
     drüben unter Alarme in „Jetzt einsteigen".</strong> Nichts anderes. Der Filter
     <em>Jetzt einsteigen</em> oben zeigt genau diese Werte.</p>
-    <p style="font-size:13.5px">Blass <em>am Einstieg · B</em> heisst: der Kurs ist zwar an
-    der Marke, aber das Setup ist schwächer als A−. Solche stehen unter Alarme in einem
-    eigenen Abschnitt und klingeln nicht. <em>noch X %</em> heisst: gutes Setup, Kurs noch
-    nicht da — dort gehört eine Limit-Order hin, nicht ein Kauf zum Marktpreis.</p>
+    <p style="font-size:13.5px">Blass <em>am Einstieg · kein Alarm</em> heisst: der Kurs ist
+    zwar an der Marke, aber das Setup kommt nicht durchs Alarm-Tor (zu schwache Note, eine
+    Setup-Art mit Verlust in der eigenen Bilanz, zu wenig Raum nach Gebühren …). Der Grund
+    steht beim Antippen dran und unter Alarme. Solche Werte klingeln nicht.
+    <em>noch X %</em> heisst: gutes Setup, Kurs noch nicht da — dort gehört eine
+    Limit-Order hin, nicht ein Kauf zum Marktpreis.</p>
     <p>Diese Seite ist die vollständige Rangliste zum Nachsehen. Gekauft wird unter
     <strong>Alarme</strong> — dort steht genau das, was hier gerade <em>JETZT</em> zeigt,
     und sonst nichts. ${jetzt ? `Aktuell sind das <strong>${jetzt}</strong>${
       jetztAktien ? ` (davon ${jetztAktien} Aktien)` : ''}.`
       : 'Aktuell ist das <strong>keiner</strong> — dann ist nichts zu tun.'}${
-      knappe ? ` Dazu ${knappe} Wert${knappe===1?'':'e'} am Einstieg, aber unter A− —
+      knappe ? ` Dazu ${knappe} Wert${knappe===1?'':'e'} am Einstieg, aber ohne Alarm —
       ${knappe===1?'er steht':'sie stehen'} drüben in einem eigenen Abschnitt und
       ${knappe===1?'klingelt':'klingeln'} nicht.` : ''}
     Beide Seiten rechnen seit dem 16.09. mit <em>derselben</em> Funktion; dieselben Zahlen
@@ -4600,11 +4604,39 @@ function gemeldetMerken(key){
    unabhaengig von der Note, weil dort Geld im Feuer steht. */
 const MELDE_AB_RANG = 4;   // A−
 
+/* ============================================ DAS ALARM-TOR (seit 26.09.)
+
+   „Die Alarme sind irgendwie schlecht geworden … bessere Alarme, da wo es sich wirklich
+   lohnt."
+
+   Ob ein Einstieg ein Alarm ist, entscheidet nicht mehr die App allein nach der Note,
+   sondern das Alarm-Tor im Scan (scanner/alarm_tor.py) — DIESELBE Pruefung, die der
+   Waechter vor dem Senden aufs Handy macht. Sie steht in jeder Zeile unter ``alarm``:
+   ``ja`` und der Grund, wenn nicht. Fehlt sie (alter Scan), gilt die alte Notenregel.
+
+   Geprueft wird: benanntes Setup, Note ab A− (B+ nur bei bewaehrter Setup-Art), die
+   eigene Bilanz der Setup-Art, Chance-Risiko ab 1:2, Ziel 1 weit genug weg fuer die
+   Gebuehren. Aufs Handy kommen davon hoechstens drei am Tag, derselbe Coin einmal in
+   48 Stunden — das steht nur im Waechter, weil es vom Verlauf abhaengt. */
+function alarmTor(x){ const o = x && (x.o || x); return (o && o.alarm && typeof o.alarm.ja === 'boolean') ? o.alarm : null; }
+function alarmReif(x){
+  const t = alarmTor(x);
+  if (t) return t.ja;
+  const w = x && (x.w || x);
+  return (NOTE_RANG[w && w.note] || 0) >= MELDE_AB_RANG;
+}
+function alarmGrund(x){
+  const t = alarmTor(x);
+  if (t) return t.grund || '';
+  const w = x && (x.w || x);
+  return `Note ${w ? w.note : '—'} — Alarm erst ab A−`;
+}
+
 function benachrichtige(x){
   // Aus einem toten Scan kommt keine Meldung. Eine Kaufaufforderung mit Marken von
   // gestern Abend ist genau die Art Alarm, die Geld kostet.
   if (scanTot()) return;
-  if ((NOTE_RANG[x.w.note] || 0) < MELDE_AB_RANG) return;
+  if (!alarmReif(x)) return;
   const key = x.w.instrument + ':' + x.w.aufgenommen;
   if (gemeldetLaden()[key]) return;
   gemeldetMerken(key);
@@ -4651,6 +4683,9 @@ function ausRanking(){
       zustand: w ? w.zustand : 'wartet_auf_einstieg',
       erreicht: w ? (w.erreicht||[]) : [],
       einstiegskurs: w ? w.einstiegskurs : null,
+      gemeldet: w ? (w.gemeldet || '') : '',
+      schutz: w ? w.schutz : null,
+      raus: w ? !!w.raus : false,
       aufgenommen: w ? w.aufgenommen : (S?.erzeugt || ''),
       frisch: !imTrade,
     };
@@ -4779,6 +4814,19 @@ function signalKarte(x){
       color:var(--accent);margin-top:5px">${esc(st.name)}</div>`:''}
     <p style="font-size:14.5px;margin-top:6px">${urteil}</p>
     ${st?`<p style="font-size:12.5px;color:var(--ink-2);margin-top:4px">${esc(st.these)}</p>`:''}
+    ${(()=>{ /* Warum das (k)ein Alarm ist — in einem Satz, auf der Karte selbst. */
+      if (x.stufe === 'im_trade' || x.stufe === 'stop'){
+        return w.gemeldet ? `<p style="font-size:12px;margin-top:5px;color:var(--accent)">Der
+          Einstieg kam als Alarm aufs Handy (${zeit(w.gemeldet)}) — Ziel, Stop und Ausstieg
+          klingeln ebenfalls.</p>` : '';
+      }
+      const t = alarmTor(x);
+      if (!t) return '';
+      return t.ja
+        ? `<p style="font-size:12px;margin-top:5px;color:var(--long)">Kommt durchs Alarm-Tor${
+            t.bilanz ? ` · ${esc(t.bilanz)}` : ''}</p>`
+        : `<p style="font-size:12px;margin-top:5px;color:var(--warn)">Kein Alarm: ${esc(t.grund)}</p>`;
+    })()}
     <div class="kpi">
       <span>Einstieg <b>${preis(o,'einstieg',w.einstieg,d)}</b> <span style="color:var(--ink-3)">${esc(w.einstieg_art)}${w.frisch?' · aus dem letzten Scan':' · fest seit Einstieg'}</span></span>
       <span>Stop <b>${preis(o,'stop',w.stop,d)}</b></span>
@@ -4811,6 +4859,124 @@ function signalKarte(x){
   </div>`;
 }
 
+/* ============================================ DEINE ALARM-TRADES
+
+   Bisher standen laufende Trades nur hier, solange ihr Setup im AKTUELLEN Scan noch
+   handelbar war. Drehte der Scan auf „beobachten", verschwand der Trade von der Seite —
+   obwohl Geld darin steckte. Diese Liste kommt deshalb aus der Wachliste selbst: jeder
+   Trade, dessen Einstieg als Alarm aufs Handy ging, bis er laut Plan draussen ist. */
+const PLAN_ZIEL_R = {TP1: 1, TP2: 2, TP3: 3.5};
+function planR(w){
+  const e = (w.erreicht || []).filter(t => PLAN_ZIEL_R[t] != null);
+  if (e.length) return e.reduce((a, t) => a + PLAN_ZIEL_R[t], 0) / 3;
+  return w.zustand === 'stop' ? -1 : null;
+}
+function wacheName(w){
+  return (w.name && w.name !== w.instrument) ? w.name : name(w.instrument);
+}
+function alarmTradesBlock(){
+  const alle = ((WL && WL.wachen) || []).filter(w => w.gemeldet);
+  const scanKurs = new Map((S?.gesamt || []).map(o => [o.instrument, o.kurs]));
+  if (!alle.length) return '';
+  return `<div id="alarmtrades">${alarmTradesInhalt(alle, scanKurs)}</div>`;
+}
+function alarmTradesInhalt(alle, scanKurs){
+  const offen = alle.filter(w => w.zustand === 'aktiv' && !w.raus)
+                    .sort((a,b) => String(b.gemeldet).localeCompare(String(a.gemeldet)));
+  const fertig = alle.filter(w => !(w.zustand === 'aktiv' && !w.raus))
+                     .sort((a,b) => String(b.zuletzt).localeCompare(String(a.zuletzt))).slice(0, 8);
+  let h = '';
+  if (offen.length){
+    h += `<h2>Deine Alarm-Trades <span class="mono" style="font-size:12px;color:var(--ink-3)">${offen.length} offen — dazu klingeln Ziel, Stop und Ausstieg</span></h2>`;
+    h += offen.map(w => {
+      const d = digits(w.einstieg);
+      const lang = w.richtung === 'long';
+      // Live, wo es einen Stream gibt (Krypto); sonst der Kurs aus dem letzten Scan.
+      const st = kursStand(w.instrument, scanKurs.get(w.instrument));
+      const kurs = st.kurs;
+      const basis = w.einstiegskurs ?? w.einstieg;
+      const risiko = Math.abs(w.einstieg - w.stop);
+      const r = (kurs != null && risiko > 0) ? (lang ? kurs - basis : basis - kurs) / risiko : null;
+      const stopJetzt = w.schutz != null ? w.schutz : w.stop;
+      const naechstes = [['TP1', w.tp1], ['TP2', w.tp2], ['TP3', w.tp3]]
+        .find(([t, v]) => v != null && !(w.erreicht || []).includes(t));
+      return `<div class="alarm hot" data-sym="${esc(w.instrument)}">
+        <div class="ah"><span>${esc(wacheName(w))}</span>
+          <span class="note">${lang ? 'LONG' : 'SHORT'} · ${esc(w.note)}</span>
+          <span class="d">Alarm ${zeit(w.gemeldet)}</span></div>
+        ${w.setup ? `<div class="mono" style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-top:5px">${esc(w.setup)}</div>` : ''}
+        <div class="kpi">
+          <span>Einstieg <b>${num(basis, d)}</b></span>
+          <span>Stop jetzt <b>${num(stopJetzt, d)}</b>${w.schutz != null ? ' <span class="up">nachgezogen</span>' : ''}</span>
+          ${naechstes ? `<span>Nächstes Ziel <b>${num(naechstes[1], d)}</b> <span style="color:var(--ink-3)">${naechstes[0].replace('TP','Ziel ')}</span></span>` : ''}
+        </div>
+        <div class="kpi">
+          ${kurs != null ? `<span>Kurs <b>${num(kurs, d)}</b> ${st.live
+            ? '<span class="up">live</span>' : '<span style="color:var(--ink-3)">aus dem Scan</span>'}</span>` : ''}
+          ${r != null ? `<span>Stand <b class="${r >= 0 ? 'up' : 'dn'}">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</b></span>` : ''}
+          ${(w.erreicht || []).length ? `<span>erreicht <b>${w.erreicht.join(', ').replace(/TP/g,'Ziel ')}</b></span>` : ''}
+          ${w.broker ? `<span>bei <b>${esc(w.broker)}</b></span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  if (fertig.length){
+    h += `<h2>So gingen deine letzten Alarme aus</h2>`;
+    h += `<div class="note-box"><p style="font-size:12.5px;color:var(--ink-2)">Gerechnet nach
+      dem Plan aus dem Alarm: ein Drittel bei jedem Ziel, nach Ziel 1 Stop auf Einstand.
+      „ohne Ergebnis" heisst: der Trade endete, bevor er Ziel oder Stop sah (Analyse
+      gedreht, abgelaufen) — dann zählt der Kurs beim Ausstieg, und der steht hier nicht
+      als Zahl, weil er nicht gemessen wurde.</p>`;
+    h += `</div><div class="tw"><table class="mtf"><tr><th>Wert</th><th>Ausgang</th><th>R nach Plan</th></tr>`
+      + fertig.map(w => {
+        const r = planR(w);
+        const was = w.raus && w.zustand === 'aktiv' ? 'nachgezogener Stop'
+                  : (ZUSTAND_TEXT[w.zustand] || w.zustand);
+        return `<tr><td>${esc(wacheName(w))}</td>
+          <td>${esc(was)}${(w.erreicht||[]).length ? '<br><span class="nu">' + w.erreicht.join(', ').replace(/TP/g,'Ziel ') + '</span>' : ''}</td>
+          ${r == null ? '<td class="nu">ohne Ergebnis</td>'
+            : `<td class="${r >= 0 ? 'up' : 'dn'}">${r >= 0 ? '+' : ''}${r.toFixed(2).replace('.',',')}</td>`}</tr>`;
+      }).join('') + `</table></div>`;
+  }
+  return h;
+}
+
+/* Was aufs Handy geht — und was nicht. Mit der Bilanz je Setup-Art, damit eine
+   Sperre nachvollziehbar ist und man sieht, wann sie sich lösen würde. */
+function alarmRegelnBlock(){
+  const R = S && S.alarm_regeln;
+  const arten = R ? Object.entries(R.setup_arten || {}) : [];
+  const zeile = ([n, v]) => {
+    const kl = v.urteil === 'gesperrt' ? 'dn' : v.urteil === 'bewaehrt' ? 'up' : 'nu';
+    const wort = v.urteil === 'gesperrt' ? 'gesperrt' : v.urteil === 'bewaehrt' ? 'bewährt' : 'offen';
+    return `<tr><td>${esc(n)}</td><td>${v.anzahl}</td><td>${v.ziel1}</td>
+      <td class="${v.summe_r >= 0 ? 'up' : 'dn'}">${v.summe_r >= 0 ? '+' : ''}${v.summe_r.toFixed(1).replace('.',',')}</td>
+      <td class="${kl}">${wort}</td></tr>`;
+  };
+  return `<div class="note-box warn" style="margin-top:22px"><span class="nt">Was aufs Handy geht — und was nicht</span>
+    <p><strong>Ein Einstieg klingelt nur, wenn er durchs Alarm-Tor kommt:</strong> benanntes
+    Setup · Note ab A− (B+ nur, wenn sich die Setup-Art in der eigenen Bilanz bewährt hat) ·
+    die Setup-Art hat bisher nicht unterm Strich verloren · Chance-Risiko ab
+    1:${R ? R.min_crv : 2} · Ziel 1 weit genug weg, dass nach Gebühren etwas bleibt.</p>
+    <p><strong>Und höchstens ${R ? R.max_je_tag : 3} am Tag</strong>, derselbe Coin höchstens
+    einmal in ${R ? R.sperre_je_wert_h : 48} Stunden. Kommen mehr zusammen, gehen die besten raus.</p>
+    <p><strong>Ziel, Stop, nachgezogener Stop und Ausstieg</strong> klingeln nur für Trades,
+    deren Einstieg als Alarm kam — für alles andere hast du nichts im Markt.</p>
+    ${arten.length ? `<p style="margin-top:10px"><strong>Bilanz je Setup-Art</strong>
+      <span style="color:var(--ink-3)">— nur entschiedene Trades (Ziel oder Stop erreicht),
+      gerechnet nach Plan. Ab ${R.min_faelle} Fällen gibt es ein Urteil; eine Sperre löst sich
+      von selbst, sobald die Bilanz dreht.</span></p>
+      <div class="tw"><table class="mtf"><tr><th>Setup-Art</th><th>Trades</th><th>Ziel 1</th><th>R</th><th></th></tr>
+      ${arten.map(zeile).join('')}</table></div>` : ''}
+    ${R && (R.gesperrt || []).length ? `<p style="margin-top:8px;color:var(--ink-3)">Gerade
+      gesperrt: ${R.gesperrt.map(esc).join(' · ')}</p>` : ''}
+    <p style="color:var(--ink-3)">Das ist gezählte Vergangenheit aus wenigen Wochen, kein Beweis
+    für einen Vorteil. Es reicht aber, um nicht weiter jede Stunde eine Setup-Art aufs Handy
+    zu schicken, die bisher nur Geld gekostet hat.</p>
+    <p>Krypto-Scan alle 10 Minuten, alle Aktien alle 30, Wächter alle 5 Minuten, diese Seite
+    rechnet dazwischen live weiter.</p></div>`;
+}
+
 function zeichneAlarme(){
   // Dieselbe Quelle wie der Markt-Reiter — nicht dieselbe Rechnung noch einmal.
   const signale = [...rangLagen().values()];
@@ -4826,8 +4992,8 @@ function zeichneAlarme(){
      gehoert — und genau dafuer stand unten schon die Zusage "nur ab A−".
      Weggeworfen wird nichts: die schwaecheren stehen darunter, mit dem Grund. */
   const amEinstieg = amEinstiegListe();
-  const jetzt   = amEinstieg.filter(x=>(NOTE_RANG[x.w.note]||0) >= MELDE_AB_RANG);
-  const knapp   = amEinstieg.filter(x=>(NOTE_RANG[x.w.note]||0) <  MELDE_AB_RANG);
+  const jetzt   = amEinstieg.filter(alarmReif);
+  const knapp   = amEinstieg.filter(x=>!alarmReif(x));
   const imTrade = signale.filter(x=>x.stufe==='im_trade'||x.stufe==='stop');
   const warten = tot ? [] : signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
@@ -4844,8 +5010,8 @@ function zeichneAlarme(){
     Nachsehen. „Handelbar" heißt dort nur, dass das Setup gut genug ist — <strong>nicht</strong>,
     dass der Kurs schon am Einstieg steht. Kurz: <strong>Markt = lesen, Alarme = handeln.</strong></p>
     <p><strong>Es steht hier genau das, was im Markt <em>JETZT</em> zeigt — ${jetzt.length}
-    ${jetzt.length===1?'Wert':'Werte'} ab A−${knapp.length?`, dazu ${knapp.length} schwächere
-    weiter unten`:''}.</strong> Beide Seiten benutzen seit dem 16.09. dieselbe Funktion;
+    ${jetzt.length===1?'Wert':'Werte'}, die durchs Alarm-Tor kommen${knapp.length?`, dazu
+    ${knapp.length} ohne Alarm weiter unten`:''}.</strong> Beide Seiten benutzen seit dem 16.09. dieselbe Funktion;
     vorher waren es zwei Rechnungen, und Aktien konnten hier gar nicht auftauchen, weil
     sie keinen Livekurs haben. Sie tun es jetzt — mit dem Vermerk <em>Kurs aus dem letzten
     Scan</em>, damit du den Unterschied siehst.</p>
@@ -4871,16 +5037,22 @@ function zeichneAlarme(){
        brauchst du gar keinen Alarm.</p></div>`;
 
   if (knapp.length){
-    h += `<h2>Auch am Einstieg — aber unter A− <span class="mono" style="font-size:12px;color:var(--ink-3)">${knapp.length}</span></h2>
+    h += `<h2>Auch am Einstieg — aber kein Alarm <span class="mono" style="font-size:12px;color:var(--ink-3)">${knapp.length}</span></h2>
       <div class="note-box warn"><p style="font-size:13px">Der Kurs steht hier ebenfalls
-      an der Marke, aber die Setups sind B oder B+: weniger Zeitebenen ziehen mit, die
-      Klarheit ist niedriger, oft widerspricht eine Warnung dem Setup selbst. Sie stehen
-      hier vollständig, damit nichts verschwindet — sie klingeln nicht aufs Handy, und
-      sie gehören nicht in dieselbe Zeile wie ein A.</p></div>`;
+      an der Marke, aber das Setup kommt nicht durchs Alarm-Tor. Auf jeder Karte steht in
+      einem Satz, woran es hängt — meist die Note, eine Setup-Art, die in der eigenen
+      Bilanz bisher Geld gekostet hat, oder ein Ziel, das nach Gebühren nichts übrig lässt.
+      Sie stehen hier vollständig, damit nichts verschwindet — sie klingeln nicht aufs
+      Handy, und sie gehören nicht in dieselbe Zeile wie ein echter Alarm.</p></div>`;
     h += knapp.map(signalKarte).join('');
   }
 
-  if (imTrade.length) h += `<h2>Laufende Trades <span class="mono" style="font-size:12px;color:var(--ink-3)">kein Einstieg — die laufen schon</span></h2>` + imTrade.map(signalKarte).join('');
+  h += alarmTradesBlock();
+  /* Die gemeldeten Trades stehen schon oben in „Deine Alarm-Trades" — hier nicht noch
+     einmal. Was hier bleibt, sind laufende Trades der Beobachtungsliste, zu denen es
+     keinen Alarm gab: zum Nachsehen, nicht zum Handeln. */
+  const imTradeRest = imTrade.filter(x => !x.w.gemeldet);
+  if (imTradeRest.length) h += `<h2>Laufende Trades ohne Alarm <span class="mono" style="font-size:12px;color:var(--ink-3)">beobachtet, nicht gemeldet</span></h2>` + imTradeRest.map(signalKarte).join('');
 
   if (warten.length){
     h += `<h2>Kaufen ab … <span class="mono" style="font-size:12px;color:var(--ink-3)">${warten.length} Kandidaten, nach Note sortiert</span></h2>`;
@@ -4909,13 +5081,7 @@ function zeichneAlarme(){
       ${a.body?`<p style="white-space:pre-wrap">${esc(a.body)}</p>`:''}</div>`).join('');
   }
 
-  h += `<div class="note-box warn" style="margin-top:22px"><span class="nt">Was aufs Handy geht — und was nicht</span>
-    <p><strong>Immer:</strong> Ziel erreicht, Stop berührt, Setup ungültig — unabhängig
-    von der Note, sobald es um einen laufenden Trade geht. Dort steht Geld im Feuer.</p>
-    <p><strong>Neue Setups nur ab A−.</strong> B und B+ stehen hier, klingeln aber nicht.
-    <span style="color:var(--ink-3)">Das stand hier schon vorher — seit dem 16.09. stimmt
-    es auch: vorher gab es keine Notenprüfung, es klingelte jedes erreichte Setup.</span></p>
-    <p>Scan alle 30 Minuten, Wächter alle 5 Minuten, diese Seite rechnet dazwischen live weiter.</p></div>`;
+  h += alarmRegelnBlock();
 
   $('alarme').innerHTML = h;
   $('alarme').querySelectorAll('[data-sym]').forEach(el=>
