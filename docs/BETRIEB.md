@@ -14,7 +14,8 @@ Es gibt **keinen dauerlaufenden Prozess**. Es gibt einen Zeitplan:
 | Wann | Was |
 |---|---|
 | alle 15 Min (:05 :20 :35 :50) | **Wächter**: kein Scan, nur die Kurse der beobachteten Setups. Meldet, wenn Einstieg, Ziel oder Stop tatsächlich getroffen wurde |
-| stündlich, :25 UTC | voller Marktscan (Krypto, Aktien, Gold) → neue Setups auf die Wachliste → Alarm bei Änderung → Seite neu bauen |
+| alle 10 Min | Krypto-Scan über **alle liquiden Kraken-Dollarpaare** (rund 160, seit 26.09.; vorher die 110 umsatzstärksten), Aktien aus dem letzten veröffentlichten Scan übernommen |
+| :25 und :55 UTC | voller Marktscan — Krypto und Aktien **gleichzeitig**, Gold → neue Setups auf die Wachliste → Seite neu bauen |
 | täglich, 23:10 UTC | zusätzlich Forward-Journalzeile + Tagesplan per Telegram |
 
 ## Die Wachliste
@@ -42,18 +43,38 @@ darunter steht. Jeder Übergang wird genau einmal gemeldet; der Zustand liegt in
 2. Der Takt ist 15 Minuten, nicht Echtzeit. Für Swing-Trades über Tage kein
    Unterschied; für Scalping wäre es einer.
 
-**Was aufs Telefon geht:** alles, was einen laufenden Trade betrifft (Einstieg, Ziel,
-Stop, ungültig) — immer, unabhängig von der Note. Neue Setups nur ab **A−**; B und B+
-stehen auf der Wachliste und in der App, klingeln aber nicht. Beim ersten Lauf waren es
-17 Setups auf einmal; ohne diese Grenze wäre das eine Lawine gewesen.
+**Was aufs Telefon geht (seit 26.09.):** das entscheidet das **Alarm-Tor**
+(`scanner/alarm_tor.py`) — dieselbe Prüfung im Scan (Feld `alarm` je Zeile, App) und im
+Wächter (Telefon):
+
+1. **Einstieg** nur, wenn alles stimmt: benanntes Setup · Note ab A− (B+ nur bei
+   *bewährter* Setup-Art) · die Setup-Art hat in der eigenen Bilanz nicht unterm Strich
+   verloren (ab 6 entschiedenen Trades; auch je Klasse und je Klasse+Richtung) ·
+   Chance-Risiko ab 1:2 · Ziel 1 mindestens 1,5 % (Coins) bzw. 1 % (Aktien) weg.
+   Dazu **höchstens 3 am Tag** und derselbe Basiswert (LINKUSD = LINKUSDT) höchstens
+   einmal in 48 Stunden; die besten zuerst.
+2. **Ziel, Stop, nachgezogener Stop (SCHUTZ), Ausstieg** nur für Trades, deren Einstieg
+   gemeldet wurde (`gemeldet` in der Wache), und nur, bis die Position laut Plan draußen
+   ist (`raus`).
+
+Warum: bis zum 26.09. ging **jeder** bestätigte Einstieg raus, auch B und B+, samt Ziel
+und Stop — die App versprach „nur ab A−", der Wächter hielt sich nicht daran. Die eigene
+Bilanz zeigte außerdem: die Note trennt nicht (A− −0,25 R je Trade), die Setup-Art sehr
+wohl („Ausbruch aus der Basis" +7,5 R, „Rückeroberung nach Liquiditätsgriff" −5 R ohne
+ein einziges Ziel).
+
+Nach **Ziel 1** steht der Schutz-Stop auf dem Einstieg, nach **Ziel 2** auf Ziel 1 —
+genau wie im Plan-Text. Berührt der Kurs ihn, kommt `SCHUTZ` („Rest ohne Verlust raus").
+Die Wache läuft für die Statistik mit dem ursprünglichen Stop weiter.
 
 **Wer meldet was** — damit dieselbe Nachricht nicht zweimal kommt:
 
 | Meldung | Skript |
 |---|---|
-| Neues Setup mit Einstieg, Stop, Zielen, CRV — **nur ab A−** | `watch_levels.py --vollstaendig` |
-| Einstieg / TP1 / TP2 / TP3 / Stop erreicht | `watch_levels.py` |
-| Setup abgelaufen, Richtung gedreht | `watch_levels.py` |
+| Neues Setup — **nur in der App**, klingelt nie | `watch_levels.py --vollstaendig` |
+| Einstieg bestätigt — **nur durchs Alarm-Tor**, mit vollem Plan | `watch_levels.py` |
+| Ziel 1/2/3, Stop, nachgezogener Stop, Ausstieg (Analyse gedreht) — **nur gemeldete Trades** | `watch_levels.py` |
+| Setup abgelaufen, Richtung gedreht vor dem Einstieg — nur App | `watch_levels.py` |
 | Setup weggebrochen, neue Nummer 1, Chart zieht an | `scan_alert.py --ohne-setups` |
 
 Der echte Dauerlauf-Daemon (`scripts/run_live_daemon.py`) existiert und ist fertig
@@ -378,7 +399,7 @@ Die Reihenfolge ist bewusst diese und nicht umgekehrt:
 1. **Setup** (`scanner/setups.py`) — hat der Chart einen Namen? Rücksetzer im Trend,
    Ausbruch aus der Basis, Rückeroberung nach einem Liquiditätsgriff, Abpraller an der
    Unterstützung. Ohne Namen ist bei **B+** Schluss: der Wert steht in der App, aber er
-   klingelt nicht. Alarme gehen erst ab A− raus.
+   klingelt nicht. Ob ein Einstieg klingelt, entscheidet das Alarm-Tor (oben).
 2. **Score** (`scanner/chart_score.py`) — sechs Faktoren, wie gehabt. Er ordnet
    *innerhalb* dessen, was ein Setup ist.
 3. **Plan** (`scanner/plan.py`) — Ziele aus Struktur **und** Risiko: Ziel 1 liegt nie
