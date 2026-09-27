@@ -12,6 +12,7 @@ on the way back, take the single non-``last`` key from ``result``.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 from typing import Any
 
@@ -233,8 +234,17 @@ class KrakenDataProvider(AsyncOHLCVSource, AsyncTradeSource, AsyncQuoteSource):
             self._gelernt[name] = altname
             self._rueck[kraken_name] = name
             self._rueck[altname] = name
+            # Die kleinste Preisstufe. Der Universumsfilter braucht sie, um Coins mit
+            # winzigem Kurs (Pepe, Shiba Inu) nicht pauschal auszusortieren.
+            try:
+                tick = float(row.get("tick_size") or 0.0)
+            except (TypeError, ValueError):
+                tick = 0.0
+            if tick <= 0:
+                with contextlib.suppress(TypeError, ValueError):
+                    tick = 10.0 ** -int(row.get("pair_decimals"))
             aus.append(
-                {"instrument": name, "basis": basis, "quote": waehrung, "spot": True}
+                {"instrument": name, "basis": basis, "quote": waehrung, "spot": True, "tick": tick}
             )
         self._health.record_success(latency_ms=1.0)
         return aus
