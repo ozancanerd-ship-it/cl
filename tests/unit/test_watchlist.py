@@ -126,11 +126,12 @@ def test_ziele_werden_der_reihe_nach_gemeldet() -> None:
     w.pruefen(_kurs(100.0, 99.0), jetzt=T0 + timedelta(minutes=15))
     ev = w.pruefen(_kurs(112.0, 105.0), jetzt=T0 + timedelta(minutes=30))
     assert [e.art for e in ev] == ["TP"]
-    assert "TP1" in ev[0].titel
+    # Seit 26.09. in Worten: „ZIEL 1 … Teil verkaufen" statt „TP1 ERREICHT".
+    assert ev[0].titel.startswith("ZIEL 1")
     assert w.wachen["BTCUSDT"].erreicht == ["TP1"]
 
     ev2 = w.pruefen(_kurs(131.0, 120.0), jetzt=T0 + timedelta(minutes=45))
-    assert [e.titel.split()[0] for e in ev2] == ["TP2", "TP3"]
+    assert [" ".join(e.titel.split()[:2]) for e in ev2] == ["ZIEL 2", "ZIEL 3"]
     assert w.wachen["BTCUSDT"].zustand == Zustand.ZIEL_ERREICHT.value
 
 
@@ -174,7 +175,7 @@ def test_short_laeuft_spiegelbildlich() -> None:
     ev = w.pruefen(_kurs(hoch=100.5, tief=97.0), jetzt=T0 + timedelta(minutes=15))
     assert [e.art for e in ev] == ["EINSTIEG"]
     ev2 = w.pruefen(_kurs(hoch=99.0, tief=79.0), jetzt=T0 + timedelta(minutes=30))
-    assert [e.titel.split()[0] for e in ev2] == ["TP1", "TP2"]
+    assert [" ".join(e.titel.split()[:2]) for e in ev2] == ["ZIEL 1", "ZIEL 2"]
     assert w.wachen["BTCUSDT"].zustand == Zustand.ZIEL_ERREICHT.value
 
 

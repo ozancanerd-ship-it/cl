@@ -22,8 +22,13 @@ from pathlib import Path
 
 SKRIPT = Path(__file__).resolve().parents[2] / "scripts" / "watch_levels.py"
 
-#: Nur diese drei. Alles andere steht in der App.
-ERLAUBT = {"EINSTIEG", "TP", "STOP"}
+#: Nur diese. Alles andere steht in der App.
+#:
+#: Seit 26.09. dazu SCHUTZ (nachgezogener Stop nach Ziel 1/2 beruehrt) und AUSSTIEG
+#: (Analyse hat bei einem LAUFENDEN Trade gedreht). Beides sind Ausstiege aus einer
+#: Position, in der Geld steckt — keine Statusmeldungen. Und beide klingeln nur fuer
+#: Trades, deren Einstieg selbst durch das Alarm-Tor kam (``alarm_tor.fuers_telefon``).
+ERLAUBT = {"EINSTIEG", "TP", "STOP", "SCHUTZ", "AUSSTIEG"}
 
 
 def _liste() -> set[str]:
