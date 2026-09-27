@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.analysis.macro_context import MacroLage, warnungen_fuer
 from trading_agent.core.enums import AssetClass, Timeframe
+from trading_agent.scanner import alarm_tor
 from trading_agent.scanner import erwartung as erw
 from trading_agent.scanner import gleichlauf as gl
 from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnung
@@ -101,6 +102,9 @@ AKTIEN = [
     # der Basiswert schon — und daran haengt, ob der Schein noch Sinn ergibt.
     "TSM",
     "NFLX",
+    # 26.09.: Turbo long auf Mercado Libre im Depot (Screenshot) — der Basiswert stand
+    # nicht im Scan, der Schein bekam deshalb keine Bewertung.
+    "MELI",
     # Breiteres Aktienuniversum. Vorher waren es 42 Werte — bei der Haelfte dessen,
     # was Ozan bei Trade Republic kaufen kann, stand deshalb 'keine Daten'. Ein
     # Scanner, der nur seine eigene Liste kennt, findet auch nur seine eigene Liste.
@@ -183,8 +187,13 @@ GOLD = ["PAXGUSD"]
 # Einzelaktien bleiben in Euro: die laufen ueber Trade Republic, und dort gibt es
 # nichts anderes.
 KRYPTO_QUOTE = "USD"
-KRYPTO_MIN_UMSATZ = 150_000.0
-KRYPTO_MIN_TRADES = 300
+#: 26.09.: von 150 000 / 300 auf 100 000 / 200 gesenkt. Ozan: „komplett alle Cryptos,
+#: Altcoins". Bei Kraken sind das rund 160 statt 140 Paare — alles, worin eine Position
+#: von ein paar hundert Euro noch ein Tropfen ist. Darunter wird es duenn: dort ist der
+#: eigene Auftrag schon ein spuerbarer Teil des Tagesumsatzes, und der Spread frisst den
+#: Plan. Die Warnung „duenn fuer schnelle Ausstiege" steht bei solchen Werten weiter dran.
+KRYPTO_MIN_UMSATZ = 100_000.0
+KRYPTO_MIN_TRADES = 200
 
 #: Die Euro-Notloesung: gleiche Idee, niedrigere Schwelle, weil der Markt duenner ist.
 EUR_MIN_UMSATZ = 50_000.0
@@ -208,9 +217,35 @@ BYBIT_MIN_UMSATZ = 3_000_000.0
 #: Die Auswahl folgt Marktkapitalisierung und Bekanntheit — also dem, was ein Scanner
 #: fuer Krypto ohnehin abdecken sollte.
 KERN_COINS: tuple[str, ...] = (
-    "BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LINK", "AVAX", "DOT", "LTC",
-    "ARB", "OP", "INJ", "SEI", "RENDER", "FET", "NEAR", "ATOM", "TIA",
-    "SUI", "APT", "KAS", "TAO", "UNI", "AAVE", "FIL", "ICP", "ETC", "BCH",
+    "BTC",
+    "ETH",
+    "SOL",
+    "XRP",
+    "ADA",
+    "DOGE",
+    "LINK",
+    "AVAX",
+    "DOT",
+    "LTC",
+    "ARB",
+    "OP",
+    "INJ",
+    "SEI",
+    "RENDER",
+    "FET",
+    "NEAR",
+    "ATOM",
+    "TIA",
+    "SUI",
+    "APT",
+    "KAS",
+    "TAO",
+    "UNI",
+    "AAVE",
+    "FIL",
+    "ICP",
+    "ETC",
+    "BCH",
 )
 
 #: Fenster fuer Yahoo: kein natives H4, also muss M5 lang genug sein, damit die
@@ -511,20 +546,36 @@ async def _eurusd() -> float | None:
         return None
 
 
-def _quotentabelle() -> dict[str, erw.Quote]:
-    """Die Trefferhaeufigkeiten aus der eigenen Wachliste.
+WACHLISTE = Path("data/repository_real/live/watchlist.json")
+
+
+def _wachliste_roh() -> dict[str, Any]:
+    """Der gespeicherte Zustand der Wachliste — Quelle fuer Trefferquoten UND Alarm-Tor.
 
     Bewusst aus dem Zustand der Wachliste und nicht aus ``web/performance.json``: die
     Bilanz wird im Tagesablauf **nach** dem Scan gerechnet, die Datei waere also einen
     Lauf alt. Dieselbe Quelle, nur ohne den Umweg.
     """
-    quelle = Path("data/repository_real/live/watchlist.json")
-    if not quelle.is_file():
+    if not WACHLISTE.is_file():
         return {}
     try:
-        daten = json.loads(quelle.read_text(encoding="utf-8"))
+        daten = json.loads(WACHLISTE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"  ::warning::Wachliste fuer Trefferquoten nicht lesbar: {exc}")
+        print(f"  ::warning::Wachliste nicht lesbar: {exc}")
+        return {}
+    return daten if isinstance(daten, dict) else {}
+
+
+def _alarm_stand() -> dict[str, alarm_tor.Stand]:
+    """Die Bilanz je Setup-Art fuer das Alarm-Tor — dieselbe, die der Waechter benutzt."""
+    wachen = (_wachliste_roh().get("wachen") or {}).values()
+    return alarm_tor.bilanz(w for w in wachen if isinstance(w, dict))
+
+
+def _quotentabelle() -> dict[str, erw.Quote]:
+    """Die Trefferhaeufigkeiten aus der eigenen Wachliste."""
+    daten = _wachliste_roh()
+    if not daten:
         return {}
     from trading_agent.scanner.performance import bericht
 
@@ -567,10 +618,70 @@ def _erwartung_anhaengen(r: dict[str, Any], tabelle: dict[str, erw.Quote]) -> No
     r["erwartung"] = e.as_dict()
 
 
+#: Ein Vorlauf, der aelter ist, wird nicht uebernommen — dann lieber alles neu scannen.
+VORLAUF_MAX_STUNDEN = 3
+
+
+def _frisch_genug(doc: dict[str, Any]) -> bool:
+    try:
+        t = datetime.fromisoformat(str(doc.get("erzeugt")))
+    except (TypeError, ValueError):
+        return False
+    return datetime.now(UTC) - t < timedelta(hours=VORLAUF_MAX_STUNDEN)
+
+
+async def _vorlauf_holen(url: str) -> dict[str, Any]:
+    """Den zuletzt veroeffentlichten Scan holen.
+
+    WARUM DAS NOETIG IST: ``--nur krypto,gold`` sollte die Aktien aus dem letzten Scan
+    uebernehmen. Der liegt aber in ``web/``, und ``web/scan.json`` ist nicht im Repo — in
+    der CI war er also nie da. Jeder Zehn-Minuten-Lauf fiel deshalb auf „alles scannen"
+    zurueck, OHNE ``--aktien 120``: Aktien mit dem Standarddeckel 40. Sechs von acht
+    Laeufen je Stunde kosteten drei Minuten Aktienscan fuer eine Liste, in der 61 der
+    101 Aktien fehlten — auch TSMC und Netflix, auf die Ozan Turbos haelt.
+    """
+    import httpx
+
+    ziel = url.rstrip("/") + "/scan.json"
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as c:
+            r = await c.get(ziel, params={"v": datetime.now(UTC).strftime("%H%M%S")})
+            r.raise_for_status()
+            doc = r.json()
+    except Exception as exc:
+        print(f"  Vorlauf von {ziel} nicht ladbar: {type(exc).__name__}: {str(exc)[:120]}")
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+async def _details_holen(url: str, namen: list[str], ordner: Path) -> int:
+    """Detaildateien der uebernommenen Werte von der Seite holen. Gibt die Anzahl zurueck."""
+    import httpx
+
+    basis = url.rstrip("/") + "/asset/"
+    geholt = 0
+    sem = asyncio.Semaphore(8)
+
+    async def eins(c: Any, name: str) -> None:
+        nonlocal geholt
+        async with sem:
+            try:
+                r = await c.get(basis + f"{name}.json")
+                r.raise_for_status()
+                (ordner / f"{name}.json").write_bytes(r.content)
+                geholt += 1
+            except Exception as exc:
+                print(f"    {name}: Detaildatei nicht ladbar ({type(exc).__name__})")
+
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as c:
+        await asyncio.gather(*(eins(c, n) for n in namen))
+    return geholt
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="web", help="Ausgabeordner (scan.json + asset/)")
-    ap.add_argument("--krypto", type=int, default=110, help="Deckel fuer das Krypto-Universum")
+    ap.add_argument("--krypto", type=int, default=200, help="Deckel fuer das Krypto-Universum")
     ap.add_argument("--aktien", type=int, default=40)
     ap.add_argument(
         "--profil",
@@ -581,6 +692,15 @@ async def main() -> int:
     ap.add_argument("--detail", type=int, default=60, help="fuer wie viele Werte Detaildateien")
     ap.add_argument("--makro", default="web/macro.json", help="Makrolage aus fetch_macro.py")
     ap.add_argument("--ohne-aktien", action="store_true")
+    ap.add_argument(
+        "--vorlauf-url",
+        default="",
+        help=(
+            "Adresse der veroeffentlichten App. Fehlt bei --nur der lokale Vorlauf "
+            "(in der CI immer: web/ liegt nicht im Repo), wird der letzte Scan samt "
+            "Detaildateien von dort geholt, statt alles neu zu scannen."
+        ),
+    )
     ap.add_argument(
         "--nur",
         default="",
@@ -664,43 +784,58 @@ async def main() -> int:
 
     nur = {t.strip() for t in args.nur.split(",") if t.strip()}
     alt_doc: dict[str, Any] = {}
+    alt_quelle = ""
     if nur:
         alt = out / "scan.json"
         if alt.exists():
             try:
                 alt_doc = json.loads(alt.read_text(encoding="utf-8"))
+                alt_quelle = "lokal"
             except (OSError, json.JSONDecodeError):
                 alt_doc = {}
+        if not alt_doc and args.vorlauf_url:
+            alt_doc = await _vorlauf_holen(args.vorlauf_url)
+            alt_quelle = "veroeffentlicht" if alt_doc else ""
+        if alt_doc and not _frisch_genug(alt_doc):
+            print(
+                f"  (letzter Scan von {alt_doc.get('erzeugt')} ist aelter als "
+                f"{VORLAUF_MAX_STUNDEN} Std. — es wird alles gescannt)"
+            )
+            alt_doc = {}
         if not alt_doc:
             print("  (kein alter Scan zum Ergaenzen — es wird alles gescannt)")
             nur = set()
+        else:
+            print(f"  Vorlauf: Scan von {alt_doc.get('erzeugt')} ({alt_quelle})")
 
     klassen: dict[str, list[Any]] = {}
     fehler: dict[str, str] = {}
     universum: dict[str, Any] = {}
     uebernommen: dict[str, list[dict[str, Any]]] = {}
 
-    def ueberspringen(name: str) -> bool:
+    async def ueberspringen(name: str) -> bool:
         if not nur or name in nur:
             return False
         reihen = (alt_doc.get("klassen") or {}).get(name) or []
+        # Jede uebernommene Zeile traegt, von wann ihre Analyse ist. Sonst sieht eine
+        # Aktienzeile von vor einer halben Stunde in der App aus wie eine von eben.
+        for r in reihen:
+            r.setdefault("aus_vorlauf", alt_doc.get("erzeugt"))
         uebernommen[name] = reihen
         universum[name] = ((alt_doc.get("universum") or {}).get(name)) or {}
         if reihen:
             print(f"— {name} — aus dem letzten Scan uebernommen ({len(reihen)})")
+        if alt_quelle == "veroeffentlicht" and reihen:
+            # Die Detaildateien (Chart, Analyse) liegen dann auch nur auf der Seite —
+            # ohne sie zeigte die App fuer jede uebernommene Aktie ein leeres Chartfeld.
+            vorhanden = set(alt_doc.get("detail_vorhanden") or [])
+            namen = [str(r.get("instrument")) for r in reihen if r.get("instrument") in vorhanden]
+            geholt = await _details_holen(args.vorlauf_url, namen, ordner)
+            print(f"  {geholt} von {len(namen)} Detaildateien von der Seite geholt")
         return True
 
-    print("— krypto —", flush=True)
-    if not ueberspringen("krypto"):
-        chancen, info, err = await _krypto(profil, args.krypto, schreiber("krypto"), lage)
-        klassen["krypto"] = chancen
-        universum["krypto"] = info
-        if err:
-            fehler["krypto"] = err
-            print(f"  ! {err}")
-
     print("— gold —", flush=True)
-    if not ueberspringen("gold"):
+    if not await ueberspringen("gold"):
         chancen, info, err = await _gold(profil, schreiber("gold"), lage)
         klassen["gold"] = chancen
         universum["gold"] = info
@@ -708,15 +843,27 @@ async def main() -> int:
             fehler["gold"] = err
             print(f"  ! {err}")
 
+    # Krypto und Aktien GLEICHZEITIG. Die beiden haengen an verschiedenen Anbietern mit
+    # eigener Ratenbremse (Kraken, Yahoo) und warten fast nur aufs Netz. Nacheinander
+    # dauerte ein voller Lauf bei 101 Aktien und 160 Coins rund eine Viertelstunde —
+    # laenger als der Abstand zum naechsten Lauf. Nebeneinander so lange wie der
+    # langsamere der beiden.
+    aufgaben: dict[str, Any] = {}
+    print("— krypto —", flush=True)
+    if not await ueberspringen("krypto"):
+        aufgaben["krypto"] = _krypto(profil, args.krypto, schreiber("krypto"), lage)
     if not args.ohne_aktien:
         print("— aktien —", flush=True)
-        if not ueberspringen("aktien"):
-            chancen, info, err = await _aktien(profil, args.aktien, schreiber("aktien"), lage)
-            klassen["aktien"] = chancen
-            universum["aktien"] = info
+        if not await ueberspringen("aktien"):
+            aufgaben["aktien"] = _aktien(profil, args.aktien, schreiber("aktien"), lage)
+    if aufgaben:
+        ergebnisse = await asyncio.gather(*aufgaben.values())
+        for name, (chancen, info, err) in zip(aufgaben, ergebnisse, strict=True):
+            klassen[name] = chancen
+            universum[name] = info
             if err:
-                fehler["aktien"] = err
-                print(f"  ! {err}")
+                fehler[name] = err
+                print(f"  ! {name}: {err}")
 
     alle: list[Any] = [c for liste in klassen.values() for c in liste]
     alle.sort(key=lambda c: -c.score)
@@ -773,6 +920,22 @@ async def main() -> int:
     for r in kompakt_neu + kompakt_alt:
         _erwartung_anhaengen(r, tabelle)
 
+    # Das Alarm-Tor — dieselbe Pruefung wie im Waechter (watch_levels.py). Damit steht in
+    # der App unter „Jetzt einsteigen" genau das, was auch aufs Handy geht, und bei allem
+    # anderen der Grund, warum nicht. Zwei Rechnungen fuer dieselbe Frage hatten wir
+    # schon einmal (16.09.), mit einem echten Verkauf als Folge.
+    alarm_stand = _alarm_stand()
+    for r in kompakt_neu + kompakt_alt:
+        if r.get("handelbar") and r.get("einstieg") is not None:
+            r["alarm"] = alarm_tor.pruefe_zeile(r, alarm_stand).as_dict()
+        else:
+            r.pop("alarm", None)
+    gesperrt = [
+        k for k, v in alarm_stand.items() if k.startswith("setup:") and v.urteil == "gesperrt"
+    ]
+    if gesperrt:
+        print(f"  Alarm-Tor: gesperrt — {', '.join(g.removeprefix('setup:') for g in gesperrt)}")
+
     # Welche Coins stehen nur als Kuerzel da? Das Universum ist dynamisch — heute ist
     # ein Coin liquide, morgen ein anderer. Die Namenstabelle laeuft dem hinterher.
     # Statt das stillschweigend hinzunehmen, sagt es der Lauf: dann laesst es sich
@@ -810,10 +973,19 @@ async def main() -> int:
         "detail_vorhanden": sorted(behalten),
         "makro": lage.as_dict() if lage is not None else None,
         "eurusd": eurusd,
+        "alarm_regeln": alarm_tor.regeln_uebersicht(alarm_stand),
+        # Uebernommene Klassen gehoeren in BEIDE Listen. Bis zum 26.09. standen sie in
+        # keiner — was nie auffiel, weil die Uebernahme in der CI nie geklappt hat (siehe
+        # ``--vorlauf-url``): jeder Zehn-Minuten-Lauf hat stattdessen alles neu gescannt,
+        # Aktien mit dem Standarddeckel 40 statt 101.
         "klassen": {
-            k: sorted((zeile_je[c.instrument] for c in v), key=_rang) for k, v in klassen.items()
+            **{
+                k: sorted((zeile_je[c.instrument] for c in v), key=_rang)
+                for k, v in klassen.items()
+            },
+            **{k: sorted(v, key=_rang) for k, v in uebernommen.items() if k not in klassen},
         },
-        "gesamt": sorted(kompakt_neu, key=_rang),
+        "gesamt": kompakt_alle,
     }
 
     # Gleichlauf: die gemessenen Tagesrenditen, standardisiert und auf ein Byte je Tag
@@ -828,7 +1000,11 @@ async def main() -> int:
     neuer_gl = gl.baue(kurse_je) if kurse_je else None
     alter_gl = alt_doc.get("gleichlauf") if alt_doc else None
     gesamt_universum = len(kompakt_alle) or 1
-    if neuer_gl and len(neuer_gl["z"]) >= gesamt_universum * 0.6:
+    # Seit 26.09. klappt die Uebernahme wirklich, und das Krypto-Universum ist groesser:
+    # ein reiner Kryptolauf deckt dann ueber 60 % des Universums ab und haette den vollen
+    # Block ueberschrieben — ohne Aktien. Also: bei einem Teillauf bleibt der alte Block.
+    teillauf = bool(uebernommen)
+    if neuer_gl and not (teillauf and alter_gl) and len(neuer_gl["z"]) >= gesamt_universum * 0.6:
         doc["gleichlauf"] = neuer_gl
         print(
             f"Gleichlauf: {len(neuer_gl['z'])} Reihen ueber {neuer_gl['tage']} Handelstage "
@@ -837,8 +1013,7 @@ async def main() -> int:
     elif alter_gl:
         doc["gleichlauf"] = alter_gl
         print(
-            f"Gleichlauf: aus dem letzten vollen Lauf uebernommen "
-            f"({len(alter_gl.get('z') or {})})"
+            f"Gleichlauf: aus dem letzten vollen Lauf uebernommen ({len(alter_gl.get('z') or {})})"
         )
     elif neuer_gl:
         doc["gleichlauf"] = neuer_gl

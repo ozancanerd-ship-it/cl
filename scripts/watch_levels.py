@@ -66,6 +66,38 @@ def _laden(pfad: str) -> dict[str, Any] | None:
 #: Grosszuegig, weil ein einzelner Ausfall der Boerse keine Position beenden soll.
 OHNE_KURS_STUNDEN = 30.0
 
+#: Bei Aktien zaehlen nur BOERSENSTUNDEN (US-Handel 13:30–20:00 UTC, Mo–Fr). Zwei volle
+#: Handelstage ohne einen einzigen Kurs — das ist ein echter Ausfall, kein Wochenende.
+OHNE_KURS_BOERSENSTUNDEN = 13.0
+
+
+def _boersenstunden(von: datetime, bis: datetime) -> float:
+    """Wie viele US-Handelsstunden zwischen ``von`` und ``bis`` lagen.
+
+    Der Grund fuer diese Funktion war der teuerste stille Fehler der Aktienseite: jede
+    Aktien-Wache, die am Freitagabend ihren letzten Kurs sah, stand am Sonntag um zwei
+    Uhr frueh dreissig Stunden „ohne Kurs" — und wurde als Karteileiche geschlossen.
+    Am 20.09. traf das GILD, NEE, WMT, NOW und GOOGL auf einen Schlag, laufende Trades
+    im Plus. Aktien konnten damit nie ueber ein Wochenende laufen, obwohl genau das ihre
+    Haltedauer ist („in zwei, drei Tagen passiert das nicht").
+
+    Feiertage kennt die Funktion nicht; ein Feiertag zaehlt als Handelstag. Das macht die
+    Grenze nur etwas strenger, nie lockerer.
+    """
+    if bis <= von:
+        return 0.0
+    stunden = 0.0
+    tag = von.replace(hour=0, minute=0, second=0, microsecond=0)
+    while tag < bis:
+        if tag.weekday() < 5:
+            auf = tag.replace(hour=13, minute=30)
+            zu = tag.replace(hour=20, minute=0)
+            a, b = max(auf, von), min(zu, bis)
+            if b > a:
+                stunden += (b - a).total_seconds() / 3600.0
+        tag += timedelta(days=1)
+    return stunden
+
 
 def _raeume_zombies(liste: Any, kurse: dict[str, dict[str, float]], jetzt: datetime) -> int:
     """Offene Wachen schliessen, fuer die es seit Tagen keinen Kurs mehr gibt.
@@ -89,12 +121,18 @@ def _raeume_zombies(liste: Any, kurse: dict[str, dict[str, float]], jetzt: datet
             zuletzt = datetime.fromisoformat(str(w.zuletzt))
         except (TypeError, ValueError):
             continue
-        if (jetzt - zuletzt).total_seconds() / 3600.0 < OHNE_KURS_STUNDEN:
-            continue
+        if w.klasse == "aktien":
+            if _boersenstunden(zuletzt, jetzt) < OHNE_KURS_BOERSENSTUNDEN:
+                continue
+            grenze = f"{OHNE_KURS_BOERSENSTUNDEN:.0f} Boersenstunden"
+        else:
+            if (jetzt - zuletzt).total_seconds() / 3600.0 < OHNE_KURS_STUNDEN:
+                continue
+            grenze = f"{OHNE_KURS_STUNDEN:.0f} h"
         w.zustand = "abgelaufen"
         w.zuletzt = jetzt.isoformat()
         zu += 1
-        print(f"  {w.instrument:<14} geschlossen — seit ueber {OHNE_KURS_STUNDEN:.0f} h kein Kurs")
+        print(f"  {w.instrument:<14} geschlossen — seit ueber {grenze} kein Kurs")
     if zu:
         print(f"  {zu} Karteileiche(n) geschlossen")
     return zu
@@ -187,6 +225,35 @@ async def _extrema(
     return aus, reihen
 
 
+def _alte_trades_uebernehmen(liste: Any, stand: dict[str, Any] | None) -> int:
+    """Einmalig beim Umstieg auf das Alarm-Tor (26.09.): laufende Trades einordnen.
+
+    Folgealarme klingeln seitdem nur fuer Trades, deren Einstieg „gemeldet" ist. Die
+    Trades, die schon vorher liefen, kennen das Feld nicht — ohne diese Uebernahme waeren
+    sie alle auf einen Schlag stumm, auch die, in denen Ozan nach dem alten Alarm vielleicht
+    drin ist. Uebernommen werden die, die auch nach heutigem Massstab durchs Tor kaemen;
+    die uebrigen bleiben in der App. Danach traegt jede Wache das Feld, und die Funktion
+    tut nichts mehr.
+    """
+    from trading_agent.scanner import alarm_tor
+
+    roh = (stand or {}).get("wachen") or {}
+    alt = {k for k, v in roh.items() if isinstance(v, dict) and "gemeldet" not in v}
+    if not alt:
+        return 0
+    bilanz = alarm_tor.bilanz(v for v in roh.values() if isinstance(v, dict))
+    n = 0
+    for k in alt:
+        w = liste.wachen.get(k)
+        if w is None or w.zustand != "aktiv" or w.gemeldet:
+            continue
+        if alarm_tor.pruefe_wache(w, bilanz).ja:
+            w.gemeldet = w.aufgenommen
+            n += 1
+    print(f"Umstieg Alarm-Tor: {n} von {len(alt)} alten Wachen als gemeldet uebernommen")
+    return n
+
+
 def _seit(stand: dict[str, Any] | None, jetzt: datetime) -> datetime:
     """Ab wann geprueft wird: seit der letzten Pruefung, hoechstens einige Stunden.
 
@@ -219,11 +286,9 @@ async def main() -> int:
         "--alle-setups",
         action="store_true",
         help=(
-            "Auch B- und B+-Setups aufs Telefon schicken. Standard: nur A−/A/A+. "
-            "Alles Handelbare steht so oder so auf der Wachliste und in der App — "
-            "aber jede Stunde ein paar B-Setups zu melden waere genau der Spam, den "
-            "wir nicht wollen. Einstieg, Ziel und Stop werden IMMER gemeldet, "
-            "unabhaengig von der Note: da bist du dann im Trade."
+            "Das Alarm-Tor abschalten und JEDEN Einstieg samt Folgealarmen schicken — nur "
+            "fuer Tests von Hand. Standard: Einstiege nur durch das Tor "
+            "(scanner/alarm_tor.py), Folgealarme nur fuer gemeldete Trades."
         ),
     )
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
@@ -246,6 +311,10 @@ async def main() -> int:
     liste = Wachliste.from_dict(stand)
     scan = _laden(args.scan) or {}
     zeilen = scan.get("gesamt") or []
+    # Welche Trades waren VOR diesem Lauf schon draussen (Schutz-Stop, Ausstieg)? Zu
+    # denen klingelt nichts mehr — egal, was der Kurs danach noch macht.
+    raus_vorher = {k: w.raus for k, w in liste.wachen.items()}
+    _alte_trades_uebernehmen(liste, stand)
 
     ereignisse = []
     if args.vollstaendig and zeilen:
@@ -275,19 +344,33 @@ async def main() -> int:
     #
     # Ozans Einwand, woertlich: „mein Handy kriegt die ganze Zeit Nachrichten, wenn er
     # sich neu aktualisiert hat. Ich will nur Alarme bekommen, wo ich reingehen kann."
-    # Er hat recht. Vorher ging fast alles raus: jede neue Wache, jeder angepasste Plan,
-    # jede abgelaufene Idee. Das sind Zustandsaenderungen eines Programms, keine
-    # Handlungsaufforderungen — und ein Telefon, das bei jeder davon summt, wird
-    # stummgeschaltet. Dann kommt auch das Wichtige nicht mehr an.
+    # Und am 26.09.: „Die Alarme sind irgendwie schlecht geworden … bessere Alarme, da
+    # wo es sich wirklich lohnt."
     #
-    # Auf dem Telefon landen nur noch die drei Momente, in denen wirklich etwas zu tun
-    # oder zu wissen ist:
-    #   EINSTIEG — der Kurs ist da UND bestaetigt. Jetzt oder nie.
-    #   TP       — ein Ziel ist erreicht, Teilverkauf und Stop nachziehen.
-    #   STOP     — die Position ist raus.
+    # Bis zum 26.09. ging hier JEDER bestaetigte Einstieg raus, egal welche Note — und
+    # danach Ziel und Stop fuer jeden dieser Trades. Die App behauptete „nur ab A−"; der
+    # Waechter hielt sich nicht daran. Von 60 abgeschlossenen Signalen waren 50 B oder B+.
+    #
+    # Jetzt:
+    #   EINSTIEG — nur durch das Alarm-Tor (scanner/alarm_tor.py): benanntes Setup, Note,
+    #              eigene Bilanz der Setup-Art, Chance-Risiko, Raum nach Kosten, kein
+    #              Doppel, hoechstens drei am Tag. Die besten zuerst.
+    #   TP / STOP / SCHUTZ / AUSSTIEG — nur fuer Trades, deren Einstieg gemeldet wurde,
+    #              und nur, solange die Position laut Plan noch offen ist.
     # Alles andere steht in der App, wo man es nachliest, wenn man hinsieht.
-    AUFS_TELEFON = {"EINSTIEG", "TP", "STOP"}
-    zu_senden = [e for e in ereignisse if e.art in AUFS_TELEFON or args.alle_setups]
+    AUFS_TELEFON = {"EINSTIEG", "TP", "STOP", "SCHUTZ", "AUSSTIEG"}
+    from trading_agent.scanner import alarm_tor
+
+    zu_senden, notizen = alarm_tor.fuers_telefon(
+        ereignisse,
+        liste.wachen,
+        raus_vorher=raus_vorher,
+        jetzt=jetzt,
+        erlaubt=AUFS_TELEFON,
+        alle=args.alle_setups,
+    )
+    for satz in notizen:
+        print(f"  {satz}")
     still = len(ereignisse) - len(zu_senden)
 
     print(
@@ -347,11 +430,20 @@ async def main() -> int:
     # Hat sich am Zustand etwas geaendert? Nur dann muss der Stand gesichert werden.
     # Sonst wuerde die CI viermal pro Stunde einen Commit erzeugen, der nichts sagt
     # ausser "ich war hier".
+    # Seit 26.09. gehoeren auch „gemeldet" und „raus" dazu: bleibt einer davon ungesichert,
+    # kommt beim naechsten leichten Lauf derselbe Alarm noch einmal.
     vorher = {
-        k: (v.get("zustand"), tuple(v.get("erreicht") or []))
+        k: (
+            v.get("zustand"),
+            tuple(v.get("erreicht") or []),
+            v.get("gemeldet") or "",
+            bool(v.get("raus")),
+        )
         for k, v in ((stand or {}).get("wachen") or {}).items()
     }
-    nachher = {k: (w.zustand, tuple(w.erreicht)) for k, w in liste.wachen.items()}
+    nachher = {
+        k: (w.zustand, tuple(w.erreicht), w.gemeldet, w.raus) for k, w in liste.wachen.items()
+    }
     geaendert = vorher != nachher
 
     entfernt = liste.aufraeumen()
