@@ -116,7 +116,18 @@ def note_kurz(note: str) -> str:
     return {"A_PLUS": "A+", "A_MINUS": "A−", "A-": "A−", "B_PLUS": "B+"}.get(note, note)
 
 
-def _r_drittel(zustand: str, erreicht: Iterable[str]) -> float:
+def _r_drittel(
+    zustand: str, erreicht: Iterable[str], raus_erreicht: Iterable[str] | None = None
+) -> float:
+    """R nach Plan. ``raus_erreicht``: die Ziele, die erreicht waren, als der Schutz-Stop
+    die Position beendet hat — was die Wache danach noch sieht, hat der Plan nicht mehr."""
+    if raus_erreicht is not None:
+        getroffen = [t for t in ("TP1", "TP2", "TP3") if t in set(raus_erreicht)]
+        if not getroffen:
+            return 0.0
+        # Rest am Schutz-Stop: nach Ziel 2 liegt er auf Ziel 1, sonst auf Einstand.
+        rest_r = _ZIEL_R["TP1"] if "TP2" in getroffen else 0.0
+        return (sum(_ZIEL_R[t] for t in getroffen) + (3 - len(getroffen)) * rest_r) / 3.0
     getroffen = [t for t in ("TP1", "TP2", "TP3") if t in set(erreicht)]
     if not getroffen:
         return -1.0 if zustand == "stop" else 0.0
@@ -207,15 +218,21 @@ def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
     for w in wachen:
         if not isinstance(w, Mapping):
             continue
-        if str(w.get("zustand") or "") not in _ABGESCHLOSSEN:
+        roh_raus = w.get("raus_erreicht")
+        # Laut Plan draussen (Schutz-Stop) ist entschieden, auch wenn die Wache fuer die
+        # Statistik weiterlaeuft — das Ergebnis steht fest.
+        raus_e = (
+            [str(x) for x in roh_raus] if w.get("raus") and isinstance(roh_raus, list) else None
+        )
+        if str(w.get("zustand") or "") not in _ABGESCHLOSSEN and raus_e is None:
             continue
         if w.get("einstiegskurs") is None:
             continue
         erreicht = [str(x) for x in (w.get("erreicht") or [])]
         zustand = str(w.get("zustand"))
-        if zustand not in ("stop", "ziel_erreicht") and "TP1" not in erreicht:
+        if raus_e is None and zustand not in ("stop", "ziel_erreicht") and "TP1" not in erreicht:
             continue
-        r = _r_drittel(zustand, erreicht)
+        r = _r_drittel(zustand, erreicht, raus_e)
         for k in _schluessel(
             str(w.get("setup") or ""), str(w.get("klasse") or ""), str(w.get("richtung") or "")
         ):

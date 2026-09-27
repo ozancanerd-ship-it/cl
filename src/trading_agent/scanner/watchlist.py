@@ -131,6 +131,13 @@ class Wache:
     raus: bool = False
     #: Kurs beim vorzeitigen Ausstieg (Analyse gedreht).
     ausstiegskurs: float | None = None
+    #: Welche Ziele erreicht waren, als der Schutz-Stop die Position laut Plan beendet
+    #: hat, und wo dieser Schutz-Stop lag. Die Wache laeuft danach weiter — ``erreicht``
+    #: waechst also womoeglich noch. Bis zum 27.09. zaehlte die Bilanz auch Ziele, die
+    #: ERST NACH dem Ausstieg kamen: Ziel 1, zurueck auf Einstand (raus), spaeter Ziel 3
+    #: ging als +2,17 R in die Statistik, obwohl der Plan nur +0,33 R gebracht hat.
+    raus_erreicht: list[str] | None = None
+    raus_kurs: float | None = None
 
     @property
     def long(self) -> bool:
@@ -182,6 +189,8 @@ class Wache:
             "schutz": self.schutz,
             "raus": self.raus,
             "ausstiegskurs": self.ausstiegskurs,
+            "raus_erreicht": (list(self.raus_erreicht) if self.raus_erreicht is not None else None),
+            "raus_kurs": self.raus_kurs,
         }
 
     @property
@@ -645,6 +654,8 @@ class Wachliste:
                 schutz_beruehrt = tief <= w.schutz if w.long else hoch >= w.schutz
                 if schutz_beruehrt:
                     w.raus = True
+                    w.raus_erreicht = list(w.erreicht)
+                    w.raus_kurs = w.schutz
                     nach_tp2 = "TP2" in w.erreicht
                     ergebnis = (1.0 + 2.0 + 1.0) / 3.0 if nach_tp2 else 1.0 / 3.0
                     ereignisse.append(

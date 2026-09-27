@@ -96,7 +96,9 @@ def _r_ganz(zustand: str, erreicht: tuple[str, ...], mfe: float) -> float:
     return 0.0
 
 
-def _r_drittel(zustand: str, erreicht: tuple[str, ...]) -> float:
+def _r_drittel(
+    zustand: str, erreicht: tuple[str, ...], raus_erreicht: tuple[str, ...] | None = None
+) -> float:
     """Drittel-Regel: je Ziel ein Drittel raus, nach dem ersten Ziel Stop auf Einstand.
 
     Der entscheidende Unterschied liegt nicht in den Teilgewinnen, sondern im Stop auf
@@ -105,6 +107,14 @@ def _r_drittel(zustand: str, erreicht: tuple[str, ...]) -> float:
     Trefferquote aus.
     """
     teil = 1.0 / 3.0
+    if raus_erreicht is not None:
+        # Der Schutz-Stop hat die Position beendet; spaetere Ziele zaehlen nicht mehr.
+        # Rest am Schutz-Stop: nach Ziel 2 auf Ziel 1, sonst auf Einstand.
+        vorher = [t for t in ("TP1", "TP2", "TP3") if t in raus_erreicht]
+        if not vorher:
+            return 0.0
+        rest_r = ZIEL_R["TP1"] if "TP2" in vorher else 0.0
+        return sum(teil * ZIEL_R[t] for t in vorher) + (3 - len(vorher)) * teil * rest_r
     getroffen = [t for t in ("TP1", "TP2", "TP3") if t in erreicht]
     if not getroffen:
         return -1.0 if zustand == "stop" else 0.0
@@ -159,6 +169,12 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
         if zustand not in ABGESCHLOSSEN:
             continue
         erreicht = tuple(str(x) for x in (w.get("erreicht") or []))
+        roh_raus = w.get("raus_erreicht")
+        raus_e = (
+            tuple(str(x) for x in roh_raus)
+            if w.get("raus") and isinstance(roh_raus, list)
+            else None
+        )
         mfe = float(w.get("bestes_r") or 0.0)
         begonnen = str(w.get("aufgenommen") or "")
         beendet = str(w.get("zuletzt") or "")
@@ -174,7 +190,7 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
                 mae=float(w.get("schlechtestes_r") or 0.0),
                 beendet=beendet,
                 r_ganz=_r_ganz(zustand, erreicht, mfe),
-                r_drittel=_r_drittel(zustand, erreicht),
+                r_drittel=_r_drittel(zustand, erreicht, raus_e),
                 begonnen=begonnen,
                 dauer_h=_stunden(begonnen, beendet),
             )
