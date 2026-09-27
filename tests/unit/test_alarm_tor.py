@@ -301,3 +301,45 @@ def test_tagesdeckel_laesst_die_besten_durch() -> None:
     assert len(raus) == at.MAX_JE_TAG
     assert "TOPUSD" in {e.instrument for e in raus}
     assert len(notizen) == 5 - at.MAX_JE_TAG
+
+
+def test_ziele_nach_dem_ausstieg_zaehlen_nicht() -> None:
+    """Bis zum 27.09.: Ziel 1, zurueck auf Einstand (laut Plan raus), spaeter Ziel 2 und 3.
+    Die Wache laeuft fuer die Statistik weiter — und die Bilanz buchte +2,17 R, obwohl der
+    Plan bei +0,33 R ausgestiegen war. Das hat Setup-Arten besser aussehen lassen, als sie
+    fuer jemanden waren, der den Alarmen gefolgt ist."""
+    from trading_agent.scanner import performance
+
+    liste = Wachliste()
+    liste.aufnehmen([_zeile("AAVEUSD", name="Aave")], jetzt=T0)
+    liste.pruefen(_kurs("AAVEUSD", 101.0, 99.5), jetzt=T0 + timedelta(minutes=15))
+    liste.pruefen(_kurs("AAVEUSD", 106.0, 101.0), jetzt=T0 + timedelta(minutes=30))
+    liste.pruefen(_kurs("AAVEUSD", 101.0, 99.8), jetzt=T0 + timedelta(minutes=45))
+    w = liste.wachen["AAVEUSD"]
+    assert w.raus and w.raus_erreicht == ["TP1"] and w.raus_kurs == w.einstiegskurs
+    liste.pruefen(_kurs("AAVEUSD", 118.0, 104.0), jetzt=T0 + timedelta(hours=2))
+    assert w.zustand == Zustand.ZIEL_ERREICHT.value
+    assert w.erreicht == ["TP1", "TP2", "TP3"]
+
+    d = w.as_dict()
+    st = at.bilanz([d])["setup:Ausbruch aus der Basis"]
+    assert round(st.summe_r, 3) == round(1 / 3, 3)
+    erg = performance.aus_wachliste({"wachen": {"AAVEUSD": d}})
+    assert round(erg[0].r_drittel, 3) == round(1 / 3, 3)
+    # Die Alles-oder-nichts-Rechnung sieht den ganzen Verlauf und bleibt bei Ziel 3.
+    assert erg[0].r_ganz == 3.5
+
+
+def test_raus_nach_ziel_2_rest_bei_ziel_1() -> None:
+    assert round(at._r_drittel("stop", ["TP1", "TP2"], ["TP1", "TP2"]), 3) == round(4 / 3, 3)
+    assert at._r_drittel("aktiv", ["TP1"], ["TP1"]) == 1 / 3
+
+
+def test_laufender_trade_ist_nach_dem_schutz_stop_entschieden() -> None:
+    """Laut Plan draussen ist entschieden — die Bilanz muss nicht warten, bis die Wache
+    fuer die Statistik zu Ende gelaufen ist."""
+    d = _fertig("Y", "aktiv", ["TP1"])
+    d.update(raus=True, raus_erreicht=["TP1"])
+    st = at.bilanz([d])["setup:Y"]
+    assert st.anzahl == 1
+    assert round(st.summe_r, 3) == round(1 / 3, 3)
