@@ -105,6 +105,8 @@ AKTIEN = [
     # 26.09.: Turbo long auf Mercado Libre im Depot (Screenshot) — der Basiswert stand
     # nicht im Scan, der Schein bekam deshalb keine Bewertung.
     "MELI",
+    # 27.09.: Turbo long auf Axon Enterprise im Depot (Knock-out 304,53 $).
+    "AXON",
     # Breiteres Aktienuniversum. Vorher waren es 42 Werte — bei der Haelfte dessen,
     # was Ozan bei Trade Republic kaufen kann, stand deshalb 'keine Daten'. Ein
     # Scanner, der nur seine eigene Liste kennt, findet auch nur seine eigene Liste.
@@ -124,7 +126,9 @@ AKTIEN = [
     "NET",
     "ABNB",
     "BKNG",
-    "SQ",
+    # Block hiess an der Boerse bis Januar 2025 SQ, seitdem XYZ. Unter SQ kam bei jedem
+    # Lauf nur noch ein Fehler — die Aktie stand still und stumm nicht im Scan.
+    "XYZ",
     "PYPL",
     "INTU",
     "ISRG",
@@ -630,6 +634,21 @@ def _frisch_genug(doc: dict[str, Any]) -> bool:
     return datetime.now(UTC) - t < timedelta(hours=VORLAUF_MAX_STUNDEN)
 
 
+#: So alt darf eine uebernommene Makrolage hoechstens sein. Der volle Lauf holt sie
+#: halbstuendlich; fallen mehrere aus, laeuft Krypto lieber ohne Makro als mit altem.
+MAKRO_MAX_STUNDEN = 6
+
+
+def _makro_frisch(erzeugt: str) -> bool:
+    try:
+        t = datetime.fromisoformat(str(erzeugt))
+    except (TypeError, ValueError):
+        return False
+    if t.tzinfo is None:
+        return False
+    return datetime.now(UTC) - t < timedelta(hours=MAKRO_MAX_STUNDEN)
+
+
 async def _vorlauf_holen(url: str) -> dict[str, Any]:
     """Den zuletzt veroeffentlichten Scan holen.
 
@@ -807,6 +826,17 @@ async def main() -> int:
             nur = set()
         else:
             print(f"  Vorlauf: Scan von {alt_doc.get('erzeugt')} ({alt_quelle})")
+
+    # Die Makrolage aus dem Vorlauf, wenn dieser Lauf keine eigene hat. Bis zum 27.09.
+    # holte nur der volle Lauf (:25/:55) die Makrodaten; jeder Zehn-Minuten-Lauf dazwischen
+    # bewertete Krypto OHNE Makro und schrieb ``makro: null`` in die App. Dieselbe Münze
+    # bekam damit je nach Uhrzeit zwei verschiedene Noten, und die Makro-Anzeige war die
+    # meiste Zeit leer. Uebernommen wird nur mit Zeitstempel und nur, solange sie frisch ist.
+    if lage is None and alt_doc.get("makro"):
+        kandidat = MacroLage.from_dict(alt_doc.get("makro"))
+        if kandidat is not None and _makro_frisch(kandidat.erzeugt):
+            lage = kandidat
+            print(f"  Makrolage aus dem Vorlauf ({kandidat.erzeugt}): {lage.regime.upper()}")
 
     klassen: dict[str, list[Any]] = {}
     fehler: dict[str, str] = {}
