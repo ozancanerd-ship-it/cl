@@ -1039,7 +1039,9 @@ function pruefeDepotAlarme(){
    sich wieder aendert. Eine Aufwertung meldet sich nicht: „es laeuft weiter gut" ist
    keine Nachricht, sondern Laerm. */
 const URTEIL_KEY = 'desk.urteil.v1';
-const URTEIL_MELDEN = new Set(['REDUZIEREN', 'GEGEN DIE THESE', 'BEOBACHTEN']);
+/* „Beobachten" ist keine Handlung und geht deshalb nicht mehr aufs Telefon (27.09.) —
+   Ozans Regel: nur Alarme, bei denen er etwas tun kann. */
+const URTEIL_MELDEN = new Set(['REDUZIEREN', 'GEGEN DIE THESE']);
 const URTEIL_DRINGEND = new Set(['REDUZIEREN', 'GEGEN DIE THESE']);
 function urteilStandLaden(){
   try { return JSON.parse(localStorage.getItem(URTEIL_KEY) || '{}') || {}; } catch(e){ return {}; }
@@ -2485,9 +2487,15 @@ function marktbreite(){
 
    Gemessen wird jetzt, was fuer eine BESTEHENDE Position zaehlt: die relative Staerke
    innerhalb der eigenen Klasse — jeder Coin gegen alle anderen gescannten Coins, jede
-   Aktie gegen alle anderen Aktien. Das ist die eine Momentum-Aussage mit ordentlichem
-   empirischem Rueckhalt: relative Staerke bleibt ueber Wochen bis Monate eher bestehen,
-   als dass sie dreht. Ein Nachzuegler bleibt meistens einer.
+   Aktie gegen alle anderen Aktien.
+
+   Nachgemessen am 27.09. (24 Coins seit 2024, 103 Aktien seit 2024, je Hälfte IS/OOS):
+   Führer liefen danach leicht besser als ihre Klasse, Schlusslichter aber NICHT
+   schlechter — Coins nach 28 Tagen im Schnitt sogar +1,1 % über der Klasse, Aktien nach
+   42 Tagen +0,4 %. Der Satz „ein Nachzügler bleibt meistens einer", auf dem bis dahin
+   „REDUZIEREN" und „ein Drittel verkaufen" standen, hält den eigenen Daten nicht stand.
+   Schwäche heisst deshalb jetzt BEOBACHTEN (nicht nachkaufen) — verkauft wird über den
+   Stop, die gedrehte Analyse oder einen zu grossen Klumpen, nicht über die Rangliste.
 
    Der Score bleibt auf der Karte sichtbar — er sagt weiterhin etwas darueber, ob man HEUTE
    nachkaufen wuerde. Er entscheidet nur nicht mehr ueber das Halten. */
@@ -2508,8 +2516,7 @@ function haltUrteil(row){
   let urteil, kl;
   if (rs >= RS_FUEHRER)      { urteil = 'STARK HALTEN'; kl = 'gut'; }
   else if (rs >= RS_MITTE)   { urteil = 'HALTEN';       kl = 'gut'; }
-  else if (rs >= RS_SCHWACH) { urteil = 'BEOBACHTEN';   kl = 'warn'; }
-  else                       { urteil = 'REDUZIEREN';   kl = 'bad'; }
+  else                       { urteil = 'BEOBACHTEN';   kl = 'warn'; }
   // Ein aktuelles Short-Setup im eigenen Wert hebt kein Halten auf, deckelt es aber.
   if (gegen && kl === 'gut'){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
   return {urteil, kl, rs, ren, gegen};
@@ -2659,13 +2666,23 @@ function bewertePosition(pos){
       if (brow){
         basis = {art:'turbo', sym: b.sym, row: brow, richtung: b.richtung || 'long',
                  geraten: !!b.geraten};
-        const s = brow.score;
+        /* Bis 27.09. entschied hier der SCORE des Basiswerts (unter 40 → REDUZIEREN). Der
+           Score misst aber, ob HEUTE ein guter Einstieg da ist — genau der Denkfehler, der
+           oben beim Halte-Urteil beschrieben ist. Bei einem laufenden Schein steht da fast
+           immer eine kleine Zahl, und die App riet bei fast jedem Turbo zum Verkaufen.
+           Jetzt wie bei jeder anderen Position: gegen die These nur mit einem HANDELBAREN
+           Gegen-Setup, sonst die relative Stärke des Basiswerts (bei Short gespiegelt).
+           Der Knock-out-Abstand wird davon getrennt und vorrangig bewertet. */
         const gegenlaeufig = (brow.richtung === 'short') === (basis.richtung === 'long')
                           && brow.richtung != null;
-        if (gegenlaeufig){ urteil = 'GEGEN DIE THESE'; kl = 'bad'; }
-        else if (s >= 52){ urteil = 'HALTEN'; kl = 'gut'; }   // nie STRONG — mit Hebel nie
-        else if (s >= 40){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
-        else { urteil = 'REDUZIEREN'; kl = 'bad'; }
+        const hb = haltUrteil(brow);
+        const rsEff = hb && hb.rs != null ? (basis.richtung === 'short' ? 100 - hb.rs : hb.rs) : null;
+        basis.rs = rsEff;
+        basis.gegen = gegenlaeufig ? (brow.handelbar ? 'setup' : 'neigung') : null;
+        if (gegenlaeufig && brow.handelbar){ urteil = 'GEGEN DIE THESE'; kl = 'bad'; }
+        else if (gegenlaeufig){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
+        else if (rsEff == null || rsEff >= RS_MITTE){ urteil = 'HALTEN'; kl = 'gut'; }  // nie STARK — mit Hebel nie
+        else { urteil = 'BEOBACHTEN'; kl = 'warn'; }
       }
     }
   }
@@ -3005,23 +3022,33 @@ function positionsRat(b){
     const ba = b.basis;
     if (ba && ba.art === 'turbo' && ba.row){
       const br = ba.row;
+      const ren = (br.zusatz && br.zusatz.renditen) || {};
+      const lauf = [];
+      if (ren.r21 != null) lauf.push(`${ren.r21>=0?'+':''}${ren.r21.toFixed(0)} % im letzten Monat`);
+      if (ren.r63 != null) lauf.push(`${ren.r63>=0?'+':''}${ren.r63.toFixed(0)} % im Quartal`);
       const saetze = [
         `Der Schein selbst laesst sich nicht scannen — sein Basiswert schon. `
-        + `${name(ba.sym)} steht bei Score ${br.score.toFixed(0)} (Note ${br.note}): `
-        + `${br.headline || 'kein klares Bild'}.`];
-      if (br.score >= 52) saetze.push('Solange der Basiswert traegt, traegt auch der Schein — '
-        + 'nur schneller in beide Richtungen.');
-      else if (br.score >= 40) saetze.push('Der Basiswert traegt nicht mehr richtig. Mit Hebel '
-        + 'ist das frueher ein Problem als ohne: dieselbe Seitwaertsbewegung kostet hier Geld, '
-        + 'weil der Schein Zeit und Abstand zur Schwelle verliert.');
-      else saetze.push('Der Basiswert ist schwach. Ein gehebelter Schein auf einen schwachen '
-        + 'Basiswert ist die Kombination, bei der aus einem Minus sehr schnell ein Totalverlust '
-        + 'wird — die Knock-out-Schwelle wartet nicht auf eine Erholung.');
+        + `${name(ba.sym)}: ${br.headline || 'kein klares Bild'}`
+        + (lauf.length ? ` (${lauf.join(', ')})` : '') + '.'];
+      if (ba.gegen === 'setup') saetze.push('Die Analyse des Basiswerts zeigt gerade ein handelbares '
+        + 'Setup GEGEN deine Richtung. Mit Hebel ist das der Moment, die Position zu verkleinern '
+        + 'oder den Stop enger zu ziehen — nicht, sie auszusitzen.');
+      else if (ba.gegen === 'neigung') saetze.push('Das Chartbild des Basiswerts neigt gegen deine '
+        + 'Richtung, ohne handelbares Setup. Beobachten — und den Abstand zur Schwelle im Blick.');
+      else if (ba.rs == null || ba.rs >= RS_MITTE) saetze.push('Solange der Basiswert traegt, '
+        + 'traegt auch der Schein — nur schneller in beide Richtungen.'
+        + (ba.rs != null ? ` Relative Stärke ${ba.rs.toFixed(0)} von 100.` : ''));
+      else saetze.push(`Der Basiswert läuft schwächer als ${(100-ba.rs).toFixed(0)} % seiner Klasse. `
+        + 'Nicht nachkaufen. Allein ein Verkaufsgrund ist das nicht — beim Schein entscheidet '
+        + 'vor allem der Abstand zur Knock-out-Schwelle, und der wird oben eigens bewertet.');
+      saetze.push(`Score ${br.score.toFixed(0)} (Note ${br.note}) heisst nur: so gut wäre ein `
+        + 'NEUER Einstieg heute. Über das Halten sagt er nichts.');
       saetze.push('Wichtig: Stop und Ziele des Basiswerts sind NICHT die des Scheins. Der Hebel '
         + 'verschiebt jeden Abstand, und die genaue Schwelle steht nur im Papier des Emittenten.');
       if (ba.geraten) saetze.push('(Basiswert automatisch aus dem Namen erkannt — wenn das nicht '
         + 'stimmt, trag die Position mit dem richtigen Kuerzel neu ein.)');
-      const stufe = br.score >= 52 ? 'gut' : (br.score >= 40 ? 'warn' : 'bad');
+      const stufe = ba.gegen === 'setup' ? 'bad'
+                  : (ba.gegen || (ba.rs != null && ba.rs < RS_MITTE)) ? 'warn' : 'gut';
       return {stufe, kopf: 'Ueber den Basiswert ' + name(ba.sym), saetze};
     }
     if (ba && ba.art === 'breit'){
@@ -3079,11 +3106,12 @@ function positionsRat(b){
         + (lauf.length?` (${lauf.join(', ')})`:'') + '. Wenn der Rest der Klasse läuft und dieser '
         + 'Wert nicht, gibt es dafür meistens einen Grund. Beobachten, nicht nachkaufen.');
     } else {
-      stufe = 'bad';
+      stufe = 'warn';
       saetze.push(`Schlusslicht: schwächer als ${(100-rs).toFixed(0)} % der ${klasse}`
-        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Genau hier liegt totes Kapital am längsten. '
-        + 'Die ehrliche Frage ist nicht „kommt es zurück", sondern: würdest du das heute nochmal '
-        + 'kaufen — und wenn nein, warum hältst du es dann?');
+        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Nicht nachkaufen. Ein Verkaufsgrund ist '
+        + 'das allein aber nicht: in den eigenen Daten liefen Schlusslichter danach im Schnitt '
+        + 'nicht schlechter als der Rest ihrer Klasse. Raus geht es über deinen Stop oder wenn '
+        + 'die Analyse gegen dich dreht — nicht über den Tabellenplatz.');
     }
   } else if (h){
     stufe = h.kl === 'bad' ? 'bad' : (h.kl === 'warn' ? 'warn' : 'gut');
@@ -3280,28 +3308,117 @@ function ausDepotCode(text){
   const liste = Array.isArray(d) ? d : (Array.isArray(d.p) ? d.p : null);
   if (!liste) return null;
   const sauber = liste.filter(x => x && typeof x.sym === 'string' && x.sym);
-  return sauber.length ? {liste: sauber, zeit: d.t || null} : null;
+  /* ``k``: die Konten, die dieser Code VOLLSTÄNDIG beschreibt (ein Abgleich, etwa aus
+     Screenshots). Für diese Konten gilt: was im Code fehlt, ist verkauft. Ohne ``k`` ist
+     der Code wie bisher nur eine Liste — dann wird nie etwas als verkauft markiert. */
+  const konten = (!Array.isArray(d) && Array.isArray(d.k)) ? d.k.map(String) : [];
+  return sauber.length ? {liste: sauber, zeit: d.t || null, konten,
+                          quelle: (!Array.isArray(d) && d.q) ? String(d.q) : ''} : null;
 }
 /* Schlüssel einer Position: Kürzel UND Konto. Denselben Coin auf zwei Börsen zu halten
    ist normal, und beim Zusammenführen dürfen die sich nicht gegenseitig auffressen. */
 const posSchluessel = p => String(p.sym||'').toUpperCase() + '|' + String(p.konto||'').toLowerCase();
-function depotVergleich(eingehend){
-  const alt = new Map(ladePositionen().map(p => [posSchluessel(p), p]));
-  const neu = [], geaendert = [], gleich = [];
+
+/* ================================================ DEPOT-ABGLEICH (seit 27.09.)
+
+   „Update mein Portfolio" — mit Screenshots aus Kraken, Bybit und Trade Republic.
+
+   Bisher verglich der Import nur das exakte Kürzel. Stand Solana im Depot als SOLEUR und
+   kam im Code als SOLUSDT, waren das zwei Positionen: die alte blieb stehen, die neue kam
+   dazu, und das Depot zeigte Solana doppelt. Und ein Import ersetzte die ganze Position —
+   dein Stop, die abgehakten Ziele, der Knock-out waren danach weg, wenn der Code sie nicht
+   selbst mitbrachte.
+
+   Jetzt:
+   * Verglichen wird die MÜNZE (SOLEUR = SOLUSD = SOLUSDT) bzw. bei Scheinen der
+     BASISWERT, jeweils je Konto (Kraken, Bybit und Trade Republic in jeder Schreibweise).
+   * Zusammengeführt wird FELDWEISE: was der Code mitbringt, gilt; was er nicht kennt
+     (Stop, Ziele, abgehakte Teilverkäufe, Notizen), bleibt. Wechselt die Währung der
+     Position (SOLEUR → SOLUSDT), wird der gespeicherte Plan umgerechnet statt in der
+     falschen Währung stehen zu bleiben.
+   * Ein Abgleich-Code nennt die Konten, die er vollständig beschreibt. Was dort im Depot
+     steht, aber im Code fehlt, ist verkauft — und wird angezeigt, nicht stillschweigend
+     gelöscht. Entfernt wird es nur mit dem eigenen Knopf dafür. */
+function kontoNorm(k){
+  const s = String(k||'').toLowerCase().replace(/[^a-z]/g, '');
+  if (!s) return '';
+  if (s === 'tr' || s.startsWith('traderepublic') || s.startsWith('trade')) return 'traderepublic';
+  for (const b of ['bybit','kraken','binance']) if (s.includes(b)) return b;
+  return s;
+}
+function abgleichKern(p){
+  const s = String((p && p.sym) || '').toUpperCase();
+  // Scheine (Turbo, Knock-out …) über ihren Basiswert — „TURBO-TSMC-LONG" und ein Turbo
+  // mit basis TSM sind derselbe Posten. Nie über muenzeVon: die kürzt „TURBO-…" auf
+  // „TURBO", und dann wären alle Scheine ein und derselbe.
+  const scheinArtig = p && (p.ko != null || p.basis || /TURBO|KNOCK|MINI|LONG|SHORT|CALL|PUT/.test(s));
+  if (scheinArtig){
+    const b = basisVon(p);
+    if (b && b.sym) return 'T:' + String(b.sym).toUpperCase() + (p.hebel_richtung === 'short' ? ':S' : '');
+    return 'S:' + s;
+  }
+  if (s.includes('-') && !/-YFD$/.test(s)) return 'S:' + s;   // ETF, Freitext
+  return muenzeVon(s);
+}
+/* Zu einer eingehenden Position die vorhandene finden: gleicher Kern und gleiches Konto;
+   hat die vorhandene gar kein Konto eingetragen, reicht der Kern. */
+function findeGegenstueck(p, vorhanden, schonVergeben){
+  const kern = abgleichKern(p), konto = kontoNorm(p.konto);
+  const frei = vorhanden.filter(q => !schonVergeben.has(q) && abgleichKern(q) === kern);
+  return frei.find(q => kontoNorm(q.konto) === konto)
+      || frei.find(q => !kontoNorm(q.konto))
+      || null;
+}
+function depotVergleich(eingehend, konten, vorhanden){
+  vorhanden = vorhanden || ladePositionen();
+  const vergeben = new Set();
+  const neu = [], geaendert = [], gleich = [], paare = [];
   for (const p of eingehend){
-    const vorher = alt.get(posSchluessel(p));
-    if (!vorher) neu.push(p);
-    else if (JSON.stringify(vorher) !== JSON.stringify(p)) geaendert.push(p);
+    const vorher = findeGegenstueck(p, vorhanden, vergeben);
+    if (!vorher){ neu.push(p); paare.push([null, p]); continue; }
+    vergeben.add(vorher);
+    paare.push([vorher, p]);
+    const zusammen = zusammenfuegen(vorher, p);
+    if (JSON.stringify(zusammen) !== JSON.stringify(vorher)) geaendert.push(p);
     else gleich.push(p);
   }
-  const nurHier = ladePositionen().filter(p =>
-    !eingehend.some(q => posSchluessel(q) === posSchluessel(p)));
-  return {neu, geaendert, gleich, nurHier};
+  const nurHier = vorhanden.filter(q => !vergeben.has(q));
+  const kset = new Set((konten || []).map(kontoNorm).filter(Boolean));
+  const weg = kset.size ? nurHier.filter(q => kset.has(kontoNorm(q.konto))) : [];
+  return {neu, geaendert, gleich, nurHier, weg, paare};
 }
-function depotZusammenfuehren(eingehend){
-  const map = new Map(ladePositionen().map(p => [posSchluessel(p), p]));
-  for (const p of eingehend) map.set(posSchluessel(p), p);
-  speicherePositionen([...map.values()]);
+/* Feldweise: der Code gewinnt, das Depot behält, was der Code nicht kennt. */
+function zusammenfuegen(alt, neu){
+  const m = {...alt, ...neu};
+  if (neu.plan == null && alt.plan) m.plan = alt.plan;
+  if (neu.erledigt == null && alt.erledigt) m.erledigt = alt.erledigt;
+  if (neu.seit == null && alt.seit) m.seit = alt.seit;
+  const wa = posWaehrung(alt), wn = posWaehrung(m);
+  if (m.plan && neu.plan == null && wa !== wn){
+    const k = S && S.eurusd;
+    if (k){
+      const f = wn === 'EUR' ? 1 / k : k;        // EUR → USD: mal Kurs; USD → EUR: geteilt
+      const pl = {...m.plan};
+      for (const f2 of ['stop','tp1','tp2','tp3','einstieg']) if (pl[f2] != null) pl[f2] = pl[f2] * f;
+      pl.waehrung = wn; pl.umgerechnet = wa + '→' + wn;
+      m.plan = pl;
+    } else {
+      delete m.plan;       // lieber kein Stop als einer in der falschen Währung
+    }
+  }
+  return m;
+}
+/* ``entfernen``: die Positionen, die als verkauft raus sollen — verglichen über ihren
+   Inhalt, nicht über das Objekt. Zwischen Anzeige und Klick wird das Depot neu geladen,
+   und ein neu geladenes Objekt ist nie dasselbe wie das angezeigte. */
+function depotZusammenfuehren(eingehend, entfernen){
+  const vorhanden = ladePositionen();
+  const v = depotVergleich(eingehend, [], vorhanden);
+  const raus = new Set((entfernen || []).map(q => JSON.stringify(q)));
+  const gepaart = new Set(v.paare.map(([a]) => a).filter(Boolean));
+  const bleibt = vorhanden.filter(q => !gepaart.has(q) && !raus.has(JSON.stringify(q)));
+  const aus = v.paare.map(([a, p]) => a ? zusammenfuegen(a, p) : p);
+  speicherePositionen([...bleibt, ...aus]);
 }
 
 /* Der Vergleich vor dem Einsetzen. Ohne ihn wuerde ein Import vom Mac genau die
@@ -3317,13 +3434,19 @@ function zeigeDepotVergleich(v, d, ziel){
     ${zeile('neu', v.neu, 'var(--up)')}
     ${zeile('geändert', v.geaendert, 'var(--warn)')}
     ${zeile('unverändert', v.gleich, 'var(--ink-3)')}
-    ${zeile('nur auf DIESEM Gerät', v.nurHier, 'var(--accent)')}
+    ${v.weg && v.weg.length ? zeile(`nicht mehr im Depot — verkauft? (${d.konten.join(', ')})`, v.weg, 'var(--bad)') : ''}
+    ${zeile('nur auf DIESEM Gerät', v.nurHier.filter(p => !(v.weg||[]).includes(p)), 'var(--accent)')}
     <p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">
       <strong>Zusammenführen</strong> übernimmt neue und geänderte Positionen und lässt
       stehen, was es nur hier gibt — das ist fast immer das Richtige.
       <strong>Ersetzen</strong> macht dieses Gerät exakt zum Abbild des Codes; alles, was
       hier zusätzlich steht, ist dann weg.</p>
-    <p style="margin:10px 0 0"><button class="btn" id="pf_code_merge">Zusammenführen</button>
+    ${v.weg && v.weg.length ? `<p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">
+      Der Code beschreibt ${esc(d.konten.join(', '))} vollständig${d.quelle ? ` (${esc(d.quelle)})` : ''}.
+      Was dort im Depot steht, aber im Code fehlt, hast du offenbar verkauft.
+      <strong>Abgleichen</strong> führt zusammen UND entfernt diese ${v.weg.length}.</p>
+      <p style="margin:10px 0 0"><button class="btn" id="pf_code_abgleich">Abgleichen</button></p>` : ''}
+    <p style="margin:10px 0 0"><button class="${v.weg && v.weg.length ? 'link' : 'btn'}" id="pf_code_merge">Nur zusammenführen</button>
       <button class="link" id="pf_code_replace" style="margin-left:14px">Ersetzen</button></p>
   </div>`;
   const fertig = (text) => { zeichnePortfolio();
@@ -3335,6 +3458,10 @@ function zeigeDepotVergleich(v, d, ziel){
   const m = $('pf_code_merge');
   if (m) m.addEventListener('click',()=>{ depotZusammenfuehren(d.liste);
     fertig(`${v.neu.length} neu, ${v.geaendert.length} geändert, ${v.nurHier.length} unangetastet.`); });
+  const ab = $('pf_code_abgleich');
+  if (ab) ab.addEventListener('click',()=>{ depotZusammenfuehren(d.liste, v.weg);
+    fertig(`${v.neu.length} neu, ${v.geaendert.length} aktualisiert, ${v.weg.length} als verkauft entfernt, `
+      + `${v.nurHier.length - v.weg.length} unangetastet.`); });
   const r = $('pf_code_replace');
   if (r) r.addEventListener('click',()=>{ speicherePositionen(d.liste);
     fertig(`Dieses Gerät führt jetzt genau die ${d.liste.length} Positionen aus dem Code.`); });
@@ -3352,7 +3479,7 @@ function depotAusLink(){
   zeichneSync();
   zeigeTab(4);
   const ziel = $('pf_code_diff');
-  if (ziel){ zeigeDepotVergleich(depotVergleich(d.liste), d, ziel); ziel.scrollIntoView({block:'center'}); }
+  if (ziel){ zeigeDepotVergleich(depotVergleich(d.liste, d.konten), d, ziel); ziel.scrollIntoView({block:'center'}); }
 }
 
 /* ======================================================= SYNC-SEITE
@@ -3456,7 +3583,7 @@ function pruefeSync(){
   if (!d){ ziel.innerHTML = `<div class="note-box bad" style="margin:10px 0 0">
     <span class="nt">Das war kein Depot-Text</span><p>Auf dem anderen Gerät oben auf
     <em>Depot kopieren</em> tippen und den ganzen Text herbringen.</p></div>`; return; }
-  zeigeDepotVergleich(depotVergleich(d.liste), d, ziel);
+  zeigeDepotVergleich(depotVergleich(d.liste, d.konten), d, ziel);
 }
 
 /* Der ausgeschriebene Name einer Position. „OPEUR" steht so im Depot, weil Ozan es dort
@@ -3617,15 +3744,14 @@ function positionsAktion(b, stand){
       'teilverkauf', true, 'Gegen die These — Hälfte verkaufen');
   }
 
-  // 4 — Schlusslicht der eigenen Klasse.
-  if (!inSchonfrist && rs != null && rs < RS_SCHWACH){
-    return teil(1/3, `${posName(b)} ist schwächer als ${(100-rs).toFixed(0)} % der `
-      + `gescannten ${klasseName}. Relative Schwäche hält über Wochen eher an, als dass sie `
-      + `dreht${b.gvPct!=null&&b.gvPct<0?`. Du liegst hier ${b.gvPct.toFixed(0)} % im Minus — `
-      + `das ist kein Grund zu warten, sondern der Grund, warum es weh tut`:''}. Ein Drittel `
-      + 'raus setzt das Kapital frei, ohne die These ganz aufzugeben.',
-      'teilverkauf', false, 'Schlusslicht — ein Drittel verkaufen');
-  }
+  /* 4 — Schlusslicht der eigenen Klasse: bis 27.09. „ein Drittel verkaufen". Nachgemessen
+     hielt die Begründung nicht (Schlusslichter liefen danach nicht schlechter als ihre
+     Klasse, siehe haltUrteil). Ein Teilverkauf ohne gemessenen Vorteil kostet nur Gebühr,
+     Spread und bei Gewinnen Steuer. Deshalb hier nur noch der Hinweis, nicht nachzukaufen. */
+  const schlusslicht = rs != null && rs < RS_SCHWACH
+    ? ` ${posName(b)} ist schwächer als ${(100-rs).toFixed(0)} % der ${klasseName} — nicht `
+      + 'nachkaufen; verkauft wird über den Stop oder eine gedrehte Analyse, nicht über den Tabellenplatz.'
+    : '';
 
   // 5 — Klumpenrisiko.
   if (!inSchonfrist && anteil != null && anteil > MAX_GEWICHT){
@@ -3691,7 +3817,7 @@ function positionsAktion(b, stand){
   }
   return {...basis, art:'halten', dringend:false, titel:'Halten — nichts zu tun',
     text:(rs != null ? `Relative Stärke ${rs.toFixed(0)} von 100, kein Anlass zu handeln.`
-        : 'Kein Anlass zu handeln.') + wohin};
+        : 'Kein Anlass zu handeln.') + schlusslicht + wohin};
 }
 
 const AKTION_FARBE = {raus:'bad', teilverkauf:'warn', trimmen:'warn', nachlegen:'', halten:''};
@@ -4244,7 +4370,10 @@ function zeichnePortfolio(){
         <strong>${esc(name(beste.instrument))}</strong> ein handelbares Setup
         (Score ${beste.score.toFixed(0)}, Note ${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+pct(beste.erwartete_bewegung_pct,1):''}).</p>
         <p>Das ist ein Hinweis, keine Anweisung — und nichts wird automatisch umgeschichtet.
-        Ein Wechsel kostet Gebühren und Spread und wirft die laufende These weg.</p></div>`;
+        Schlusslicht zu sein ist allein kein Verkaufsgrund (gemessen liefen Schlusslichter danach
+        nicht schlechter als ihre Klasse). Wenn du aber Kapital für das Setup brauchst, ist das
+        die Position, deren Verkauf dich am wenigsten Stärke kostet. Ein Wechsel kostet Gebühren
+        und Spread und wirft die laufende These weg.</p></div>`;
     }
   } else {
     h += `<p class="leer">Noch keine Positionen eingetragen.</p>`;
@@ -4867,6 +4996,14 @@ function signalKarte(x){
    Trade, dessen Einstieg als Alarm aufs Handy ging, bis er laut Plan draussen ist. */
 const PLAN_ZIEL_R = {TP1: 1, TP2: 2, TP3: 3.5};
 function planR(w){
+  // War der Plan schon draussen (Schutz-Stop), zählen nur die Ziele bis dahin — die Wache
+  // läuft für die Statistik weiter, ein späteres Ziel 3 hat der Plan aber nicht mehr.
+  if (w.raus && Array.isArray(w.raus_erreicht)){
+    const v = w.raus_erreicht.filter(t => PLAN_ZIEL_R[t] != null);
+    if (!v.length) return 0;
+    const rest = v.includes('TP2') ? PLAN_ZIEL_R.TP1 : 0;
+    return (v.reduce((a, t) => a + PLAN_ZIEL_R[t], 0) + (3 - v.length) * rest) / 3;
+  }
   const e = (w.erreicht || []).filter(t => PLAN_ZIEL_R[t] != null);
   if (e.length) return e.reduce((a, t) => a + PLAN_ZIEL_R[t], 0) / 3;
   return w.zustand === 'stop' ? -1 : null;
@@ -4933,7 +5070,8 @@ function alarmTradesInhalt(alle, scanKurs){
         const was = w.raus && w.zustand === 'aktiv' ? 'nachgezogener Stop'
                   : (ZUSTAND_TEXT[w.zustand] || w.zustand);
         return `<tr><td>${esc(wacheName(w))}</td>
-          <td>${esc(was)}${(w.erreicht||[]).length ? '<br><span class="nu">' + w.erreicht.join(', ').replace(/TP/g,'Ziel ') + '</span>' : ''}</td>
+          <td>${esc(was)}${(() => { const e = (w.raus && Array.isArray(w.raus_erreicht)) ? w.raus_erreicht : (w.erreicht || []);
+            return e.length ? '<br><span class="nu">' + e.join(', ').replace(/TP/g,'Ziel ') + '</span>' : ''; })()}</td>
           ${r == null ? '<td class="nu">ohne Ergebnis</td>'
             : `<td class="${r >= 0 ? 'up' : 'dn'}">${r >= 0 ? '+' : ''}${r.toFixed(2).replace('.',',')}</td>`}</tr>`;
       }).join('') + `</table></div>`;
