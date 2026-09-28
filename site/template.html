@@ -2850,6 +2850,28 @@ function bewertePosition(pos){
    Deshalb wird der Plan beim Kauf mitgespeichert und hier bei jedem Kurs neu
    ausgerechnet. Er sagt genau einen naechsten Schritt — nicht fuenf Moeglichkeiten. */
 
+/* Wann Ziele ueberhaupt gelten.
+
+   Ozan, 28.09.: „In meinem Portfolio sagt er bei mehreren Sachen, ich soll schon Teil
+   verkaufen, obwohl du selber meintest, das wäre nicht so sinnvoll."
+
+   Der Fehler lag hier: fuer eine Position, die Ozan von Hand eingetragen hat (also sein
+   ganzes bestehendes Depot), uebernahm die App beim ersten Setzen des Stops auch die
+   ZIELE des gerade laufenden Setups — eines kurzfristigen Trades, den er nie gemacht
+   hat. Lief der Kurs zwei Prozent, stand dort „Ziel 1 erreicht — ein Drittel verkaufen".
+   Das ist ein Plan fuer einen anderen Trade, nicht fuer seine Position.
+
+   Ziele gelten deshalb nur, wenn sie zur Position gehoeren:
+     * gekauft ueber „Gekauft — ins Depot" auf einer Signalkarte (dann ist es genau
+       dieser Trade, mit genau diesem Plan),
+     * oder von Ozan selbst gesetzt bzw. ausdruecklich als Vorschlag uebernommen.
+   Von der App automatisch gesetzte Ziele gelten nicht. Gehaltene Positionen haben einen
+   Stop, der nachgezogen wird — verkauft wird, wenn er faellt. */
+function zieleGelten(pl){
+  if (!pl) return false;
+  if (pl.gekauft) return true;
+  return pl.quelle === 'selbst' || pl.quelle === 'analyse' || pl.quelle === 'selbst_nachgezogen';
+}
 function naechsterSchritt(pos, kurs){
   const pl = pos && pos.plan;
   if (!pl || kurs == null || !isFinite(kurs)) return null;
@@ -2869,9 +2891,10 @@ function naechsterSchritt(pos, kurs){
         + 'Die Idee ist widerlegt. Verkaufen, nicht nachverhandeln — genau hier entstehen '
         + 'aus kleinen Verlusten grosse.'};
   }
-  // 2 — Ziele der Reihe nach.
-  const ziele = [['TP1', pl.tp1, 'ein Drittel'], ['TP2', pl.tp2, 'das zweite Drittel'],
-                 ['TP3', pl.tp3, 'den Rest']];
+  // 2 — Ziele der Reihe nach — aber nur, wenn sie zu DIESER Position gehören.
+  const zg = zieleGelten(pl);
+  const ziele = [['TP1', zg ? pl.tp1 : null, 'ein Drittel'], ['TP2', zg ? pl.tp2 : null, 'das zweite Drittel'],
+                 ['TP3', zg ? pl.tp3 : null, 'den Rest']];
   for (const [marke, ziel, teil] of ziele){
     if (ziel == null || erledigt.has(marke)) continue;
     if (erreicht(ziel)){
@@ -3041,7 +3064,8 @@ function stopPflege(b){
     if (pl && pl.stop != null && planEbene !== ebene && pl.quelle === 'selbst')
       return {art:'steht', stop:pl.stop};
     if (!v) return {art:'keiner'};
-    return {art:'neu', stop:v.stop, tp1:v.tp1, tp2:v.tp2, tp3:v.tp3, ebene,
+    // Keine Ziele: fuer eine gehaltene Position setzt die App nur den Schutz (siehe zieleGelten).
+    return {art:'neu', stop:v.stop, tp1:null, tp2:null, tp3:null, ebene,
             basisName:v.basisName, waehrung:v.waehrung, halteArt:v.art,
             vomBasiswert:v.vomBasiswert,
             grund:`${v.grund} — die App setzt sie als Stop`};
@@ -3230,7 +3254,7 @@ function ausstiegsKasten(b){
   const d = digits(pk || b.kurs || 1);
   const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : (basis ? ' $' : ''));
   const marken = [[basis ? `Stop auf ${esc(pl.basis_name || 'Basiswert')}` : 'Stop', pl.stop],
-                  ['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]]
+                  ...(zieleGelten(pl) ? [['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]] : [])]
     .filter(([,v]) => v != null)
     .map(([k,v]) => `<span>${k} <b>${num(v,d)}${w}</b></span>`).join('');
   /* Bei einem Schein: was die Position an der Marke ungefaehr noch wert waere. Das ist
@@ -4781,6 +4805,30 @@ function zeichnePortfolio(){
 
     h += glKasten(stand);
 
+    /* Auf einen Blick: wie viel Geld wo steckt. Ozan, 28.09.: „es steht ja immer noch
+       nicht, mit wie viel Euro ich dort drin bin." Jetzt als erste Tabelle, nach Wert
+       sortiert — Euro, Anteil, Gewinn/Verlust und wie weit der Stop entfernt ist. */
+    const zeilenUe = bew.map(b => {
+      const eu = inEuro(b, b.wert);
+      const pk = planKurs(b);
+      const st = b.pos.plan && b.pos.plan.stop != null && pk ? (pk - b.pos.plan.stop) / pk * 100 : null;
+      return {b, eu, st};
+    }).sort((x, y) => (y.eu || 0) - (x.eu || 0));
+    h += `<h2>Auf einen Blick</h2>
+      <div class="tw"><table class="mtf" style="font-size:13px">
+      <thead><tr><th>Position</th><th style="text-align:right">Wert</th><th style="text-align:right">Anteil</th>
+        <th style="text-align:right">G/V</th><th style="text-align:right">bis Stop</th></tr></thead>
+      <tbody>${zeilenUe.map(({b, eu, st}) => `<tr>
+        <td>${esc(posName(b))}<br><span class="nu" style="font-size:11px">${esc(b.pos.konto||'')}</span></td>
+        <td style="text-align:right"><b>${eu!=null?num(eu, eu<100?2:0)+' €':'—'}</b></td>
+        <td style="text-align:right">${eu!=null&&gesamt?(eu/gesamt*100).toFixed(1).replace('.',',')+' %':'—'}</td>
+        <td style="text-align:right" class="${b.gvPct==null?'':b.gvPct>=0?'up':'dn'}">${b.gvPct!=null?pct(b.gvPct,1):'—'}</td>
+        <td style="text-align:right">${st!=null?st.toFixed(1).replace('.',',')+' %':'<span class="nu">kein Stop</span>'}</td>
+      </tr>`).join('')}
+      <tr><td><b>Summe</b></td><td style="text-align:right"><b>${num(gesamt,0)} €</b></td><td></td>
+        <td style="text-align:right" class="${gv>=0?'up':'dn'}">${einstand?pct(gv/einstand*100,1):'—'}</td><td></td></tr>
+      </tbody></table></div>`;
+
     h += `<h2>Positionen</h2>`;
     h += bew.map(b=>{
       const d = digits(b.kurs||1);
@@ -4793,7 +4841,8 @@ function zeichnePortfolio(){
       const posWertEUR = inEuro(b, b.wert);
       const posWertEigen = (b.w !== 'EUR' && b.wert != null) ? b.wert : null;
       return `<div class="karte ${b.kl}">
-        <h3>${esc(posName(b))} <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
+        <h3>${esc(posName(b))}${posWertEUR!=null?` <span style="font-weight:600;color:var(--ink)">· ${num(posWertEUR, posWertEUR<100?2:0)} €</span>`:''}
+          <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
           <span style="float:right" class="note ${b.kl==='gut'?'gut':''}">${esc(b.urteil)}</span></h3>
         <div class="kpi">
           ${b.pos.menge?`<span>Menge <b>${num(b.pos.menge, 6)}</b></span>`:''}
