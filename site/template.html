@@ -363,6 +363,7 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   color:var(--ink-2); margin-top:11px; padding-top:11px; border-top:1px solid var(--rule)}
 .zt span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px; padding:3px 8px}
 .zt b{color:var(--ink)}
+.zt .up{color:var(--long)} .zt .dn{color:var(--bad)}
 details.mehr{margin:10px 0 0; border-top:1px dashed var(--rule); padding-top:7px; font-size:12.5px; color:var(--ink-2)}
 details.mehr > summary{cursor:pointer; list-style:none; color:var(--ink-3); font-size:12.5px}
 details.mehr > summary::-webkit-details-marker{display:none}
@@ -1703,6 +1704,7 @@ function topSignal(){
       <span>Stop <b>${num(w.stop,d)}</b></span>
       ${ziele.map((v,i)=>`<span>Ziel ${i+1} <b>${num(v,d)}</b></span>`).join('')}
       ${(()=>{ const c = crvVon(o); return c!=null?`<span>CRV <b>1:${c.toFixed(1)}</b></span>`:''; })()}
+      ${bewegungSpan(o)}
       ${pl?`<span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`:''}
       ${o.rs!=null?`<span>Rel. Stärke <b>${Math.round(o.rs)}</b></span>`:''}
     </div>
@@ -2237,6 +2239,7 @@ function oppZeile(o, rang){
         <span data-px="${esc(o.instrument)}">Kurs <b>${preis(o,'kurs',kurs,d)}</b>${
           live?` <span class="${live.pct>=0?'up':'dn'}">${pct(live.pct,2)}</span>`:''}</span>
         ${(()=>{ const c = crvVon(o); return c!=null?`<span>CRV <b>1:${c.toFixed(1)}</b></span>`:''; })()}
+        ${bewegungSpan(o)}
         ${pl?`<span>Risiko <b>${pl.risiko_pct.toFixed(1)} %</b></span>`:''}
         ${o.rs!=null?`<span>Rel. Stärke <b class="${o.rs>=70?'up':o.rs<=30?'dn':''}">${Math.round(o.rs)}</b></span>`:''}
         ${o.confidence?`<span>Klarheit <b>${Math.round(o.confidence*100)} %</b></span>`:''}
@@ -4430,6 +4433,7 @@ function mehrKasten(b){
       <span>Note <b>${esc(r.note)}</b></span>
       ${r.ziel!=null?`<span>Setup-Ziel <b>${num(r.ziel,d)}</b></span>`:''}
       ${r.invalidierung!=null?`<span>Setup-Stop <b>${num(r.invalidierung,d)}</b></span>`:''}
+      ${bewegungSpan(r)}
     </div>`);
     if (r.headline) teile.push(`<p style="margin:6px 0 0">Chart: ${esc(r.headline)}</p>`);
   }
