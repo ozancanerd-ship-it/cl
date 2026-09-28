@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 
 from trading_agent.ops.notify import (
@@ -109,6 +110,31 @@ def test_file_sink_writes_jsonl(tmp_path) -> None:
     n = Notifier([FileSink(path)], clock=_Clock(_T0))
     n.notify(Notification(Severity.WARNING, "x"))
     assert path.read_text().count("\n") == 1
+
+
+def test_file_sink_kappt_bei_ueberlauf(tmp_path) -> None:
+    """28.09.: alerts.jsonl wird jetzt committet statt bei jedem CI-Lauf leer
+    anzufangen — dann darf sie im Repo nicht unbegrenzt wachsen. Getrimmt wird erst
+    deutlich ueber der Grenze (siehe FileSink._trimmen, spart Datei-I/O), die Datei
+    bleibt also zwischen max_zeilen und 2×max_zeilen — begrenzt, nicht exakt gekappt."""
+    path = tmp_path / "alerts.jsonl"
+    sink = FileSink(path, max_zeilen=10)
+    n = Notifier([sink], clock=_Clock(_T0), dedup_window_s=0.0, max_per_window=10_000)
+    for i in range(50):
+        n.notify(Notification(Severity.WARNING, f"signal {i}", dedup_key=f"k{i}"))
+    zeilen = path.read_text(encoding="utf-8").splitlines()
+    assert len(zeilen) <= 20
+    # die neuesten muessen erhalten bleiben, nicht die aeltesten
+    assert json.loads(zeilen[-1])["title"] == "signal 49"
+    assert json.loads(zeilen[0])["title"] != "signal 0"
+
+
+def test_file_sink_laesst_kleine_dateien_unangetastet(tmp_path) -> None:
+    path = tmp_path / "alerts.jsonl"
+    n = Notifier([FileSink(path, max_zeilen=500)], clock=_Clock(_T0))
+    for i in range(5):
+        n.notify(Notification(Severity.WARNING, f"signal {i}"))
+    assert path.read_text(encoding="utf-8").count("\n") == 5
 
 
 def test_telegram_sink_unavailable_without_token(monkeypatch) -> None:
