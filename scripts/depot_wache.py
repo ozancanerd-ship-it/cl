@@ -52,6 +52,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -158,11 +159,19 @@ def stand_sichern(pfad: str | Path, stand: dict[str, Any], schluessel: bytes) ->
 
 
 def _boerse_offen(jetzt: datetime) -> bool:
-    """US-Boerse grob offen (Mo–Fr 13:30–20:00 UTC). Ausserhalb gilt der Schlusskurs."""
-    if jetzt.weekday() >= 5:
+    """US-Boerse offen (Mo–Fr 9:30–16:00 New Yorker Zeit). Ausserhalb gilt der Schlusskurs.
+
+    Vorher fest 13:30–20:00 UTC — das stimmt nur in der amerikanischen Sommerzeit. Ab
+    November (EST) oeffnet die Boerse erst 14:30 UTC; die erste Handelsstunde fehlte dann,
+    und nach 20:00 UTC haette der Waechter noch eine Stunde lang Schlusskurse fuer Livekurse
+    gehalten. Die Zeitzone rechnet die Umstellung selbst."""
+    if jetzt.tzinfo is None:
+        jetzt = jetzt.replace(tzinfo=UTC)
+    ny = jetzt.astimezone(ZoneInfo("America/New_York"))
+    if ny.weekday() >= 5:
         return False
-    minuten = jetzt.hour * 60 + jetzt.minute
-    return 13 * 60 + 30 <= minuten <= 20 * 60 + 5
+    minuten = ny.hour * 60 + ny.minute
+    return 9 * 60 + 30 <= minuten <= 16 * 60 + 5
 
 
 async def livekurse(
