@@ -38,12 +38,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.analysis.macro_context import MacroLage, warnungen_fuer
 from trading_agent.core.enums import AssetClass, Timeframe
+from trading_agent.data import markt_extras as mx
+from trading_agent.data.providers.nasdaq_info import tage_bis
+from trading_agent.refdata import zahlen as zahlen_ref
 from trading_agent.scanner import alarm_tor
 from trading_agent.scanner import erwartung as erw
 from trading_agent.scanner import gleichlauf as gl
 from trading_agent.scanner.analysis_view import kommentar, mtf_tabelle, zeichnung
 from trading_agent.scanner.chart_score import bewerte_chart
 from trading_agent.scanner.grading import NOTE_KURZ, NOTEN, Profil
+from trading_agent.scanner.halte_stop import halte_werte
 from trading_agent.scanner.handelbarkeit import beschrifte
 from trading_agent.scanner.patterns import muster_ueber_zeitebenen
 from trading_agent.scanner.relative_strength import anwenden as rs_anwenden
@@ -697,6 +701,148 @@ async def _details_holen(url: str, namen: list[str], ordner: Path) -> int:
     return geholt
 
 
+#: Ab so vielen Kalendertagen vor den Quartalszahlen steht der Termin als Warnung in der
+#: Zeile; innerhalb von TERMIN_SPERRE_TAGE gibt es keinen Einstiegs-Alarm (Masterplan §8:
+#: kein neuer Trade, wenn wichtige News unmittelbar bevorstehen).
+TERMIN_WARNUNG_TAGE = 14
+TERMIN_SPERRE_TAGE = 3
+
+
+def _aktien_info(pfad: str) -> dict[str, Any]:
+    p = Path(pfad)
+    if not p.exists():
+        return {}
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _datum_de(iso: str) -> str:
+    try:
+        d = datetime.fromisoformat(iso).date()
+    except ValueError:
+        return iso
+    tage = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+    return f"{tage[d.weekday()]} {d.day:02d}.{d.month:02d}."
+
+
+def aktien_info_anhaengen(r: dict[str, Any], info: dict[str, Any], heute: Any) -> None:
+    """Sektor, Kursziel, Analysten und den naechsten Zahlen-Termin an eine Aktienzeile.
+
+    Der Termin wird zur Warnung, wenn er in den naechsten zwei Wochen liegt, und sperrt den
+    Einstiegs-Alarm, wenn er in den naechsten drei Tagen liegt: an so einem Tag springt der
+    Kurs oft ueber jeden Stop hinweg — das R, mit dem der Plan rechnet, gilt dann nicht.
+    """
+    if not info:
+        return
+    kompakt = {k: info[k] for k in ("sektor", "branche", "kursziel", "kursziel_tief",
+                                     "kursziel_hoch", "kursziel_3m_pct", "analysten",
+                                     "hoch52", "tief52", "marktwert", "dividende_pct")
+               if info.get(k) is not None}
+    z = info.get("zahlen") or {}
+    tage = tage_bis(z.get("datum"), heute)
+    if tage is not None and tage >= 0:
+        kompakt["zahlen"] = {**{k: z[k] for k in ("datum", "zeit", "eps_prognose") if z.get(k)},
+                             "tage": tage}
+        # Wie weit diese Aktie an ihren letzten Terminen gesprungen ist (gemessen, 2024–26).
+        bew = zahlen_ref.je_aktie(str(r.get("instrument") or ""))
+        if bew:
+            kompakt["zahlen"]["bewegung"] = bew
+        wann = _datum_de(str(z.get("datum")))
+        zeit = f", {z['zeit']}" if z.get("zeit") else ""
+        if tage <= TERMIN_SPERRE_TAGE:
+            r["termin_sperre"] = (
+                f"Quartalszahlen {wann}{zeit} — kein neuer Einstieg davor: an so einem Tag "
+                "springt der Kurs oft über den Stop"
+            )
+        if tage <= TERMIN_WARNUNG_TAGE:
+            satz = f"Quartalszahlen {wann}{zeit} (in {tage} Tagen) — Kurslücke über Nacht möglich"
+            if bew:
+                satz += (
+                    f"; zuletzt im Mittel ±{bew['median']:.1f} % in zwei Tagen, "
+                    f"höchstens {bew['max']:.1f} %"
+                ).replace(".", ",")
+            w = [x for x in (r.get("warnungen") or []) if not str(x).startswith("Quartalszahlen")]
+            r["warnungen"] = [satz, *w]
+    r["info"] = kompakt
+
+
+def sektoren_rechnen(zeilen: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Welche Branchen tragen gerade? Mittel der relativen Staerke je Sektor.
+
+    Nur Sektoren mit mindestens drei gescannten Aktien — mit einer einzigen waere das die
+    Staerke dieser einen Aktie, nicht die ihres Sektors.
+    """
+    je: dict[str, list[dict[str, Any]]] = {}
+    for r in zeilen:
+        sek = (r.get("info") or {}).get("sektor")
+        if r.get("klasse") == "aktien" and sek and r.get("rs") is not None:
+            je.setdefault(str(sek), []).append(r)
+    aus = []
+    for sek, rs in je.items():
+        if len(rs) < 3:
+            continue
+        ren21 = sorted(float(x["zusatz"]["renditen"]["r21"]) for x in rs
+                       if (x.get("zusatz") or {}).get("renditen", {}).get("r21") is not None)
+        ren63 = sorted(float(x["zusatz"]["renditen"]["r63"]) for x in rs
+                       if (x.get("zusatz") or {}).get("renditen", {}).get("r63") is not None)
+        aus.append({
+            "sektor": sek,
+            "n": len(rs),
+            "rs": round(sum(float(x["rs"]) for x in rs) / len(rs), 1),
+            "r21_median": round(ren21[len(ren21) // 2], 2) if ren21 else None,
+            "r63_median": round(ren63[len(ren63) // 2], 2) if ren63 else None,
+            "fuehrer": [x["instrument"] for x in sorted(rs, key=lambda y: -float(y["rs"]))[:3]],
+        })
+    aus.sort(key=lambda x: -x["rs"])
+    for i, e in enumerate(aus, start=1):
+        e["rang"] = i
+    rang = {e["sektor"]: (e["rang"], len(aus)) for e in aus}
+    for r in zeilen:
+        sek = (r.get("info") or {}).get("sektor")
+        if sek in rang:
+            r["info"]["sektor_rang"], r["info"]["sektor_von"] = rang[sek]
+    return aus
+
+
+async def krypto_extras(zeilen: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Finanzierung und offene Positionen je Coin, dazu Angst & Gier — ein Abruf je Quelle."""
+    derivate_roh, fng_roh = await asyncio.gather(
+        mx.hole_json(mx.KRAKEN_FUTURES_TICKER), mx.hole_json(mx.ANGST_GIER)
+    )
+    tabelle = mx.derivate_tabelle(derivate_roh or {})
+    coins = []
+    for r in zeilen:
+        if r.get("klasse") != "krypto":
+            continue
+        c = mx.muenze(str(r.get("instrument") or ""))
+        d = tabelle.get(c)
+        if d is None:
+            continue
+        coins.append(c)
+        z = r.setdefault("zusatz", {})
+        # Nur Kontext, KEINE Warnung: die vorab registrierte Studie (docs/FUNDING-STUDIE-
+        # 2026-09.md) fand keinen Vorhersagewert — hohe Finanzierung lief danach im Mittel
+        # nicht schlechter. Was die eigenen Daten nicht hergeben, steht nicht unter
+        # „Was dagegen spricht".
+        z["derivate"] = d
+    stimmung: dict[str, Any] = {"stand": datetime.now(UTC).isoformat()}
+    zus = mx.stimmung_zusammenfassen(tabelle, coins)
+    if zus:
+        stimmung["derivate"] = {**zus, "quelle": "Kraken Futures"}
+    fng = mx.angst_gier_aus(fng_roh or {})
+    if fng:
+        stimmung["angst_gier"] = {**fng, "quelle": "alternative.me"}
+    print(
+        f"  Terminmarkt: {len(coins)} Coins mit Finanzierung"
+        + (f", Median {zus['median_funding_jahr_pct']:+.1f} %/Jahr" if zus else "")
+        + (f" · Angst & Gier {fng['wert']:.0f} ({fng['text']})" if fng else "")
+    )
+    return stimmung if len(stimmung) > 1 else None
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="web", help="Ausgabeordner (scan.json + asset/)")
@@ -711,6 +857,11 @@ async def main() -> int:
     ap.add_argument("--detail", type=int, default=60, help="fuer wie viele Werte Detaildateien")
     ap.add_argument("--makro", default="web/macro.json", help="Makrolage aus fetch_macro.py")
     ap.add_argument("--ohne-aktien", action="store_true")
+    ap.add_argument(
+        "--aktien-info",
+        default="web/aktien_info.json",
+        help="Termine, Sektor, Kursziele aus fetch_aktien_info.py (fehlt sie: ohne)",
+    )
     ap.add_argument(
         "--vorlauf-url",
         default="",
@@ -762,6 +913,10 @@ async def main() -> int:
     # Tagesschlusskurse fuer die Gleichlauf-Rechnung. Nur Datum und Kurs, kein
     # Kerzenobjekt — der Lauf ist schon einmal am Speicher gestorben.
     kurse_je: dict[str, dict[Any, float]] = {}
+    # Der Halte-Stop je Wert (Chandelier aus den Tageskerzen). Er gehoert in JEDE Zeile,
+    # nicht nur in die mit Setup: das Depot braucht einen Stop auch fuer Werte, in denen
+    # es laengst drin ist und fuer die heute kein Einstieg ansteht.
+    halte_je: dict[str, dict[str, Any]] = {}
 
     def schreiber(klasse: str) -> Any:
         """Detaildatei sofort schreiben, solange der Kontext noch lebt.
@@ -777,6 +932,10 @@ async def main() -> int:
             reihe = gl.sammle(getattr(d1, "bars", ()) if d1 is not None else ())
             if len(reihe) >= gl.MIN_TAGE:
                 kurse_je[chance.instrument] = reihe
+            with contextlib.suppress(Exception):
+                hw = halte_werte(getattr(d1, "bars", ()) if d1 is not None else ())
+                if hw is not None:
+                    halte_je[chance.instrument] = hw
             muster = muster_ueber_zeitebenen(per_tf, (Timeframe.D1, Timeframe.H4, Timeframe.H1))
             muster_je[chance.instrument] = muster
             klasse_je[chance.instrument] = klasse
@@ -917,6 +1076,12 @@ async def main() -> int:
     }
     kompakt_neu = [zeile_je[c.instrument] for c in alle]
     kompakt_alt = [r for reihen in uebernommen.values() for r in reihen]
+    # Uebernommene Zeilen behalten ihren Halte-Stop aus dem Vorlauf — er haengt an
+    # Tageskerzen und aendert sich in einer halben Stunde nicht.
+    for r in kompakt_neu:
+        hw = halte_je.get(str(r.get("instrument")))
+        if hw is not None:
+            r["halte"] = hw
 
     # Relative Staerke: jede Klasse gegen sich selbst. Muss hier passieren und nicht
     # im Scan — sie braucht alle Werte der Klasse gleichzeitig.
@@ -950,6 +1115,34 @@ async def main() -> int:
     for r in kompakt_neu + kompakt_alt:
         _erwartung_anhaengen(r, tabelle)
 
+    # Aktien: Quartalszahlen-Termin, Sektor, Analystenkonsens. Nur fuer frisch gescannte
+    # Zeilen — uebernommene bringen ihren Stand aus dem letzten vollen Lauf mit.
+    ai = _aktien_info(args.aktien_info)
+    ai_werte = ai.get("werte") or {}
+    if ai_werte:
+        heute = datetime.now(UTC).date()
+        n_ai = 0
+        for r in kompakt_neu:
+            if r.get("klasse") == "aktien" and str(r.get("instrument")) in ai_werte:
+                aktien_info_anhaengen(r, ai_werte[str(r.get("instrument"))], heute)
+                n_ai += 1
+        gesperrt_ai = [str(r.get("instrument")) for r in kompakt_neu if r.get("termin_sperre")]
+        print(f"  Aktien-Info: {n_ai} Zeilen ergaenzt" + (
+            f" · Zahlen in den naechsten Tagen: {', '.join(gesperrt_ai)}" if gesperrt_ai else ""))
+    sektoren = sektoren_rechnen(kompakt_neu + kompakt_alt)
+    if sektoren:
+        print("  Sektoren: " + " · ".join(f"{s['sektor']} {s['rs']:.0f}" for s in sektoren[:5]))
+
+    # Krypto: Terminmarkt und Stimmung — nur, wenn Krypto in diesem Lauf gescannt wurde.
+    stimmung = None
+    if klassen.get("krypto"):
+        try:
+            stimmung = await krypto_extras(kompakt_neu)
+        except Exception as exc:
+            print(f"  ::warning::Terminmarkt/Stimmung nicht ladbar: {type(exc).__name__}")
+    if stimmung is None and alt_doc.get("stimmung"):
+        stimmung = alt_doc.get("stimmung")
+
     # Das Alarm-Tor — dieselbe Pruefung wie im Waechter (watch_levels.py). Damit steht in
     # der App unter „Jetzt einsteigen" genau das, was auch aufs Handy geht, und bei allem
     # anderen der Grund, warum nicht. Zwei Rechnungen fuer dieselbe Frage hatten wir
@@ -957,6 +1150,7 @@ async def main() -> int:
     alarm_stand = _alarm_stand()
     for r in kompakt_neu + kompakt_alt:
         if r.get("handelbar") and r.get("einstieg") is not None:
+            # pruefe_zeile beachtet auch die Termin-Sperre (Quartalszahlen).
             r["alarm"] = alarm_tor.pruefe_zeile(r, alarm_stand).as_dict()
         else:
             r.pop("alarm", None)
@@ -1002,6 +1196,8 @@ async def main() -> int:
         "statistik": statistik,
         "detail_vorhanden": sorted(behalten),
         "makro": lage.as_dict() if lage is not None else None,
+        "stimmung": stimmung,
+        "sektoren": sektoren,
         "eurusd": eurusd,
         "alarm_regeln": alarm_tor.regeln_uebersicht(alarm_stand),
         # Uebernommene Klassen gehoeren in BEIDE Listen. Bis zum 26.09. standen sie in

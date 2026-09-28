@@ -1,43 +1,42 @@
 #!/usr/bin/env python3
-"""Der Depot-Waechter — meldet, wenn an OZANS EIGENEN Positionen etwas passiert.
+"""Der Depot-Waechter — Stops fuer OZANS EIGENE Positionen, rund um die Uhr.
 
     python3 scripts/depot_wache.py --scan web/scan.json --send
 
 WARUM ES DAS GIBT
 
-Ozan: „Ich kriege auch keine Alarme. Ich kriege nur die Alarme, wenn ich auf der App
-drauf bin." Das stimmte, und es war keine Schlamperei, sondern eine Luecke im Aufbau:
-Das Depot liegt ausschliesslich im Browser (localStorage). Der oeffentliche Ablauf auf
-GitHub kannte es nicht — er konnte also unmoeglich melden, dass ein Stop faellt. Die
-Signalalarme (Einstieg, Stop, Ziel eines gescannten Setups) liefen laengst; nur an
-seinen eigenen Positionen lief nichts.
+Ozan: „Ich kriege nur die Alarme, wenn ich auf der App drauf bin." Und am 27.09.: „Die
+Stops auf meinem Portfolio 24/7 analysieren und immer neu setzen und mir Bescheid sagen."
 
-Dieses Skript schliesst die Luecke. Das Depot kommt als Geheimnis ``DEPOT_CODE`` in den
-Lauf — derselbe Text, den die App unter „Sync" ausgibt. Geheimnisse stehen nicht im
-oeffentlichen Repository und tauchen auch in den Protokollen nicht auf.
+Das Depot liegt im Browser (localStorage). Damit der oeffentliche Ablauf auf GitHub es
+kennt, kommt es als Geheimnis ``DEPOT_CODE`` herein — derselbe Text, den die App unter
+„Sync" ausgibt. Geheimnisse stehen nicht im Repository und nicht in den Protokollen.
 
-WAS GEMELDET WIRD — UND WAS AUSDRUECKLICH NICHT
+WAS BEI JEDEM LAUF PASSIERT (alle zehn Minuten)
 
-Gemeldet wird nur, was eine Entscheidung verlangt:
+Fuer jede Position (``portfolio_intel/depot_stops.py``):
+  * Knock-out-Puffer pruefen (Turbos),
+  * Stop gerissen? Ziel erreicht?
+  * Stop setzen, wo keiner ist, und nachziehen, wo die Analyse es hergibt — aus der
+    Invalidierung der laufenden Analyse und dem Halte-Stop (``scanner/halte_stop.py``).
 
-  * Stop gerissen
-  * Ziel erreicht (je Marke einmal)
-  * Knock-out- oder Liquidationspuffer unter 6 % — der Fall, der ueber Nacht alles kostet
+WAS GEMELDET WIRD
 
-Nicht gemeldet wird: Kursbewegung, Notenwechsel, „Scan erfolgreich", Rangaenderungen.
-Ozan dazu woertlich: „nicht jetzt wie davor mit diesen Scans, dass er jede 15 Minuten
-sagt, ja, Scan erfolgreich, sowas interessiert mich nicht."
+  * sofort und dringend: Stop gerissen, Ziel erreicht, Knock-out nah oder beruehrt
+  * gebuendelt: Stop neu gesetzt, Stop nachgezogen (erst ab 2 % Abstand zur zuletzt
+    gemeldeten Marke — sonst kaeme fast taeglich eine Nachricht je Position)
 
-WARUM IM OEFFENTLICHEN KANAL KEINE DETAILS STEHEN
+Jede Meldung genau einmal. Keine Kursbewegung, kein „Scan erfolgreich".
 
-Der Auffangweg ist ein GitHub-Issue mit Erwaehnung — der einzige Weg, der ohne
-eingerichtete Geheimnisse per Mail ankommt. **Das Repository ist oeffentlich.** Ein
-Issue „STOP SOLUSD — 1,79 Stueck" wuerde damit verraten, was Ozan haelt und wie viel.
-Deshalb traegt der oeffentliche Kanal nur die Klingel: wie viele Positionen eine
-Entscheidung verlangen und welcher Art. Die Zahlen stehen in der App.
+WAS NIRGENDS OEFFENTLICH STEHT
 
-Wer die Einzelheiten in der Nachricht will, richtet Telegram ein (TELEGRAM_BOT_TOKEN und
-TELEGRAM_CHAT_ID) oder Web Push — beide Wege sind privat und bekommen den vollen Text.
+Das Repository ist oeffentlich. Deshalb:
+  * der Stand (welcher Stop gilt, was gemeldet ist) liegt VERSIEGELT im Repo
+    (``security/siegel.py``, Schluessel aus ``DEPOT_CODE``),
+  * der oeffentliche Kanal (GitHub-Issue → Mail) traegt nur die Klingel ohne Werte,
+  * ``web/waechter.json`` fuer die App enthaelt nur Zaehler und einen Fingerabdruck,
+    an dem die App erkennt, ob der Waechter denselben Depotstand kennt wie das Geraet.
+Den vollen Text bekommen nur die privaten Wege (Web Push, Telegram).
 """
 
 from __future__ import annotations
@@ -55,7 +54,6 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.ops.notify import (
-    FileSink,
     GitHubIssueSink,
     Notification,
     Notifier,
@@ -63,13 +61,30 @@ from trading_agent.ops.notify import (
     TelegramSink,
     WebPushSink,
 )
+from trading_agent.portfolio_intel.depot_stops import (
+    Ereignis,
+    pruefe_depot,
+    stand_kennung,
+)
+from trading_agent.security.siegel import oeffnen, schluessel_aus, versiegeln
 
-STAND = "data/repository_real/live/depot_alarme.json"
-PROTOKOLL = "data/repository_real/live/alerts.jsonl"
+STAND = "data/repository_real/live/depot_stand.siegel"
+OEFFENTLICH = "web/waechter.json"
+ZWECK = "depot-waechter-stand-v1"
 
-#: Unter diesem Puffer zum Knock-out bzw. zur Liquidation wird es ernst — dagegen hilft
-#: kein Stop, die Schwelle greift auch nachts.
-PUFFER_KRITISCH_PCT = 6.0
+ART_TITEL = {
+    "stop": "Stop gerissen — verkaufen",
+    "ziel": "Ziel erreicht — Teil verkaufen",
+    "ko": "Knock-out berührt",
+    "puffer_kritisch": "Knock-out bedrohlich nah — raus",
+    "puffer_eng": "Knock-out-Puffer wird eng",
+    "stop_neu": "Stop gesetzt",
+    "stop_nach": "Stop nachziehen",
+    "zahlen": "Quartalszahlen stehen an",
+    "zahlen_ko": "Quartalszahlen — Knock-out-Risiko",
+}
+#: Diese Arten verlangen JETZT eine Entscheidung und bekommen die Klingel auch oeffentlich.
+DRINGEND = {"stop", "ziel", "ko", "puffer_kritisch", "puffer_eng", "zahlen_ko"}
 
 
 # --------------------------------------------------------------------------- Depot lesen
@@ -82,7 +97,7 @@ def depot_lesen(roh: str) -> list[dict[str, Any]]:
         return []
     if "depot=" in s:
         s = s.split("depot=", 1)[1].split("&")[0].strip()
-    if not s.startswith("{"):
+    if not s.startswith("{") and not s.startswith("["):
         try:
             s = base64.b64decode(s + "=" * (-len(s) % 4)).decode("utf-8")
         except (binascii.Error, UnicodeDecodeError, ValueError):
@@ -91,151 +106,156 @@ def depot_lesen(roh: str) -> list[dict[str, Any]]:
         d = json.loads(s)
     except json.JSONDecodeError:
         return []
-    liste = d if isinstance(d, list) else d.get("p")
+    liste = d if isinstance(d, list) else d.get("p") if isinstance(d, dict) else None
     if not isinstance(liste, list):
         return []
     return [p for p in liste if isinstance(p, dict) and p.get("sym")]
 
 
-# --------------------------------------------------------------------------- Kurse
-
-
-def _kurstabelle(scan: dict[str, Any]) -> dict[str, float]:
-    raus: dict[str, float] = {}
-    for r in scan.get("gesamt") or []:
-        name = str(r.get("instrument") or "").upper()
-        kurs = r.get("kurs")
-        if name and isinstance(kurs, int | float):
-            raus[name] = float(kurs)
-    return raus
-
-
-#: Wie die App: derselbe Coin heisst bei Bybit USDT, bei Kraken USD. Ein Depoteintrag
-#: muss beide finden, sonst faellt ausgerechnet die Position aus der Ueberwachung, die
-#: von der anderen Boerse eingetragen wurde.
-_ENDUNGEN = ("", "USDT", "USD", "EUR")
-
-
-def kurs_fuer(sym: str, tabelle: dict[str, float]) -> float | None:
-    s = str(sym or "").upper()
-    if s in tabelle:
-        return tabelle[s]
-    stamm = s
-    for e in ("USDT", "USD", "EUR"):
-        if stamm.endswith(e) and len(stamm) > len(e):
-            stamm = stamm[: -len(e)]
-            break
-    for e in _ENDUNGEN:
-        if (stamm + e) in tabelle:
-            return tabelle[stamm + e]
-    return None
-
-
-# --------------------------------------------------------------------------- Pruefung
-
-
-def _lang(pos: dict[str, Any]) -> bool:
-    plan = pos.get("plan") or {}
-    if plan.get("richtung") == "short":
-        return False
-    return pos.get("hebel_richtung") != "short"
-
-
-def ereignisse_fuer(
-    pos: dict[str, Any], kurs: float | None, tabelle: dict[str, float] | None = None
-) -> list[dict[str, str]]:
-    """Was an dieser Position eine Entscheidung verlangt. Leer heisst: nichts."""
-    raus: list[dict[str, str]] = []
-    sym = str(pos.get("sym") or "")
-    plan = pos.get("plan") or {}
-    lang = _lang(pos)
-
-    # Knock-out / Liquidation zuerst — davor schuetzt kein Stop.
-    ko = pos.get("ko")
-    # Die Kurstabelle MUSS hier durchgereicht werden. Zuerst stand hier ein leeres
-    # Woerterbuch — damit war der Basiskurs immer None und die Knock-out-Pruefung, also
-    # die einzige, die vor einem Totalverlust warnt, lief nie an.
-    basis_kurs = kurs_fuer(str(pos.get("basis") or ""), tabelle or {}) if pos.get("basis") else None
-    if isinstance(ko, int | float) and basis_kurs:
-        abstand = (basis_kurs - float(ko)) if lang else (float(ko) - basis_kurs)
-        if abstand > 0 and abstand / basis_kurs * 100 < PUFFER_KRITISCH_PCT:
-            raus.append({"art": "puffer", "sym": sym})
-
-    if kurs is None:
-        return raus
-
-    stop = plan.get("stop")
-    gerissen = isinstance(stop, int | float) and (
-        (kurs <= float(stop)) if lang else (kurs >= float(stop))
-    )
-    if gerissen:
-        raus.append({"art": "stop", "sym": sym})
-        return raus  # Ist der Stop gerissen, ist der Rest egal.
-
-    erledigt = set(pos.get("erledigt") or [])
-    for marke in ("TP1", "TP2", "TP3"):
-        ziel = plan.get(marke.lower())
-        if not isinstance(ziel, int | float) or marke in erledigt:
-            continue
-        if (kurs >= float(ziel)) if lang else (kurs <= float(ziel)):
-            raus.append({"art": "ziel", "sym": sym, "marke": marke})
-            break
-    return raus
-
-
 # --------------------------------------------------------------------------- Stand
 
 
-def stand_laden(pfad: str) -> dict[str, str]:
+def stand_laden(pfad: str | Path, schluessel: bytes) -> dict[str, Any]:
     p = Path(pfad)
     if not p.exists():
         return {}
     try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        klar = oeffnen(p.read_text(encoding="utf-8"), schluessel)
+    except OSError:
         return {}
-    return {str(k): str(v) for k, v in (d.get("gemeldet") or {}).items()}
+    if klar is None:
+        # Anderer Schluessel (DEPOT_CODE neu hinterlegt) oder beschaedigt: neu anfangen.
+        # Die Stops aus dem neuen Depot-Text gelten dann als Untergrenze.
+        print("  (alter Waechter-Stand passt nicht zum Depot-Code — es wird neu begonnen)")
+        return {}
+    try:
+        d = json.loads(klar.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    return d if isinstance(d, dict) else {}
 
 
-def stand_sichern(pfad: str, gemeldet: dict[str, str]) -> None:
+def stand_sichern(pfad: str | Path, stand: dict[str, Any], schluessel: bytes) -> None:
     p = Path(pfad)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(
-        json.dumps({"gemeldet": gemeldet}, indent=2, ensure_ascii=False, sort_keys=True),
-        encoding="utf-8",
+    klar = json.dumps(stand, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    p.write_text(versiegeln(klar.encode("utf-8"), schluessel) + "\n", encoding="utf-8")
+
+
+def oeffentlich_schreiben(pfad: str | Path, inhalt: dict[str, Any]) -> None:
+    p = Path(pfad)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(inhalt, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- Auswahl
+
+
+def neue_meldungen(
+    ereignisse: list[Ereignis], gemeldet: dict[str, str], jetzt: datetime
+) -> tuple[list[Ereignis], dict[str, str]]:
+    """Was davon ist neu? Gibt die neuen Ereignisse und den fortgeschriebenen Merker zurueck.
+
+    Knock-out-Warnungen vergessen ihren Merker, sobald der Puffer wieder in Ordnung ist —
+    naehert sich der Kurs spaeter erneut der Schwelle, ist das eine neue Lage.
+    """
+    neu: list[Ereignis] = []
+    merker = dict(gemeldet)
+    heute = {e.merker for e in ereignisse}
+    for k in list(merker):
+        teile = k.split("|")
+        if len(teile) >= 3 and teile[2].startswith("puffer") and k not in heute:
+            del merker[k]
+    for e in ereignisse:
+        if e.merker in merker:
+            continue
+        merker[e.merker] = jetzt.isoformat()
+        neu.append(e)
+    return neu, merker
+
+
+def texte(neu: list[Ereignis]) -> tuple[str, str, str]:
+    """Titel und Text fuer die privaten Wege, dazu die oeffentliche Klingel."""
+    dringend = [e for e in neu if e.art in DRINGEND]
+    ruhig = [e for e in neu if e.art not in DRINGEND]
+    if dringend:
+        e = dringend[0]
+        titel = f"{ART_TITEL.get(e.art, e.art)} · {e.name}"
+        if len(dringend) > 1:
+            titel += f" (+{len(dringend) - 1})"
+    else:
+        titel = (
+            f"{len(ruhig)} Stop(s) gesetzt oder nachgezogen"
+            if len(ruhig) > 1
+            else f"{ART_TITEL.get(ruhig[0].art)} · {ruhig[0].name}"
+        )
+    zeilen = []
+    for e in dringend + ruhig:
+        zeilen.append(f"• {ART_TITEL.get(e.art, e.art)} — {e.name}: {e.text}")
+    if ruhig:
+        zeilen.append(
+            "Die App überwacht diese Stops und meldet sich, wenn einer fällt. Die Order beim "
+            "Broker musst du selbst anpassen — die App führt keine Orders aus."
+        )
+    arten = sorted({ART_TITEL.get(e.art, e.art) for e in dringend})
+    klingel = (
+        f"{len(dringend)} Position(en) in deinem Depot verlangen jetzt eine Entscheidung "
+        f"({', '.join(arten)}).\n\n"
+        "Die Einzelheiten stehen **in der App** unter Portfolio und kommen per Push — hier "
+        "nicht, weil dieses Repository oeffentlich ist und dein Depot niemanden etwas angeht.\n\n"
+        "https://ozancanerd-ship-it.github.io/cl/"
     )
+    return titel, "\n".join(zeilen), klingel
 
 
 # --------------------------------------------------------------------------- Lauf
-
-
-ART_TEXT = {
-    "stop": "Stop gerissen",
-    "ziel": "Ziel erreicht",
-    "puffer": "Knock-out bedrohlich nah",
-}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--scan", default="web/scan.json")
     ap.add_argument("--stand", default=STAND)
+    ap.add_argument("--oeffentlich", default=OEFFENTLICH)
     ap.add_argument("--send", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
     args = ap.parse_args()
+    jetzt = datetime.now(UTC)
 
-    roh = os.environ.get("DEPOT_CODE", "")
-    if not roh.strip():
+    roh = os.environ.get("DEPOT_CODE", "").strip()
+    push = WebPushSink(min_severity=Severity.INFO)
+    tg = TelegramSink(min_severity=Severity.INFO)
+    gh = GitHubIssueSink(erwaehnen="ozancanerd-ship-it")
+    kanaele = [n for n, s in (("push", push), ("telegram", tg), ("mail", gh)) if s.available()]
+
+    if not roh:
         print("kein DEPOT_CODE hinterlegt — der Depot-Waechter bleibt still.")
         print(
             "  Einrichten: App -> Sync -> 'Depot kopieren', dann unter Settings -> Secrets"
             " -> Actions ein Geheimnis DEPOT_CODE anlegen und den Text einfuegen."
+        )
+        oeffentlich_schreiben(
+            args.oeffentlich,
+            {
+                "aktiv": False,
+                "geprueft": jetzt.isoformat(),
+                "grund": "kein DEPOT_CODE",
+                "kanaele": kanaele,
+            },
         )
         return 0
 
     positionen = depot_lesen(roh)
     if not positionen:
         print("::warning::DEPOT_CODE liess sich nicht lesen — Text aus dem Sync-Reiter erwartet.")
+        oeffentlich_schreiben(
+            args.oeffentlich,
+            {
+                "aktiv": False,
+                "geprueft": jetzt.isoformat(),
+                "grund": "DEPOT_CODE unlesbar",
+                "kanaele": kanaele,
+            },
+        )
         return 0
 
     try:
@@ -244,84 +264,72 @@ def main() -> int:
         print(f"::warning::Scan nicht lesbar ({exc}) — keine Depotpruefung.")
         return 0
 
-    tabelle = _kurstabelle(scan)
-    jetzt = datetime.now(UTC)
-    gemeldet = stand_laden(args.stand)
-    neu: list[dict[str, str]] = []
+    schluessel = schluessel_aus(roh, ZWECK)
+    stand = stand_laden(args.stand, schluessel)
+    neuer_stand, ereignisse, uebersicht = pruefe_depot(positionen, scan, stand)
 
-    for pos in positionen:
-        kurs = kurs_fuer(str(pos.get("sym") or ""), tabelle)
-        for e in ereignisse_fuer(pos, kurs, tabelle):
-            # Der Schluessel haelt einen Alarm fest, nicht einen Kurs: derselbe Stop an
-            # derselben Position meldet sich genau einmal.
-            schluessel = f"{e['sym']}|{e['art']}|{e.get('marke', '')}"
-            if schluessel in gemeldet:
-                continue
-            gemeldet[schluessel] = jetzt.isoformat()
-            neu.append(e)
+    # Merker von Positionen, die es nicht mehr gibt, fallen weg — sonst meldete ein
+    # spaeterer Wiedereinstieg nie wieder etwas.
+    aktuell = set(neuer_stand["positionen"])
+    gemeldet = {
+        k: v for k, v in neuer_stand["gemeldet"].items() if "|".join(k.split("|")[:2]) in aktuell
+    }
+    neu, gemeldet = neue_meldungen(ereignisse, gemeldet, jetzt)
+    neuer_stand["gemeldet"] = gemeldet
+    neuer_stand["geprueft"] = jetzt.isoformat()
 
-    # Positionen, die es nicht mehr gibt, duerfen ihren Merker wieder verlieren — sonst
-    # meldet ein spaeterer Wiedereinstieg nie wieder etwas.
-    aktuell = {str(p.get("sym") or "") for p in positionen}
-    gemeldet = {k: v for k, v in gemeldet.items() if k.split("|")[0] in aktuell}
-
-    print(f"{len(positionen)} Position(en) geprueft, {len(neu)} neue Meldung(en).")
+    print(
+        f"{uebersicht['positionen']} Position(en) geprueft · {uebersicht['mit_stop']} mit Stop · "
+        f"{uebersicht['ohne_kurs']} ohne Kurs · {len(neu)} neue Meldung(en)"
+    )
     for e in neu:
-        print(f"  [!] {ART_TEXT.get(e['art'], e['art'])}")
+        # Im Protokoll nur die Art — das Protokoll ist oeffentlich einsehbar.
+        print(f"  [{'!' if e.art in DRINGEND else '·'}] {ART_TITEL.get(e.art, e.art)}")
 
     if args.send and neu:
-        # Voller Text nur ueber die privaten Wege. Der oeffentliche Kanal bekommt die
-        # Klingel ohne Inhalt — das Repository ist oeffentlich, und was Ozan haelt,
-        # geht niemanden etwas an.
-        privat = f"{len(neu)} Position(en) im Depot verlangen eine Entscheidung:\n" + "\n".join(
-            f"  {ART_TEXT.get(e['art'], e['art'])} — {e['sym']}"
-            + (f" ({e['marke']})" if e.get("marke") else "")
-            for e in neu
-        )
-        arten = sorted({ART_TEXT.get(e["art"], e["art"]) for e in neu})
-        oeffentlich = (
-            f"{len(neu)} Position(en) in deinem Depot verlangen jetzt eine Entscheidung "
-            f"({', '.join(arten)}).\n\n"
-            "Die Einzelheiten stehen **in der App** unter Portfolio — hier nicht, weil "
-            "dieses Repository oeffentlich ist und dein Depot niemanden etwas angeht.\n\n"
-            "https://ozancanerd-ship-it.github.io/cl/"
-        )
-
-        sinks: list[Any] = [FileSink(PROTOKOLL)]
-        tg = TelegramSink(min_severity=Severity.INFO)
-        push = WebPushSink(min_severity=Severity.INFO)
-        if tg.available():
-            sinks.insert(0, tg)
+        titel, text, klingel = texte(neu)
+        dringend = any(e.art in DRINGEND for e in neu)
+        # Bewusst KEIN FileSink: alerts.jsonl fliesst in die oeffentliche Seite ein.
+        sinks: list[Any] = []
         if push.available():
-            sinks.insert(0, push)
-        n_privat = Notifier(sinks, max_per_window=10, dedup_window_s=0.0)
-        n_privat.notify(
-            Notification(
-                severity=Severity.CRITICAL,
-                title="Depot — Handlung noetig",
-                body=privat,
-                dedup_key="depot|" + "|".join(sorted(f"{e['sym']}{e['art']}" for e in neu)),
-                ts=jetzt,
+            sinks.append(push)
+        if tg.available():
+            sinks.append(tg)
+        if sinks:
+            Notifier(sinks, max_per_window=10, dedup_window_s=0.0).notify(
+                Notification(
+                    severity=Severity.CRITICAL if dringend else Severity.WARNING,
+                    title=titel,
+                    body=text,
+                    dedup_key="depot|" + "|".join(sorted(e.merker for e in neu)),
+                    ts=jetzt,
+                )
             )
-        )
-
-        gh = GitHubIssueSink(erwaehnen="ozancanerd-ship-it")
-        if gh.available():
-            n_oeff = Notifier([gh], max_per_window=5, dedup_window_s=0.0)
-            n_oeff.notify(
+        if dringend and gh.available():
+            Notifier([gh], max_per_window=5, dedup_window_s=0.0).notify(
                 Notification(
                     severity=Severity.CRITICAL,
-                    title=f"DEPOT — {len(neu)} Position(en) brauchen eine Entscheidung",
-                    body=oeffentlich,
+                    title=f"DEPOT — {sum(e.art in DRINGEND for e in neu)} Position(en) brauchen eine Entscheidung",
+                    body=klingel,
                     dedup_key="depot-oeffentlich|" + jetzt.strftime("%Y%m%d%H%M"),
                     ts=jetzt,
                 )
             )
-        else:
-            print("::warning::Kein Weg nach draussen — weder Telegram noch Web Push noch Issue.")
+        if not sinks and not (dringend and gh.available()):
+            print("  (kein privater Kanal eingerichtet — die Meldung steht nur in der App)")
 
+    oeffentlich_schreiben(
+        args.oeffentlich,
+        {
+            "aktiv": True,
+            "geprueft": jetzt.isoformat(),
+            "stand": stand_kennung(positionen),
+            **uebersicht,
+            "kanaele": kanaele,
+        },
+    )
     if not args.dry_run:
-        stand_sichern(args.stand, gemeldet)
+        stand_sichern(args.stand, neuer_stand, schluessel)
     return 0
 
 

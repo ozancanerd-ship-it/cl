@@ -368,6 +368,12 @@ async def main() -> int:
         jetzt=jetzt,
         erlaubt=AUFS_TELEFON,
         alle=args.alle_setups,
+        # Quartalszahlen in den naechsten Tagen: der Scan sperrt den Einstieg (Masterplan §8).
+        sperren={
+            str(z.get("instrument")): str(z.get("termin_sperre"))
+            for z in zeilen
+            if z.get("termin_sperre")
+        },
     )
     for satz in notizen:
         print(f"  {satz}")

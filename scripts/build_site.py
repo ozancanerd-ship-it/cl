@@ -101,7 +101,7 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
     import shutil
 
     quelle = repo / "web"
-    stat = {"scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0}
+    stat = {"scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0, "waechter": 0, "aktien_info": 0}
     # performance.json wurde hier vergessen — die App holte sie, bekam 404 und zeigte
     # deshalb "noch kein abgeschlossener Trade ausgewertet", obwohl 60 in der Datei
     # standen. Genau die Zahl, die man sehen muss, bevor man dem naechsten Signal glaubt.
@@ -109,6 +109,12 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
         ("scan.json", "scan"),
         ("watchlist.json", "wachliste"),
         ("performance.json", "bilanz"),
+        # Nur Zaehler und ein Fingerabdruck — die App zeigt damit, ob der Depot-Waechter
+        # auf GitHub laeuft und denselben Stand kennt wie das Geraet.
+        ("waechter.json", "waechter"),
+        # Termine, Sektoren, Kursziele — liegt auf der Seite, damit der naechste Lauf sie
+        # uebernehmen kann, statt sie jedes Mal neu bei Nasdaq zu holen.
+        ("aktien_info.json", "aktien_info"),
     ):
         f = quelle / name
         if f.exists():
