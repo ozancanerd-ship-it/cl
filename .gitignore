@@ -56,6 +56,13 @@ data/repository_real/*
 data/repository_real/live/*
 !data/repository_real/live/tsmom_forward.jsonl
 !data/repository_real/live/tsmom_forward_corrections.jsonl
+# Der Alarm-Verlauf (alerts.jsonl) — bis 28.09. NICHT hier gelistet und deshalb bei
+# jedem CI-Lauf leer, obwohl scan_alert.py brav in sie schreibt: eine frische Ubuntu-VM
+# hat keine Datei, die nie committet wurde. Die Folge: die "Alarme"-Seite in der App
+# zeigte praktisch nie echten Verlauf, egal wie viele Alarme tatsaechlich rausgingen —
+# und genau das sah fuer Ozan aus wie "seit Tagen kommt nichts". FileSink kappt sie
+# jetzt selbst (max_zeilen), also waechst sie nicht unbegrenzt im Repo.
+!data/repository_real/live/alerts.jsonl
 # NICHT freigegeben: echter Depotstand.
 data/repository_real/live/portfolio_snapshot.json
 data/cache/*
