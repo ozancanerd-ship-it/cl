@@ -358,7 +358,8 @@ jobs:
                    data/repository_real/live/scan_alert_state.json \
                    data/repository_real/live/watchlist.json \
                    data/repository_real/live/depot_alarme.json \
-                   data/repository_real/live/depot_stand.siegel; do
+                   data/repository_real/live/depot_stand.siegel \
+                   data/repository_real/live/alerts.jsonl; do
             if [ -f "$f" ]; then git add -f "$f"; else echo "  (noch nicht vorhanden: $f)"; fi
           done
           if git diff --cached --quiet; then
