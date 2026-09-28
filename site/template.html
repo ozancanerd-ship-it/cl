@@ -647,6 +647,7 @@ function name(sym){ return NAMEN[sym] || (D.names && D.names[sym]) || sym; }
 function kuerzel(sym){ return String(sym||'').replace(/-YFD$/,'').replace(/USDT$/,''); }
 
 let PF = null;
+let WA = null;                // waechter.json — laeuft der Depot-Waechter auf GitHub?
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
 
 /* ---- Euro, Broker, Gebuehr -------------------------------------------------
@@ -760,6 +761,10 @@ async function ladeScan(){
     const rp = await fetch('performance.json?v=' + Date.now(), {cache:'no-store'});
     PF = rp.ok ? await rp.json() : null;
   } catch(e){ PF = null; }
+  try {
+    const rwa = await fetch('waechter.json?v=' + Date.now(), {cache:'no-store'});
+    WA = rwa.ok ? await rwa.json() : null;
+  } catch(e){ WA = null; }
   sicher('Namen', ()=>merkeNamen(S && S.gesamt));
   /* Jeder Teil fuer sich. Vorher standen die Aufrufe in einer Zeile hintereinander —
      ein Fehler im ersten hat alle folgenden mitgenommen, und die App blieb bei
@@ -1013,7 +1018,7 @@ function pruefeDepotAlarme(){
   for (const p of pos){
     let b;
     try { b = bewertePosition(p); } catch(e){ continue; }
-    const schritt = naechsterSchritt(p, b.kurs);
+    const schritt = naechsterSchritt(p, planKurs(b));
     if (!schritt || (schritt.stufe !== 'stop' && schritt.stufe !== 'ziel')) continue;
     const key = 'verkauf:' + p.sym + ':' + (schritt.marke || 'stop');
     if (gemeldetLaden()[key]) continue;
@@ -1468,6 +1473,8 @@ function zeichneStatus(){
     ${depotZeile()}
     ${topSignal()}
     ${makroKasten()}
+    ${stimmungKasten()}
+    ${sektorKasten()}
     ${fehler ? `<div class="note-box bad"><span class="nt">Eine Anlageklasse fehlt</span>
       <p>${Object.entries(S.fehler).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>')}</p>
       <p>Die Rangliste ist unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>` : ''}`;
@@ -1739,6 +1746,128 @@ function terminKasten(){
   <p class="leer">Nachrichten gehen <strong>nicht</strong> in den Score ein. Sie ändern
   das Risiko, nicht die Richtung — und wer eine Zinsentscheidung handelt, handelt nicht
   den Chart, sondern eine Münze.</p>`;
+}
+
+/* ============================================ STIMMUNG UND BREITE (seit 27.09.)
+
+   Masterplan §5 und §9: Funding, Open Interest, Stimmung, Marktbreite. Bis dahin stand
+   davon nichts in der App. Hier stehen sie als KONTEXT — nicht im Score. Ob einer davon
+   die Signale besser macht, entscheidet eine vorab registrierte Studie, nicht der Klang.
+
+   Die Krypto-Breite rechnet die App selbst aus der Rangliste (wie die Aktien-Breite
+   beim Welt-ETF): wie viele Coins stehen ueber ihrem Stand von vor einem Monat bzw.
+   einem Quartal — und laufen die Altcoins besser oder schlechter als Bitcoin. */
+function kryptoBreite(){
+  const c = (S?.gesamt||[]).filter(o => o.klasse === 'krypto' && o.zusatz && o.zusatz.renditen);
+  const m = c.filter(o => o.zusatz.renditen.r21 != null);
+  const q = c.filter(o => o.zusatz.renditen.r63 != null);
+  if (m.length < 10) return null;
+  const btc = c.find(o => muenzeVon(o.instrument) === 'BTC');
+  const alts = m.filter(o => o !== btc).map(o => o.zusatz.renditen.r21).sort((a,b)=>a-b);
+  const median = alts.length ? alts[Math.floor(alts.length/2)] : null;
+  const btc21 = btc ? btc.zusatz.renditen.r21 : null;
+  return {
+    n: m.length,
+    monat: m.filter(o => o.zusatz.renditen.r21 > 0).length / m.length * 100,
+    quartal: q.length ? q.filter(o => o.zusatz.renditen.r63 > 0).length / q.length * 100 : null,
+    altMedian: median, btc21,
+    altVorsprung: (median != null && btc21 != null) ? median - btc21 : null,
+  };
+}
+function stimmungKasten(){
+  const st = S && S.stimmung;
+  const br = kryptoBreite();
+  if (!st && !br) return '';
+  const teile = [];
+  const ag = st && st.angst_gier;
+  if (ag){
+    const kl = ag.wert >= 75 ? 'dn' : ag.wert <= 25 ? 'up' : '';
+    teile.push(`<span>Angst &amp; Gier <b class="${kl}">${ag.wert.toFixed(0)}</b> ${esc(ag.text||'')}${
+      ag.vorwoche!=null?` <span style="color:var(--ink-3)">(Vorwoche ${ag.vorwoche.toFixed(0)})</span>`:''}</span>`);
+  }
+  const dv = st && st.derivate;
+  if (dv){
+    teile.push(`<span>Finanzierung Bitcoin <b>${dv.btc_funding_jahr_pct!=null?pct(dv.btc_funding_jahr_pct,1):'—'}</b>/Jahr</span>`);
+    teile.push(`<span>Median Coins <b>${pct(dv.median_funding_jahr_pct,1)}</b>/Jahr${
+      dv.heiss?` · ${dv.heiss} mit sehr hoher Finanzierung`:''}${
+      dv.kalt?` · ${dv.kalt} mit zahlenden Shorts`:''}</span>`);
+  }
+  if (br){
+    teile.push(`<span>Coins im Plus (Monat) <b>${br.monat.toFixed(0)} %</b>${
+      br.quartal!=null?` · Quartal <b>${br.quartal.toFixed(0)} %</b>`:''}</span>`);
+    if (br.altVorsprung != null)
+      teile.push(`<span>Altcoins gegen Bitcoin <b class="${br.altVorsprung>=0?'up':'dn'}">${
+        br.altVorsprung>=0?'+':''}${br.altVorsprung.toFixed(1).replace('.',',')} Pkt.</b> (Monat)</span>`);
+  }
+  const lesart = [];
+  if (ag && ag.wert >= 75) lesart.push('Gier ist verbreitet — gute Nachrichten sind oft schon im Kurs');
+  if (ag && ag.wert <= 25) lesart.push('Angst ist verbreitet — schlechte Nachrichten sind oft schon im Kurs');
+  if (br && br.monat < 30) lesart.push('die Mehrheit der Coins fällt — Long-Setups haben Gegenwind vom ganzen Markt');
+  if (br && br.monat > 70) lesart.push('die Mehrheit der Coins steigt — der Markt trägt');
+  return `<div class="note-box">
+    <span class="nt">Krypto · Stimmung und Breite</span>
+    <div class="kpi">${teile.join('')}</div>
+    ${lesart.length?`<p style="margin-top:8px">${esc(lesart.join('; '))}.</p>`:''}
+    <p style="margin-top:6px;color:var(--ink-3);font-size:12px">Kontext, kein Signal — geht nicht in
+      den Score ein. Hohe Finanzierung war in den eigenen Daten (Studie 27.09.) kein verlässliches
+      Warnzeichen. Finanzierung: Kraken Futures${st && st.stand ? ', ' + esc(zeit(st.stand)) : ''};
+      Angst &amp; Gier: alternative.me.</p></div>`;
+}
+function sektorKasten(){
+  const sk = (S && S.sektoren) || [];
+  if (sk.length < 3) return '';
+  const zeile = (e) => `<span>${esc(e.sektor)} <b class="${e.rs>=55?'up':e.rs<45?'dn':''}">${e.rs.toFixed(0)}</b>
+    <span style="color:var(--ink-3)">${e.n} · ${e.fuehrer.slice(0,2).map(x=>esc(name(x))).join(', ')}</span></span>`;
+  return `<div class="note-box">
+    <span class="nt">Aktien · Welche Sektoren tragen</span>
+    <div class="kpi">${sk.map(zeile).join('')}</div>
+    <p style="margin-top:6px;color:var(--ink-3);font-size:12px">Mittlere relative Stärke der
+      gescannten Aktien je Sektor (100 = die stärksten, 0 = die schwächsten). Ein Long in einem
+      führenden Sektor hat Rückenwind, einer im Schlusslicht-Sektor Gegenwind — als Kontext,
+      nicht im Score. Sektor laut Nasdaq.</p></div>`;
+}
+/* Hintergrund zu einem einzelnen Wert: bei Aktien Sektor, Analysten, Kursziel, Termin;
+   bei Coins der Terminmarkt; bei allen der Halte-Stop fuer eine gehaltene Position. */
+function hintergrundKasten(row, kurs){
+  if (!row) return '';
+  const zeilen = [];
+  const d = digits(kurs || row.kurs || 1);
+  const I = row.info || {};
+  if (I.sektor) zeilen.push(`<span>Sektor <b>${esc(I.sektor)}</b>${I.sektor_rang?` <span style="color:var(--ink-3)">Rang ${I.sektor_rang} von ${I.sektor_von}</span>`:''}${I.branche?` · ${esc(I.branche)}`:''}</span>`);
+  if (I.analysten){
+    const a = I.analysten, n = a.kaufen + a.halten + a.verkaufen;
+    if (n) zeilen.push(`<span>Analysten <b>${a.kaufen} kaufen · ${a.halten} halten · ${a.verkaufen} verkaufen</b></span>`);
+  }
+  if (I.kursziel != null && kurs){
+    const auf = (I.kursziel / kurs - 1) * 100;
+    zeilen.push(`<span>Kursziel <b>${num(I.kursziel,d)} $</b> <span class="${auf>=0?'up':'dn'}">${pct(auf,0)}</span>${
+      I.kursziel_3m_pct!=null?` <span style="color:var(--ink-3)">· in 3 Monaten ${pct(I.kursziel_3m_pct,0)} angepasst</span>`:''}</span>`);
+  }
+  if (I.hoch52 != null && I.tief52 != null && kurs && I.hoch52 > I.tief52){
+    const lage = (kurs - I.tief52) / (I.hoch52 - I.tief52) * 100;
+    zeilen.push(`<span>52 Wochen <b>${num(I.tief52,d)} – ${num(I.hoch52,d)} $</b> <span style="color:var(--ink-3)">Kurs bei ${Math.max(0,Math.min(100,lage)).toFixed(0)} % der Spanne</span></span>`);
+  }
+  if (I.zahlen){
+    const z = I.zahlen, nah = z.tage != null && z.tage <= 14;
+    zeilen.push(`<span>Quartalszahlen <b class="${nah?'dn':''}">${esc(new Date(z.datum+'T12:00:00Z').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}))}</b>${
+      z.zeit?` ${esc(z.zeit)}`:''}${z.tage!=null?` <span style="color:var(--ink-3)">in ${z.tage} Tagen</span>`:''}</span>`);
+  }
+  const dv = row.zusatz && row.zusatz.derivate;
+  if (dv){
+    zeilen.push(`<span>Finanzierung <b class="${dv.funding_jahr_pct>=50?'dn':dv.funding_jahr_pct<=-30?'up':''}">${pct(dv.funding_jahr_pct,1)}</b>/Jahr <span style="color:var(--ink-3)">${dv.funding_jahr_pct>=0?'Longs zahlen':'Shorts zahlen'}</span></span>`);
+    if (dv.oi_usd) zeilen.push(`<span>Offene Positionen <b>${num(dv.oi_usd/1e6, dv.oi_usd>=1e8?0:1)} Mio. $</b>${
+      dv.oi_zu_umsatz!=null?` <span style="color:var(--ink-3)">${dv.oi_zu_umsatz.toFixed(2).replace('.',',')}× Tagesumsatz</span>`:''}</span>`);
+  }
+  const h = row.halte;
+  if (h && h.stop_long != null && kurs){
+    const ab = (kurs - h.stop_long) / kurs * 100;
+    zeilen.push(`<span>Halte-Stop (long) <b>${num(h.stop_long,d)}</b> <span style="color:var(--ink-3)">${ab.toFixed(1).replace('.',',')} % unter dem Kurs · Tagesschwankung ${String(h.atr_pct).replace('.',',')} %</span></span>`);
+  }
+  if (!zeilen.length) return '';
+  return `<h2>Hintergrund</h2><div class="karte"><div class="kpi" style="margin-top:0;flex-direction:column;align-items:flex-start;gap:6px">${zeilen.join('')}</div>
+    <p style="margin:8px 0 0;font-size:12px;color:var(--ink-3)">Kontext zum Wert — nicht im Score.
+    Termine von Zacks über Nasdaq, teils geschätzt, bis das Unternehmen sie bestätigt.
+    Der Halte-Stop ist die Marke, die die App für eine GEHALTENE Position setzt.</p></div>`;
 }
 
 function makroKasten(){
@@ -2193,7 +2322,12 @@ function zeichneAnalyse(){
     $('analyse').innerHTML = `<div class="note-box"><span class="nt">Keine Detailansicht</span>
       <p>Für <strong>${esc(name(AKTIV.instrument))}</strong> liegt keine ausgearbeitete
       Analyse vor — Detailansichten werden nur für die vordersten Werte der Rangliste
-      erzeugt. Die Kennzahlen aus der Rangliste stehen im Reiter <em>Markt</em>.</p></div>`;
+      erzeugt. Die Kennzahlen aus der Rangliste stehen im Reiter <em>Markt</em>.</p></div>`
+      + (() => { const z = scanRowGenau(AKTIV.instrument); if (!z) return '';
+          const w = z.warnungen || [];
+          return (w.length ? `<div class="note-box warn"><span class="nt">Was dagegen spricht</span>
+            <ul class="satzliste">${w.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>` : '')
+            + hintergrundKasten(z, (L.get(z.instrument)||{}).p || z.kurs); })();
     return;
   }
   const c = AKTIV.chance || {}, K = AKTIV.kommentar, M = AKTIV.muster || [];
@@ -2265,9 +2399,14 @@ function zeichneAnalyse(){
       </div>`;
   }
 
-  if ((c.warnungen||[]).length)
+  // Die Warnungen aus der SCAN-Zeile: sie ist juenger als die Detaildatei und traegt seit
+  // dem 27.09. auch Termin und Terminmarkt.
+  const zeileS = scanRowGenau(AKTIV.instrument);
+  const warn = (zeileS && zeileS.warnungen) || c.warnungen || [];
+  if (warn.length)
     h += `<div class="note-box warn"><span class="nt">Was dagegen spricht</span>
-      <ul class="satzliste">${c.warnungen.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+      <ul class="satzliste">${warn.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+  h += hintergrundKasten(zeileS, kurs);
 
   h += `<h2>Was die Zeitebenen sagen</h2><div class="tw"><table class="mtf">
     <thead><tr><th>TF</th><th>Regime</th><th>RSI</th><th>Letzter Bruch</th><th>Lage</th><th>Liquidität</th></tr></thead>
@@ -2375,6 +2514,16 @@ function muenzeVon(sym){
     if (s.endsWith(q) && s.length > q.length) return s.slice(0, -q.length);
   }
   return s;
+}
+/* Ein Turbo, Knock-out oder Faktor-Schein ist nie ein Coin. Kraken fuehrt einen Coin, der
+   TURBO heisst — ueber die Muenzensuche bekaeme „TURBO-TSM-LONG" sonst dessen Kurs, und
+   jede Stopmarke waere Unsinn. Solche Posten werden nur exakt gesucht. */
+const SCHEIN_MUSTER = /^(TURBO|KO|MINI|FAKTOR|OPEN|CALL|PUT)-|-(LONG|SHORT)$/i;
+function istSchein(pos){
+  return !!pos && (pos.ko != null || !!pos.basis || SCHEIN_MUSTER.test(String(pos.sym||'')));
+}
+function scanRowGenau(sym){
+  return (S?.gesamt||[]).find(o => o.instrument === sym) || null;
 }
 function scanRow(sym){
   const g = (S?.gesamt||[]);
@@ -2601,7 +2750,7 @@ function hebelLage(pos, basisRow, eurusd){
 }
 
 function bewertePosition(pos){
-  const row = scanRow(pos.sym);
+  const row = istSchein(pos) ? scanRowGenau(pos.sym) : scanRow(pos.sym);
   const live = L.get(pos.sym) || (row ? L.get(row.instrument) : null);
   const roh = live ? live.p : (row ? row.kurs : null);
   let kurs = inPositionsWaehrung(row, roh, pos);
@@ -2708,12 +2857,15 @@ function naechsterSchritt(pos, kurs){
   const erledigt = new Set(pos.erledigt || []);
   const erreicht = (ziel) => ziel != null && (lang ? kurs >= ziel : kurs <= ziel);
   const d = digits(kurs);
-  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : '');
+  const basis = pl.ebene === 'basis';
+  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT'
+          : (basis ? ' $' : ''));
+  const wer = basis ? `${pl.basis_name || 'Der Basiswert'} steht` : 'Der Kurs steht';
 
   // 1 — Stop zuerst. Wenn der gerissen ist, ist alles andere egal.
   if (pl.stop != null && (lang ? kurs <= pl.stop : kurs >= pl.stop)){
     return {stufe:'stop', titel:'Stop erreicht — raus',
-      text:`Der Kurs steht bei ${num(kurs,d)}${w}, der Stop lag bei ${num(pl.stop,d)}${w}. `
+      text:`${wer} bei ${num(kurs,d)}${w}, der Stop lag bei ${num(pl.stop,d)}${w}. `
         + 'Die Idee ist widerlegt. Verkaufen, nicht nachverhandeln — genau hier entstehen '
         + 'aus kleinen Verlusten grosse.'};
   }
@@ -2740,7 +2892,8 @@ function naechsterSchritt(pos, kurs){
     if (pl.stop != null && !erledigt.size){
       const weg = Math.abs(kurs - pl.stop) / kurs * 100;
       return {stufe:'halten', titel:'Halten — Stop steht',
-        text:`Kein festes Ziel, aber ein Stop bei ${num(pl.stop,d)}${w} — `
+        text:(basis ? `${wer} bei ${num(kurs,d)}${w}. ` : '')
+          + `Kein festes Ziel, aber ein Stop ${basis ? 'auf ' + (pl.basis_name || 'den Basiswert') + ' ' : ''}bei ${num(pl.stop,d)}${w} — `
           + `${weg.toFixed(1).replace('.',',')} % entfernt. So lange laufen lassen und den `
           + 'Stop nachziehen, wenn der Kurs davonläuft. Verkauft wird, wenn der Stop fällt, '
           + 'nicht wenn es sich unangenehm anfühlt.'};
@@ -2768,16 +2921,71 @@ function naechsterSchritt(pos, kurs){
    Vorschlag da — zum Uebernehmen mit einem Klick. Gibt sie keine her, sagt die App das
    und laesst Ozan selbst eine Zahl eintragen. Ein selbst gesetzter Stop, den die App
    ueberwacht, ist unendlich viel mehr wert als ein ausgedachter. */
+/* Der Kurs, auf dem der Stop einer Position gefuehrt wird. Bei einem Schein ist das
+   der BASISWERT: „faellt TSMC unter X, raus". Eine Marke auf den Schein selbst waere mit
+   einem Posten fuer alle Scheine keine Zahl, die sich beim Broker eintragen liesse. */
+function basisKursVon(b){
+  if (b && b.hebel && b.hebel.basisKurs != null && isFinite(b.hebel.basisKurs)) return b.hebel.basisKurs;
+  const br = b && b.basis && b.basis.row;
+  if (!br) return null;
+  const bl = L.get(br.instrument);
+  return bl ? bl.p : br.kurs;
+}
+function planKurs(b){
+  const pl = b && b.pos && b.pos.plan;
+  return (pl && pl.ebene === 'basis') ? basisKursVon(b) : (b ? b.kurs : null);
+}
+
+/* Gueltige Stopmarken aus der Analyse — schon in der Waehrung der Ebene.
+
+   Zwei Quellen, dieselben wie im Waechter auf GitHub (portfolio_intel/depot_stops.py):
+     * die Invalidierung des laufenden Setups — eng, aber nur da, wo es ein Setup gibt;
+     * der Halte-Stop (Chandelier aus Tageskerzen) — fuer JEDEN Wert mit Kerzen.
+   Seit dem 27.09. steht der zweite in jeder Scan-Zeile. Vorher blieb eine Position ohne
+   frisches Setup ganz ohne Stop — und damit ohne Verkaufsalarm. */
+function stopKandidaten(r, lang, kurs, um){
+  const aus = [];
+  if (!r || kurs == null || !isFinite(kurs)) return aus;
+  const inv = um(r.invalidierung);
+  if (inv != null && isFinite(inv) && (lang ? inv < kurs : inv > kurs))
+    aus.push({stop: inv, art: 'setup', grund: 'die laufende Analyse (Invalidierung des Setups)'});
+  const h = r.halte || {};
+  const ch = um(lang ? h.stop_long : h.stop_short);
+  if (ch != null && isFinite(ch) && ch > 0 && (lang ? ch < kurs : ch > kurs))
+    aus.push({stop: ch, art: 'halte', grund: `Halte-Stop (${h.k || 5}× Tagesschwankung `
+      + `${lang ? 'unter dem 22-Tage-Hoch' : 'über dem 22-Tage-Tief'})`});
+  return aus;
+}
+
+/* Ein Stop, den die App aus der laufenden Analyse ableiten kann — oder ehrlich: keiner.
+   Erfunden wird nichts: gibt es weder Setup noch Tageskerzen, gibt es auch keine Marke. */
 function stopVorschlag(b){
-  const r = b.row || (b.basis && b.basis.row) || null;
-  if (!r) return null;
-  const um = (v) => v == null ? null : inPositionsWaehrung(r, v, b.pos);
-  const stop = um(r.invalidierung);
-  if (stop == null) return null;
-  // Ein Vorschlag ueber dem aktuellen Kurs waere bei einer Long-Position Unsinn.
-  if (b.kurs != null && stop >= b.kurs) return null;
-  return {stop, tp1: um(r.ziel), tp2: um(r.tp2), tp3: um(r.tp3),
-          vomBasiswert: !b.row && !!(b.basis && b.basis.row)};
+  const pos = b.pos;
+  const lang = stopRichtungLang(pos);
+  if (istSchein(pos)){
+    const r = b.basis && b.basis.row;
+    const bk = basisKursVon(b);
+    if (!r || bk == null) return null;
+    const ko = pos.ko != null && isFinite(Number(pos.ko)) ? Number(pos.ko) : null;
+    // Eine Marke jenseits der Knock-out-Schwelle schuetzt nichts — vorher ist der Schein weg.
+    const k = stopKandidaten(r, lang, bk, v => v == null ? null : Number(v))
+      .filter(x => ko == null || (lang ? x.stop > ko : x.stop < ko));
+    if (!k.length) return null;
+    const best = k.reduce((a, c) => (lang ? c.stop > a.stop : c.stop < a.stop) ? c : a);
+    return {stop: best.stop, grund: best.grund, art: best.art, ebene: 'basis',
+            basisName: r.name || r.instrument, waehrung: r.waehrung === 'EUR' ? 'EUR' : 'USD',
+            tp1: null, tp2: null, tp3: null, vomBasiswert: true};
+  }
+  const r = b.row;
+  if (!r || b.kurs == null) return null;
+  const um = (v) => v == null ? null : inPositionsWaehrung(r, v, pos);
+  const k = stopKandidaten(r, lang, b.kurs, um);
+  if (!k.length) return null;
+  const best = k.reduce((a, c) => (lang ? c.stop > a.stop : c.stop < a.stop) ? c : a);
+  const mitZielen = best.art === 'setup';   // der Halte-Stop hat keine Ziele
+  return {stop: best.stop, grund: best.grund, art: best.art, ebene: 'position',
+          tp1: mitZielen ? um(r.ziel) : null, tp2: mitZielen ? um(r.tp2) : null,
+          tp3: mitZielen ? um(r.tp3) : null, vomBasiswert: false};
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -2813,43 +3021,55 @@ function stopRichtungLang(pos){
   return true;
 }
 
-/* Was mit dem Stop dieser Position zu geschehen hat — ohne etwas zu schreiben. */
+/* Was mit dem Stop dieser Position zu geschehen hat — ohne etwas zu schreiben.
+   Dieselbe Regel wie im Waechter auf GitHub: nur in Richtung Sicherheit, nie auf oder
+   ueber den Kurs, kleine Schritte nicht. */
 function stopPflege(b){
-  const pos = b.pos, kurs = b.kurs;
-  if (kurs == null || !isFinite(kurs)) return {art:'ohne_kurs'};
+  const pos = b.pos;
   if (istBar(pos)) return {art:'bar'};
+  const ebene = istSchein(pos) ? 'basis' : 'position';
+  const kurs = ebene === 'basis' ? basisKursVon(b) : b.kurs;
+  if (kurs == null || !isFinite(kurs)) return {art:'ohne_kurs'};
   const lang = stopRichtungLang(pos);
   const v = stopVorschlag(b);
   const pl = pos.plan || null;
-  const hat = pl && pl.stop != null && isFinite(pl.stop);
+  const planEbene = (pl && pl.ebene) || 'position';
+  const hat = pl && pl.stop != null && isFinite(pl.stop) && planEbene === ebene;
 
   if (!hat){
+    // Ein von Hand gesetzter Stop auf den Schein selbst bleibt unangetastet.
+    if (pl && pl.stop != null && planEbene !== ebene && pl.quelle === 'selbst')
+      return {art:'steht', stop:pl.stop};
     if (!v) return {art:'keiner'};
-    return {art:'neu', stop:v.stop, tp1:v.tp1, tp2:v.tp2, tp3:v.tp3,
+    return {art:'neu', stop:v.stop, tp1:v.tp1, tp2:v.tp2, tp3:v.tp3, ebene,
+            basisName:v.basisName, waehrung:v.waehrung, halteArt:v.art,
             vomBasiswert:v.vomBasiswert,
-            grund:'die Analyse gibt eine Invalidierung her — die App setzt sie als Stop'};
+            grund:`${v.grund} — die App setzt sie als Stop`};
   }
 
   const besser = (a, c) => lang ? a > c : a < c;   // „weiter in Sicherheit"
-  let ziel = null, grund = '';
+  let ziel = null, grund = '', art = pl.art || null;
 
   // Ziel 1 durch → auf den Einstieg. Ab da kann der Trade nichts mehr kosten.
   const erledigt = new Set(pos.erledigt || []);
-  if (erledigt.has('TP1') && pos.einstieg != null && besser(pos.einstieg, pl.stop)){
+  if (ebene === 'position' && erledigt.has('TP1') && pos.einstieg != null && besser(pos.einstieg, pl.stop)){
     ziel = pos.einstieg;
     grund = 'Ziel 1 ist abgehakt — ab dem Einstieg kann die Position nichts mehr kosten';
+    art = 'einstand';
   }
-  // Die Analyse hat ihre Invalidierung nachgezogen.
+  // Die Analyse (Setup oder Halte-Stop) gibt eine bessere Marke her.
   if (v && besser(v.stop, ziel != null ? ziel : pl.stop)){
     ziel = v.stop;
-    grund = 'die laufende Analyse hat ihre Invalidierung nachgezogen';
+    grund = v.art === 'halte' ? 'der Halte-Stop ist mit dem Kurs nachgerückt'
+                              : 'die laufende Analyse hat ihre Invalidierung nachgezogen';
+    art = v.art;
   }
   if (ziel == null) return {art:'steht', stop:pl.stop};
   // Niemals auf oder ueber den aktuellen Kurs — das waere ein sofortiger Verkauf.
   if (lang ? ziel >= kurs : ziel <= kurs) return {art:'steht', stop:pl.stop};
   if (Math.abs(ziel - pl.stop) / kurs * 100 < TRAIL_MIN_SCHRITT_PCT)
     return {art:'steht', stop:pl.stop};
-  return {art:'nachziehen', von:pl.stop, stop:ziel, grund,
+  return {art:'nachziehen', von:pl.stop, stop:ziel, grund, ebene, halteArt: art,
           selbst: pl.quelle === 'selbst'};
 }
 
@@ -2866,16 +3086,22 @@ function stopsPflegen(bew){
     if (!p || (p.art !== 'neu' && p.art !== 'nachziehen')) continue;
     const pos = a.find(x => posSchluessel(x) === posSchluessel(b.pos));
     if (!pos) continue;
-    const alt = pos.plan && pos.plan.stop != null ? pos.plan.stop : null;
+    const ebene = p.ebene || (pos.plan && pos.plan.ebene) || 'position';
+    const vorher = (pos.plan && (pos.plan.ebene || 'position') === ebene) ? pos.plan : {};
+    const alt = vorher.stop != null ? vorher.stop : null;
     pos.plan = {
-      ...(pos.plan || {}),
-      richtung: (pos.plan && pos.plan.richtung) || (stopRichtungLang(pos) ? 'long' : 'short'),
-      waehrung: (pos.plan && pos.plan.waehrung) || posWaehrung(pos),
+      ...vorher,
+      richtung: vorher.richtung || (stopRichtungLang(pos) ? 'long' : 'short'),
+      waehrung: ebene === 'basis' ? (p.waehrung || vorher.waehrung || 'USD')
+                                  : (vorher.waehrung || posWaehrung(pos)),
+      ebene,
+      ...(ebene === 'basis' ? {basis_name: p.basisName || vorher.basis_name || ''} : {}),
+      art: p.halteArt || vorher.art || null,
       stop: p.stop,
       // Ziele nur beim ERSTEN Setzen dazu — spaeter wuerden sie einen abgehakten
       // Teilverkauf wieder auferstehen lassen.
       ...(p.art === 'neu' ? {tp1:p.tp1 ?? null, tp2:p.tp2 ?? null, tp3:p.tp3 ?? null} : {}),
-      quelle: (pos.plan && pos.plan.quelle === 'selbst') ? 'selbst_nachgezogen' : 'app',
+      quelle: (vorher.quelle === 'selbst') ? 'selbst_nachgezogen' : 'app',
       gesetzt: Date.now(),
       /* Offen, bis Ozan sagt, dass die Order beim Broker liegt.
 
@@ -2884,7 +3110,8 @@ function stopsPflegen(bew){
          Hintergrund — der Stop konnte also laengst gesetzt sein, bevor Ozan den Reiter
          ueberhaupt aufmacht. Dann haette die App brav einen Stop ueberwacht, den es beim
          Broker nie gab. Der Merker bleibt deshalb stehen, bis er abgehakt wird. */
-      broker_offen: {von: alt, stop: p.stop, grund: p.grund || '', zeit: Date.now()},
+      broker_offen: {von: alt, stop: p.stop, grund: p.grund || '', zeit: Date.now(),
+                     ebene},
     };
     geaendert = true;
     geschehen.push({b, art:p.art, von:alt, stop:p.stop, grund:p.grund, selbst:!!p.selbst});
@@ -2914,6 +3141,19 @@ function stopKasten(geschehen, bew){
       schützt nur der Alarm, und der braucht dich. Diese Marken gehören eingetragen:</p>
       ${broker.map(b => {
         const o = b.pos.plan.broker_offen;
+        if (o.ebene === 'basis'){
+          const bn = esc(b.pos.plan.basis_name || 'Basiswert');
+          const zb = b.pos.plan.waehrung === 'EUR' ? ' €' : ' $';
+          const db = digits(o.stop || 1);
+          return `<p style="margin:8px 0 0;font-size:13px">
+          <strong>${esc(posName(b))}</strong> — Marke auf ${bn} ${o.von != null
+            ? `von ${num(o.von,db)}${zb} auf <strong>${num(o.stop,db)}${zb}</strong> nachgezogen`
+            : `bei <strong>${num(o.stop,db)}${zb}</strong>`}
+          <span style="color:var(--ink-3)">· Für den Schein gibt es beim Broker keine Order
+            auf den Basiswert — die App und der Wächter melden sich, wenn ${bn} darunter fällt.</span>
+          <button class="btn" data-brokerok="${esc(posSchluessel(b.pos))}"
+                  style="margin-left:8px;padding:3px 9px;font-size:12px">verstanden</button></p>`;
+        }
         const d = digits(b.kurs || o.stop || 1);
         const z = waehrungsZeichen(b.w);
         return `<p style="margin:8px 0 0;font-size:13px">
@@ -2939,7 +3179,7 @@ function stopKasten(geschehen, bew){
 }
 
 function ausstiegsKasten(b){
-  const schritt = naechsterSchritt(b.pos, b.kurs);
+  const schritt = naechsterSchritt(b.pos, planKurs(b));
   if (!schritt){
     // Ohne Kurs kein Stop: bei einem Turbo oder einem ETF, der hier nur mit dem von Hand
     // eingetragenen Wert steht, waere eine Stopmarke eine Zahl ohne Gegenstueck.
@@ -2985,11 +3225,37 @@ function ausstiegsKasten(b){
   }
   const farbe = schritt.stufe === 'stop' ? 'bad' : (schritt.stufe === 'halten' ? '' : 'warn');
   const pl = b.pos.plan || {};
-  const d = digits(b.kurs || 1);
-  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : '');
-  const marken = [['Stop', pl.stop], ['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]]
+  const basis = pl.ebene === 'basis';
+  const pk = planKurs(b);
+  const d = digits(pk || b.kurs || 1);
+  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : (basis ? ' $' : ''));
+  const marken = [[basis ? `Stop auf ${esc(pl.basis_name || 'Basiswert')}` : 'Stop', pl.stop],
+                  ['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]]
     .filter(([,v]) => v != null)
     .map(([k,v]) => `<span>${k} <b>${num(v,d)}${w}</b></span>`).join('');
+  /* Bei einem Schein: was die Position an der Marke ungefaehr noch wert waere. Das ist
+     die Zahl, die man im Depot beim Broker wiedererkennt. */
+  let scheinSatz = '';
+  const hb = b.hebel;
+  if (basis && hb && !hb.ausgeknockt && pl.stop != null && hb.ko != null){
+    const abst = hb.lang ? pl.stop - hb.ko : hb.ko - pl.stop;
+    if (abst > 0){
+      let je = abst / (hb.ratio || 1);
+      const kEU = (b.basis && b.basis.row && b.basis.row.eurusd) || (S && S.eurusd);
+      if (b.w === 'EUR' && pl.waehrung !== 'EUR' && kEU) je = je / kEU;
+      const wert = je * (Number(b.pos.menge) || 1);
+      scheinSatz = `<p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Fällt
+        ${esc(pl.basis_name || 'der Basiswert')} auf die Marke, wäre deine Position noch rund
+        <strong>${num(wert, 0)}${waehrungsZeichen(b.w)}</strong> wert. Die Marke liegt auf dem
+        Basiswert, nicht auf dem Schein — beim Broker gibt es dafür keine eigene Order; die App
+        und der Wächter auf GitHub melden sich, wenn sie fällt.</p>`;
+    }
+  }
+  const halteSatz = pl.art === 'halte'
+    ? `<p style="margin:6px 0 0;font-size:12px;color:var(--ink-3)">Halte-Stop: eine
+        Versicherung gegen den Absturz, kein Renditebringer. Gemessen (Studie 27.09.) hat er
+        die schlimmsten Verläufe bei Coins etwa halbiert, in Aufwärtsphasen aber Rendite
+        gekostet. Nach einem Stop kommt der Wert auf die Wiedereinstiegs-Liste.</p>` : '';
   const knopf = schritt.marke
     ? `<p style="margin:9px 0 0"><button class="btn" data-erledigt="${esc(b.pos.sym)}"
          data-marke="${esc(schritt.marke)}">${esc(schritt.marke)} verkauft — abhaken</button></p>`
@@ -2998,7 +3264,7 @@ function ausstiegsKasten(b){
     <span class="nt">Was jetzt zu tun ist</span>
     <p style="font-size:14px;margin:0 0 4px"><strong>${esc(schritt.titel)}</strong></p>
     <p style="margin:0">${esc(schritt.text)}</p>
-    <div class="kpi" style="margin-top:8px">${marken}</div>${knopf}</div>`;
+    <div class="kpi" style="margin-top:8px">${marken}</div>${scheinSatz}${halteSatz}${knopf}</div>`;
 }
 
 /* ================================================ URTEIL JE POSITION
@@ -3482,6 +3748,84 @@ function depotAusLink(){
   if (ziel){ zeigeDepotVergleich(depotVergleich(d.liste, d.konten), d, ziel); ziel.scrollIntoView({block:'center'}); }
 }
 
+/* ======================================== DER DEPOT-WAECHTER AUF GITHUB
+
+   „Die Stops auf meinem Portfolio 24/7 analysieren und immer neu setzen und mir Bescheid
+   sagen." Rund um die Uhr heisst: auch wenn die App zu ist. Das kann nur der Lauf auf
+   GitHub — und der kennt das Depot nur, wenn es als Geheimnis DEPOT_CODE hinterlegt ist.
+
+   Hier steht deshalb sichtbar, ob er laeuft UND ob er denselben Stand kennt wie dieses
+   Geraet. Verglichen wird ein Fingerabdruck (Symbol, Konto, Stueckzahl — gehasht); der
+   Waechter veroeffentlicht nur diesen und ein paar Zaehler, nie Werte. */
+async function depotKennung(positionen){
+  const teile = (positionen || []).filter(p => p && p.sym).map(p =>
+    `${String(p.sym).toUpperCase()}|${String(p.konto || '').toLowerCase()}|`
+    + `${(Number(p.menge) || 0).toFixed(6)}`).sort();
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(teile.join(';')));
+    return Array.from(new Uint8Array(buf)).map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 12);
+  } catch(e){ return null; }
+}
+function geheimnisLink(){
+  let owner = 'ozancanerd-ship-it', repo = 'cl';
+  try {
+    if (/\.github\.io$/.test(location.hostname)){
+      owner = location.hostname.split('.')[0];
+      repo = location.pathname.split('/').filter(Boolean)[0] || repo;
+    }
+  } catch(e){}
+  return `https://github.com/${owner}/${repo}/settings/secrets/actions`;
+}
+const KANAL_TEXT = {push:'Push aufs Handy', telegram:'Telegram', mail:'Mail über GitHub (ohne Einzelheiten)'};
+async function fuelleWaechter(el){
+  if (!el) return;
+  const pos = ladePositionen();
+  if (!WA){ el.innerHTML = ''; return; }
+  const link = geheimnisLink();
+  const kan = (WA.kanaele || []).map(k => KANAL_TEXT[k] || k);
+  const privat = (WA.kanaele || []).some(k => k === 'push' || k === 'telegram');
+  const kanSatz = kan.length
+    ? `Meldung per: ${esc(kan.join(', '))}.` + (privat ? '' : ' Für die Einzelheiten direkt aufs '
+      + 'Handy fehlt noch Push (Reiter Alarme → „Alarme aufs Handy").')
+    : 'Es ist noch kein Meldeweg eingerichtet — dann steht es nur hier in der App.';
+  if (!WA.aktiv){
+    el.innerHTML = `<div class="note-box warn" style="margin:10px 0 0">
+      <span class="nt">Wächter rund um die Uhr: nicht eingerichtet</span>
+      <p style="font-size:13px">Deine Stops werden gerade nur gesetzt, nachgezogen und
+      überwacht, solange diese App offen ist. Damit das auch nachts und bei geschlossener App
+      passiert, braucht der Lauf auf GitHub dein Depot als Geheimnis:</p>
+      <p style="font-size:13px">1. Reiter <strong>Sync</strong> → <em>Depot kopieren</em>.
+      2. <a href="${link}" target="_blank" rel="noopener">GitHub → Secrets</a> →
+      <em>New repository secret</em>, Name <span class="mono">DEPOT_CODE</span>, Text einfügen.
+      Es landet nicht im öffentlichen Repository und nicht in den Protokollen.</p></div>`;
+    return;
+  }
+  const kennung = pos.length ? await depotKennung(pos) : null;
+  const alter = vorMin(WA.geprueft);
+  const wann = alter == null ? '—' : (alter < 2 ? 'gerade eben' : alter < 90 ? `vor ${alter} Minuten`
+             : `vor ${Math.round(alter/60)} Stunden`);
+  const gleich = kennung && WA.stand && kennung === WA.stand;
+  if (!gleich && pos.length){
+    el.innerHTML = `<div class="note-box warn" style="margin:10px 0 0">
+      <span class="nt">Wächter läuft — kennt aber einen anderen Stand</span>
+      <p style="font-size:13px">Der Lauf auf GitHub prüft ${WA.positionen} Position(en), dieses
+      Gerät führt ${pos.length}. Seit dem Hinterlegen hast du gekauft, verkauft oder die Menge
+      geändert — für die neuen Werte meldet er sich nicht. <strong>Sync → Depot kopieren</strong>,
+      dann bei <a href="${link}/DEPOT_CODE" target="_blank" rel="noopener">DEPOT_CODE</a>
+      <em>Update secret</em> und den Text ersetzen.</p>
+      <p style="font-size:12px;color:var(--ink-3)">Zuletzt geprüft ${esc(wann)}. ${kanSatz}</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="note-box gut" style="margin:10px 0 0">
+    <span class="nt">Wächter rund um die Uhr: aktiv</span>
+    <p style="font-size:13px">Der Lauf auf GitHub prüft dein Depot alle zehn Minuten — auch
+    wenn diese App zu ist: Stop gerissen, Ziel erreicht, Knock-out nah sofort; Stop gesetzt
+    oder nachgezogen gebündelt. ${WA.mit_stop} von ${WA.positionen} Positionen haben einen
+    Stop${WA.ohne_kurs ? `, ${WA.ohne_kurs} ohne Kurs (nicht im Scan)` : ''}.</p>
+    <p style="font-size:12px;color:var(--ink-3)">Zuletzt geprüft ${esc(wann)} · derselbe
+    Stand wie auf diesem Gerät. ${kanSatz}</p></div>`;
+}
+
 /* ======================================================= SYNC-SEITE
 
    „Ich komme nicht rein auf dem Handy, nur auf dem Mac — mach das extra so ordnermaessig,
@@ -3511,6 +3855,7 @@ function zeichneSync(){
     einen eigenen Speicher. Ein angetippter Link öffnet Safari, und dort landet das Depot
     dann — die App sieht es nie. Über die Zwischenablage bleibt alles in der App.</p>
   </div>
+  <div id="sy_waechter"></div>
 
   <h2>1 · Auf dem Gerät mit dem aktuellen Stand</h2>
   <div class="karte">
@@ -3545,6 +3890,7 @@ function zeichneSync(){
     dein Stop und die Ziele, abgehakte Teilverkäufe. Nicht übertragen werden die Kurse und
     die Analyse — die holt sich jedes Gerät selbst und hat damit dieselben.</p></div>`;
   $('sync').innerHTML = h;
+  fuelleWaechter($('sy_waechter'));
 
   const melde = (el, text, gut) => { el.innerHTML = `<p style="margin:8px 0 0;font-size:13px;
     color:${gut?'var(--up)':'var(--warn)'}">${esc(text)}</p>`; };
@@ -3682,9 +4028,10 @@ function positionsAktion(b, stand){
   }
 
   // 1 + 2 — was der Ausstiegsplan sagt, hat Vorrang. Feste Marken schlagen Einschätzungen.
-  const schritt = naechsterSchritt(pos, b.kurs);
+  const schritt = naechsterSchritt(pos, planKurs(b));
   if (schritt && schritt.stufe === 'stop'){
-    return teil(1.0, `Der Kurs steht bei ${num(b.kurs,d)}${z}, dein Stop lag bei `
+    return teil(1.0, (pos.plan && pos.plan.ebene === 'basis') ? schritt.text
+      : `Der Kurs steht bei ${num(b.kurs,d)}${z}, dein Stop lag bei `
       + `${num(pos.plan.stop,d)}${z}. Die Idee ist widerlegt — hier wird nicht nachverhandelt.`,
       'raus', true, 'Alles verkaufen — Stop gerissen');
   }
@@ -4229,6 +4576,123 @@ function glKasten(stand){
   return h;
 }
 
+/* ========================================== DEPOT-GESUNDHEIT 0–100 (Masterplan §15)
+
+   Eine Zahl fuer das ganze Depot — aber keine erfundene. Sie setzt sich aus fuenf Teilen
+   zu je 20 Punkten zusammen, und jeder Teil misst etwas, das Ozan SELBST aendern kann:
+
+     Schutz    — welcher Anteil des Geldes hat einen Stop (bei Scheinen: genug Puffer)
+     Streuung  — aus wie vielen unabhaengigen Wetten das Depot wirklich besteht
+     Klumpen   — wie gross die groesste Einzelposition ist
+     Hebel     — wie viel des gehebelten Geldes weit genug vom Knock-out entfernt ist
+     Termine   — wie viel des Geldes in den naechsten 7 Tagen KEINE Quartalszahlen hat
+
+   Was bewusst NICHT hineinzaehlt: die relative Staerke. Nachgemessen (27.09.) liefen
+   Schlusslichter danach nicht schlechter — ein Gesundheitswert, der sie bestraft, wuerde
+   zum Verkaufen draengen, ohne dass es etwas bringt. Die Gewichte sind gesetzt, nicht
+   optimiert; deshalb steht jeder Teil mit seiner Zahl daneben. */
+function depotGesundheit(stand){
+  if (!stand || !stand.bew.length || !stand.gesamt) return null;
+  const inEU = (b) => stand.inEuro(b, b.wert) || 0;
+  const teile = stand.bew.filter(b => !istBar(b.pos) && inEU(b) > 0);
+  const summe = teile.reduce((s, b) => s + inEU(b), 0);
+  if (!summe) return null;
+  const anteil = (f) => teile.filter(f).reduce((s, b) => s + inEU(b), 0) / summe;
+  const hatSchutz = (b) => {
+    const pl = b.pos.plan;
+    if (pl && pl.stop != null && isFinite(pl.stop)) return true;
+    return !!(b.hebel && !b.hebel.ausgeknockt && b.hebel.puffer_pct >= KO_PUFFER_ENG * 2);
+  };
+  const schutz = anteil(hatSchutz);
+  const a = (typeof glBuendel === 'function') ? glBuendel(stand.bew, stand) : null;
+  const eff = a && a.effektiv != null ? a.effektiv : null;
+  const groesste = Math.max(...teile.map(b => inEU(b))) / summe * 100;
+  const gehebelt = teile.filter(b => b.hebel);
+  const hebelOk = gehebelt.length
+    ? gehebelt.filter(b => !b.hebel.ausgeknockt && b.hebel.puffer_pct >= KO_PUFFER_ENG)
+        .reduce((s, b) => s + inEU(b), 0) / gehebelt.reduce((s, b) => s + inEU(b), 0)
+    : 1;
+  const zahlenBald = (b) => {
+    const row = b.row || (b.basis && b.basis.row);
+    const z = row && row.info && row.info.zahlen;
+    return !!(z && z.tage != null && z.tage <= 7);
+  };
+  const ohneTermin = 1 - anteil(zahlenBald);
+  const pk = {
+    schutz: Math.round(20 * schutz),
+    streuung: eff == null ? null : Math.round(20 * Math.max(0, Math.min(1, (eff - 1) / 4))),
+    klumpen: Math.round(20 * Math.max(0, Math.min(1, (40 - groesste) / 25))),
+    hebel: Math.round(20 * hebelOk),
+    termine: Math.round(20 * ohneTermin),
+  };
+  // Fehlt die Gleichlauf-Messung, wird auf die vier anderen Teile hochgerechnet.
+  const da = Object.values(pk).filter(v => v != null);
+  const wert = Math.round(da.reduce((s, v) => s + v, 0) / (da.length * 20) * 100);
+  return {wert, pk, schutz, eff, groesste, hebelOk, ohneTermin,
+          ohneStop: teile.filter(b => !hatSchutz(b))};
+}
+function gesundheitKasten(stand){
+  const g = depotGesundheit(stand);
+  if (!g) return '';
+  const kl = g.wert >= 75 ? 'gut' : g.wert >= 50 ? 'warn' : 'bad';
+  const farbe = g.wert >= 75 ? 'Grün' : g.wert >= 50 ? 'Gelb' : 'Rot';
+  const z = (t, p, satz) => `<div class="rowx"><span class="lab">${t}</span>
+    <span class="val" style="font-family:inherit;font-weight:400;text-align:right">
+    <b>${p == null ? '—' : p + '/20'}</b> <span style="color:var(--ink-3)">${satz}</span></span></div>`;
+  const tun = [];
+  if (g.pk.schutz < 16 && g.ohneStop.length)
+    tun.push(`Stop setzen für ${g.ohneStop.slice(0,4).map(b => esc(posName(b))).join(', ')}`);
+  if (g.pk.klumpen < 10) tun.push('die größte Position verkleinern');
+  if (g.pk.hebel < 16) tun.push('Scheine mit knappem Knock-out-Puffer verkleinern');
+  if (g.pk.termine < 16) tun.push('vor den anstehenden Quartalszahlen entscheiden, was du hältst');
+  return `<div class="note-box ${kl}" style="margin:10px 0 0">
+    <span class="nt">Depot-Gesundheit ${g.wert}/100 · ${farbe}</span>
+    ${z('Schutz', g.pk.schutz, `${Math.round(g.schutz*100)} % des Geldes mit Stop oder weitem Puffer`)}
+    ${z('Streuung', g.pk.streuung, g.eff != null ? `${g.eff.toFixed(1).replace('.',',')} unabhängige Wetten` : 'Gleichlauf noch nicht gemessen')}
+    ${z('Klumpen', g.pk.klumpen, `größte Position ${g.groesste.toFixed(0)} % des Depots`)}
+    ${z('Hebel', g.pk.hebel, `${Math.round(g.hebelOk*100)} % des gehebelten Geldes ≥ ${KO_PUFFER_ENG} % vom Knock-out`)}
+    ${z('Termine', g.pk.termine, `${Math.round(g.ohneTermin*100)} % ohne Quartalszahlen in 7 Tagen`)}
+    ${tun.length ? `<p style="margin:8px 0 0;font-size:13px"><strong>Was sie hebt:</strong> ${tun.join('; ')}.</p>` : ''}
+    <p style="margin:6px 0 0;font-size:12px;color:var(--ink-3)">Fünf Teile zu je 20 Punkten —
+      nur Dinge, die du selbst ändern kannst. Die relative Stärke zählt bewusst nicht mit.</p></div>`;
+}
+
+/* Quartalszahlen eines gehaltenen Werts (bei Scheinen: des Basiswerts). An so einem Tag
+   springt der Kurs oft ueber jeden Stop — und bei einem Turbo kann eine Nacht den
+   Knock-out bringen. Das gehoert an die Position, nicht nur in die Signal-Liste. */
+/* Jeder zehnte Zahlen-Termin aller gescannten Aktien bewegte den Kurs um mehr als diesen
+   Wert (Prozent, zwei Tage, 2024–26; refdata/zahlen_bewegung.json). */
+const ZAHLEN_P90 = 13.1;
+function zahlenHinweis(b){
+  const row = b.row || (b.basis && b.basis.row) || null;
+  const z = row && row.info && row.info.zahlen;
+  if (!z || z.tage == null || z.tage > 14) return '';
+  const wann = new Date(z.datum + 'T12:00:00Z').toLocaleDateString('de-DE',
+    {weekday:'short', day:'2-digit', month:'2-digit'});
+  const nm = name((row||{}).instrument || '');
+  const bew = z.bewegung || null;
+  const k = (x) => Number(x).toFixed(1).replace('.', ',');
+  const hist = bew ? ` An den letzten ${bew.n} Terminen bewegte sich ${esc(nm)} im Mittel um
+    ±${k(bew.median)} %, höchstens um ${k(bew.max)} %.` : '';
+  const puffer = b.hebel && !b.hebel.ausgeknockt && b.hebel.puffer_pct != null ? b.hebel.puffer_pct : null;
+  let satz, eng = z.tage <= 3;
+  if (puffer != null){
+    const grenze = Math.max(ZAHLEN_P90, bew && bew.max != null ? bew.max : 0);
+    const knapp = puffer < grenze;
+    eng = eng || knapp;
+    satz = knapp
+      ? ` <strong>Dein Puffer zum Knock-out: ${k(puffer)} %</strong> — eine Zahlen-Lücke dieser Größe
+          hat es schon gegeben. Entscheide vorher, ob du den Schein über den Termin hältst.`
+      : ` Dein Puffer zum Knock-out (${k(puffer)} %) ist größer als jede bisherige Zahlen-Bewegung —
+          der Schein übersteht einen normalen Termin, ein Stop schützt aber nicht vor der Lücke.`;
+  } else {
+    satz = ' Ein Stop schützt nicht vor einer Kurslücke über Nacht.';
+  }
+  return `<div class="note-box ${eng?'warn':''}" style="margin:8px 0 0;padding:8px 12px">
+    <p style="margin:0;font-size:13px"><strong>Quartalszahlen ${esc(nm)}
+    ${esc(wann)}${z.zeit?' '+esc(z.zeit):''}</strong> — in ${z.tage} Tag${z.tage===1?'':'en'}.${hist}${satz}</p></div>`;
+}
+
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -4252,10 +4716,12 @@ function zeichnePortfolio(){
   const groesste = bew.slice().sort((a,b)=>(inEuro(b,b.wert)||0)-(inEuro(a,a.wert)||0))[0];
   const konz = (groesste && gesamt) ? (inEuro(groesste, groesste.wert)||0)/gesamt*100 : 0;
 
-  let h = `<div class="note-box"><span class="nt">Nur auf diesem Gerät</span>
-    <p>Deine Positionen werden ausschließlich lokal in diesem Browser gespeichert. Sie
-    gehen nicht ins Repo, nicht auf die öffentliche Seite und nicht an mich. Auf einem
-    anderen Gerät musst du sie erneut eintragen.</p></div>`;
+  let h = `<div class="note-box"><span class="nt">Wo dein Depot liegt</span>
+    <p>Deine Positionen liegen in diesem Browser. Sie gehen nicht ins öffentliche Repo und
+    nicht auf die öffentliche Seite. ${WA && WA.aktiv
+      ? 'Für den Wächter rund um die Uhr liegt eine Kopie als <strong>Geheimnis</strong> bei '
+        + 'GitHub (DEPOT_CODE) — dort ist sie für niemanden lesbar, auch nicht in den Protokollen.'
+      : 'Auf einem anderen Gerät bringst du sie über den Reiter Sync hin.'}</p></div><div id="pf_waechter"></div>`;
 
   if (bew.length){
     h += `<div class="status">
@@ -4274,6 +4740,7 @@ function zeichnePortfolio(){
       Neu bewertet: ${new Date().toLocaleTimeString('de-DE')} — das läuft weiter, auch
       wenn dieser Reiter zu ist.</p>`;
 
+    h += gesundheitKasten(stand);
     h += stopKasten(stopLauf, bew);
 
     /* Die Handlungsliste ganz oben. Wer das Depot aufmacht, will nicht vierzehn Karten
@@ -4319,17 +4786,27 @@ function zeichnePortfolio(){
       const d = digits(b.kurs||1);
       const r = b.row;
       const z = waehrungsZeichen(b.w);
+      /* Was die Position gerade wert ist — in Euro UND in ihrer eigenen Waehrung.
+         b.wert steht in der Waehrung der Position (bei SOLUSDT also Dollar); ohne
+         Umrechnung stuende hier ein Dollarbetrag mit Euro-Zeichen. Umgerechnet wird mit
+         derselben Funktion wie der Depotwert oben — eine Zahl, ein Rechenweg. */
+      const posWertEUR = inEuro(b, b.wert);
+      const posWertEigen = (b.w !== 'EUR' && b.wert != null) ? b.wert : null;
       return `<div class="karte ${b.kl}">
         <h3>${esc(posName(b))} <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
           <span style="float:right" class="note ${b.kl==='gut'?'gut':''}">${esc(b.urteil)}</span></h3>
         <div class="kpi">
           ${b.pos.menge?`<span>Menge <b>${num(b.pos.menge, 6)}</b></span>`:''}
+          ${(posWertEUR!=null && b.kurs!=null)?`<span>Wert <b>${num(posWertEUR, posWertEUR<100?2:0)} €</b>${
+            posWertEigen!=null?` <span style="color:var(--ink-3)">≈ ${num(posWertEigen, posWertEigen<100?2:0)} $</span>`:''}${
+            (gesamt && posWertEUR!=null)?` <span style="color:var(--ink-3)">· ${(posWertEUR/gesamt*100).toFixed(1).replace('.',',')} % vom Depot</span>`:''}</span>`:''}
           ${b.pos.einstieg?`<span>Einstieg <b>${num(b.pos.einstieg,d)}${z}</b></span>`:''}
           ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}${z}</b>${b.live?' <span class="up">live</span>':''}</span>`
             :`<span>Wert <b>${num(b.wert,2)} €</b> <span style="color:var(--ink-3)">von dir eingetragen</span></span>`}
           ${b.gvPct!=null?`<span>G/V <b class="${b.gvPct>=0?'up':'dn'}">${pct(b.gvPct,1)}</b></span>`:''}
           ${b.r!=null?`<span>R <b class="${b.r>=0?'up':'dn'}">${b.r.toFixed(2)}R</b></span>`:''}
         </div>
+        ${zahlenHinweis(b)}
         ${r?`<div class="zt">
           <span>Score <b>${r.score.toFixed(0)}</b></span>
           <span>Note <b>${esc(r.note)}</b></span>
@@ -4424,6 +4901,7 @@ function zeichnePortfolio(){
     </div>`;
 
   $('portfolio').innerHTML = h;
+  fuelleWaechter($('pf_waechter'));
   $('portfolio').querySelectorAll('[data-weg]').forEach(b=>b.addEventListener('click',()=>{
     speicherePositionen(ladePositionen().filter(p=>p.sym!==b.dataset.weg)); zeichnePortfolio();
   }));
@@ -5755,7 +6233,7 @@ function lokaleAntwort(frage){
       + 'oder benutz den Knopf „Gekauft — ins Depot" auf einer Signalkarte.';
     return pos.map(p=>{
       const b = bewertePosition(p);
-      const schritt = naechsterSchritt(p, b.kurs);
+      const schritt = naechsterSchritt(p, planKurs(b));
       return `**${name(p.sym)}** — ${schritt ? schritt.titel + ': ' + schritt.text : 'kein Ausstiegsplan hinterlegt'}`;
     }).join('\n\n');
   }
@@ -5790,7 +6268,7 @@ function lokaleAntwort(frage){
         + 'sagt die App bei jedem Kurs, was als Nächstes zu tun ist — halten, Teilverkauf oder raus.';
       return pos.map(p => {
         const b = bewertePosition(p);
-        const sch = naechsterSchritt(p, b.kurs);
+        const sch = naechsterSchritt(p, planKurs(b));
         return `**${name(p.sym)}** — ${sch ? sch.titel + ': ' + sch.text : 'kein Ausstiegsplan hinterlegt'}`;
       }).join('\n\n');
     }],
