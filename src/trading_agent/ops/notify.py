@@ -79,15 +79,40 @@ class ConsoleSink(Sink):
 
 
 class FileSink(Sink):
+    """Schreibt jede Meldung als JSONL-Zeile an — mit einer Obergrenze.
+
+    WARUM EINE OBERGRENZE
+
+    Diese Datei ist die einzige Quelle fuer den Alarm-Verlauf, den die App unter
+    "Alarme" zeigt (``build_site.py::_alarm_verlauf``, zeigt die letzten 25). Ohne
+    Kappung wuerde sie ueber Monate und mehrere Laeufe pro Stunde unbegrenzt wachsen —
+    committet ins Repo, fuer immer. ``max_zeilen`` haelt sie klein: deutlich mehr als
+    die App je zeigt, aber nicht unbegrenzt. Getrimmt wird nur, wenn die Grenze
+    ueberschritten ist, nicht bei jedem Schreiben — das haelt die Datei-I/O klein.
+    """
+
     name = "file"
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, max_zeilen: int = 500) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.max_zeilen = max_zeilen
 
     def deliver(self, note: Notification) -> None:
         with open(self.path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(note.as_dict(), default=str) + "\n")
+        self._trimmen()
+
+    def _trimmen(self) -> None:
+        if self.max_zeilen <= 0:
+            return
+        zeilen = self.path.read_text(encoding="utf-8").splitlines()
+        # Erst ab deutlich ueber der Grenze schneiden, nicht bei jeder einzelnen Zeile
+        # drueber — sonst liest und schreibt jeder Aufruf die ganze Datei neu.
+        if len(zeilen) <= self.max_zeilen * 2:
+            return
+        behalten = zeilen[-self.max_zeilen :]
+        self.path.write_text("\n".join(behalten) + "\n", encoding="utf-8")
 
 
 class TelegramSink(Sink):
