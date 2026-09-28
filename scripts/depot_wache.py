@@ -42,8 +42,10 @@ Den vollen Text bekommen nur die privaten Wege (Web Push, Telegram).
 from __future__ import annotations
 
 import argparse
+import asyncio
 import base64
 import binascii
+import contextlib
 import json
 import os
 import sys
@@ -135,11 +137,100 @@ def stand_laden(pfad: str | Path, schluessel: bytes) -> dict[str, Any]:
     return d if isinstance(d, dict) else {}
 
 
-def stand_sichern(pfad: str | Path, stand: dict[str, Any], schluessel: bytes) -> None:
+def stand_sichern(pfad: str | Path, stand: dict[str, Any], schluessel: bytes) -> bool:
+    """Versiegelt schreiben — aber nur, wenn sich INHALTLICH etwas geaendert hat.
+
+    Jede Versiegelung hat eine neue Zufallszahl, die Datei saehe also bei jedem Lauf
+    anders aus. Ohne diesen Vergleich gaebe es alle fuenf Minuten einen Commit, der nichts
+    sagt. Gibt zurueck, ob geschrieben wurde."""
     p = Path(pfad)
-    p.parent.mkdir(parents=True, exist_ok=True)
     klar = json.dumps(stand, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if p.exists():
+        alt = oeffnen(p.read_text(encoding="utf-8"), schluessel)
+        if alt is not None and alt.decode("utf-8", "replace") == klar:
+            return False
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(versiegeln(klar.encode("utf-8"), schluessel) + "\n", encoding="utf-8")
+    return True
+
+
+# --------------------------------------------------------------------------- Livekurse
+
+
+def _boerse_offen(jetzt: datetime) -> bool:
+    """US-Boerse grob offen (Mo–Fr 13:30–20:00 UTC). Ausserhalb gilt der Schlusskurs."""
+    if jetzt.weekday() >= 5:
+        return False
+    minuten = jetzt.hour * 60 + jetzt.minute
+    return 13 * 60 + 30 <= minuten <= 20 * 60 + 5
+
+
+async def livekurse(
+    scan: dict[str, Any], positionen: list[dict[str, Any]], jetzt: datetime
+) -> dict[str, float]:
+    """Aktuelle Kurse fuer genau die Werte, die das Depot braucht (Coins und Basiswerte).
+
+    Coins ueber Kraken (oeffentlicher Ticker), Aktien ueber Yahoo nur waehrend der
+    Boersenzeit. Faellt eine Quelle aus, bleibt fuer diesen Wert der Scan-Kurs — lieber
+    zehn Minuten alt als gar keiner."""
+    import httpx
+
+    from trading_agent.portfolio_intel.depot_stops import ScanIndex, lage_fuer
+
+    idx = ScanIndex(scan)
+    brauche: dict[str, str] = {}
+    for pos in positionen:
+        lg = lage_fuer(pos, idx)
+        if lg.row and lg.row.get("instrument"):
+            brauche[str(lg.row["instrument"])] = str(lg.row.get("klasse") or "")
+    aus: dict[str, float] = {}
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        for inst, klasse in brauche.items():
+            if klasse not in ("krypto", "gold") or not inst.endswith("USD"):
+                continue
+            try:
+                r = await c.get("https://api.kraken.com/0/public/Ticker", params={"pair": inst})
+                d = r.json()
+                werte = list((d.get("result") or {}).values())
+                if werte:
+                    aus[inst] = float(werte[0]["c"][0])
+            except Exception:
+                continue
+    aktien = [i for i, k in brauche.items() if k == "aktien"]
+    if aktien and _boerse_offen(jetzt):
+        from trading_agent.data.providers.yahoo_finance import YahooFinanceProvider
+
+        prov = YahooFinanceProvider()
+        try:
+            for inst in aktien:
+                try:
+                    aus[inst] = float((await prov.latest_indicative(inst)).price)
+                except Exception:
+                    continue
+        finally:
+            with contextlib.suppress(Exception):
+                await prov.aclose()
+    return aus
+
+
+def scan_holen(pfad: str, url: str) -> dict[str, Any] | None:
+    """Die Scan-Datei — lokal, oder (im leichten Lauf) die veroeffentlichte von der Seite."""
+    try:
+        return json.loads(Path(pfad).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        pass
+    if not url:
+        return None
+    import httpx
+
+    try:
+        r = httpx.get(url.rstrip("/") + "/scan.json", timeout=30.0)
+        if r.status_code == 200:
+            d = r.json()
+            return d if isinstance(d, dict) else None
+    except Exception:
+        return None
+    return None
 
 
 def oeffentlich_schreiben(pfad: str | Path, inhalt: dict[str, Any]) -> None:
@@ -218,6 +309,16 @@ def main() -> int:
     ap.add_argument("--oeffentlich", default=OEFFENTLICH)
     ap.add_argument("--send", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
+    ap.add_argument(
+        "--live",
+        action="store_true",
+        help="aktuelle Kurse holen (leichter Lauf alle fuenf Minuten) statt der Scan-Kurse",
+    )
+    ap.add_argument(
+        "--seite",
+        default="",
+        help="Adresse der App — fehlt die lokale scan.json, wird die veroeffentlichte geholt",
+    )
     args = ap.parse_args()
     jetzt = datetime.now(UTC)
 
@@ -258,11 +359,27 @@ def main() -> int:
         )
         return 0
 
-    try:
-        scan = json.loads(Path(args.scan).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"::warning::Scan nicht lesbar ({exc}) — keine Depotpruefung.")
+    scan = scan_holen(args.scan, args.seite)
+    if scan is None:
+        print("::warning::Scan nicht lesbar — keine Depotpruefung.")
         return 0
+    if args.live:
+        try:
+            live = asyncio.run(livekurse(scan, positionen, jetzt))
+        except Exception as exc:
+            live = {}
+            print(f"  (Livekurse nicht ladbar: {type(exc).__name__} — es gelten die Scan-Kurse)")
+        if live:
+            scan = {
+                **scan,
+                "gesamt": [
+                    {**r, "kurs": live[str(r.get("instrument"))]}
+                    if str(r.get("instrument")) in live
+                    else r
+                    for r in (scan.get("gesamt") or [])
+                ],
+            }
+        print(f"  Livekurse: {len(live)} Wert(e)")
 
     schluessel = schluessel_aus(roh, ZWECK)
     stand = stand_laden(args.stand, schluessel)
@@ -276,7 +393,6 @@ def main() -> int:
     }
     neu, gemeldet = neue_meldungen(ereignisse, gemeldet, jetzt)
     neuer_stand["gemeldet"] = gemeldet
-    neuer_stand["geprueft"] = jetzt.isoformat()
 
     print(
         f"{uebersicht['positionen']} Position(en) geprueft · {uebersicht['mit_stop']} mit Stop · "
@@ -329,7 +445,11 @@ def main() -> int:
         },
     )
     if not args.dry_run:
-        stand_sichern(args.stand, neuer_stand, schluessel)
+        geschrieben = stand_sichern(args.stand, neuer_stand, schluessel)
+        marker = Path(os.environ.get("GITHUB_OUTPUT", ""))
+        if marker.name:
+            with open(marker, "a", encoding="utf-8") as fh:
+                fh.write(f"geaendert={'1' if geschrieben else '0'}\n")
     return 0
 
 
