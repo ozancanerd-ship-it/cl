@@ -281,7 +281,7 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python scripts/depot_wache.py --scan web/scan.json --send
+        run: python scripts/depot_wache.py --scan web/scan.json --live --send
 
       # Die eigene Bilanz. Laeuft nach der Wachliste und schreibt sie in die App —
       # ein Scanner, der nie nachrechnet, ob die alten Chancen aufgegangen sind,
@@ -309,6 +309,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/watch_levels.py --send
 
+      # Ozans eigene Positionen auch im leichten Lauf — alle fuenf Minuten mit AKTUELLEN
+      # Kursen (Kraken-Ticker, Aktien waehrend der Boersenzeit ueber Yahoo), nicht nur
+      # beim Scan. Stop, Ziel, Knock-out melden sich damit spaetestens nach Minuten.
+      - name: Depot bewachen (leicht)
+        id: depot_licht
+        if: github.event.schedule == '*/5 * * * *'
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+          DEPOT_CODE: ${{ secrets.DEPOT_CODE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/depot_wache.py --live --send --oeffentlich /tmp/waechter.json \
+            --seite "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
       - name: Web-App bauen
         if: github.event.schedule != '*/5 * * * *'
         env:
@@ -316,7 +335,7 @@ jobs:
         run: python scripts/build_site.py --out _site
 
       - name: Journal sichern
-        if: github.event.schedule != '*/5 * * * *' || steps.wache_licht.outputs.geaendert == '1'
+        if: github.event.schedule != '*/5 * * * *' || steps.wache_licht.outputs.geaendert == '1' || steps.depot_licht.outputs.geaendert == '1'
         run: |
           git config user.name  "trading-agent[bot]"
           git config user.email "trading-agent@users.noreply.github.com"
