@@ -171,6 +171,20 @@ jobs:
           PYTHONPATH: src
         run: python scripts/fetch_macro.py --out web/macro.json
 
+      # Aktien-Hintergrund: Quartalszahlen-Termine, Sektor, Analystenkonsens (Nasdaq).
+      # Holt nur, wenn die veroeffentlichte Datei aelter als 20 Stunden ist — sonst wird
+      # sie uebernommen. Faellt Nasdaq aus, laeuft der Scan ohne Termine weiter.
+      - name: Aktien-Info holen
+        id: aktien_info
+        if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
+        continue-on-error: true
+        timeout-minutes: 6
+        env:
+          PYTHONPATH: src
+        run: |
+          python scripts/fetch_aktien_info.py --out web/aktien_info.json \
+            --vorlauf-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+
       # Der Gesamtmarkt-Scan: dynamisches Krypto-Universum von der Boerse, Aktien,
       # Gold. Schreibt die Rangliste UND je Wert eine Detaildatei mit Zeichnung,
       # MTF-Tabelle, Mustern und Kommentar.
@@ -249,8 +263,12 @@ jobs:
       # als Geheimnis DEPOT_CODE herein (derselbe Text wie im Sync-Reiter der App);
       # ohne das Geheimnis bleibt der Schritt einfach still.
       #
-      # Gemeldet wird nur Stop, Ziel und ein bedrohlicher Knock-out-Puffer. Keine
-      # Kursbewegung, kein Notenwechsel, kein "Scan erfolgreich".
+      # Seit 27.09. setzt und zieht der Waechter die Stops selbst (Invalidierung der
+      # Analyse und Halte-Stop), statt nur die Stops zu kennen, die im Depot-Text stehen.
+      # Gemeldet wird: Stop gerissen, Ziel, Knock-out nah — sofort; Stop gesetzt oder
+      # nachgezogen — gebuendelt und erst ab 2 % Schritt. Keine Kursbewegung, kein
+      # Notenwechsel, kein "Scan erfolgreich". Der Stand liegt VERSIEGELT im Repo
+      # (depot_stand.siegel); oeffentlich (web/waechter.json) stehen nur Zaehler.
       - name: Depot bewachen
         id: depot
         if: github.event.schedule != '*/5 * * * *'
@@ -320,7 +338,8 @@ jobs:
                    data/repository_real/live/tsmom_forward_corrections.jsonl \
                    data/repository_real/live/scan_alert_state.json \
                    data/repository_real/live/watchlist.json \
-                   data/repository_real/live/depot_alarme.json; do
+                   data/repository_real/live/depot_alarme.json \
+                   data/repository_real/live/depot_stand.siegel; do
             if [ -f "$f" ]; then git add -f "$f"; else echo "  (noch nicht vorhanden: $f)"; fi
           done
           if git diff --cached --quiet; then
