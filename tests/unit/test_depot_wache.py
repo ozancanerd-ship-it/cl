@@ -174,7 +174,7 @@ def test_ziel_1_zieht_den_stop_auf_den_einstieg() -> None:
             "sym": "SOLUSD",
             "menge": 1,
             "einstieg": 100.0,
-            "plan": {"stop": 90.0, "tp1": 110.0, "tp2": 120.0},
+            "plan": {"stop": 90.0, "tp1": 110.0, "tp2": 120.0, "gekauft": "2026-09-20"},
         }
     ]
     stand, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {})
@@ -369,3 +369,29 @@ def test_ohne_depot_code_meldet_die_seite_inaktiv(tmp_path) -> None:
         check=True,
     )
     assert json.loads((tmp_path / "w.json").read_text())["aktiv"] is False
+
+
+def test_ziele_eines_fremden_setups_gelten_nicht_fuer_eine_gehaltene_position() -> None:
+    """Ozan, 28.09.: „Ich soll schon Teil verkaufen, obwohl du selber meintest, das wäre
+    nicht so sinnvoll." Ziele, die die App automatisch aus einem gerade laufenden Setup
+    uebernommen hat, gehoeren nicht zu seiner Position — kein Teilverkauf daraus."""
+    pos = [
+        {
+            "sym": "SOLUSD",
+            "menge": 1,
+            "einstieg": 100.0,
+            "plan": {"stop": 90.0, "tp1": 110.0, "quelle": "app"},
+        }
+    ]
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {})
+    assert [e.art for e in ev] == []
+    # Selbst gesetzt oder ueber die Signalkarte gekauft: dann schon.
+    pos[0]["plan"]["quelle"] = "selbst"
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {})
+    assert [e.art for e in ev] == ["ziel"]
+
+
+def test_der_waechter_legt_keine_ziele_an() -> None:
+    scan = _scan(_zeile("SOLUSD", 120.0, halte=100.0, inv=110.0, richtung="long", ziel=125.0))
+    stand, _, _ = pruefe_depot([{"sym": "SOLUSD", "menge": 1}], scan, {})
+    assert not stand["positionen"]["SOLUSD|"].get("ziele")
