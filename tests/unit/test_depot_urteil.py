@@ -107,10 +107,14 @@ def test_urteil_wird_mit_staerke_nie_schlechter() -> None:
 
 
 def test_hoher_score_rettet_ein_schlusslicht_nicht() -> None:
-    """Gegenprobe: der Score darf das Urteil nicht mehr anheben."""
+    """Gegenprobe: der Score darf das Urteil nicht mehr anheben.
+
+    Seit 27.09. heisst Schlusslicht BEOBACHTEN statt REDUZIEREN — nachgemessen liefen
+    Schlusslichter danach nicht schlechter als ihre Klasse (docs/SIGNAL-STUDIE-2026-09.md).
+    Verkauft wird ueber Stop, gedrehte Analyse oder Klumpen, nicht ueber den Tabellenplatz."""
     (mit_score,) = _laufe([_zeile(9.0, score=95.0)])
     (ohne_score,) = _laufe([_zeile(9.0, score=1.0)])
-    assert mit_score == ohne_score == "REDUZIEREN"
+    assert mit_score == ohne_score == "BEOBACHTEN"
 
 
 def test_laufendes_short_setup_deckelt_das_halten() -> None:

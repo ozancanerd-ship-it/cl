@@ -41,6 +41,7 @@ AUS_TEXTEN = frozenset(
         "A_MINUS",
         "B_PLUS",
         "NO_TRADE",
+        "DEPOT_CODE",
         "PUSH_ABOS",
         "VAPID_PRIVATE_KEY",
     }
