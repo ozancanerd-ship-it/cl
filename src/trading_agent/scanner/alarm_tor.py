@@ -425,13 +425,23 @@ def ziel1_prozent(einstieg: float | None, tp1: float | None) -> float | None:
     return abs(float(tp1) - float(einstieg)) / float(einstieg) * 100.0
 
 
+def termin_punkt(sperre: str | None) -> Punkt | None:
+    """Pruefung 8: kein Einstiegs-Alarm kurz vor Quartalszahlen (Masterplan §8).
+
+    An so einem Tag springt der Kurs oft ueber jeden Stop hinweg — das R, mit dem der
+    Plan rechnet, gilt dann nicht mehr. Die Sperre setzt der Scan (``termin_sperre``)."""
+    if not sperre:
+        return None
+    return Punkt("termin", False, str(sperre))
+
+
 def pruefe_zeile(z: Mapping[str, Any], stand: Mapping[str, Stand] | None) -> Tor:
     """:func:`pruefe` fuer eine Scan-Zeile."""
     pl = z.get("plan") if isinstance(z.get("plan"), Mapping) else {}
     st = z.get("setup") if isinstance(z.get("setup"), Mapping) else {}
     einstieg = (pl or {}).get("einstieg") or z.get("einstieg")
     tp1 = (pl or {}).get("tp1") or z.get("ziel")
-    return pruefe(
+    tor = pruefe(
         note=str(z.get("note") or ""),
         setup=str((st or {}).get("name") or ""),
         klasse=str(z.get("klasse") or ""),
@@ -440,6 +450,8 @@ def pruefe_zeile(z: Mapping[str, Any], stand: Mapping[str, Stand] | None) -> Tor
         ziel1_pct=ziel1_prozent(einstieg, tp1),
         stand=stand,
     )
+    punkt = termin_punkt(z.get("termin_sperre"))
+    return tor.mit(punkt) if punkt is not None else tor
 
 
 def pruefe_wache(w: Any, stand: Mapping[str, Stand] | None) -> Tor:
@@ -497,6 +509,7 @@ def fuers_telefon(
     jetzt: datetime,
     erlaubt: Iterable[str] = ("EINSTIEG", "TP", "STOP", "SCHUTZ", "AUSSTIEG"),
     alle: bool = False,
+    sperren: Mapping[str, str] | None = None,
 ) -> tuple[list[Any], list[str]]:
     """Welche Ereignisse aufs Telefon gehen — in ihrer Reihenfolge, Einstiege ergaenzt.
 
@@ -533,6 +546,9 @@ def fuers_telefon(
             einstiege.append((pruefe_wache(w, stand), i, e, w))
     einstiege.sort(key=lambda t: -t[0].guete)
     for tor, i, e, w in einstiege:
+        punkt = termin_punkt((sperren or {}).get(w.instrument))
+        if punkt is not None:
+            tor = tor.mit(punkt)
         tor = deckel(tor, instrument=w.instrument, verlauf=verlauf, jetzt=jetzt)
         if tor.ja or alle:
             w.gemeldet = jetzt.isoformat()
