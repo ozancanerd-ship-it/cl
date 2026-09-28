@@ -44,6 +44,9 @@ AUS_TEXTEN = frozenset(
         "DEPOT_CODE",
         "PUSH_ABOS",
         "VAPID_PRIVATE_KEY",
+        # Browser-eigen (DOM), nicht in der Vorlage deklariert: NodeFilter.SHOW_TEXT,
+        # benutzt beim Umlaute-Reparieren (28.09.).
+        "SHOW_TEXT",
     }
 )
 
