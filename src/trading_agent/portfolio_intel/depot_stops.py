@@ -100,6 +100,16 @@ def ist_bar(pos: dict[str, Any]) -> bool:
     return bool(re.search(r"\bcash\b|bargeld|guthaben", str(pos.get("konto") or ""), re.I))
 
 
+def ziele_gelten(plan: dict[str, Any] | None) -> bool:
+    """Gehoeren die Ziele im Plan zu dieser Position? Nur bei einem Kauf ueber die
+    Signalkarte (``gekauft``) oder wenn Ozan sie selbst gesetzt bzw. uebernommen hat."""
+    if not plan:
+        return False
+    if plan.get("gekauft"):
+        return True
+    return str(plan.get("quelle") or "") in {"selbst", "analyse", "selbst_nachgezogen"}
+
+
 def schluessel(pos: dict[str, Any]) -> str:
     """Wie ``posSchluessel`` in der App: Symbol plus Konto."""
     return str(pos.get("sym") or "").upper() + "|" + str(pos.get("konto") or "").lower()
@@ -491,11 +501,14 @@ def pflegen(
         )
         return st, ev
 
-    # 2 — Ziele (nur fuer Positionen, deren Stop auf Positionsebene laeuft).
-    ziele = dict(st.get("ziele") or {})
-    for m in ("tp1", "tp2", "tp3"):
-        if plan.get(m) is not None and lg.ebene == "position":
-            ziele[m] = _zahl(plan.get(m))
+    # 2 — Ziele: nur, wenn sie zu DIESER Position gehoeren (wie ``zieleGelten`` in der
+    # App). Fuer eine von Hand eingetragene Position waren das bis 28.09. die Ziele
+    # eines fremden, kurzfristigen Setups — mit „ein Drittel verkaufen" als Folge.
+    ziele: dict[str, Any] = {}
+    if lg.ebene == "position" and ziele_gelten(plan):
+        for m in ("tp1", "tp2", "tp3"):
+            if plan.get(m) is not None:
+                ziele[m] = _zahl(plan.get(m))
     erledigt = set(pos.get("erledigt") or []) | set(st.get("erreicht") or [])
     for marke, teil in (("TP1", "ein Drittel"), ("TP2", "das zweite Drittel"), ("TP3", "den Rest")):
         ziel = _zahl(ziele.get(marke.lower()))
@@ -537,25 +550,6 @@ def pflegen(
         neu, grund = best
         if stop is None:
             st.update(stop=neu, ebene=lg.ebene, quelle=grund)
-            if (
-                lg.ebene == "position"
-                and lg.row is not None
-                and "ziele" not in st
-                and not any(plan.get(m) is not None for m in ("tp1", "tp2", "tp3"))
-                and "Invalidierung" in grund
-            ):
-                # Ziele nur zusammen mit einem Setup-Stop — der Halte-Stop hat keine.
-                row = lg.row
-                eurusd = _zahl(row.get("eurusd")) or lg.eurusd
-
-                def conv(v: Any) -> float | None:
-                    return umrechnen(_zahl(v), zeile_waehrung(row), lg.waehrung, eurusd)
-
-                st["ziele"] = {
-                    "tp1": conv(row.get("ziel")),
-                    "tp2": conv(row.get("tp2")),
-                    "tp3": conv(row.get("tp3")),
-                }
             ev.append(
                 Ereignis(
                     "stop_neu",
@@ -671,4 +665,5 @@ __all__ = [
     "pruefe_depot",
     "schluessel",
     "stand_kennung",
+    "ziele_gelten",
 ]
