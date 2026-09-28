@@ -363,6 +363,11 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   color:var(--ink-2); margin-top:11px; padding-top:11px; border-top:1px solid var(--rule)}
 .zt span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px; padding:3px 8px}
 .zt b{color:var(--ink)}
+details.mehr{margin:10px 0 0; border-top:1px dashed var(--rule); padding-top:7px; font-size:12.5px; color:var(--ink-2)}
+details.mehr > summary{cursor:pointer; list-style:none; color:var(--ink-3); font-size:12.5px}
+details.mehr > summary::-webkit-details-marker{display:none}
+details.mehr > summary::before{content:'▸ '}
+details.mehr[open] > summary::before{content:'▾ '}
 .note-box{background:var(--sunk); border:1px solid var(--rule); border-radius:11px;
   padding:12px 14px; font-size:12.5px; color:var(--ink-2); margin:14px 0}
 .note-box.warn{background:var(--warn-bg); border-color:rgba(255,182,72,.26); color:var(--warn)}
@@ -625,6 +630,89 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = id => document.getElementById(id);
 
+/* ============================================================ UMLAUTE
+   Ein großer Teil der Analysetexte kommt aus dem Scanner (Python) und aus älterem Code,
+   der Umlaute als ae/oe/ue schreibt: „laeuft ueber", „Rueckeroberung", „Boersenzeit".
+   Ozan, 28.09.: „die Analysen gefallen mir nicht." Beim Durchlesen aller Reiter standen
+   über 400 solcher Wörter auf der Seite — das liest sich wie ein Protokoll, nicht wie
+   eine Analyse.
+
+   Gelöst wird es an EINER Stelle, beim Anzeigen: jeder sichtbare Textknoten läuft durch
+   diese Liste. Bewusst eine Liste von Wortstämmen und keine allgemeine Regel — „aktuell",
+   „neue", „Quelle", „Steuer", „Euro", „zuerst", „Issue" bleiben, wie sie sind. Attribute,
+   Eingabefelder, Code und der Sync-Text werden nicht angefasst: Schlüssel und Symbole
+   müssen Zeichen für Zeichen gleich bleiben. */
+const UMLAUT_PAARE = [
+  ['ueber','über'],['uebrig','übrig'],['ueblich','üblich'],['rueck','rück'],['laeuf','läuf'],
+  ['laess','läss'],['faell','fäll'],['haelt','hält'],['haelft','hälft'],['traeg','träg'],
+  ['taeg','täg'],['naechst','nächst'],['schluessel','schlüssel'],['staerk','stärk'],
+  ['schwaech','schwäch'],['schoepf','schöpf'],['guenstig','günstig'],['waerts','wärts'],
+  ['duenn','dünn'],['hoech','höch'],['hoeh','höh'],['loes','lös'],['baeren','bären'],
+  ['baeris','bäris'],['kaeuf','käuf'],['maerkt','märkt'],['haeuf','häuf'],['saetz','sätz'],
+  ['schaetz','schätz'],['taet','tät'],['jaehr','jähr'],['kaempf','kämpf'],['brueche','brüche'],
+  ['laed','läd'],['oeffn','öffn'],['oeffentl','öffentl'],['pruef','prüf'],['gaeng','gäng'],
+  ['boers','börs'],['aender','änder'],['moegl','mögl'],['koenn','könn'],['muess','müss'],
+  ['wuerd','würd'],['fuehr','führ'],['frueh','früh'],['glueck','glück'],['stueck','stück'],
+  ['lueck','lück'],['buendel','bündel'],['gebuehr','gebühr'],['schuetz','schütz'],
+  ['stuetz','stütz'],['nuetz','nütz'],['zueg','züg'],['fuell','füll'],['muenz','münz'],
+  ['duerf','dürf'],['haette','hätte'],['aelter','älter'],['spruen','sprün'],['schaeft','schäft'],
+  ['kraeft','kräft'],['huerde','hürde'],['faehig','fähig'],['gefaehr','gefähr'],
+  ['naemlich','nämlich'],['aehnlich','ähnlich'],['waechter','wächter'],['zaehl','zähl'],
+  ['laeng','läng'],['haeng','häng'],['klaer','klär'],['waehl','wähl'],['waehr','währ'],
+  ['waehn','wähn'],['haend','händ'],['spaet','spät'],['moecht','möcht'],['gruen','grün'],
+  ['naeh','näh'],['hoert','hört'],['hoeren','hören'],['gehoer','gehör'],['gaenz','gänz'],
+  ['staend','ständ'],['laend','länd'],['waere','wäre'],
+  ['aeuss','äuß'],['ausser','außer'],['groess','größ'],['schliess','schließ'],['heiss','heiß'],
+  ['gemaess','gemäß'],['maessig','mäßig'],['fliess','fließ'],
+];
+const UMLAUT_MAP = new Map();
+for (const [a, b] of UMLAUT_PAARE){
+  UMLAUT_MAP.set(a, b);
+  UMLAUT_MAP.set(a[0].toUpperCase() + a.slice(1), b[0].toUpperCase() + b.slice(1));
+}
+const UMLAUT_RE = new RegExp([...UMLAUT_MAP.keys()].sort((x, y) => y.length - x.length).join('|'), 'g');
+function mitUmlauten(t){
+  if (!t || !/ae|oe|ue|ss/.test(t)) return t;
+  return t.replace(/\b(da|wo|hier)?([Ff])uer\b/g, (m, vor, f) => (vor || '') + (vor ? 'für' : (f === 'F' ? 'Für' : 'für')))
+          .replace(UMLAUT_RE, m => UMLAUT_MAP.get(m) || m);
+}
+/* Dasselbe für Dezimalpunkte. Der Scanner schreibt „Einstieg bei 529.4", „CRV 1:3.98",
+   „1 R = 10.61" — mitten in einer deutschen Seite, deren eigene Zahlen „529,40" heißen.
+   Umgeschrieben wird nur, was eindeutig ein Dezimalpunkt ist: ein bis zwei oder vier und
+   mehr Nachkommastellen. Genau drei („10.020") kann ein deutscher Tausenderpunkt sein und
+   bleibt stehen; Daten („28.09.") und Versionen („v1.2") ebenso. */
+const DEZIMAL_RE = /(^|[^\d.,\w])(\d+)\.(\d{1,2}|\d{4,})(?![\d.A-Za-z])/g;
+function deZahlen(t){
+  if (!t || t.indexOf('.') < 0) return t;
+  return t.replace(DEZIMAL_RE, '$1$2,$3');
+}
+function anzeigeText(t){ return deZahlen(mitUmlauten(t)); }
+const UMLAUT_NICHT = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE', 'SELECT']);
+function umlautKnoten(n){
+  for (let e = n.parentElement; e; e = e.parentElement){
+    if (UMLAUT_NICHT.has(e.tagName) || e.isContentEditable || (e.dataset && e.dataset.roh != null)) return;
+  }
+  const neu = anzeigeText(n.data);
+  if (neu !== n.data) n.data = neu;
+}
+function umlauteIn(wurzel){
+  if (!wurzel) return;
+  if (wurzel.nodeType === 3){ umlautKnoten(wurzel); return; }
+  if (wurzel.nodeType !== 1 || UMLAUT_NICHT.has(wurzel.tagName)) return;
+  const w = document.createTreeWalker(wurzel, NodeFilter.SHOW_TEXT);
+  const knoten = [];
+  while (w.nextNode()) knoten.push(w.currentNode);
+  knoten.forEach(umlautKnoten);
+}
+function umlauteBeobachten(){
+  umlauteIn(document.body);
+  try {
+    new MutationObserver(liste => {
+      for (const m of liste) for (const n of m.addedNodes) umlauteIn(n);
+    }).observe(document.body, {childList: true, subtree: true});
+  } catch(e){}
+}
+
 function digits(v){ v = Math.abs(v||0);
   return v >= 1000 ? 2 : v >= 10 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8; }
 function num(v, d){ if (v == null || !isFinite(v)) return '—';
@@ -632,6 +720,18 @@ function num(v, d){ if (v == null || !isFinite(v)) return '—';
     {minimumFractionDigits: d ?? digits(v), maximumFractionDigits: d ?? digits(v)}); }
 function pct(v, k){ if (v == null || !isFinite(v)) return '—';
   return (v>0?'+':'') + Number(v).toFixed(k ?? 2).replace('.',',') + ' %'; }
+/* Die erwartete Bewegung kommt aus dem Scanner als BETRAG. Bei einem Short stand dort
+   deshalb grün „+8,0 %" — als würde der Kurs steigen. Jetzt mit Richtung. */
+function bewegungText(o){
+  const v = o && o.erwartete_bewegung_pct;
+  if (v == null || !isFinite(v)) return '—';
+  const runter = o.richtung === 'short';
+  return (runter ? '↓ ' : '↑ ') + Math.abs(v).toFixed(1).replace('.',',') + ' %';
+}
+function bewegungSpan(o){
+  if (!o || o.erwartete_bewegung_pct == null) return '';
+  return `<span>Erwartet <b class="${o.richtung==='short'?'dn':'up'}">${bewegungText(o)}</b></span>`;
+}
 function zeit(iso){ if (!iso) return '—';
   try { return new Date(iso).toLocaleString('de-DE',
     {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return '—'; } }
@@ -1018,7 +1118,7 @@ function pruefeDepotAlarme(){
   for (const p of pos){
     let b;
     try { b = bewertePosition(p); } catch(e){ continue; }
-    const schritt = naechsterSchritt(p, planKurs(b));
+    const schritt = naechsterSchritt(p, planKurs(b), b.w);
     if (!schritt || (schritt.stufe !== 'stop' && schritt.stufe !== 'ziel')) continue;
     const key = 'verkauf:' + p.sym + ':' + (schritt.marke || 'stop');
     if (gemeldetLaden()[key]) continue;
@@ -2340,7 +2440,7 @@ function zeichneAnalyse(){
       <span>Score <b>${(c.score||0).toFixed(0)}/100</b></span>
       ${c.confidence?`<span>Confidence <b>${Math.round(c.confidence*100)} %</b></span>`:''}
       ${c.rr?`<span>CRV <b>1:${c.rr.toFixed(2)}</b></span>`:''}
-      ${c.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${c.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(c.erwartete_bewegung_pct,1)}</b></span>`:''}
+      ${bewegungSpan(c)}
       <span>Profil <b>${esc(c.profil||'')}</b></span>
     </div>
     <div class="zt">
@@ -2872,7 +2972,7 @@ function zieleGelten(pl){
   if (pl.gekauft) return true;
   return pl.quelle === 'selbst' || pl.quelle === 'analyse' || pl.quelle === 'selbst_nachgezogen';
 }
-function naechsterSchritt(pos, kurs){
+function naechsterSchritt(pos, kurs, wPos){
   const pl = pos && pos.plan;
   if (!pl || kurs == null || !isFinite(kurs)) return null;
   const lang = (pl.richtung || 'long') === 'long';
@@ -2881,7 +2981,7 @@ function naechsterSchritt(pos, kurs){
   const d = digits(kurs);
   const basis = pl.ebene === 'basis';
   const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT'
-          : (basis ? ' $' : ''));
+          : (basis ? ' $' : (wPos ? waehrungsZeichen(wPos) : '')));
   const wer = basis ? `${pl.basis_name || 'Der Basiswert'} steht` : 'Der Kurs steht';
 
   // 1 — Stop zuerst. Wenn der gerissen ist, ist alles andere egal.
@@ -2912,14 +3012,16 @@ function naechsterSchritt(pos, kurs){
     // Ein Plan, der nur aus einem Stop besteht, ist kein halber Plan — fuer eine
     // laufende Position ist er oft der ganze. „Kein Ziel" heisst dann nicht „fertig",
     // sondern: laufen lassen, solange der Stop haelt.
-    if (pl.stop != null && !erledigt.size){
+    // Nur Ziel-Marken zaehlen hier. In ``erledigt`` stehen seit 28.09. auch abgehakte
+    // Teilverkaufs-Regeln (ko_eng, gegen) — die beenden keinen Plan.
+    if (pl.stop != null && !['TP1','TP2','TP3'].some(m => erledigt.has(m))){
       const weg = Math.abs(kurs - pl.stop) / kurs * 100;
       return {stufe:'halten', titel:'Halten — Stop steht',
         text:(basis ? `${wer} bei ${num(kurs,d)}${w}. ` : '')
           + `Kein festes Ziel, aber ein Stop ${basis ? 'auf ' + (pl.basis_name || 'den Basiswert') + ' ' : ''}bei ${num(pl.stop,d)}${w} — `
-          + `${weg.toFixed(1).replace('.',',')} % entfernt. So lange laufen lassen und den `
-          + 'Stop nachziehen, wenn der Kurs davonläuft. Verkauft wird, wenn der Stop fällt, '
-          + 'nicht wenn es sich unangenehm anfühlt.'};
+          + `${weg.toFixed(1).replace('.',',')} % entfernt. Laufen lassen — läuft der Kurs `
+          + 'davon, zieht die App den Stop nach (nur nach oben, nie zurück). Verkauft wird, '
+          + 'wenn der Stop fällt, nicht wenn es sich unangenehm anfühlt.'};
     }
     return {stufe:'fertig', titel:'Alle Ziele erreicht',
       text:'Es gibt keinen Plan mehr. Entweder schliessen oder bewusst neu entscheiden.'};
@@ -2978,6 +3080,22 @@ function stopKandidaten(r, lang, kurs, um){
     aus.push({stop: ch, art: 'halte', grund: `Halte-Stop (${h.k || 5}× Tagesschwankung `
       + `${lang ? 'unter dem 22-Tage-Hoch' : 'über dem 22-Tage-Tief'})`});
   return aus;
+}
+
+/* Ein Schein, bei dem jede Marke aus der Analyse jenseits der Knock-out-Schwelle laege.
+   Dann ist die Schwelle selbst der Stop — und die Karte darf nicht „wichtigste Lücke"
+   rufen, als haette die App nichts gefunden. Liefert die Schwelle oder null. */
+function scheinSchwelleIstStop(b){
+  const pos = b.pos;
+  if (!istSchein(pos) || !b.hebel || b.hebel.ausgeknockt || b.hebel.art === 'margin') return null;
+  const r = b.basis && b.basis.row;
+  const bk = basisKursVon(b);
+  const ko = pos.ko != null && isFinite(Number(pos.ko)) ? Number(pos.ko) : null;
+  if (!r || bk == null || ko == null) return null;
+  const lang = stopRichtungLang(pos);
+  const alle = stopKandidaten(r, lang, bk, v => v == null ? null : Number(v));
+  if (!alle.length) return null;
+  return alle.every(x => lang ? x.stop <= ko : x.stop >= ko) ? ko : null;
 }
 
 /* Ein Stop, den die App aus der laufenden Analyse ableiten kann — oder ehrlich: keiner.
@@ -3068,7 +3186,7 @@ function stopPflege(b){
     return {art:'neu', stop:v.stop, tp1:null, tp2:null, tp3:null, ebene,
             basisName:v.basisName, waehrung:v.waehrung, halteArt:v.art,
             vomBasiswert:v.vomBasiswert,
-            grund:`${v.grund} — die App setzt sie als Stop`};
+            grund:v.grund};
   }
 
   const besser = (a, c) => lang ? a > c : a < c;   // „weiter in Sicherheit"
@@ -3149,7 +3267,7 @@ function stopsPflegen(bew){
 function stopKasten(geschehen, bew){
   const offen = bew.filter(b => {
     const p = stopPflege(b);
-    return p && p.art === 'keiner';
+    return p && p.art === 'keiner' && scheinSchwelleIstStop(b) == null;
   });
   // Nicht aus ``geschehen`` — sondern aus dem, was noch nicht abgehakt ist.
   const broker = bew.filter(b => b.pos.plan && b.pos.plan.broker_offen);
@@ -3202,8 +3320,10 @@ function stopKasten(geschehen, bew){
   return h;
 }
 
-function ausstiegsKasten(b){
-  const schritt = naechsterSchritt(b.pos, planKurs(b));
+function ausstiegsKasten(b, a){
+  const schritt = naechsterSchritt(b.pos, planKurs(b), b.w);
+  const hinw = a && a.hinweis
+    ? `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(a.hinweis)}</p>` : '';
   if (!schritt){
     // Ohne Kurs kein Stop: bei einem Turbo oder einem ETF, der hier nur mit dem von Hand
     // eingetragenen Wert steht, waere eine Stopmarke eine Zahl ohne Gegenstueck.
@@ -3212,7 +3332,20 @@ function ausstiegsKasten(b){
         <p>Für diesen Posten hat die App keinen laufenden Kurs — nur den Wert, den du
         eingetragen hast. Einen Stop kann sie deshalb nicht überwachen.
         ${b.basis && b.basis.sym ? `Was sie kann: dir sagen, wenn <strong>${esc(name(b.basis.sym))}</strong>
-        als Basiswert kippt — das steht oben im Urteil.` : ''}</p></div>`;
+        als Basiswert kippt — das steht oben im Urteil.` : ''}</p>${hinw}</div>`;
+    }
+    const schwelle = scheinSchwelleIstStop(b);
+    if (schwelle != null){
+      const bn = esc((b.hebel && b.hebel.basisName) || 'der Basiswert');
+      return `<div class="note-box" style="margin:10px 0 0"><span class="nt">Was jetzt zu tun ist</span>
+        <p style="font-size:14px;margin:0 0 4px"><strong>Halten — die Schwelle ist hier der Stop</strong></p>
+        <p style="margin:0">Jede Marke aus der Analyse (Halte-Stop, Setup) läge unter der
+        Knock-out-Schwelle bei ${num(schwelle, digits(schwelle))} — bevor sie greifen könnte,
+        wäre der Schein schon weg. Deshalb setzt die App hier keinen eigenen Stop. Sie und der
+        Wächter auf GitHub melden sich, wenn der Puffer von ${bn} bis zur Schwelle unter
+        ${KO_PUFFER_ENG} % (eng) oder ${KO_PUFFER_KRITISCH} % (kritisch) fällt.</p>
+        <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Ist dir das zu nah, hilft
+        kein Stop, sondern ein Schein mit mehr Abstand zur Schwelle — also weniger Hebel.</p>${hinw}</div>`;
     }
     const v = stopVorschlag(b);
     const d = digits(b.kurs || 1);
@@ -3245,7 +3378,7 @@ function ausstiegsKasten(b){
                style="width:120px;padding:5px 7px;border:1px solid var(--linie);border-radius:6px;
                       background:var(--flaeche);color:var(--ink)">
         <button class="btn" data-stopsetzen="${sym}">Stop speichern</button>
-      </p></div>`;
+      </p>${hinw}</div>`;
   }
   const farbe = schritt.stufe === 'stop' ? 'bad' : (schritt.stufe === 'halten' ? '' : 'warn');
   const pl = b.pos.plan || {};
@@ -3253,10 +3386,7 @@ function ausstiegsKasten(b){
   const pk = planKurs(b);
   const d = digits(pk || b.kurs || 1);
   const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : (basis ? ' $' : ''));
-  const marken = [[basis ? `Stop auf ${esc(pl.basis_name || 'Basiswert')}` : 'Stop', pl.stop],
-                  ...(zieleGelten(pl) ? [['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]] : [])]
-    .filter(([,v]) => v != null)
-    .map(([k,v]) => `<span>${k} <b>${num(v,d)}${w}</b></span>`).join('');
+  const marken = planMarken(b);
   /* Bei einem Schein: was die Position an der Marke ungefaehr noch wert waere. Das ist
      die Zahl, die man im Depot beim Broker wiedererkennt. */
   let scheinSatz = '';
@@ -3276,19 +3406,19 @@ function ausstiegsKasten(b){
     }
   }
   const halteSatz = pl.art === 'halte'
-    ? `<p style="margin:6px 0 0;font-size:12px;color:var(--ink-3)">Halte-Stop: eine
-        Versicherung gegen den Absturz, kein Renditebringer. Gemessen (Studie 27.09.) hat er
-        die schlimmsten Verläufe bei Coins etwa halbiert, in Aufwärtsphasen aber Rendite
-        gekostet. Nach einem Stop kommt der Wert auf die Wiedereinstiegs-Liste.</p>` : '';
+    ? `<p style="margin:6px 0 0;font-size:12px;color:var(--ink-3)">Halte-Stop — wird nur
+        nachgezogen, nie gelockert. Warum und wie gemessen: „Mehr zur Analyse".</p>` : '';
+  const titel = a && a.eigen ? a.titel : schritt.titel;
+  const text = a && a.eigen ? a.text : schritt.text;
   const knopf = schritt.marke
     ? `<p style="margin:9px 0 0"><button class="btn" data-erledigt="${esc(b.pos.sym)}"
          data-marke="${esc(schritt.marke)}">${esc(schritt.marke)} verkauft — abhaken</button></p>`
     : '';
   return `<div class="note-box ${farbe}" style="margin:10px 0 0">
     <span class="nt">Was jetzt zu tun ist</span>
-    <p style="font-size:14px;margin:0 0 4px"><strong>${esc(schritt.titel)}</strong></p>
-    <p style="margin:0">${esc(schritt.text)}</p>
-    <div class="kpi" style="margin-top:8px">${marken}</div>${scheinSatz}${halteSatz}${knopf}</div>`;
+    <p style="font-size:14px;margin:0 0 4px"><strong>${esc(titel)}</strong></p>
+    <p style="margin:0">${esc(text)}</p>
+    <div class="kpi" style="margin-top:8px">${marken}</div>${scheinSatz}${halteSatz}${hinw}${knopf}</div>`;
 }
 
 /* ================================================ URTEIL JE POSITION
@@ -3415,28 +3545,39 @@ function positionsRat(b){
       + 'also gegen die Richtung, die das System sieht. Kein Verkaufsbefehl — aber der Moment, '
       + 'in dem ein Stop im Depot stehen sollte.');
   }
+  /* Was nicht jeden Tag auf jeder Karte stehen muss, kommt in ``mehr`` — die Karte
+     klappt es auf Wunsch auf. Ozan, 28.09.: „die Analysen gefallen mir nicht." Beim
+     Nachsehen stand auf jeder Karte derselbe Satz „Einstiegsseite: Score 0 — kein
+     frisches Setup", zweimal „Was jetzt zu tun ist" und technische Warnungen wie „Reihe
+     auf H4 nicht frisch" bei Aktien am Wochenende. Oben bleibt nur, was entscheidet. */
+  const mehr = [];
   if (score != null){
-    saetze.push(score >= 52
-      ? `Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — hier wäre heute sogar ein `
-        + 'Zukauf vertretbar.'
-      : `Einstiegsseite: Score ${score.toFixed(0)} — kein frisches Setup. Das ist eine Aussage `
-        + 'über den Einstieg, nicht über das Halten; für einen Zukauf fehlt gerade der Anlass.');
+    if (score >= 52){
+      saetze.push(`Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — hier wäre heute `
+        + 'sogar ein Zukauf vertretbar.');
+    } else {
+      mehr.push(`Einstiegsseite: Score ${score.toFixed(0)} — kein frisches Setup. Das ist eine `
+        + 'Aussage über den Einstieg, nicht über das Halten; für einen Zukauf fehlt gerade der Anlass.');
+    }
   }
 
   if (gv != null && gv <= -20){
-    saetze.push(`Du liegst ${gv.toFixed(0)} % im Minus. Die Frage ist nicht, wann es `
-      + 'zurueckkommt, sondern ob dieselbe These heute noch gilt. Ein Verlust wird nicht '
-      + 'dadurch kleiner, dass man ihn aussitzt.');
+    saetze.push(`Du liegst ${Math.abs(gv).toFixed(0)} % im Minus. Die Frage ist nicht, wann es `
+      + 'zurückkommt, sondern ob dieselbe These heute noch gilt. Ein Verlust wird nicht '
+      + 'dadurch kleiner, dass man ihn aussitzt — begrenzt wird er vom Stop.');
   } else if (gv != null && gv >= 20){
-    saetze.push(`${gv.toFixed(0)} % im Plus. Wenn es kein Ziel gibt, gibt es auch keinen `
-      + 'Grund auszusteigen — aber dann gehoert wenigstens ein nachgezogener Stop hin, '
-      + 'damit aus dem Gewinn nicht wieder eine Null wird.');
+    saetze.push(`${gv.toFixed(0)} % im Plus. Ohne festes Ziel gibt es keinen Grund auszusteigen `
+      + '— der nachgezogene Stop sorgt dafür, dass aus dem Gewinn nicht wieder eine Null wird.');
   }
-  if ((r.warnungen||[]).length) saetze.push('Dagegen: ' + r.warnungen.slice(0,2).join(' · '));
+  // Datenwarnungen, die bei Aktien ausserhalb der Boersenzeit normal sind, sind fuer
+  // eine gehaltene Position kein Gegenargument — sie verunsichern nur.
+  const aktie = r.klasse === 'aktien';
+  const warn = (r.warnungen||[]).filter(w => !(aktie && /nicht frisch|veraltet|alt\b/i.test(w)));
+  if (warn.length) mehr.push('Dagegen: ' + warn.slice(0,2).join(' · '));
 
-  const kopf = {gut:'Halten', warn:'Beobachten', bad:'Reduzieren erwaegen',
+  const kopf = {gut:'Halten', warn:'Beobachten', bad:'Reduzieren erwägen',
                 neutral:'Halten', unbekannt:'Keine Bewertung'}[stufe];
-  return {stufe, kopf, saetze};
+  return {stufe, kopf, saetze, mehr};
 }
 
 /* Die Zahlen des Basiswerts — sichtbar getrennt von den Zahlen der Position, damit
@@ -3476,7 +3617,7 @@ function hebelKasten(b){
     style="margin:10px 0 0">
     <span class="nt">Hebel · ${esc(h.basisName)}</span>
     <div class="kpi">
-      <span>Hebel <b>${h.hebel.toFixed(1)}×</b></span>
+      <span>Hebel <b>${h.hebel.toFixed(1).replace('.',',')}×</b></span>
       <span>Puffer bis Knock-out <b class="${eng?'dn':'up'}">${h.puffer_pct.toFixed(1).replace('.',',')} %</b></span>
       <span>Basiswert <b>${num(h.basisKurs,d)}</b></span>
       <span>Schwelle <b>${num(h.ko,d)}</b></span>
@@ -4038,21 +4179,27 @@ function positionsAktion(b, stand){
     return teil(1.0, `Bis zur Knock-out-Schwelle sind es nur noch `
       + `${b.hebel.puffer_pct.toFixed(1).replace('.',',')} % im Basiswert `
       + `(${b.hebel.basisName} bei ${num(b.hebel.basisKurs, digits(b.hebel.basisKurs))}, `
-      + `Schwelle ${num(b.hebel.ko, digits(b.hebel.ko))}). Bei ${b.hebel.hebel.toFixed(1)}× Hebel `
+      + `Schwelle ${num(b.hebel.ko, digits(b.hebel.ko))}). Bei ${b.hebel.hebel.toFixed(1).replace('.',',')}× Hebel `
       + 'ist das eine normale Tagesbewegung. Hier geht es nicht um Gewinn oder Verlust, '
       + 'sondern um Totalverlust — und dagegen hilft kein Stop, die Schwelle greift auch nachts.',
       'raus', true, 'Knock-out zu nah — raus');
   }
-  if (b.hebel && b.hebel.puffer_pct < KO_PUFFER_ENG){
-    return teil(0.5, `Der Puffer bis zur Schwelle ist auf `
+  /* Jede Teilverkaufs-Regel gilt EINMAL je Position. Vorher kam „Hälfte raus" nach dem
+     Verkauf sofort wieder — der Puffer ist ja weiter eng —, dann wieder, bis von der
+     Position nichts mehr übrig war. Wer den Rat befolgt hat, wird dafür nicht bestraft:
+     der „Verkauft"-Knopf hakt die Regel ab (pos.erledigt), danach schützt der Stop,
+     und bei kritischem Puffer greift die Regel darüber (ganz raus). */
+  const schonErledigt = new Set(pos.erledigt || []);
+  if (b.hebel && b.hebel.puffer_pct < KO_PUFFER_ENG && !schonErledigt.has('ko_eng')){
+    return {...teil(0.5, `Der Puffer bis zur Schwelle ist auf `
       + `${b.hebel.puffer_pct.toFixed(1).replace('.',',')} % geschmolzen. Bei `
-      + `${b.hebel.hebel.toFixed(1)}× Hebel reicht ein schlechter Tag im Basiswert. Die Hälfte `
+      + `${b.hebel.hebel.toFixed(1).replace('.',',')}× Hebel reicht ein schlechter Tag im Basiswert. Die Hälfte `
       + 'rausnehmen halbiert das, was ein Knock-out kosten kann, und lässt die These am Leben.',
-      'teilverkauf', true, 'Puffer wird eng — Hälfte raus');
+      'teilverkauf', true, 'Puffer wird eng — Hälfte raus'), marke:'ko_eng'};
   }
 
   // 1 + 2 — was der Ausstiegsplan sagt, hat Vorrang. Feste Marken schlagen Einschätzungen.
-  const schritt = naechsterSchritt(pos, planKurs(b));
+  const schritt = naechsterSchritt(pos, planKurs(b), b.w);
   if (schritt && schritt.stufe === 'stop'){
     return teil(1.0, (pos.plan && pos.plan.ebene === 'basis') ? schritt.text
       : `Der Kurs steht bei ${num(b.kurs,d)}${z}, dein Stop lag bei `
@@ -4060,9 +4207,9 @@ function positionsAktion(b, stand){
       'raus', true, 'Alles verkaufen — Stop gerissen');
   }
   if (schritt && schritt.stufe === 'ziel'){
-    return teil(1/3, `${schritt.marke} ist erreicht. Ein Drittel raus, den Stop auf deinen `
+    return {...teil(1/3, `${schritt.marke} ist erreicht. Ein Drittel raus, den Stop auf deinen `
       + 'Einstieg ziehen — ab da kann der Trade nichts mehr kosten.',
-      'teilverkauf', true, `${schritt.marke} erreicht — ein Drittel verkaufen`);
+      'teilverkauf', true, `${schritt.marke} erreicht — ein Drittel verkaufen`), marke:schritt.marke};
   }
 
   const rs = b.halt && b.halt.rs;
@@ -4107,12 +4254,13 @@ function positionsAktion(b, stand){
      Klasse gehören. Sonst hätte Solana bei +26 % und relativer Stärke 59 halbiert werden
      sollen, nur weil der Scanner kurzfristig nach unten zeigt. Ein Setup ist eine Aussage
      über die nächsten Tage; eine Position, die über Wochen trägt, wirft man dafür nicht weg. */
-  if (!inSchonfrist && r && r.richtung === 'short' && r.handelbar && (rs == null || rs < RS_MITTE)){
-    return teil(0.5, 'Die Analyse sieht hier gerade ein handelbares Setup nach UNTEN, du '
+  if (!inSchonfrist && !schonErledigt.has('gegen') && r && r.richtung === 'short' && r.handelbar
+      && (rs == null || rs < RS_MITTE)){
+    return {...teil(0.5, 'Die Analyse sieht hier gerade ein handelbares Setup nach UNTEN, du '
       + `hältst long — und der Wert gehört auch nicht zu den stärkeren seiner Klasse `
       + `(relative Stärke ${rs != null ? rs.toFixed(0) : '—'}). Das ist kein Verkaufsbefehl, `
       + 'aber der Moment, die Position zu halbieren statt sie auszusitzen.',
-      'teilverkauf', true, 'Gegen die These — Hälfte verkaufen');
+      'teilverkauf', true, 'Gegen die These — Hälfte verkaufen'), marke:'gegen'};
   }
 
   /* 4 — Schlusslicht der eigenen Klasse: bis 27.09. „ein Drittel verkaufen". Nachgemessen
@@ -4124,13 +4272,22 @@ function positionsAktion(b, stand){
       + 'nachkaufen; verkauft wird über den Stop oder eine gedrehte Analyse, nicht über den Tabellenplatz.'
     : '';
 
-  // 5 — Klumpenrisiko.
-  if (!inSchonfrist && anteil != null && anteil > MAX_GEWICHT){
+  /* 5 — Klumpenrisiko: seit 28.09. ein Hinweis, kein Verkaufsauftrag.
+
+     Ozan: „Ich soll bei mehreren Sachen schon Teil verkaufen, obwohl du selber meintest,
+     das wäre nicht so sinnvoll." Der Klumpen-Rat stand oben in „Was jetzt zu tun ist"
+     mit einer Stückzahl — als wäre er so belegt wie ein gerissener Stop. Das ist er nicht:
+     eine Obergrenze je Wert senkt Schwankung, bringt aber gemessen keine Rendite, und ob
+     jemand bewusst groß in Bitcoin sitzt, ist seine Entscheidung. Die Zahl bleibt
+     sichtbar (Karte, Gesundheit), die Aufforderung fällt weg. */
+  let hinweis = '';
+  if (anteil != null && anteil > MAX_GEWICHT){
     const runter = (anteil - MAX_GEWICHT) / anteil;
-    return teil(runter, `Diese eine Position ist ${anteil.toFixed(0)} % deines Depots. `
-      + `Ab ${MAX_GEWICHT} % entscheidet ein einzelner Wert über dein Ergebnis — das ist kein `
-      + 'Depot mehr, sondern eine Wette mit Beiwerk. Zurück auf ' + MAX_GEWICHT + ' %.',
-      'trimmen', false, 'Klumpen abbauen');
+    const t = teil(runter, '', 'trimmen', false, '');
+    hinweis = `Klumpen: diese Position ist ${anteil.toFixed(0)} % deines Depots — ein einzelner `
+      + 'Wert entscheidet damit spürbar über dein Ergebnis. Wenn du das Risiko senken willst: '
+      + `${num(t.menge, t.menge<1?6:4)} Stück (≈ ${num(t.euro,0)} €) bringen sie auf ${MAX_GEWICHT} %. `
+      + 'Das senkt die Schwankung, nicht die Chance — deshalb nur ein Hinweis.';
   }
 
   // 6 — nachlegen. Nur in Stärke, nur mit Setup, nur mit Stop.
@@ -4155,7 +4312,7 @@ function positionsAktion(b, stand){
          Einzelposten bleibt unter seinem Deckel, das Buendel nicht. */
       const gl = glAnteilFuer(b, stand);
       if (gl && gl.anzahl > 1 && gl.anteil > BUENDEL_MAX){
-        return {...basis, art:'halten', dringend:false,
+        return {...basis, art:'halten', dringend:false, eigen:true, hinweis,
           titel:'Nachlegen wäre hier keine neue Chance, sondern dieselbe Wette',
           text:`Das Setup traegt — ${posName(b)} gehoert zu den staerksten `
             + `${(100-rs).toFixed(0)} % der ${klasseName}. Aber dieser Wert liegt in einem `
@@ -4179,14 +4336,14 @@ function positionsAktion(b, stand){
   const wohin = schritt && schritt.stufe === 'halten' ? ' ' + schritt.text : '';
   if (inSchonfrist){
     const restH = Math.max(1, Math.round((schonfristEnde - Date.now())/3600000));
-    return {...basis, art:'halten', dringend:false, titel:'Halten — der Plan läuft',
+    return {...basis, art:'halten', dringend:false, eigen:true, hinweis, titel:'Halten — der Plan läuft',
       text:`Frisch gekauft, der Stop steht. Solange der Plan gilt, redet die Rangliste hier `
         + `nicht rein — sonst würde dir dieselbe App im selben Atemzug Kaufen und Verkaufen `
         + `sagen. Begrenzt wird das Risiko durch deinen Stop, nicht durch eine Meinung. `
         + `Noch ${restH < 48 ? restH + ' Stunden' : Math.round(restH/24) + ' Tage'}, `
         + `dann wird wieder normal bewertet.` + wohin};
   }
-  return {...basis, art:'halten', dringend:false, titel:'Halten — nichts zu tun',
+  return {...basis, art:'halten', dringend:false, hinweis, titel:'Halten — nichts zu tun',
     text:(rs != null ? `Relative Stärke ${rs.toFixed(0)} von 100, kein Anlass zu handeln.`
         : 'Kein Anlass zu handeln.') + schlusslicht + wohin};
 }
@@ -4195,35 +4352,100 @@ const AKTION_FARBE = {raus:'bad', teilverkauf:'warn', trimmen:'warn', nachlegen:
 const AKTION_WORT  = {raus:'VERKAUFEN', teilverkauf:'TEILVERKAUF', trimmen:'TRIMMEN',
                       nachlegen:'NACHLEGEN', halten:'HALTEN'};
 
-function aktionsKasten(b, stand){
-  const a = positionsAktion(b, stand);
+const pctK = (v, n=1) => v.toFixed(n).replace('.', ',') + ' %';
+
+/* Die Marken des Plans als eine Zeile — Stop (und Ziele, wo sie gelten). */
+function planMarken(b){
+  const pl = b.pos.plan || {};
+  if (pl.stop == null) return '';
+  const basis = pl.ebene === 'basis';
+  const d = digits(planKurs(b) || b.kurs || 1);
+  const w = pl.waehrung === 'EUR' ? ' €' : (pl.waehrung === 'USDT' ? ' USDT' : (basis ? ' $' : waehrungsZeichen(b.w)));
+  return [[basis ? `Stop auf ${esc(pl.basis_name || 'Basiswert')}` : 'Stop', pl.stop],
+          ...(zieleGelten(pl) ? [['TP1', pl.tp1], ['TP2', pl.tp2], ['TP3', pl.tp3]] : [])]
+    .filter(([,v]) => v != null)
+    .map(([k,v]) => `<span>${k} <b>${num(v,d)}${w}</b></span>`).join('');
+}
+
+function aktionsKasten(b, stand, a){
+  a = a || positionsAktion(b, stand);
   if (!a) return '';
-  const d = digits(b.kurs || 1);
   const farbe = AKTION_FARBE[a.art] || '';
   const zahl = (a.menge != null && a.euro != null)
     ? `<div class="kpi" style="margin-top:8px">
          <span>${a.art==='nachlegen'?'kaufen':'verkaufen'} <b>${num(a.menge, a.menge<1?6:4)} Stück</b></span>
          <span>≈ <b>${num(a.euro,2)} €</b></span>
-         ${a.anteil!=null?`<span>Anteil am Depot <b>${a.anteil.toFixed(1)} %</b></span>`:''}
-       </div>` : (a.anteil!=null?`<div class="kpi" style="margin-top:8px">
-         <span>Anteil am Depot <b>${a.anteil.toFixed(1)} %</b></span></div>`:'');
+         ${a.anteil!=null?`<span>Anteil am Depot <b>${pctK(a.anteil)}</b></span>`:''}
+       </div>` : '';
+  const marken = planMarken(b);
+  const knopf = (a.menge!=null && b.pos.menge) ? `<p style="margin:9px 0 0">
+      <button class="btn" data-mengeschl="${esc(posSchluessel(b.pos))}"
+              data-mengeart="${esc(a.art)}" data-mengewert="${a.menge}"
+              data-mengemarke="${esc(a.marke||'')}"
+              data-mengekurs="${b.kurs!=null?b.kurs:''}">${
+        a.art==='nachlegen' ? 'Gekauft — ins Depot übernehmen'
+                            : (a.art==='raus' ? 'Verkauft — Position schliessen'
+                                              : 'Verkauft — Menge anpassen')}</button></p>` : '';
   return `<div class="note-box ${farbe}" style="margin:10px 0 0">
-    <span class="nt">${a.art==='halten'?'Was jetzt zu tun ist':'HANDELN · '+AKTION_WORT[a.art]}</span>
+    <span class="nt">Was jetzt zu tun ist · ${esc(AKTION_WORT[a.art])}</span>
     <p style="font-size:14.5px;margin:0 0 4px"><strong>${esc(a.titel)}</strong></p>
     <p style="margin:0">${esc(a.text)}</p>${zahl}
-    ${a.art!=='halten'?`<p style="margin:8px 0 0;font-size:11.5px;color:var(--ink-3)">
+    ${marken?`<div class="kpi" style="margin-top:6px">${marken}</div>`:''}${knopf}
+    <p style="margin:8px 0 0;font-size:11.5px;color:var(--ink-3)">
       Vorschlag mit Begründung, keine Anweisung — und nichts passiert automatisch.
-      Die Stückzahl ist gerechnet, nicht geschätzt.</p>`:''}
+      Die Stückzahl ist gerechnet, nicht geschätzt.</p>
   </div>`;
+}
+
+/* EIN Kasten je Position für die Frage „was tun?". Vorher standen drei untereinander —
+   „Was jetzt zu tun ist" (Aktion), „Was das System dazu sagt", und nochmal „Was jetzt zu
+   tun ist" (Ausstiegsplan) —, oft mit zwei verschiedenen Überschriften für dieselbe
+   Lage („Halten — nichts zu tun" über „Halten — Stop steht"). */
+function entscheidungsKasten(b, stand){
+  const a = positionsAktion(b, stand);
+  if (!a || a.art === 'halten') return ausstiegsKasten(b, a);
+  const hatPlan = b.pos.plan && b.pos.plan.stop != null;
+  return aktionsKasten(b, stand, a) + (hatPlan ? '' : ausstiegsKasten(b, null));
 }
 
 function ratKasten(b){
   const rat = positionsRat(b);
   const farbe = rat.stufe === 'bad' ? 'bad' : (rat.stufe === 'warn' ? 'warn' : '');
   return `<div class="note-box ${farbe}" style="margin:10px 0 0">
-    <span class="nt">Was das System dazu sagt</span>
-    <p style="font-size:14px;margin:0 0 4px"><strong>${esc(rat.kopf)}</strong></p>
+    <span class="nt">Warum · ${esc(rat.kopf)}</span>
     ${rat.saetze.map(x=>`<p style="margin:0 0 4px">${esc(x)}</p>`).join('')}</div>`;
+}
+
+/* Alles, was man nachlesen kann, aber nicht jeden Tag lesen muss. Bleibt beim
+   Neuzeichnen (alle 5 s) offen, wenn es offen war. */
+const MEHR_OFFEN = new Set();
+function mehrKasten(b){
+  const r = b.row;
+  const rat = positionsRat(b);
+  const teile = [];
+  if (r){
+    const d = digits(b.kurs||1);
+    teile.push(`<div class="zt" style="margin-top:6px">
+      <span>Score <b>${r.score.toFixed(0)}</b></span>
+      <span>Note <b>${esc(r.note)}</b></span>
+      ${r.ziel!=null?`<span>Setup-Ziel <b>${num(r.ziel,d)}</b></span>`:''}
+      ${r.invalidierung!=null?`<span>Setup-Stop <b>${num(r.invalidierung,d)}</b></span>`:''}
+    </div>`);
+    if (r.headline) teile.push(`<p style="margin:6px 0 0">Chart: ${esc(r.headline)}</p>`);
+  }
+  for (const x of (rat.mehr || [])) teile.push(`<p style="margin:6px 0 0">${esc(x)}</p>`);
+  const pl = b.pos.plan || {};
+  if (pl.art === 'halte'){
+    teile.push(`<p style="margin:6px 0 0">Halte-Stop (5× Tagesschwankung unter dem
+      22-Tage-Hoch): eine Versicherung gegen den Absturz, kein Renditebringer. Gemessen
+      (Studie 27.09.) hat er die schlimmsten Verläufe bei Coins etwa halbiert, in
+      Aufwärtsphasen aber Rendite gekostet. Er wird nur nachgezogen, nie gelockert. Nach
+      einem Stop kommt der Wert auf die Wiedereinstiegs-Liste.</p>`);
+  }
+  if (!teile.length) return '';
+  const key = posSchluessel(b.pos);
+  return `<details class="mehr" data-mehr="${esc(key)}"${MEHR_OFFEN.has(key)?' open':''}>
+    <summary>Mehr zur Analyse</summary>${teile.join('')}</details>`;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════
@@ -4550,7 +4772,7 @@ function glKasten(stand){
             x.zusammenhalt != null ? esc(glText(x.zusammenhalt)) + ' (' +
             x.zusammenhalt.toFixed(2).replace('.',',') + ')' : ''}</span></h3>
         <div class="kpi" style="margin-top:6px">${x.mitglieder.map(m=>
-          `<span>${esc(posName(m.b))}${m.hebel>1?` <b>${m.hebel.toFixed(m.hebel<10?1:0)}×</b>`:''}
+          `<span>${esc(posName(m.b))}${m.hebel>1?` <b>${m.hebel.toFixed(m.hebel<10?1:0).replace('.',',')}×</b>`:''}
            <b>${num(m.markt,0)} €</b></span>`).join('')}</div>
         <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Diese ${
           x.mitglieder.length} Positionen bewegen sich gemeinsam. Für dein Ergebnis
@@ -4565,7 +4787,7 @@ function glKasten(stand){
       return `<div class="karte ${x.anteil>35?'bad':'warn'}" style="margin-bottom:8px">
         <h3>Einzelwette · ${proz(x.anteil)} % des bewegten Marktes
           <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">${
-            esc(posName(m.b))}${m.hebel>1?` · ${m.hebel.toFixed(m.hebel<10?1:0)}×`:''}</span></h3>
+            esc(posName(m.b))}${m.hebel>1?` · ${m.hebel.toFixed(m.hebel<10?1:0).replace('.',',')}×`:''}</span></h3>
         <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Dieser eine Wert
           bewegt ${num(x.markt,0)} € und läuft zu keinem anderen Posten messbar parallel.
           Eigenständig heisst hier aber nicht ungefährlich: er ist gross genug, um allein
@@ -4785,11 +5007,12 @@ function zeichnePortfolio(){
         ${(a.menge!=null)?`<div class="kpi" style="margin-top:6px">
           <span>${a.art==='nachlegen'?'kaufen':'verkaufen'} <b>${num(a.menge, a.menge<1?6:4)}</b></span>
           <span>≈ <b>${num(a.euro,2)} €</b></span>
-          <span>Anteil <b>${a.anteil!=null?a.anteil.toFixed(1)+' %':'—'}</b></span></div>`:''}
+          <span>Anteil <b>${a.anteil!=null?pctK(a.anteil):'—'}</b></span></div>`:''}
         <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(a.text)}</p>
         ${(a.menge!=null && b.pos.menge)?`<p style="margin:9px 0 0">
           <button class="btn" data-mengeschl="${esc(posSchluessel(b.pos))}"
                   data-mengeart="${esc(a.art)}" data-mengewert="${a.menge}"
+                  data-mengemarke="${esc(a.marke||'')}"
                   data-mengekurs="${b.kurs!=null?b.kurs:''}">${
             a.art==='nachlegen' ? 'Gekauft — ins Depot übernehmen'
                                 : (a.art==='raus' ? 'Verkauft — Position schliessen'
@@ -4800,8 +5023,9 @@ function zeichnePortfolio(){
     }).join('')
     : `<div class="karte gut"><h3>Nichts zu tun</h3>
        <p style="margin:4px 0 0;font-size:13px">Keine Position verlangt gerade eine Handlung.
-       Kein Stop gerissen, kein Ziel erreicht, kein Schlusslicht, kein Klumpen — und nichts,
-       wo sich Nachlegen rechnen würde. Nichtstun ist hier das Ergebnis, nicht die Lücke.</p></div>`;
+       Kein Stop gerissen, kein Ziel erreicht, kein Knock-out, der jetzt Handeln verlangt — und nichts,
+       wo sich Nachlegen rechnen würde. Die Stops stehen und werden nachgezogen; Nichtstun
+       ist hier das Ergebnis, nicht die Lücke.</p></div>`;
 
     h += glKasten(stand);
 
@@ -4856,19 +5080,11 @@ function zeichnePortfolio(){
           ${b.r!=null?`<span>R <b class="${b.r>=0?'up':'dn'}">${b.r.toFixed(2)}R</b></span>`:''}
         </div>
         ${zahlenHinweis(b)}
-        ${r?`<div class="zt">
-          <span>Score <b>${r.score.toFixed(0)}</b></span>
-          <span>Note <b>${esc(r.note)}</b></span>
-          ${r.ziel!=null?`<span>TP1 <b>${num(r.ziel,d)}</b></span>`:''}
-          ${r.tp2!=null?`<span>TP2 <b>${num(r.tp2,d)}</b></span>`:''}
-          ${r.invalidierung!=null?`<span>Stop <b>${num(r.invalidierung,d)}</b></span>`:''}
-        </div>
-        <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.headline||'')}</p>`
-        : basisKasten(b)}
+        ${r ? '' : basisKasten(b)}
         ${hebelKasten(b)}
-        ${aktionsKasten(b, stand)}
+        ${entscheidungsKasten(b, stand)}
         ${ratKasten(b)}
-        ${ausstiegsKasten(b)}
+        ${mehrKasten(b)}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
           ${r?` · <button class="link" data-zeig="${esc(r.instrument)}">Chart ansehen</button>`:''}
           ${(!r && b.basis && b.basis.sym)?` · <button class="link" data-zeig="${esc(b.basis.sym)}">Basiswert im Chart</button>`:''}</p>
@@ -4890,11 +5106,11 @@ function zeichnePortfolio(){
                            .sort((a,b)=>a.halt.rs - b.halt.rs)[0];
     if (beste && nachzuegler && beste.instrument !== nachzuegler.row?.instrument){
       h += `<div class="note-box warn"><span class="nt">Kapital könnte besser stehen</span>
-        <p><strong>${esc(name(nachzuegler.pos.sym))}</strong> ist das Schlusslicht deiner
+        <p><strong>${esc(posName(nachzuegler))}</strong> ist das Schlusslicht deiner
         ${nachzuegler.row?.klasse === 'aktien' ? 'Aktien' : 'Coins'} — schwächer als
         ${(100-nachzuegler.halt.rs).toFixed(0)} % der Klasse. Gleichzeitig hat
         <strong>${esc(name(beste.instrument))}</strong> ein handelbares Setup
-        (Score ${beste.score.toFixed(0)}, Note ${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+pct(beste.erwartete_bewegung_pct,1):''}).</p>
+        (Score ${beste.score.toFixed(0)}, Note ${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+bewegungText(beste):''}).</p>
         <p>Das ist ein Hinweis, keine Anweisung — und nichts wird automatisch umgeschichtet.
         Schlusslicht zu sein ist allein kein Verkaufsgrund (gemessen liefen Schlusslichter danach
         nicht schlechter als ihre Klasse). Wenn du aber Kapital für das Setup brauchst, ist das
@@ -4951,6 +5167,9 @@ function zeichnePortfolio(){
 
   $('portfolio').innerHTML = h;
   fuelleWaechter($('pf_waechter'));
+  $('portfolio').querySelectorAll('details[data-mehr]').forEach(d=>d.addEventListener('toggle',()=>{
+    if (d.open) MEHR_OFFEN.add(d.dataset.mehr); else MEHR_OFFEN.delete(d.dataset.mehr);
+  }));
   $('portfolio').querySelectorAll('[data-weg]').forEach(b=>b.addEventListener('click',()=>{
     speicherePositionen(ladePositionen().filter(p=>p.sym!==b.dataset.weg)); zeichnePortfolio();
   }));
@@ -5029,6 +5248,11 @@ function zeichnePortfolio(){
         pos.menge = rest;
         // Nach einem Teilverkauf ist der alte Plan nicht falsch, aber der Stop gehoert
         // neu geprueft — das macht stopsPflegen beim naechsten Zeichnen von selbst.
+        // Die Regel, die den Teilverkauf verlangt hat, ist damit erledigt — sonst kaeme
+        // derselbe Rat auf die Restmenge sofort wieder (bei TP1 rueckt so auch der Stop
+        // auf den Einstieg).
+        const marke = btn.dataset.mengemarke;
+        if (marke) pos.erledigt = Array.from(new Set([...(pos.erledigt||[]), marke]));
       }
     }
     speicherePositionen(a);
@@ -5491,7 +5715,7 @@ function signalKarte(x){
     <div class="kpi">
       ${x.kurs!=null?`<span>Kurs <b>${num(x.kurs,d)}</b>${x.live?' <span class="up">live</span>':''}</span>`:''}
       ${(()=>{ const c = crvVon(o); return c!=null?`<span>CRV <b>1:${c.toFixed(1)}</b></span>`:''; })()}
-      ${o.erwartete_bewegung_pct!=null?`<span>Erwartet <b class="${o.erwartete_bewegung_pct>=0?'up':'dn'}">${pct(o.erwartete_bewegung_pct,1)}</b></span>`:''}
+      ${bewegungSpan(o)}
       ${x.r!=null&&(x.stufe==='im_trade'||x.stufe==='stop')?`<span>Stand <b class="${x.r>=0?'up':'dn'}">${x.r>=0?'+':''}${x.r.toFixed(2)}R</b></span>`:''}
       ${(w.erreicht||[]).length?`<span>erreicht <b>${w.erreicht.join(', ')}</b></span>`:''}
     </div>
@@ -6282,7 +6506,7 @@ function lokaleAntwort(frage){
       + 'oder benutz den Knopf „Gekauft — ins Depot" auf einer Signalkarte.';
     return pos.map(p=>{
       const b = bewertePosition(p);
-      const schritt = naechsterSchritt(p, planKurs(b));
+      const schritt = naechsterSchritt(p, planKurs(b), b.w);
       return `**${name(p.sym)}** — ${schritt ? schritt.titel + ': ' + schritt.text : 'kein Ausstiegsplan hinterlegt'}`;
     }).join('\n\n');
   }
@@ -6317,7 +6541,7 @@ function lokaleAntwort(frage){
         + 'sagt die App bei jedem Kurs, was als Nächstes zu tun ist — halten, Teilverkauf oder raus.';
       return pos.map(p => {
         const b = bewertePosition(p);
-        const sch = naechsterSchritt(p, planKurs(b));
+        const sch = naechsterSchritt(p, planKurs(b), b.w);
         return `**${name(p.sym)}** — ${sch ? sch.titel + ': ' + sch.text : 'kein Ausstiegsplan hinterlegt'}`;
       }).join('\n\n');
     }],
@@ -6923,6 +7147,7 @@ function start(){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
 }
+umlauteBeobachten();
 start();
 </script>
 </body>
