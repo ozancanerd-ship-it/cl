@@ -57,6 +57,14 @@ STABLECOINS = frozenset(
         "EURI",
         "GBP",
         "AEUR",
+        # 29.09.: diese vier G10-Fiat-Waehrungen fehlten hier, obwohl deutlich exotischere
+        # (NGN, UAH, IDRT …) schon drin waren. Folge: "AUDUSD" — der ganz normale Fiat-Kurs
+        # von Kraken, kein Coin — lief als "Krypto-Chance" mit, mit Score nahe 0 (reines
+        # Rauschen um den Wechselkurs) und zog die Krypto-Statistik nach unten.
+        "AUD",
+        "CAD",
+        "CHF",
+        "NZD",
         "TRY",
         "BRL",
         "ARS",
