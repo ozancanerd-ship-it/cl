@@ -4290,22 +4290,20 @@ function positionsAktion(b, stand){
   })();
   const inSchonfrist = schonfristEnde != null && Date.now() < schonfristEnde;
 
-  /* 3 — die eigene Analyse zeigt in die Gegenrichtung.
+  /* 3 — die eigene Analyse zeigt in die Gegenrichtung: seit 30.09. ein Hinweis, kein
+     Teilverkauf mehr.
 
-     Mit zwei Bedingungen, die beim Test am echten Depot dazukamen: das Short-Setup muss
-     die Qualitätsschwelle bestehen (sonst reicht irgendein schwaches Gegenbild, um eine
-     laufende Position zu halbieren), und der Wert darf nicht zu den stärkeren seiner
-     Klasse gehören. Sonst hätte Solana bei +26 % und relativer Stärke 59 halbiert werden
-     sollen, nur weil der Scanner kurzfristig nach unten zeigt. Ein Setup ist eine Aussage
-     über die nächsten Tage; eine Position, die über Wochen trägt, wirft man dafür nicht weg. */
-  if (!inSchonfrist && !schonErledigt.has('gegen') && r && r.richtung === 'short' && r.handelbar
-      && (rs == null || rs < RS_MITTE)){
-    return {...teil(0.5, 'Die Analyse sieht hier gerade ein handelbares Setup nach UNTEN, du '
-      + `hältst long — und der Wert gehört auch nicht zu den stärkeren seiner Klasse `
-      + `(relative Stärke ${rs != null ? rs.toFixed(0) : '—'}). Das ist kein Verkaufsbefehl, `
-      + 'aber der Moment, die Position zu halbieren statt sie auszusitzen.',
-      'teilverkauf', true, 'Gegen die These — Hälfte verkaufen'), marke:'gegen'};
-  }
+     Bis dahin riet die App hier „Hälfte verkaufen" (Long gehalten, handelbares Short-Setup,
+     relative Stärke unter der Mitte). Die Regel wurde vorab registriert geprüft
+     (docs/GEGENTHESE-STUDIE-2026-09.md, 24 Coins, 19 Monate): in genau dieser Lage liefen
+     die Coins in den 7 Tagen danach IS 1,4 Prozentpunkte BESSER als ihre Klasse, OOS nur
+     0,3 Punkte schlechter — verlangt war mindestens 1,0 Punkte schlechter in beiden Hälften.
+     Ein Teilverkauf ohne gemessenen Vorteil kostet nur Gebühr, Spread und Steuer. Verkauft
+     wird über den Stop oder eine gedrehte Analyse der eigenen Position. */
+  const gegenHinweis = (r && r.richtung === 'short' && r.handelbar && (rs == null || rs < RS_MITTE))
+    ? ' Die Analyse zeigt gerade ein Setup nach unten — gemessen ist das kein Grund, Teile zu '
+      + 'verkaufen (solche Lagen liefen danach nicht schlechter als die Klasse). Der Stop entscheidet.'
+    : '';
 
   /* 4 — Schlusslicht der eigenen Klasse: bis 27.09. „ein Drittel verkaufen". Nachgemessen
      hielt die Begründung nicht (Schlusslichter liefen danach nicht schlechter als ihre
@@ -4389,7 +4387,7 @@ function positionsAktion(b, stand){
   }
   return {...basis, art:'halten', dringend:false, hinweis, titel:'Halten — nichts zu tun',
     text:(rs != null ? `Relative Stärke ${rs.toFixed(0)} von 100, kein Anlass zu handeln.`
-        : 'Kein Anlass zu handeln.') + schlusslicht + wohin};
+        : 'Kein Anlass zu handeln.') + gegenHinweis + schlusslicht + wohin};
 }
 
 const AKTION_FARBE = {raus:'bad', teilverkauf:'warn', trimmen:'warn', nachlegen:'', halten:''};
