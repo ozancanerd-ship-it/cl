@@ -258,6 +258,33 @@ def _euro(w: Wache, v: float | None) -> str:
     return f"≈ {e:,.{n}f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def short_hinweis(w: Wache) -> str:
+    """Wie ein Short bei Ozans Handelsplaetzen ueberhaupt geht — steht im Alarm, nicht im Kopf.
+
+    30.09.: die drei Alarme, die gerade klingelten, waren alle Aktien-Shorts mit „Short
+    bei: Trade Republic". Trade Republic verkauft aber keine Aktie leer; ein Short geht
+    dort nur ueber einen Short-Schein (Knock-out/Turbo). Und bei Coins geht ein Short
+    nicht im Spotmarkt, sondern nur ueber einen Terminkontrakt. Ohne diesen Satz ist der
+    Alarm eine Anweisung, die man so gar nicht ausfuehren kann.
+    """
+    if w.long:
+        return ""
+    if w.klasse == "aktien":
+        return (
+            "So geht der Short: bei Trade Republic nur ueber einen Short-Schein "
+            f"(Knock-out/Turbo). Knock-out-Schwelle UEBER dem Stop ({_fmt(w.stop)}) waehlen, "
+            "sonst ist der Schein weg, bevor der Plan greift. Der Hebel steckt im Schein — "
+            "Einsatz entsprechend kleiner."
+        )
+    if w.klasse == "krypto":
+        return (
+            "So geht der Short: nicht im Spotmarkt, nur ueber einen Terminkontrakt "
+            "(Bybit Perpetual, USDT). Ohne Hebel bzw. mit 1x handeln, dann entspricht das "
+            "Risiko dem Plan."
+        )
+    return ""
+
+
 def einstieg_text(
     w: Wache, *, kurs: float | None = None, bestaetigt: str = "", warum: str = "", bilanz: str = ""
 ) -> str:
@@ -276,6 +303,9 @@ def einstieg_text(
     ]
     if w.broker:
         z.append(f"{'Kaufen' if w.long else 'Short'} bei: {w.broker}")
+    hinweis = short_hinweis(w)
+    if hinweis:
+        z.append(hinweis)
     z.append(
         f"Einstieg  {_fmt(w.einstieg)} {_euro(w, w.einstieg)}".rstrip()
         + (f"   · Kurs jetzt {_fmt(kurs)}" if kurs else "")
