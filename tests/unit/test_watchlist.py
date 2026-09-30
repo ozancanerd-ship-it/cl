@@ -331,3 +331,50 @@ def test_laufender_trade_behaelt_seinen_plan() -> None:
     assert ev == []
     assert w.wachen["BTCUSDT"].einstieg == 100.0
     assert w.wachen["BTCUSDT"].stop == 90.0
+
+
+# ------------------------------------------------------------------ Short ausfuehrbar
+
+
+def _wache_mit(klasse: str, richtung: str):
+    from trading_agent.scanner.watchlist import Wache
+
+    return Wache(
+        instrument="AXP" if klasse == "aktien" else "SOLUSD",
+        klasse=klasse,
+        richtung=richtung,
+        note="A",
+        einstieg=100.0,
+        einstieg_art="sofort",
+        stop=104.0 if richtung == "short" else 96.0,
+        tp1=95.0 if richtung == "short" else 105.0,
+        tp2=None,
+        tp3=None,
+        score=70.0,
+        rr=2.0,
+        erwartet_pct=5.0,
+        broker="Trade Republic" if klasse == "aktien" else "Bybit (USDT)",
+    )
+
+
+def test_aktien_short_sagt_wie_er_bei_trade_republic_geht() -> None:
+    """30.09.: alle Alarme waren Aktien-Shorts „bei Trade Republic" — dort geht Short nur
+    ueber einen Schein. Der Alarm muss das sagen, samt Knock-out-Schwelle ueber dem Stop."""
+    from trading_agent.scanner.watchlist import einstieg_text
+
+    t = einstieg_text(_wache_mit("aktien", "short"))
+    assert "Short-Schein" in t
+    assert "UEBER dem Stop" in t
+
+
+def test_krypto_short_nur_ueber_terminkontrakt() -> None:
+    from trading_agent.scanner.watchlist import einstieg_text
+
+    assert "Terminkontrakt" in einstieg_text(_wache_mit("krypto", "short"))
+
+
+def test_long_bekommt_keinen_short_hinweis() -> None:
+    from trading_agent.scanner.watchlist import einstieg_text
+
+    for kl in ("aktien", "krypto"):
+        assert "So geht der Short" not in einstieg_text(_wache_mit(kl, "long"))
