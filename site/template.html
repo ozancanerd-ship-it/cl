@@ -582,6 +582,8 @@ a{color:var(--accent); text-underline-offset:3px}
 @keyframes polar{to{transform:rotate(1turn)}}
 @media (prefers-reduced-motion:reduce){.hero::after{animation:none}}
 .hero-t{font-size:25px}
+.hero-short{margin:8px 0 10px;font-size:12.5px;line-height:1.45;color:var(--ink-2);background:var(--sunk);border:1px solid var(--rule);border-radius:10px;padding:7px 10px}
+.hero-short b{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -1781,7 +1783,8 @@ function topSignal(){
     return 0; });
   const x = kand[0], w = x.w, o = x.o || {}, d = digits(w.einstieg);
   const torGrund = !klingelt(x) && o.alarm && o.alarm.ja === false ? (o.alarm.grund || '') : '';
-  const seite = x.lang ? 'KAUFEN' : 'VERKAUFEN';
+  // Verkaufen klingt nach: das, was du hast, abstossen. Ein neuer Short ist etwas anderes.
+  const seite = x.lang ? 'KAUFEN' : 'SHORT';
   /* Hier stand ``x.stufe === 'jetzt' || x.stufe === 'im_trade'`` — und damit las eine
      laufende Position wie eine Kaufaufforderung. Auf Ozans Bildschirm stand oben
      „BNB KAUFEN — JETZT, Einstieg 720,15" und zwei Zeilen tiefer in derselben Liste
@@ -1820,6 +1823,9 @@ function topSignal(){
       Einstiegsvorschlag zu demselben Wert kann andere Zahlen haben; er steht im Markt
       in der Zeile zu diesem Wert.</p>`:''}
     ${torGrund?`<p class="hero-tor"><b>Kein Handy-Alarm</b> — ${esc(torGrund)}</p>`:''}
+    ${!x.lang && !laeuft ? `<p class="hero-short">${o.klasse==='aktien'
+      ? `<b>So geht der Short:</b> bei Trade Republic nur über einen Short-Schein (Knock-out). Knock-out-Schwelle <b>über</b> dem Stop (${num(w.stop,d)}) wählen — der Hebel steckt im Schein, Einsatz entsprechend kleiner.`
+      : `<b>So geht der Short:</b> nicht im Spotmarkt, nur über einen Terminkontrakt (Bybit Perpetual, 1×).`}</p>` : ''}
     ${st?`<p class="hero-these">${esc(st.these)}</p>`:''}
     <div class="zt" style="border-top:0;padding-top:0">
       <span>Einstieg <b>${num(w.einstieg,d)}</b></span>
