@@ -68,3 +68,43 @@ Eine Regel wird in den Live-Betrieb übernommen, wenn **alle** Punkte erfüllt s
 
 Hält eine Regel nur in IS, wird sie **nicht** übernommen — auch wenn sie dort glänzt. Wird
 keine Regel übernommen, bleibt es beim Alarm-Tor vom 26.09.; das ist dann das Ergebnis.
+
+---
+
+## Ergebnis (30.09.2026)
+
+Phase A (24 Coins × 1 705 Bewertungszeitpunkte), Phase B (1 009 Wachen) und Phase C
+gerechnet, Regeln unverändert wie oben. Erwartungswert je Trade in R nach Kosten:
+
+| Filter | Ausstieg | IS n | IS E | OOS n | OOS E | OOS 90 % |
+|---|---|---:|---:|---:|---:|---|
+| F0 alle | X0 Plan | 338 | −0,047 | 295 | −0,030 | −0,14 … +0,08 |
+| F0 alle | X1 ganz | 328 | −0,062 | 287 | −0,001 | −0,16 … +0,16 |
+| F1 Tor fest | X0 Plan | 76 | +0,002 | 41 | **−0,195** | −0,51 … +0,14 |
+| F1 Tor fest | X1 ganz | 74 | +0,004 | 41 | −0,085 | −0,52 … +0,38 |
+| F2 Tor + Bilanz | X0 Plan | 45 | −0,121 | 30 | −0,321 | −0,68 … +0,08 |
+| F3 Tor + BTC-Lage | X0 Plan | 63 | −0,021 | 33 | −0,319 | −0,67 … +0,04 |
+| F4 Tor + eigener Trend | X0 Plan | 71 | +0,011 | 39 | −0,277 | −0,59 … +0,06 |
+| F5 Tor + RS | X0 Plan | 57 | +0,032 | 35 | −0,155 | −0,52 … +0,22 |
+| F6 Tor + nur Long | X0 Plan | 47 | −0,120 | 5 | −0,163 | — |
+
+**Urteil nach der Regel: keine Regel wird übernommen.** Keine Variante hat in OOS einen
+Erwartungswert über null; X1 ist in IS schlechter als X0. Es bleibt beim Alarm-Tor vom 26.09.
+
+### Was das heißt — ohne Beschönigung
+
+Der Struktur-Scanner, genau so wie er live läuft, liegt über 19 Monate und 24 Coins bei
+**etwa null R je Trade nach Kosten**. Das Alarm-Tor (F1) ist in OOS nicht besser als alle
+Trades zusammen (F0), sondern schlechter — die Spanne ist allerdings so breit, dass auch
+das Rauschen sein kann. Keiner der vorab festgelegten Zusatzfilter dreht das Ergebnis.
+
+Die gute Live-Bilanz der Krypto-Signale seit 13.09. (30 Trades, +12 R) ist damit ein
+einzelner Marktabschnitt, kein Beleg. Die Replay-Zahlen sind der größere und ältere Test.
+
+### Nur zur Einordnung (nachträglich angeschaut, entscheidet nichts)
+
+- Shorts: IS −0,087 R, OOS −0,087 R (n = 147 / 180). Longs: IS −0,017, OOS +0,060.
+- „Rücksetzer im Trend": IS −0,286, OOS −0,106 (n = 41 / 31) — in beiden Hälften die
+  schwächste Setup-Art. „Ausbruch aus der Basis": ≈ 0 in beiden Hälften.
+- Diese Zahlen sind aus denselben Daten ausgewählt, auf denen sie gut oder schlecht
+  aussehen. Wer daraus eine Regel macht, muss sie vorab registrieren und vorwärts prüfen.

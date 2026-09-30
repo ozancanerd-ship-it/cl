@@ -34,3 +34,21 @@ Die Regel bleibt nur, wenn die Lage „gegen die These" nach 7 Tagen **in IS und
 mindestens **1,0 Prozentpunkte** schlechter lief als die Klasse, bei mindestens 20 Fällen
 je Hälfte. Sonst fällt der automatische Teilverkaufs-Rat weg; der Hinweis auf das
 Gegen-Setup bleibt als Beobachtung stehen.
+
+---
+
+## Ergebnis (30.09.2026)
+
+`python3 scripts/gegenthese_studie.py` auf den vollständigen Scan-Zeilen der Signal-Studie.
+
+| Hälfte | Fälle | nach 7 Tagen, relativ zur Klasse (Mittel) | Median | Anteil schlechter |
+|---|---:|---:|---:|---:|
+| IS | 108 | **+1,38 Pp** (besser, nicht schlechter) | −0,29 Pp | 55 % |
+| OOS | 123 | **−0,32 Pp** | −0,65 Pp | 53 % |
+
+Nach 14 Tagen: IS +1,81 Pp, OOS −0,37 Pp.
+
+**Urteil nach der Regel: die Regel fällt.** Verlangt waren mindestens 1,0 Prozentpunkte
+schlechter in beiden Hälften; in IS lief die Lage sogar besser als die Klasse. Der Rat
+„Gegen die These — Hälfte verkaufen" ist aus dem Depot entfernt. Der Hinweis auf das
+Gegen-Setup bleibt als Satz in der Halte-Empfehlung stehen, ohne Stückzahl und ohne Alarm.
