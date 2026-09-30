@@ -740,6 +740,12 @@ class Wachliste:
         return ereignisse
 
     def _haltbarkeit(self, w: Wache, jetzt: datetime) -> list[Ereignis]:
+        # Nur ein Setup, das noch auf seinen Einstieg WARTET, kann ablaufen. Bis 30.09. lief
+        # diese Pruefung auch fuer laufende Trades, sobald ein Lauf keinen Kurs hatte — eine
+        # Aktie, die zehn Tage nach der Aufnahme am Wochenende ohne Kurs dastand, wurde
+        # mitten im Trade mit 0 R beendet, samt der Meldung, der Einstieg sei nie erreicht.
+        if w.zustand != Zustand.WARTET.value:
+            return []
         try:
             seit = datetime.fromisoformat(w.aufgenommen)
         except ValueError:

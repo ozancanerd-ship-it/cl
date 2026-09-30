@@ -77,6 +77,43 @@ class Ergebnis:
     #: vergangen sind. ``None``, wenn eine der beiden Zeiten fehlt.
     begonnen: str = ""
     dauer_h: float | None = None
+    #: Wurde der Einstieg ueberhaupt ausgeloest? Ein Setup, das seinen Einstieg nie
+    #: erreicht hat, ist kein Trade — es hat kein Geld gekostet und keines gebracht.
+    eingestiegen: bool = True
+    #: Ging der Einstieg aufs Telefon (Alarm-Tor offen)? Nur diese Trades hat Ozan
+    #: tatsaechlich gesehen.
+    gemeldet: bool = False
+    #: Eingestiegen, aber ohne bekannten Ausgang beendet — die Wache wurde geschlossen,
+    #: weil es keinen Kurs mehr gab (bis 27.09. jedes Wochenende bei Aktien). Das Ergebnis
+    #: ist unbekannt; es als 0 R zu buchen, waere eine erfundene Zahl.
+    ohne_ergebnis: bool = False
+
+    @property
+    def gezaehlt(self) -> bool:
+        return self.eingestiegen and not self.ohne_ergebnis
+
+
+def _r_bei(w: dict[str, Any], kurs: float) -> float | None:
+    """R beim Kurs ``kurs`` — ab dem echten Einstiegskurs, gemessen am urspruenglichen Stop."""
+    try:
+        einstieg = float(w["einstieg"])
+        stop = float(w["stop"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    risiko = abs(einstieg - stop)
+    if risiko <= 0:
+        return None
+    basis = float(w.get("einstiegskurs") or einstieg)
+    weg = (kurs - basis) if str(w.get("richtung") or "long") == "long" else (basis - kurs)
+    return weg / risiko
+
+
+def _ist_eingestiegen(w: dict[str, Any], zustand: str, erreicht: tuple[str, ...]) -> bool:
+    """Aeltere Eintraege haben keinen Einstiegskurs — Stop und Ziele gibt es aber nur
+    nach einem Einstieg, also zaehlen sie ebenfalls."""
+    return (
+        w.get("einstiegskurs") is not None or zustand in ("stop", "ziel_erreicht") or bool(erreicht)
+    )
 
 
 def _r_ganz(zustand: str, erreicht: tuple[str, ...], mfe: float) -> float:
@@ -178,6 +215,27 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
         mfe = float(w.get("bestes_r") or 0.0)
         begonnen = str(w.get("aufgenommen") or "")
         beendet = str(w.get("zuletzt") or "")
+        r_ganz = _r_ganz(zustand, erreicht, mfe)
+        r_drittel = _r_drittel(zustand, erreicht, raus_e)
+        # Ausstieg auf gedrehte Analyse: der Kurs beim Ausstieg steht in der Wache. Bis
+        # 30.09. wurde er ignoriert und der Trade pauschal mit 0 R gebucht — mal zu gut
+        # (TAO -0,59 R), mal zu schlecht (DASH +1,13 R). Jetzt der echte Kurs, wo es ihn gibt.
+        if zustand == "invalidiert" and w.get("ausstiegskurs") is not None:
+            r_aus = _r_bei(w, float(w["ausstiegskurs"]))
+            if r_aus is not None:
+                r_ganz = r_aus
+                if raus_e is None:
+                    teil = 1.0 / 3.0
+                    getroffen = [t for t in ("TP1", "TP2", "TP3") if t in erreicht]
+                    # Nach Ziel 1 steht der Schutz-Stop auf Einstand, nach Ziel 2 auf Ziel 1 —
+                    # tiefer kann der Rest laut Plan nicht rausgehen.
+                    boden = ZIEL_R["TP1"] if "TP2" in getroffen else 0.0
+                    rest_r = max(r_aus, boden) if getroffen else r_aus
+                    r_drittel = (
+                        sum(teil * ZIEL_R[t] for t in getroffen)
+                        + (1.0 - teil * len(getroffen)) * rest_r
+                    )
+        eingestiegen = _ist_eingestiegen(w, zustand, erreicht)
         aus.append(
             Ergebnis(
                 instrument=str(w.get("instrument") or "?"),
@@ -189,10 +247,13 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
                 mfe=mfe,
                 mae=float(w.get("schlechtestes_r") or 0.0),
                 beendet=beendet,
-                r_ganz=_r_ganz(zustand, erreicht, mfe),
-                r_drittel=_r_drittel(zustand, erreicht, raus_e),
+                r_ganz=r_ganz,
+                r_drittel=r_drittel,
                 begonnen=begonnen,
                 dauer_h=_stunden(begonnen, beendet),
+                eingestiegen=eingestiegen,
+                gemeldet=bool(w.get("gemeldet")),
+                ohne_ergebnis=eingestiegen and zustand == "abgelaufen" and raus_e is None,
             )
         )
     aus.sort(key=lambda e: e.beendet)
@@ -298,6 +359,13 @@ class Bericht:
     #: auf einzelne Fälle zurückführen kann, glaubt man oder nicht — mehr nicht.
     trades: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     saetze: tuple[str, ...] = field(default_factory=tuple)
+    #: Getrennt nach dem, was Ozan wirklich gesehen hat: Einstieg aufs Telefon oder nur in
+    #: der App. Drittel-Regel, weil das der Plan im Alarm ist.
+    je_meldung: dict[str, Kennzahlen] = field(default_factory=dict)
+    #: Setups, die ihren Einstieg nie erreicht haben — kein Trade, nicht mitgezaehlt.
+    nicht_ausgeloest: int = 0
+    #: Eingestiegen, aber ohne bekannten Ausgang beendet (Kursausfall) — nicht mitgezaehlt.
+    ohne_ergebnis: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -314,6 +382,9 @@ class Bericht:
             "dauer": dict(self.dauer),
             "trades": [dict(t) for t in self.trades],
             "saetze": list(self.saetze),
+            "je_meldung": {k: v.as_dict() for k, v in self.je_meldung.items()},
+            "nicht_ausgeloest": self.nicht_ausgeloest,
+            "ohne_ergebnis": self.ohne_ergebnis,
         }
 
 
@@ -358,12 +429,20 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
         )
 
     if drittel is not None and abs(drittel.summe_r - ganz.summe_r) > 0.5:
-        besser = "besser" if drittel.summe_r > ganz.summe_r else "schlechter"
-        aus.append(
-            f"Mit Teilverkauf am ersten Ziel und Stop auf Einstand wären es "
-            f"{drittel.summe_r:+.1f} R gewesen, also {besser}. Der Unterschied kommt fast "
-            "vollständig aus Trades, die kurz im Plus waren und danach voll zurückliefen."
-        )
+        if drittel.summe_r > ganz.summe_r:
+            aus.append(
+                f"Mit Teilverkauf am ersten Ziel und Stop auf Einstand wären es "
+                f"{drittel.summe_r:+.1f} R gewesen, also besser. Der Unterschied kommt fast "
+                "vollständig aus Trades, die kurz im Plus waren und danach voll zurückliefen."
+            )
+        else:
+            aus.append(
+                f"Mit Teilverkauf am ersten Ziel und Stop auf Einstand wären es "
+                f"{drittel.summe_r:+.1f} R gewesen, also weniger. Der Teilverkauf gibt Gewinn "
+                "ab, wenn Trades nach Ziel 1 bis ans letzte Ziel weiterlaufen — dafür schützt "
+                "er vor dem vollen Rücklauf. Welche Regel über mehrere Marktphasen besser ist, "
+                "klärt die Signal-Studie (X0 gegen X1)."
+            )
 
     mfe = [e.mfe for e in ergebnisse]
     nie = [e for e in ergebnisse if e.mfe < IM_PLUS_AB]
@@ -465,7 +544,12 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
     """Die vollständige Auswertung aus dem gespeicherten Wachlisten-Zustand."""
     from datetime import UTC
 
-    ergebnisse = aus_wachliste(wachliste)
+    alle = aus_wachliste(wachliste)
+    # Gezaehlt wird, was ein Trade war: eingestiegen und mit bekanntem Ausgang. Bis 30.09.
+    # standen hier auch Setups, die ihren Einstieg nie erreicht haben, und Aktien-Trades,
+    # die der Waechter am Wochenende mangels Kurs geschlossen hat — alle mit 0 R. Das hat
+    # Trefferquote und Erwartungswert verduennt, bei Aktien bis auf „0 % Treffer".
+    ergebnisse = [e for e in alle if e.gezaehlt]
     roh = (wachliste or {}).get("wachen") or {}
     offen = sum(
         1
@@ -489,6 +573,11 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
         je_note=_gruppiere(ergebnisse, lambda e: e.note),
         je_klasse=_gruppiere(ergebnisse, lambda e: e.klasse),
         je_setup=_gruppiere(ergebnisse, lambda e: e.setup),
+        je_meldung=_gruppiere(
+            ergebnisse, lambda e: "aufs_handy" if e.gemeldet else "nur_app", "drittel"
+        ),
+        nicht_ausgeloest=sum(1 for e in alle if not e.eingestiegen),
+        ohne_ergebnis=sum(1 for e in alle if e.eingestiegen and e.ohne_ergebnis),
         mfe_schnitt=(sum(mfe) / len(mfe)) if mfe else None,
         mae_schnitt=(sum(mae) / len(mae)) if mae else None,
         nie_im_plus=(sum(1 for m in mfe if m < IM_PLUS_AB) / len(mfe) if mfe else None),
@@ -508,11 +597,40 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
                 "beendet": e.beendet,
                 "begonnen": e.begonnen,
                 "dauer_h": round(e.dauer_h, 1) if e.dauer_h is not None else None,
+                "eingestiegen": e.eingestiegen,
+                "gemeldet": e.gemeldet,
+                "gezaehlt": e.gezaehlt,
             }
-            for e in reversed(ergebnisse)
+            for e in reversed(alle)
         ),
-        saetze=tuple(_saetze(ergebnisse, je_regel)),
+        saetze=tuple(_saetze(ergebnisse, je_regel) + _saetze_zaehlung(alle)),
     )
+
+
+def _saetze_zaehlung(alle: list[Ergebnis]) -> list[str]:
+    """Was NICHT mitgezaehlt wurde, und was die Handy-Alarme allein gebracht haben."""
+    aus: list[str] = []
+    nie = sum(1 for e in alle if not e.eingestiegen)
+    ausfall = [e for e in alle if e.eingestiegen and e.ohne_ergebnis]
+    if nie:
+        aus.append(
+            f"{nie} Setups haben ihren Einstieg nie erreicht — kein Trade, kein Geld im "
+            "Markt, deshalb nicht mitgezählt."
+        )
+    if ausfall:
+        namen = ", ".join(sorted({e.instrument for e in ausfall})[:8])
+        aus.append(
+            f"{len(ausfall)} Trades liefen, als der Wächter sie mangels Kurs schloss ({namen}). "
+            "Ihr Ausgang ist unbekannt — sie stehen in der Liste, zählen aber nicht."
+        )
+    handy = [e.r_drittel for e in alle if e.gezaehlt and e.gemeldet]
+    if handy:
+        s = sum(handy)
+        aus.append(
+            f"Nur die Alarme, die aufs Handy gingen: {len(handy)} Trades, zusammen "
+            f"{s:+.1f} R nach Plan ({s / len(handy):+.2f} R je Trade)."
+        )
+    return aus
 
 
 __all__ = [
