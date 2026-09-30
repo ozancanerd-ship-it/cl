@@ -521,6 +521,7 @@ a{color:var(--accent); text-underline-offset:3px}
   animation:scan 1.5s linear infinite}
 @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 
+.mini-tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.06em;padding:1px 5px;border-radius:5px;background:color-mix(in srgb,var(--long) 16%,transparent);color:var(--long);vertical-align:1px}
 </style>
 </head>
 <body>
@@ -626,6 +627,7 @@ let AKTIV_TF = 'H4';
 const DETAIL = new Map();     // Instrument -> Detaildaten
 const L = new Map();          // Instrument -> {p, pct, t}
 let WS = null, WS_OK = false, WS_TRY = 0;
+let ABONNIERT = new Set();   // Kraken-Paare, die der Livestream schon liefert
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -921,11 +923,35 @@ async function waehle(sym, wechseln = true){
 function kryptoSymbole(){
   if (!S) return [];
   const aus = [];
+  const gesehen = new Set();
+  const dazu = x => { const k = String(x||'').toUpperCase(); if (k && !gesehen.has(k)){ gesehen.add(k); aus.push(k); } };
+  /* Das eigene Depot ZUERST. Bis 30.09. wurden nur die ersten 90 Werte des Scans
+     abonniert — in der Reihenfolge des Scans. Eine Position, die dort weiter hinten
+     stand (oder gar nicht, weil der Coin gerade durch den Liquiditaetsfilter fiel), bekam
+     nie einen Livekurs und stand auf dem Stand des letzten Scans, bis zu 20 Minuten alt.
+     Genau die Kurse, auf die es am meisten ankommt. */
+  for (const d of depotKryptoSymbole()) dazu(d);
   // GROSS, nicht klein: Kraken meldet die Symbole gross zurueck, und der Livespeicher
   // wird an anderer Stelle mit dem Instrumentnamen aus dem Scan abgefragt.
-  for (const o of (S.gesamt||[])) if (o.klasse === 'krypto' || o.klasse === 'gold')
-    aus.push(String(o.instrument).toUpperCase());
+  for (const o of (S.gesamt||[])) if (o.klasse === 'krypto' || o.klasse === 'gold') dazu(o.instrument);
   return aus.slice(0, 180);
+}
+function depotKryptoSymbole(){
+  const aus = [];
+  let pos = [];
+  try { pos = ladePositionen(); } catch(e){ return aus; }
+  for (const p of pos){
+    if (!p || !p.sym) continue;
+    try { if (istSchein(p)) continue; } catch(e){}
+    const row = scanRow(p.sym);
+    if (row){
+      if (row.klasse === 'krypto' || row.klasse === 'gold') aus.push(row.instrument);
+    } else if (/(USDT|USDC|USD|EUR)$/i.test(String(p.sym))){
+      // Nicht im Scan (zu duenn, ausgelistet) — Kraken versuchen wir trotzdem.
+      aus.push(p.sym);
+    }
+  }
+  return aus;
 }
 function setzeLiveChip(an, text){
   const el = $('livechip');
@@ -949,7 +975,8 @@ function starteLive(){
   catch(e){ setzeLiveChip(false,'kein Livestream'); return; }
   WS.onopen = ()=>{
     WS_OK = true; WS_TRY = 0; setzeLiveChip(true,'live');
-    const paare = syms.slice(0,90).map(krakenPaar).filter(Boolean);
+    const paare = [...new Set(syms.slice(0,120).map(krakenPaar).filter(Boolean))];
+    ABONNIERT = new Set(paare);
     if (paare.length) try {
       WS.send(JSON.stringify({method:'subscribe', params:{channel:'ticker', symbol:paare}}));
     } catch(e){}
@@ -2600,6 +2627,20 @@ function ladePositionen(){
 }
 function speicherePositionen(a){
   try { localStorage.setItem(SPEICHER, JSON.stringify(a)); } catch(e){}
+  // Neue Position → sofort Livekurs, nicht erst nach dem naechsten Neustart der App.
+  try { abonniereDepot(); } catch(e){}
+}
+function abonniereDepot(){
+  if (!WS || !WS_OK || WS.readyState !== 1) return;
+  const neu = [];
+  for (const sym of depotKryptoSymbole()){
+    KRYPTO_NAMEN_LIVE.add(String(sym).toUpperCase());
+    const pr = krakenPaar(sym);
+    if (pr && !ABONNIERT.has(pr)){ ABONNIERT.add(pr); neu.push(pr); }
+  }
+  if (neu.length) try {
+    WS.send(JSON.stringify({method:'subscribe', params:{channel:'ticker', symbol:neu}}));
+  } catch(e){}
 }
 /* Eine Position dem Scan zuordnen — ueber die MUENZE, nicht ueber das Paar.
 
@@ -4943,6 +4984,20 @@ function zahlenHinweis(b){
     ${esc(wann)}${z.zeit?' '+esc(z.zeit):''}</strong> — in ${z.tage} Tag${z.tage===1?'':'en'}.${hist}${satz}</p></div>`;
 }
 
+/* Woher der Kurs einer Position gerade kommt — live von der Boerse oder aus dem Scan.
+   Ozan, 30.09.: „brauche Live-Update bei meinem Portfolio." Live ist nur, was der
+   Kraken-Stream in den letzten zwei Minuten geliefert hat; alles andere steht mit dem
+   Alter seines Kurses da, statt so zu tun, als waere es live. */
+function kursQuelleMarke(b){
+  const l = L.get(b.pos.sym) || (b.row ? L.get(b.row.instrument) : null);
+  if (l && Date.now() - l.t < 120000)
+    return `<span class="mini-tag" title="Livekurs von Kraken">LIVE</span>`;
+  if (b.row && S && S.erzeugt){
+    const min = Math.round((Date.now() - Date.parse(S.erzeugt)) / 60000);
+    if (isFinite(min)) return `<span class="nu" style="font-size:10.5px">Scan vor ${min} Min</span>`;
+  }
+  return `<span class="nu" style="font-size:10.5px">Kurs von Hand</span>`;
+}
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -5047,7 +5102,8 @@ function zeichnePortfolio(){
       <thead><tr><th>Position</th><th style="text-align:right">Wert</th><th style="text-align:right">Anteil</th>
         <th style="text-align:right">G/V</th><th style="text-align:right">bis Stop</th></tr></thead>
       <tbody>${zeilenUe.map(({b, eu, st}) => `<tr>
-        <td>${esc(posName(b))}<br><span class="nu" style="font-size:11px">${esc(b.pos.konto||'')}</span></td>
+        <td>${esc(posName(b))}<br><span class="nu" style="font-size:11px">${esc(b.pos.konto||'')}</span>
+          ${kursQuelleMarke(b)}</td>
         <td style="text-align:right"><b>${eu!=null?num(eu, eu<100?2:0)+' €':'—'}</b></td>
         <td style="text-align:right">${eu!=null&&gesamt?(eu/gesamt*100).toFixed(1).replace('.',',')+' %':'—'}</td>
         <td style="text-align:right" class="${b.gvPct==null?'':b.gvPct>=0?'up':'dn'}">${b.gvPct!=null?pct(b.gvPct,1):'—'}</td>
@@ -6849,8 +6905,29 @@ function bilanzKasten(){
         <div class="v mittel">${(g.max_rueckgang_r||0).toFixed(1)} R</div>
         <div class="n">längste Serie ${g.verlustserie||0}</div></div>
     </div>
+    ${handyZeile()}
     <ul class="satzliste" style="margin-top:14px">${(PF.saetze||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
   </div>`;
+}
+
+/* Was Ozan wirklich gesehen hat: die Einstiege, die aufs Telefon gingen — getrennt von
+   allem, was nur in der App stand. Dazu, was NICHT gezaehlt wird (nie ausgeloest,
+   Kursausfall mitten im Trade), damit keine Zahl ohne ihren Nenner dasteht. */
+function handyZeile(){
+  const m = (PF && PF.je_meldung) || {};
+  const h = m.aufs_handy, a = m.nur_app;
+  const teile = [];
+  const eine = (k, v) => {
+    if (!v || !v.anzahl) return;
+    const s = v.summe_r || 0;
+    teile.push(`<span>${k} <b class="${s>0?'up':s<0?'dn':''}">${s>0?'+':''}${s.toFixed(1)} R</b>
+      <span style="color:var(--ink-3)">${v.anzahl}× · ${Math.round((v.trefferquote||0)*100)} % im Plus</span></span>`);
+  };
+  eine('Aufs Handy', h);
+  eine('Nur in der App', a);
+  if (PF.nicht_ausgeloest) teile.push(`<span style="color:var(--ink-3)">${PF.nicht_ausgeloest} nie ausgelöst</span>`);
+  if (PF.ohne_ergebnis) teile.push(`<span style="color:var(--warn)">${PF.ohne_ergebnis} ohne Ergebnis</span>`);
+  return teile.length ? `<div class="zt" style="margin-top:12px">${teile.join('')}</div>` : '';
 }
 
 
@@ -6935,9 +7012,14 @@ function historieKasten(){
   const zeilen = t.slice(0, 60).map(x=>{
     const gut = x.r_ganz > 0, schlecht = x.r_ganz < 0;
     const farbe = gut ? 'var(--long)' : schlecht ? 'var(--bad)' : 'var(--ink-3)';
-    const ausgang = {stop:'Stop', ziel_erreicht:'Ziel', invalidiert:'ungültig', abgelaufen:'abgelaufen'}[x.zustand] || x.zustand;
-    return `<tr>
-      <td class="tf">${esc(name(x.instrument))}</td>
+    let ausgang = {stop:'Stop', ziel_erreicht:'Ziel', invalidiert:'ungültig', abgelaufen:'abgelaufen'}[x.zustand] || x.zustand;
+    // Nicht gezaehlte Zeilen bleiben sichtbar, aber als das, was sie sind.
+    if (x.eingestiegen === false) ausgang = 'nie ausgelöst';
+    else if (x.gezaehlt === false) ausgang = 'Kursausfall';
+    const blass = x.gezaehlt === false ? ' style="opacity:.5"' : '';
+    const handy = x.gemeldet ? ' <span class="mini-tag" title="ging aufs Handy">ALARM</span>' : '';
+    return `<tr${blass}>
+      <td class="tf">${esc(name(x.instrument))}${handy}</td>
       <td>${esc(x.note)}</td>
       <td>${esc(ausgang)}${(x.erreicht||[]).length?` <span style="color:var(--ink-3)">${x.erreicht.join(',')}</span>`:''}</td>
       <td style="color:${farbe};font-weight:600">${x.r_ganz>0?'+':''}${x.r_ganz.toFixed(2)} R</td>
@@ -6948,7 +7030,9 @@ function historieKasten(){
   return `<h2>Wie die Signale ausgegangen sind</h2>
   <p class="lead">Jedes abgeschlossene Signal einzeln, das jüngste zuerst — auch die
   schlechten. <strong>Ganz</strong> ist alles-oder-nichts, <strong>Drittel</strong> mit
-  Teilverkauf am ersten Ziel und Stop auf Einstand.</p>
+  Teilverkauf am ersten Ziel und Stop auf Einstand. <span class="mini-tag">ALARM</span> = ging aufs Handy. Blasse Zeilen
+  zählen nicht: <em>nie ausgelöst</em> heißt, der Einstieg kam nie; <em>Kursausfall</em>
+  heißt, der Wächter hat den laufenden Trade mangels Kurs geschlossen — Ausgang unbekannt.</p>
   <div class="tw"><table class="mtf">
     <tr><th>Wert</th><th>Note</th><th>Ausgang</th><th>Ganz</th><th>Drittel</th><th>Beendet</th></tr>
     ${zeilen}
