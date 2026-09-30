@@ -292,6 +292,12 @@ KLASSE_JE_LAND: dict[str, tuple[str, ...]] = {
     "USD": ("aktien", "krypto", "gold"),
     "EUR": ("aktien", "gold"),
     "GBP": ("aktien",),
+    # Weitere G10-Waehrungen — wie GBP nur "aktien": ein Zinsentscheid bewegt globales
+    # Risikosentiment und damit US-Aktien, aber nicht spezifisch Krypto oder Gold.
+    "AUD": ("aktien",),
+    "CAD": ("aktien",),
+    "CHF": ("aktien",),
+    "NZD": ("aktien",),
     "ALL": ("aktien", "krypto", "gold"),
 }
 
@@ -312,10 +318,14 @@ def warnungen_fuer(lage: MacroLage | None, klasse: str, richtung: str | None) ->
     if satz := lage.wirkung.get(klasse):
         aus.append(f"Makro: {satz}")
 
+    # 29.09.: der Default hier war "betrifft alle drei Klassen" — fuer JEDE Waehrung,
+    # die nicht in KLASSE_JE_LAND steht. Ein australischer CPI-Termin (Land "AUD", nicht
+    # gelistet) landete dadurch als Warnung auf fast der Haelfte aller Krypto-Setups,
+    # obwohl er damit nichts zu tun hat. Ungelistet heisst jetzt: keine Klasse wird
+    # gewarnt, statt sicherheitshalber alle — eine verpasste Warnung fuer eine seltene
+    # Waehrung ist harmlos, eine falsche auf hundert Setups gleichzeitig nicht.
     naechste = [
-        t
-        for t in lage.naechste_termine(stunden=36)
-        if klasse in KLASSE_JE_LAND.get(t.land.upper(), ("aktien", "krypto", "gold"))
+        t for t in lage.naechste_termine(stunden=36) if klasse in KLASSE_JE_LAND.get(t.land.upper(), ())
     ]
     if naechste:
         t = naechste[0]
