@@ -55,7 +55,9 @@ def main() -> int:
     # neben jedem Signal steht. Damit laesst sich in der App nachschlagen, worauf die
     # Quote auf einer Signalkarte beruht, statt sie glauben zu muessen.
     doc = b.as_dict()
-    doc["quoten"] = {k: q.as_dict() for k, q in erw.quoten([dict(t) for t in b.trades]).items()}
+    # Nur echte Trades: ein Setup ohne Einstieg hat kein Ziel und keinen Stop gesehen.
+    gezaehlt = [dict(t) for t in b.trades if t.get("gezaehlt", True)]
+    doc["quoten"] = {k: q.as_dict() for k, q in erw.quoten(gezaehlt).items()}
 
     ziel = Path(args.out)
     ziel.parent.mkdir(parents=True, exist_ok=True)

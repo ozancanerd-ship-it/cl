@@ -588,7 +588,7 @@ def _quotentabelle() -> dict[str, erw.Quote]:
     from trading_agent.scanner.performance import bericht
 
     b = bericht(daten)
-    tab = erw.quoten([dict(t) for t in b.trades])
+    tab = erw.quoten([dict(t) for t in b.trades if t.get("gezaehlt", True)])
     if tab:
         alle = tab.get("alle")
         if alle:
