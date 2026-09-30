@@ -140,6 +140,32 @@ def test_termin_betrifft_nur_die_passende_anlageklasse() -> None:
     assert not any("BoE" in x for x in warnungen_fuer(lage, "krypto", "long"))
 
 
+def test_aud_termin_warnt_aktien_nicht_krypto() -> None:
+    """29.09.: ein AUD-CPI-Termin warnte vorher fast die Haelfte aller Krypto-Setups,
+    weil "AUD" in KLASSE_JE_LAND fehlte und der Default alle drei Klassen betraf. AUD
+    steht jetzt wie GBP nur fuer "aktien"."""
+    jetzt = datetime.now(UTC)
+    lage = bewerte(
+        baue_werte(_reihen()), [Termin("CPI m/m", "AUD", jetzt + timedelta(hours=10), "High")]
+    )
+    assert any("CPI" in x for x in warnungen_fuer(lage, "aktien", "long"))
+    assert not any("CPI" in x for x in warnungen_fuer(lage, "krypto", "long"))
+    assert not any("CPI" in x for x in warnungen_fuer(lage, "gold", "long"))
+
+
+def test_unbekannte_waehrung_warnt_niemanden() -> None:
+    """Die Gegenprobe zum obigen Fix: ohne einen expliziten Eintrag in KLASSE_JE_LAND
+    darf ein Termin KEINE Klasse mehr warnen — der alte Default ("alle drei") war der
+    eigentliche Fehler, nicht nur das fehlende AUD."""
+    jetzt = datetime.now(UTC)
+    lage = bewerte(
+        baue_werte(_reihen()),
+        [Termin("Irgendein Termin", "SEK", jetzt + timedelta(hours=4), "High")],
+    )
+    for klasse in ("aktien", "krypto", "gold"):
+        assert not any("Irgendein Termin" in x for x in warnungen_fuer(lage, klasse, "long"))
+
+
 def test_vergangene_termine_zaehlen_nicht() -> None:
     jetzt = datetime.now(UTC)
     lage = bewerte(

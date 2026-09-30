@@ -51,6 +51,18 @@ def test_stablecoins_und_verpackte_doppel_fliegen_raus() -> None:
     assert bericht.verworfen["stablecoin_oder_doppel"] == 4
 
 
+def test_g10_fiat_waehrungen_fliegen_raus() -> None:
+    """29.09.: AUDUSD lief als "Krypto-Chance" mit — der ganz normale Fiat-Kurs von
+    Kraken, kein Coin, nur Rauschen um den Wechselkurs. NGN und UAH waren schon
+    ausgeschlossen, AUD/CAD/CHF/NZD fehlten einfach."""
+    fiat = ("AUD", "CAD", "CHF", "NZD")
+    syms = [_sym(b) for b in ("BTC", *fiat)]
+    ticker = [_tick(b, umsatz=500e6) for b in ("BTC", *fiat)]
+    eintraege, bericht = bilde_universum(syms, ticker)
+    assert nur_namen(eintraege) == ["BTCUSDT"]
+    assert bericht.verworfen["stablecoin_oder_doppel"] == len(fiat)
+
+
 def test_hebel_token_fliegen_raus() -> None:
     for b in ("BTCUP", "ETHDOWN", "ADABULL", "XRPBEAR", "BTC3L", "ETH3S"):
         assert ist_hebel_token(b), b
