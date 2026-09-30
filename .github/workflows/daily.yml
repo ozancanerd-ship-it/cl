@@ -117,6 +117,16 @@ jobs:
           PYTHONPATH: src
         run: python scripts/tsmom_forward.py --source api
 
+      # Trend-Swing (docs/TREND-SWING-STUDIE-2026-09.md) ist verworfen — wird aber vorwaerts
+      # mitgeschrieben, damit spaeter mit sauberen Daten neu geprueft werden kann. Erzeugt
+      # KEINE Alarme. Ein Ausfall hier darf nichts anderes aufhalten.
+      - name: Trend-Swing vorwaerts aufzeichnen
+        if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
+        continue-on-error: true
+        env:
+          PYTHONPATH: src
+        run: python scripts/trend_swing_forward.py
+
       - name: Tagesplan schicken
         id: report
         if: github.event.schedule != '2,12,22,32,42,52 * * * *' && github.event.schedule != '*/5 * * * *'
@@ -359,7 +369,8 @@ jobs:
                    data/repository_real/live/watchlist.json \
                    data/repository_real/live/depot_alarme.json \
                    data/repository_real/live/depot_stand.siegel \
-                   data/repository_real/live/alerts.jsonl; do
+                   data/repository_real/live/alerts.jsonl \
+                   data/repository_real/live/trend_swing_forward.json; do
             if [ -f "$f" ]; then git add -f "$f"; else echo "  (noch nicht vorhanden: $f)"; fi
           done
           if git diff --cached --quiet; then
