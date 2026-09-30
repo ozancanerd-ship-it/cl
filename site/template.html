@@ -173,7 +173,10 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 
 /* ---------- Statuskacheln ---------- */
 .status{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:16px}
-.status div{
+/* NUR die Kachel selbst, nicht ihre Zeilen: bis 30.09. stand hier „.status div“ — damit
+   bekam jede Zeile in der Kachel (Titel, Zahl, Unterzeile) noch einmal Rand, Schatten und
+   Polster, und jede Kachel sah aus wie drei gestapelte Knoepfe. */
+.status > div{
   position:relative; overflow:hidden; padding:13px 14px 14px;
   background:linear-gradient(165deg, var(--glass-2), var(--glass));
   border:1px solid var(--rule); border-radius:var(--radius);
@@ -181,8 +184,8 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   box-shadow:var(--tiefe);
   transition:transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s;
 }
-.status div:hover{transform:translateY(-2px); box-shadow:var(--tiefe-hoch)}
-.status div::before{content:""; position:absolute; inset:0 0 auto 0; height:1px;
+.status > div:hover{transform:translateY(-2px); box-shadow:var(--tiefe-hoch)}
+.status > div::before{content:""; position:absolute; inset:0 0 auto 0; height:1px;
   background:linear-gradient(90deg,transparent,var(--rule-strong),transparent)}
 .status .k{font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:.16em;
   text-transform:uppercase; color:var(--ink-3); margin-bottom:6px}
@@ -361,7 +364,9 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .karte.bad{border-color:rgba(255,92,122,.28)}
 .zt{display:flex; gap:8px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace; font-size:11px;
   color:var(--ink-2); margin-top:11px; padding-top:11px; border-top:1px solid var(--rule)}
-.zt span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px; padding:3px 8px}
+/* Nur die direkten Kinder sind Kaertchen — ein Zusatz IN einem Kaertchen („5× · 60 %“)
+   ist Text, kein zweites Kaertchen im ersten. */
+.zt > span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px; padding:3px 8px}
 .zt b{color:var(--ink)}
 .zt .up{color:var(--long)} .zt .dn{color:var(--bad)}
 details.mehr{margin:10px 0 0; border-top:1px dashed var(--rule); padding-top:7px; font-size:12.5px; color:var(--ink-2)}
@@ -522,6 +527,61 @@ a{color:var(--accent); text-underline-offset:3px}
 @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 
 .mini-tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.06em;padding:1px 5px;border-radius:5px;background:color-mix(in srgb,var(--long) 16%,transparent);color:var(--long);vertical-align:1px}
+.hero-tor{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent);border:1px solid color-mix(in srgb,var(--warn) 28%,transparent);border-radius:10px;padding:7px 10px}
+.klapp>summary{list-style:none;cursor:pointer}
+.klapp>summary::-webkit-details-marker{display:none}
+.klapp>summary h3{display:inline;margin:0}
+.klapp-hint{display:block;margin-top:4px;font-size:12px;color:var(--ink-3)}
+.klapp[open] .klapp-hint{display:none}
+/* ---------- Daumen-Leiste (nur schmale Bildschirme) ---------- */
+.dock{display:none}
+@media (max-width:760px){
+  .dock{display:flex; position:fixed; z-index:60; left:10px; right:10px;
+    bottom:calc(10px + env(safe-area-inset-bottom)); justify-content:space-around;
+    padding:6px 4px; border-radius:20px; border:1px solid var(--rule-strong);
+    background:color-mix(in srgb, var(--bg-2) 93%, transparent);
+    backdrop-filter:blur(22px) saturate(160%); -webkit-backdrop-filter:blur(22px) saturate(160%);
+    box-shadow:0 14px 40px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.06) inset}
+  .dock button{appearance:none; border:0; background:none; font:inherit; color:var(--ink-3);
+    display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 8px 5px;
+    min-width:56px; border-radius:14px; cursor:pointer; position:relative;
+    transition:color .16s, background .16s}
+  .dock svg{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.7;
+    stroke-linecap:round; stroke-linejoin:round}
+  .dock span{font-size:10px; font-weight:600; letter-spacing:.02em}
+  .dock button[aria-current="page"]{color:var(--accent); background:var(--accent-soft)}
+  .dock button[aria-current="page"]::after{content:""; position:absolute; top:-7px; left:50%;
+    width:18px; height:3px; margin-left:-9px; border-radius:3px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    box-shadow:0 0 12px var(--accent)}
+  .wrap{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+}
+:root[data-theme="light"] .dock{box-shadow:0 10px 30px rgba(20,40,80,.16)}
+/* ---------- Die grosse Karte, zweite Stufe (30.09.) ----------
+   Score als Ring statt als blasse Zahl, die Handlung als Marke, und ein langsames
+   Polarlicht hinter der Karte — nur wenn ein Einstieg wirklich erreicht ist, laeuft es
+   schneller. Bei „weniger Bewegung" steht alles still. */
+.hero-k .sc.ring{--p:0; width:40px; height:40px; border-radius:50%; display:grid;
+  place-items:center; font-size:12.5px; color:var(--ink);
+  background:conic-gradient(var(--accent) calc(var(--p) * 1%), var(--rule) 0);
+  -webkit-mask:radial-gradient(circle 20px, #000 98%, transparent 100%);
+  box-shadow:0 0 22px color-mix(in srgb, var(--accent) 22%, transparent)}
+.hero-k .sc.ring i{font-style:normal; width:32px; height:32px; border-radius:50%;
+  display:grid; place-items:center; background:var(--bg-2); font-weight:700}
+.hero.kurz .hero-k .sc.ring{background:conic-gradient(var(--bad) calc(var(--p) * 1%), var(--rule) 0);
+  box-shadow:0 0 22px color-mix(in srgb, var(--bad) 20%, transparent)}
+.hero-t .akt{display:table; margin:8px 0 2px; padding:3px 10px; border-radius:9px; background:var(--long-bg);
+  border:1px solid color-mix(in srgb, var(--long) 35%, transparent); font-size:14.5px}
+.hero.kurz .hero-t .akt{background:var(--bad-bg); border-color:color-mix(in srgb, var(--bad) 35%, transparent)}
+.hero::after{content:""; position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background:conic-gradient(from 0deg, transparent 0 60%, rgba(61,240,208,.10) 70%,
+    rgba(76,141,255,.12) 80%, transparent 90%);
+  animation:polar 18s linear infinite}
+.hero{isolation:isolate}
+.hero.jetzt::after{animation-duration:7s}
+@keyframes polar{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){.hero::after{animation:none}}
+.hero-t{font-size:25px}
 </style>
 </head>
 <body>
@@ -549,6 +609,15 @@ a{color:var(--accent); text-underline-offset:3px}
     </div>
   </div>
 </header>
+<!-- Daumen-Leiste fuers Handy: die fuenf Reiter, die man wirklich braucht, ohne oben
+     durch elf Reiter zu wischen. Oben bleibt alles wie es ist; die Leiste ruft nur zeigeTab. -->
+<nav class="dock" aria-label="Schnellwahl">
+  <button type="button" data-dock="0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg><span>Markt</span></button>
+  <button type="button" data-dock="6"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span>Alarme</span></button>
+  <button type="button" data-dock="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/></svg><span>Depot</span></button>
+  <button type="button" data-dock="8"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 16l4-5 3 3 5-7"/><circle cx="19" cy="7" r="1.4"/></svg><span>Bilanz</span></button>
+  <button type="button" data-dock="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v4M8 17v4M16 5v3M16 16v4"/><rect x="5.5" y="7" width="5" height="10" rx="1.2"/><rect x="13.5" y="8" width="5" height="8" rx="1.2"/></svg><span>Chart</span></button>
+</nav>
 
 <main class="wrap">
   <section class="panel" id="p0" role="tabpanel" aria-labelledby="t0">
@@ -815,12 +884,25 @@ function zeigeTab(i){
     $('p'+k).hidden = k!==i;
   });
   $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
+  try { dockMarkieren(i); } catch(e){}
   if (i===1) requestAnimationFrame(()=>chart.groesse());
   if (i===4) zeichneSync();
   if (i===9) zeichneChat();
   try { history.replaceState(null,'','#'+i); } catch(e){}
 }
 TABS.forEach((t,i)=>t.addEventListener('click',()=>zeigeTab(i)));
+const DOCK = [...document.querySelectorAll('[data-dock]')];
+function dockMarkieren(i){
+  for (const b of DOCK){
+    if (Number(b.dataset.dock) === i) b.setAttribute('aria-current','page');
+    else b.removeAttribute('aria-current');
+  }
+}
+DOCK.forEach(b=>b.addEventListener('click',()=>{
+  zeigeTab(Number(b.dataset.dock));
+  try { window.scrollTo({top:0, behavior:'smooth'}); } catch(e){ window.scrollTo(0,0); }
+}));
+dockMarkieren(Math.max(0, TABS.findIndex(t=>t.getAttribute('aria-selected')==='true')));
 
 /* Ein Teil darf ausfallen, nicht die Seite.
 
@@ -912,7 +994,9 @@ async function waehle(sym, wechseln = true){
   if (!ebenen.includes(AKTIV_TF)) AKTIV_TF = ebenen.includes('H4') ? 'H4' : (ebenen[0]||'H4');
   zeichneChartAnsicht(); zeichneAnalyse(); abonniere(sym);
   if (wechseln) zeigeTab(1);
-  $('kopf').textContent = sym;
+  // Der Titel gehoert dem Reiter: im Markt stand sonst oben der Name des vorausgewaehlten
+  // Werts („ANET"), als ginge es auf der ganzen Seite nur um ihn.
+  if (wechseln || !$('p1').hidden || !$('p2').hidden) $('kopf').textContent = sym;
 }
 
 /* ------------------------------------------------------------ Live */
@@ -1684,9 +1768,19 @@ function crvVon(o){
 function topSignal(){
   const kand = [...rangLagen().values()];
   if (!kand.length) return '';
-  const rang = a => [-(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
-  kand.sort((a,b)=>{ const [ra,da]=rang(a), [rb,db]=rang(b); return ra!==rb ? ra-rb : da-db; });
+  /* Was aufs Handy geht (oder schon ging), steht vorn. Bis 30.09. entschied hier nur die
+     Note — und oben stand „Arista KAUFEN, A+", waehrend das Alarm-Tor genau diese Art
+     (Aktien Long) wegen der eigenen Verluste gesperrt hatte. Die groesste Karte der App
+     sagte also etwas anderes als das Telefon. Jetzt gilt dieselbe Rangfolge wie beim
+     Alarm; ein gesperrtes Setup kommt nur nach oben, wenn es sonst nichts gibt — und dann
+     mit dem Grund, warum es nicht klingelt. */
+  const klingelt = a => !!((a.w && a.w.gemeldet) || (a.o && a.o.alarm && a.o.alarm.ja));
+  const rang = a => [klingelt(a) ? 0 : 1, -(NOTE_RANG[a.w.note]||0), Math.abs(a.abstand ?? 999)];
+  kand.sort((a,b)=>{ const ra=rang(a), rb=rang(b);
+    for (let i=0;i<ra.length;i++) if (ra[i]!==rb[i]) return ra[i]-rb[i];
+    return 0; });
   const x = kand[0], w = x.w, o = x.o || {}, d = digits(w.einstieg);
+  const torGrund = !klingelt(x) && o.alarm && o.alarm.ja === false ? (o.alarm.grund || '') : '';
   const seite = x.lang ? 'KAUFEN' : 'VERKAUFEN';
   /* Hier stand ``x.stufe === 'jetzt' || x.stufe === 'im_trade'`` — und damit las eine
      laufende Position wie eine Kaufaufforderung. Auf Ozans Bildschirm stand oben
@@ -1707,7 +1801,7 @@ function topSignal(){
       <span class="mono lbl">${laeuft ? 'Läuft gerade' : 'Beste Chance'}</span>
       <span class="note ${NOTE_KLASSE[w.note]||''}">${esc(w.note)}</span>
       ${st?`<span class="mono lbl2">${esc(st.name)}</span>`:''}
-      <span class="mono sc">${o.score!=null?`${o.score.toFixed(0)}`:''}</span>
+      ${o.score!=null?`<span class="mono sc ring" style="--p:${Math.max(0,Math.min(100,o.score)).toFixed(0)}" title="Score ${o.score.toFixed(0)} von 100"><i>${o.score.toFixed(0)}</i></span>`:''}
     </div>
     <div class="hero-t">${esc(name(w.instrument))}
       <span class="akt">${
@@ -1725,6 +1819,7 @@ function topSignal(){
       fest. <strong>Das ist keine Aufforderung nachzukaufen.</strong> Ein frischer
       Einstiegsvorschlag zu demselben Wert kann andere Zahlen haben; er steht im Markt
       in der Zeile zu diesem Wert.</p>`:''}
+    ${torGrund?`<p class="hero-tor"><b>Kein Handy-Alarm</b> — ${esc(torGrund)}</p>`:''}
     ${st?`<p class="hero-these">${esc(st.these)}</p>`:''}
     <div class="zt" style="border-top:0;padding-top:0">
       <span>Einstieg <b>${num(w.einstieg,d)}</b></span>
@@ -6099,8 +6194,11 @@ function altersBanner(){
 function stoerungsBanner(){
   const push = (()=>{ try { return !!localStorage.getItem('push_abo'); } catch(e){ return false; } })();
   if (push) return '';
-  return `<div class="stoerung">
-    <h3>Es kommt nichts an — und das ist der Grund</h3>
+  /* Eingeklappt: der Grund bleibt ganz oben und rot, aber er schiebt nicht mehr den
+     ganzen Markt aus dem Bild. Die Schritte kommen mit einem Tipp. */
+  return `<details class="stoerung klapp">
+    <summary><h3>Auf diesem Gerät kommt kein Push an</h3>
+      <span class="klapp-hint">Tippen für die zwei Minuten, die das behebt</span></summary>
     <p>Der Scanner läuft rund um die Uhr und erzeugt Ereignisse. Aber es gibt derzeit
     <strong>keinen eingerichteten Weg auf dein Telefon</strong>. Solange das so ist, landen
     alle Alarme nur hier in der App — auch die guten.</p>
@@ -6118,7 +6216,7 @@ function stoerungsBanner(){
     darin erwähnt. Das kommt per E-Mail an und, wenn du die GitHub-App auf dem Handy
     hast, auch als Push. Langsamer als der richtige Weg und in einer Liste, die
     eigentlich für Fehlerberichte da ist — aber es kommt an.</p>
-  </div>`;
+  </details>`;
 }
 
 /* ===================================================== ALARME BEI ZUER APP
