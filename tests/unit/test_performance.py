@@ -229,3 +229,63 @@ def test_im_plus_schwelle_ist_bewusst_niedrig() -> None:
         r_drittel=-1.0,
     )
     assert e.mfe < IM_PLUS_AB
+
+
+# ── Was zaehlt als Trade (30.09.) ───────────────────────────────────────────────
+def _plan(**kw: Any) -> dict[str, Any]:
+    return _wache(einstieg=100.0, stop=95.0, richtung="long", **kw)
+
+
+def test_nie_ausgeloestes_setup_ist_kein_trade() -> None:
+    daten = _liste(
+        _plan(zustand="abgelaufen", einstiegskurs=None),
+        _plan(zustand="invalidiert", einstiegskurs=None),
+        _plan(zustand="stop", einstiegskurs=100.0),
+    )
+    b = bericht(daten)
+    assert b.abgeschlossen == 1
+    assert b.nicht_ausgeloest == 2
+    assert b.je_regel["ganz"].trefferquote == 0.0
+    # In der Liste stehen sie trotzdem — markiert.
+    assert sum(1 for t in b.trades if not t["eingestiegen"]) == 2
+
+
+def test_laufender_trade_ohne_kurs_geschlossen_hat_kein_ergebnis() -> None:
+    """Die Aktien vom 27.09.: im Trade, Ziel 1 erreicht, dann mangels Kurs geschlossen."""
+    daten = _liste(
+        _plan(zustand="abgelaufen", einstiegskurs=100.0, erreicht=["TP1"], bestes_r=1.7),
+        _plan(zustand="ziel_erreicht", einstiegskurs=100.0, erreicht=["TP1", "TP2", "TP3"]),
+    )
+    b = bericht(daten)
+    assert b.abgeschlossen == 1
+    assert b.ohne_ergebnis == 1
+    assert any("mangels Kurs" in s for s in b.saetze)
+
+
+def test_ausstieg_auf_gedrehte_analyse_zum_echten_kurs() -> None:
+    e = aus_wachliste(
+        _liste(_plan(zustand="invalidiert", einstiegskurs=100.0, ausstiegskurs=97.0))
+    )[0]
+    assert abs(e.r_ganz - (-0.6)) < 1e-9
+    assert abs(e.r_drittel - (-0.6)) < 1e-9
+
+
+def test_ausstieg_nach_ziel_eins_nie_unter_dem_schutz_stop() -> None:
+    """Nach Ziel 1 steht der Stop auf Einstand — der Rest kann laut Plan nicht tiefer raus."""
+    e = aus_wachliste(
+        _liste(
+            _plan(zustand="invalidiert", einstiegskurs=100.0, ausstiegskurs=98.0, erreicht=["TP1"])
+        )
+    )[0]
+    assert abs(e.r_drittel - 1 / 3) < 1e-9
+
+
+def test_handy_alarme_getrennt_ausgewiesen() -> None:
+    daten = _liste(
+        _plan(zustand="ziel_erreicht", einstiegskurs=100.0, erreicht=["TP1"], gemeldet="x"),
+        _plan(zustand="stop", einstiegskurs=100.0),
+    )
+    b = bericht(daten)
+    assert b.je_meldung["aufs_handy"].anzahl == 1
+    assert b.je_meldung["nur_app"].anzahl == 1
+    assert b.je_meldung["nur_app"].summe_r == -1.0

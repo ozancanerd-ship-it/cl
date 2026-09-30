@@ -190,6 +190,25 @@ def test_setup_laeuft_ab_wenn_der_einstieg_nie_kommt() -> None:
     assert w.wachen["BTCUSDT"].zustand == Zustand.ABGELAUFEN.value
 
 
+def test_laufender_trade_laeuft_ohne_kurs_nicht_ab() -> None:
+    """30.09.: ein Trade im Markt darf nicht „ablaufen", nur weil ein Lauf keinen Kurs hat
+    (Aktien am Wochenende). Ablaufen kann nur ein Setup, das noch auf den Einstieg wartet."""
+    w = Wachliste()
+    w.aufnehmen([_zeile()], jetzt=T0)
+    w.pruefen(_kurs(hoch=100.5, tief=99.0), jetzt=T0 + timedelta(minutes=15))
+    assert w.wachen["BTCUSDT"].zustand == Zustand.AKTIV.value
+    ev = w.pruefen({}, jetzt=T0 + HALTBARKEIT + timedelta(days=2))
+    assert ev == []
+    assert w.wachen["BTCUSDT"].zustand == Zustand.AKTIV.value
+
+
+def test_wartendes_setup_laeuft_auch_ohne_kurs_ab() -> None:
+    w = Wachliste()
+    w.aufnehmen([_zeile()], jetzt=T0)
+    ev = w.pruefen({}, jetzt=T0 + HALTBARKEIT + timedelta(hours=1))
+    assert [e.art for e in ev] == ["ABGELAUFEN"]
+
+
 def test_richtungswechsel_im_scan_macht_die_wache_ungueltig() -> None:
     w = Wachliste()
     w.aufnehmen([_zeile()], jetzt=T0)
