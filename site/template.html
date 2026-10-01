@@ -3004,9 +3004,13 @@ function vertragsSchritte(P, kurs){
     return `${r >= 0 ? '+' : '−'}${Math.abs(r).toFixed(1).replace('.', ',')} R`; };
   const weg = p => kurs ? ` <span class="nu">(${pct((p - kurs) / kurs * 100, 1)} vom Kurs)</span>` : '';
   const zeilen = [];
-  if (P.tp1 != null) zeilen.push(['TP1', `<b>Ziel 1 · ${num(P.tp1, d)}</b> (${rT(P.tp1)})${er.has('TP1') ? '' : weg(P.tp1)} — erstes Drittel verkaufen, Stop auf den Einstieg ${num(P.einstieg, d)}.`]);
-  if (P.tp2 != null) zeilen.push(['TP2', `<b>Ziel 2 · ${num(P.tp2, d)}</b> (${rT(P.tp2)})${er.has('TP2') ? '' : weg(P.tp2)} — zweites Drittel verkaufen, Stop auf Ziel 1${P.tp1 != null ? ' (' + num(P.tp1, d) + ')' : ''}.`]);
-  if (P.tp3 != null) zeilen.push(['TP3', `<b>Ziel 3 · ${num(P.tp3, d)}</b> (${rT(P.tp3)})${er.has('TP3') ? '' : weg(P.tp3)} — den Rest verkaufen. Fertig.`]);
+  // Ein Short wird nicht „verkauft", sondern geschlossen (01.10., MDLZ): direkt gehalten
+  // zurückkaufen, über einen Short-Schein den Schein-Anteil verkaufen.
+  const tun = lang ? 'verkaufen' : 'schließen';
+  const wie = lang ? '' : ' <span class="nu">(beim Short-Schein: diesen Teil des Scheins verkaufen)</span>';
+  if (P.tp1 != null) zeilen.push(['TP1', `<b>Ziel 1 · ${num(P.tp1, d)}</b> (${rT(P.tp1)})${er.has('TP1') ? '' : weg(P.tp1)} — erstes Drittel ${tun}${wie}, Stop auf den Einstieg ${num(P.einstieg, d)}.`]);
+  if (P.tp2 != null) zeilen.push(['TP2', `<b>Ziel 2 · ${num(P.tp2, d)}</b> (${rT(P.tp2)})${er.has('TP2') ? '' : weg(P.tp2)} — zweites Drittel ${tun}, Stop auf Ziel 1${P.tp1 != null ? ' (' + num(P.tp1, d) + ')' : ''}.`]);
+  if (P.tp3 != null) zeilen.push(['TP3', `<b>Ziel 3 · ${num(P.tp3, d)}</b> (${rT(P.tp3)})${er.has('TP3') ? '' : weg(P.tp3)} — den Rest ${tun}. Fertig.`]);
   const naechstes = zeilen.find(z => !er.has(z[0]));
   return `<ol class="steps vertrag">${zeilen.map(([m, t]) =>
       `<li class="${er.has(m) ? 'ok' : naechstes && naechstes[0] === m ? 'jetzt' : ''}">${t}${er.has(m) ? ' <span class="ok-tag">erreicht</span>' : ''}</li>`).join('')}</ol>
