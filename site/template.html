@@ -6022,10 +6022,22 @@ function alarmRegelnBlock(){
       <td class="${kl}">${wort}</td></tr>`;
   };
   return `<div class="note-box warn" style="margin-top:22px"><span class="nt">Was aufs Handy geht — und was nicht</span>
-    <p><strong>Ein Einstieg klingelt nur, wenn er durchs Alarm-Tor kommt:</strong> benanntes
+    ${R && R.nur_bewaehrt ? `<p><strong>Gewinner-Tor: ein Einstieg klingelt nur, wenn sich seine
+    Setup-Art in deiner eigenen Bilanz bewährt hat</strong> — mindestens ${R.min_faelle} entschiedene
+    Trades, unterm Strich im Plus, Profitfaktor ab ${String(R.bewaehrt_pf).replace('.',',')}. Dazu Note
+    ab A− (B+ klingelt nicht), Chance-Risiko ab 1:${R.min_crv}, Ziel 1 weit genug weg, dass nach
+    Gebühren etwas bleibt. ${(R.frei||[]).length
+      ? `Frei sind gerade: <strong>${R.frei.map(esc).join(', ')}</strong>.`
+      : 'Gerade ist <strong>keine</strong> Setup-Art frei — dann klingelt nichts, und das ist Absicht.'}
+    Alles andere wird weiter beobachtet und gezählt; eine Art, die sich bewährt, wird von selbst frei.</p>
+    <p style="font-size:12.5px;color:var(--ink-2)">Ehrlich dazu: das ist eine strengere Auswahl,
+    kein Beweis. Die eigene Bilanz ist noch klein, und im Nachspiel über 19 Monate hat kein Filter
+    einen belastbaren Vorteil gezeigt. Sicher ist: weniger Alarme, und keiner mehr für eine Art
+    ohne Erfolgsnachweis.</p>`
+    : `<p><strong>Ein Einstieg klingelt nur, wenn er durchs Alarm-Tor kommt:</strong> benanntes
     Setup · Note ab A− (B+ nur, wenn sich die Setup-Art in der eigenen Bilanz bewährt hat) ·
     die Setup-Art hat bisher nicht unterm Strich verloren · Chance-Risiko ab
-    1:${R ? R.min_crv : 2} · Ziel 1 weit genug weg, dass nach Gebühren etwas bleibt.</p>
+    1:${R ? R.min_crv : 2} · Ziel 1 weit genug weg, dass nach Gebühren etwas bleibt.</p>`}
     <p><strong>Und höchstens ${R ? R.max_je_tag : 3} am Tag</strong>, derselbe Coin höchstens
     einmal in ${R ? R.sperre_je_wert_h : 48} Stunden. Kommen mehr zusammen, gehen die besten raus.</p>
     <p><strong>Ziel, Stop, nachgezogener Stop und Ausstieg</strong> klingeln nur für Trades,
