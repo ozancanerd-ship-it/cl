@@ -243,6 +243,8 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   padding:3px 8px; border-radius:5px; background:var(--flat-bg); color:var(--ink-2);
   border:1px solid var(--rule)}
 .opp-h .note.gut{background:var(--long-bg); color:var(--long); border-color:rgba(43,232,165,.32)}
+.opp-h .note.tor-ja{background:transparent; color:var(--long); border-color:rgba(43,232,165,.4)}
+.opp-h .note.tor-nein{background:transparent; color:var(--ink-3); border-style:dashed}
 .opp-h .note.mittel{background:var(--accent-soft); color:var(--accent); border-color:rgba(61,240,208,.28)}
 .opp-h .sc{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:17px;
   font-weight:600; font-variant-numeric:tabular-nums; color:var(--ink-2)}
@@ -2795,7 +2797,16 @@ function oppZeile(o, rang){
         // eines Livekurses — wer das nicht sieht, haelt beides fuer dasselbe.
         const quelle = (e.stufe === 'jetzt' && e.live === false)
           ? ` <span class="note" style="background:transparent;color:var(--ink-3)">Kurs vom Scan</span>` : '';
-        return `<span class="note" style="${farbe}">${esc(e.text)}</span>${quelle}`; })()}
+        /* Wartet das Setup noch auf seinen Kurs, sieht man vorher, ob es dann klingelt.
+           Vorher stand Arista als „#1 · A+ · noch 3 %" ganz oben — und wäre nie aufs
+           Handy gekommen (Aktien Long gesperrt). Wer auf einen Alarm wartet, der nie
+           kommt, verpasst den Einstieg oder kauft ohne Signal. */
+        const tor = e.stufe === 'warten'
+          ? (alarmReif(o)
+              ? ` <span class="note tor-ja" title="Kommt der Kurs, geht der Alarm aufs Handy">mit Alarm</span>`
+              : ` <span class="note tor-nein" title="${esc(alarmGrund(o))}">ohne Alarm</span>`)
+          : '';
+        return `<span class="note" style="${farbe}">${esc(e.text)}</span>${quelle}${tor}`; })()}
       <span class="sc">${(o.score||0).toFixed(0)}</span>
     </div>
     <div class="opp-b">
@@ -2880,7 +2891,8 @@ function zeichneRadar(){
     Setup-Art mit Verlust in der eigenen Bilanz, zu wenig Raum nach Gebühren …). Der Grund
     steht beim Antippen dran und unter Alarme. Solche Werte klingeln nicht.
     <em>noch X %</em> heisst: gutes Setup, Kurs noch nicht da — dort gehört eine
-    Limit-Order hin, nicht ein Kauf zum Marktpreis.</p>
+    Limit-Order hin, nicht ein Kauf zum Marktpreis. Dahinter steht <em>mit Alarm</em> oder
+    <em>ohne Alarm</em>: ob das Handy klingelt, wenn der Kurs kommt.</p>
     <p>Diese Seite ist die vollständige Rangliste zum Nachsehen. Gekauft wird unter
     <strong>Alarme</strong> — dort steht genau das, was hier gerade <em>JETZT</em> zeigt,
     und sonst nichts. ${jetzt ? `Aktuell sind das <strong>${jetzt}</strong>${
