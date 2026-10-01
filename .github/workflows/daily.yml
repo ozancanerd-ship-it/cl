@@ -137,6 +137,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          # Kauf/Verkauf im Plan geht auch als Issue raus (Mail + GitHub-App) — bis 01.10.
+          # ging der Plan nur an Telegram, das nicht eingerichtet ist.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Sonntags zusaetzlich ein Wochenstand, auch wenn sich nichts geaendert hat.
         # Sonst kann es Wochen still bleiben, und dann weiss man nicht, ob nichts passiert
         # ist oder ob etwas kaputt ist.
