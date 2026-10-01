@@ -141,7 +141,7 @@ def test_tp1_rat_ist_konkret() -> None:
     w.pruefen(_kurs(100.0, 99.0), jetzt=T0 + timedelta(minutes=15))
     ev = w.pruefen(_kurs(112.0, 105.0), jetzt=T0 + timedelta(minutes=30))
     assert "Stop auf den Einstieg" in ev[0].text
-    assert "+1.00R" in ev[0].text
+    assert "+1,00 R" in ev[0].text
 
 
 def test_stop_beendet_die_wache() -> None:

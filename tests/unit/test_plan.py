@@ -95,3 +95,15 @@ def test_serialisierung_enthaelt_alles_was_die_app_braucht() -> None:
     d = p.as_dict()
     for k in ("einstieg", "stop", "tp1", "tp2", "tp3", "r", "risiko_pct", "crv", "schritte"):
         assert k in d, k
+
+
+def test_short_plan_sagt_schliessen_statt_verkaufen() -> None:
+    """01.10. (MDLZ): bei einem Short heisst „ein Drittel verkaufen" das Falsche."""
+    p = baue_plan(einstieg=100.0, stop=104.0, lang=False, strukturziele=[97.0, 88.0, 70.0])
+    assert p is not None
+    text = " ".join(p.schritte)
+    assert "erstes Drittel schliessen" in text and "den Rest schliessen" in text
+    assert "zurueckkaufen" in text and "Short-Schein" in text
+    assert "verkaufen," not in text.replace("Schein-Anteil verkaufen)", "")
+    lang = baue_plan(einstieg=100.0, stop=96.0, lang=True, strukturziele=[105.0, 112.0, 130.0])
+    assert lang is not None and "erstes Drittel verkaufen" in " ".join(lang.schritte)

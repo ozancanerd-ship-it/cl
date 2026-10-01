@@ -219,5 +219,9 @@ def test_laufender_trade_schritte_und_fortschritt():
     assert 'class="jetzt"><b>Ziel 2' in schritte
     # Schutz-Stop statt Stop, und der Ausstieg bei gedrehter Analyse steht drin
     assert "Schutz-Stop" in schritte and "AUSSTEIGEN" in schritte
+    # Ein Short wird geschlossen, nicht verkauft — der Schein-Weg steht dabei
+    assert "zweites Drittel schließen" in schritte
+    assert "Drittel verkaufen" not in schritte
+    assert "Short-Schein" in schritte
     # Stand: (59,55-56,5)/1,13 = +2,7 R
     assert "+2,7 R" in leiste
