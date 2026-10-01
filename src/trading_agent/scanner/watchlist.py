@@ -426,25 +426,35 @@ class Wachliste:
         Gegen Flut schuetzt nicht der Deckel, sondern die Notenschwelle: gemeldet wird
         erst ab A-, und das bleibt so.
         """
+        """Und am 01.10. derselbe Fehler noch einmal, eine Stufe hoeher: 30 Wachen standen
+        auf „aktiv", 22 davon Aktien, die langsam laufen. Die Grenze von 24 war voll — seit
+        dem 29.09. abends kam KEIN neues Setup mehr auf die Liste, auch kein Krypto-Setup,
+        und ohne Aufnahme gibt es keinen Einstiegsalarm. Ozan: „eine Woche lang keinen
+        richtigen guten Trade". Jetzt hat jede Klasse ihren eigenen Platz (30), damit
+        langsame Aktien-Trades nie wieder die Coins aussperren; gegen die Flut innerhalb
+        einer Klasse und Richtung bleibt der Buendel-Deckel. Risiko- und Anteilsregel sind
+        so gestellt, dass sie vor den Zaehl-Deckeln nie greifen (60 × 0,5 % = 30 %,
+        60 × 1,6 % = 96 %).
+        """
         grenzen = Grenzen(
-            max_offen=24,
-            max_je_klasse=14,
-            max_je_richtung=18,
+            max_offen=60,
+            max_je_klasse=30,
+            max_je_richtung=40,
             # Zwoelf gleichgerichtete Setups derselben Klasse duerfen beobachtet werden.
             # Dass zwoelf Kryptolongs im Kern EINE Wette sind, ist wahr — aber das ist
             # eine Aussage ueber das Depot, und dort steht sie auch: der Portfolio-Reiter
             # misst den Gleichlauf und raet vom Nachlegen ins selbe Buendel ab. Die
             # Beobachtungsliste deshalb blind zu machen, hilft niemandem.
-            max_je_buendel=12,
-            max_risiko_pct=12.0,
+            max_je_buendel=16,
+            max_risiko_pct=30.0,
             # Die Regel, die tatsaechlich zugeschlagen hat. Mit den Depotwerten
             # (25 % je Position, 100 % gesamt) ist die Liste schon bei VIER Wachen
             # "voll investiert" — ab der fuenften lautete die Antwort woertlich:
             # "Das Kapital ist ausgelastet. Mehr ginge nur auf Kredit." Fuer eine
             # Beobachtungsliste ist das sinnlos: Beobachten bindet kein Kapital.
-            # 4 % je Wache mal 24 Plaetze ergibt 96 % — die Regel bindet damit nie,
+            # 1,6 % je Wache mal 60 Plaetze ergibt 96 % — die Regel bindet damit nie,
             # bevor einer der echten Deckel oben greift.
-            max_anteil_je_position=0.04,
+            max_anteil_je_position=0.016,
             max_anteil_gesamt=1.0,
         )
         laufend: list[dict[str, Any]] = [
