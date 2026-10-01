@@ -160,3 +160,22 @@ def test_wartende_wache_bekommt_den_umsatz_nachgetragen_ohne_den_plan_zu_aendern
     neu = w.wachen["DCRUSD"]
     assert neu.umsatz_24h == 190_000.0
     assert (neu.stop, neu.tp1, neu.aufgenommen) == (stop, ziel, alt.aufgenommen)
+
+
+def test_stop_alarm_nennt_das_ergebnis_laut_plan_nicht_den_tiefsten_kurs():
+    """01.10., Issue #188: „Ergebnis −1,42 R" war der tiefste Kurs der Stunde, nicht der Stop."""
+    z = _zeile("krypto", "long")
+    z["invalidierung"] = 58.42
+    w = Wachliste()
+    w.aufnehmen([z], jetzt=T0)
+    w.pruefen(
+        {"DCRUSD": {"hoch": 59.6, "tief": 59.5, "letzter": 59.55}}, jetzt=T0 + timedelta(minutes=5)
+    )
+    (e,) = w.pruefen(
+        {"DCRUSD": {"hoch": 59.6, "tief": 57.95, "letzter": 58.0}}, jetzt=T0 + timedelta(minutes=10)
+    )
+    assert e.art == "STOP"
+    # Stop 58,42: (58,42 - 59,55) / 1,13 = -1,00 R; Tief 57,95 = -1,42 R
+    assert "Ergebnis laut Plan -1,00 R" in e.text
+    assert "zwischendurch lief der Kurs bis -1,42 R" in e.text
+    assert "1.356" not in e.text and "58,42" in e.text

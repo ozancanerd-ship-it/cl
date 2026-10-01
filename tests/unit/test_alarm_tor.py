@@ -149,11 +149,19 @@ def test_ohne_benanntes_setup_kein_alarm() -> None:
     assert "kein benanntes Setup" in t.grund
 
 
-def test_b_plus_klingelt_nicht_mehr() -> None:
-    """Gewinner-Tor: B+ klingelt auch bei bewaehrter Setup-Art nicht mehr."""
+def test_b_plus_klingelt_bei_bewaehrter_setup_art() -> None:
+    """01.10. abends: B+ wieder frei, aber nur fuer eine bewaehrte Art. Die einzige freie
+    Art („Ausbruch aus der Basis") war nur wegen ihrer B+-Trades bewaehrt (+3,8 R aus 11),
+    im Nachspiel war B+ in beiden Haelften nicht schlechter als A−."""
     t = _pruefe(note="B+")
+    assert t.ja, t.grund
+    assert any(p.name == "note" and "bewaehrt" in p.satz for p in t.punkte)
+
+
+def test_b_plus_ohne_bewaehrte_setup_art_klingelt_nicht() -> None:
+    t = _pruefe(note="B+", stand={})
     assert not t.ja
-    assert "ab A−" in t.grund
+    assert "B+ nur bei bewaehrter Setup-Art" in t.grund or "noch nicht bewaehrt" in t.grund
 
 
 def test_setup_art_ohne_erfolgsnachweis_klingelt_nicht() -> None:
@@ -185,6 +193,7 @@ def test_setup_art_im_minus_unter_der_mindestzahl_klingelt_nicht() -> None:
 def test_regeln_nennen_die_freien_setup_arten() -> None:
     r = at.regeln_uebersicht(_bewaehrt_stand())
     assert r["nur_bewaehrt"] is True
+    assert r["b_plus_bei_bewaehrt"] is True
     assert r["frei"] == ["Ausbruch aus der Basis"]
 
 
