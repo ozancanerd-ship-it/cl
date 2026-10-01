@@ -85,9 +85,38 @@ ART_TITEL = {
     "stop_nach": "Stop nachziehen",
     "zahlen": "Quartalszahlen stehen an",
     "zahlen_ko": "Quartalszahlen — Knock-out-Risiko",
+    "entwarnung": "Entwarnung — früherer Stop-Alarm hinfällig",
 }
 #: Diese Arten verlangen JETZT eine Entscheidung und bekommen die Klingel auch oeffentlich.
-DRINGEND = {"stop", "ziel", "ko", "puffer_kritisch", "puffer_eng", "zahlen_ko"}
+DRINGEND = {"stop", "ziel", "ko", "puffer_kritisch", "puffer_eng", "zahlen_ko", "entwarnung"}
+#: Was die oeffentliche Klingel im Betreff sagt — die Handlung, nie der Wert.
+HANDLUNG = {
+    "stop": "VERKAUFEN",
+    "ko": "VERKAUFEN",
+    "puffer_kritisch": "VERKAUFEN",
+    "ziel": "TEIL VERKAUFEN",
+    "puffer_eng": "TEIL VERKAUFEN",
+    "zahlen_ko": "PRÜFEN",
+    "entwarnung": "ENTWARNUNG",
+}
+
+
+def oeffentlicher_titel(neu: list[Ereignis]) -> str:
+    """Betreff der Mail / GitHub-Meldung: welche Handlung, wie oft — ohne Namen.
+
+    Bis 01.10. hiess er immer „DEPOT — 1 Position(en) brauchen eine Entscheidung". Ob das
+    ein Verkauf, ein Teilverkauf oder nur ein Termin ist, sah man erst in der App. Ozan will
+    gerade bei Verkäufen und Teilverkäufen extra benachrichtigt werden — also steht die
+    Handlung jetzt vorn im Betreff.
+    """
+    zaehl: dict[str, int] = {}
+    for e in neu:
+        h = HANDLUNG.get(e.art)
+        if h:
+            zaehl[h] = zaehl.get(h, 0) + 1
+    reihenfolge = ["VERKAUFEN", "TEIL VERKAUFEN", "PRÜFEN", "ENTWARNUNG"]
+    teile = [f"{h} ({zaehl[h]})" if zaehl[h] > 1 else h for h in reihenfolge if h in zaehl]
+    return "DEPOT · " + " · ".join(teile) if teile else "DEPOT · Meldung"
 
 
 # --------------------------------------------------------------------------- Depot lesen
@@ -297,12 +326,13 @@ def texte(neu: list[Ereignis]) -> tuple[str, str, str]:
             "Die App überwacht diese Stops und meldet sich, wenn einer fällt. Die Order beim "
             "Broker musst du selbst anpassen — die App führt keine Orders aus."
         )
-    arten = sorted({ART_TITEL.get(e.art, e.art) for e in dringend})
+    liste = "\n".join(
+        f"• **{HANDLUNG.get(e.art, 'PRÜFEN')}** — {ART_TITEL.get(e.art, e.art)}" for e in dringend
+    )
     klingel = (
-        f"{len(dringend)} Position(en) in deinem Depot verlangen jetzt eine Entscheidung "
-        f"({', '.join(arten)}).\n\n"
-        "Die Einzelheiten stehen **in der App** unter Portfolio und kommen per Push — hier "
-        "nicht, weil dieses Repository oeffentlich ist und dein Depot niemanden etwas angeht.\n\n"
+        f"In deinem Depot steht jetzt:\n\n{liste}\n\n"
+        "Welche Position es ist und wie viel, steht **in der App** unter Depot — hier nicht, "
+        "weil dieses Repository öffentlich ist und dein Depot niemanden etwas angeht.\n\n"
         "https://ozancanerd-ship-it.github.io/cl/"
     )
     return titel, "\n".join(zeilen), klingel
@@ -434,7 +464,7 @@ def main() -> int:
             Notifier([gh], max_per_window=5, dedup_window_s=0.0).notify(
                 Notification(
                     severity=Severity.CRITICAL,
-                    title=f"DEPOT — {sum(e.art in DRINGEND for e in neu)} Position(en) brauchen eine Entscheidung",
+                    title=oeffentlicher_titel(neu),
                     body=klingel,
                     dedup_key="depot-oeffentlich|" + jetzt.strftime("%Y%m%d%H%M"),
                     ts=jetzt,
