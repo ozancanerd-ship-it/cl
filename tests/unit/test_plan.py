@@ -54,16 +54,34 @@ def test_zu_weiter_stop_macht_den_plan_untauglich() -> None:
     assert p.untauglich and str(int(MAX_RISIKO_PCT)) in p.untauglich
 
 
-def test_plan_beschreibt_teilverkauf_einstand_und_trailing() -> None:
-    """Die Schritte sind der eigentliche Inhalt — ohne sie ist es nur ein Kursniveau."""
+def test_plan_beschreibt_genau_die_regeln_der_alarme() -> None:
+    """Die Schritte sind der eigentliche Inhalt — und sie muessen dasselbe sagen wie die
+    Alarme der Wachliste: Drittel an Ziel 1/2/3, Stop nach Ziel 1 auf den Einstieg, nach
+    Ziel 2 auf Ziel 1, vorzeitig raus nur bei Stop oder gedrehter Analyse.
+
+    Bis 01.10. versprach der Plan einen Trailing-Stop, einen Zeit-Stop und „Rest
+    reduzieren" bei einer Gegenkerze — nichts davon hat je geklingelt."""
     p = baue_plan(einstieg=100.0, stop=96.0, lang=True, atr=2.0)
     assert p is not None
     text = " ".join(p.schritte).lower()
     assert "drittel" in text
-    assert "einstand" in text
-    assert "nachziehen" in text
+    assert "stop auf den einstieg" in text
+    assert "stop auf ziel 1" in text
+    assert "rest verkaufen" in text
     ausstiege = " ".join(p.ausstiege).lower()
-    assert "tagen ohne fortschritt" in ausstiege
+    assert "aussteigen" in ausstiege
+    alles = text + " " + ausstiege
+    for nie in ("trailing", "atr", "tagen ohne fortschritt", "reduzieren"):
+        assert nie not in alles, nie
+
+
+def test_plan_schreibt_preise_mit_deutschem_komma() -> None:
+    p = baue_plan(einstieg=58.76, stop=59.565, lang=False)
+    assert p is not None
+    text = " ".join(p.schritte)
+    assert "58,76" in text and "59,56" in text
+    assert "1 R = 0,80 " in text  # Stellen nach dem Einstiegskurs, nicht 0,80500
+    assert "58.76" not in text
 
 
 def test_stop_gleich_einstieg_gibt_keinen_plan() -> None:

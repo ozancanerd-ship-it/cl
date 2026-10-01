@@ -56,7 +56,16 @@ def _funktion(roh: str, name: str) -> str:
 def _lauf(code: str, eingabe: dict) -> dict:
     roh = VORLAGE.read_text(encoding="utf-8")
     teile = "\n".join(
-        _funktion(roh, n) for n in ("digits", "num", "pct", "chartPlan", "planLeiste")
+        _funktion(roh, n)
+        for n in (
+            "digits",
+            "num",
+            "pct",
+            "chartPlan",
+            "planLeiste",
+            "fortschrittsLeiste",
+            "vertragsSchritte",
+        )
     )
     skript = (
         "let WL = null;\n" + teile + "\nconst E = JSON.parse(process.argv[1]);\n"
@@ -183,3 +192,32 @@ def test_kursschild_und_wischen():
     assert "--surface" not in block
     # Senkrecht wischen scrollt die Seite
     assert "touch-action:pan-y" in roh
+
+
+def test_vor_dem_einstieg_gelten_die_ziele_des_handelsplans_wie_im_alarm():
+    """Alarm und Wachliste nehmen die Ziele aus ``plan`` (Ziel 1 nie naeher als 1 R).
+    Chart und Analyse zeigten bis 01.10. die rohen Liquiditaetsziele — andere Zahlen."""
+    c = {
+        **_CHANCE,
+        "plan": {"einstieg": 58.76, "stop": 59.565, "tp1": 57.95, "tp2": 57.15, "tp3": 55.83},
+    }
+    p = _lauf("console.log(JSON.stringify(chartPlan('MDLZ', E.c)));", {"c": c, "wl": None})
+    assert (p["einstieg"], p["stop"]) == (58.76, 59.565)
+    assert (p["tp1"], p["tp2"], p["tp3"]) == (57.95, 57.15, 55.83)
+
+
+def test_laufender_trade_schritte_und_fortschritt():
+    w = {**_WACHE, "erreicht": ["TP1"], "schutz": 59.55}
+    aus = _lauf(
+        "const P = chartPlan('MDLZ', E.c);"
+        "console.log(JSON.stringify([vertragsSchritte(P, 56.5), fortschrittsLeiste(P, 56.5)]));",
+        {"c": _CHANCE, "wl": {"wachen": [w]}},
+    )
+    schritte, leiste = aus
+    # Ziel 1 abgehakt, Ziel 2 ist der naechste Schritt
+    assert 'class="ok"' in schritte and "erreicht" in schritte
+    assert 'class="jetzt"><b>Ziel 2' in schritte
+    # Schutz-Stop statt Stop, und der Ausstieg bei gedrehter Analyse steht drin
+    assert "Schutz-Stop" in schritte and "AUSSTEIGEN" in schritte
+    # Stand: (59,55-56,5)/1,13 = +2,7 R
+    assert "+2,7 R" in leiste
