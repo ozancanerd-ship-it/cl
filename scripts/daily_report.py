@@ -552,22 +552,38 @@ def render(plan: dict, d: dict) -> str:
 
 
 def _send(body: str, *, title: str, severity_high: bool = False) -> bool:
-    """Ueber den vorhandenen Notifier verschicken. False, wenn Telegram nicht steht."""
+    """Ueber dieselben Wege wie die Einstiegs-Alarme verschicken.
+
+    Bis 01.10. ging der Tagesplan NUR ueber Telegram — und Telegram ist nicht eingerichtet.
+    Jeder Lauf schrieb „nicht gesendet" ins Protokoll, und Ozan hat vom Plan nie etwas
+    bekommen („Von dem Big Plan haben wir nichts bekommen"). Jetzt wie bei den Alarmen:
+    Web Push und Telegram, wenn eingerichtet, und als Auffangkanal das GitHub-Issue (Mail
+    und GitHub-App) — dort aber nur, wenn wirklich gekauft oder verkauft wird.
+    """
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from trading_agent.ops.notify import (
         FileSink,
+        GitHubIssueSink,
         Notification,
         Notifier,
         Severity,
         TelegramSink,
+        WebPushSink,
     )
 
     tg = TelegramSink(min_severity=Severity.INFO)
-    if not tg.available():
-        print("::warning::Telegram nicht konfiguriert — TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
-        print("\n! Telegram nicht konfiguriert. Der Text steht oben, verschickt wurde nichts.")
+    push = WebPushSink(min_severity=Severity.INFO)
+    gh = GitHubIssueSink(erwaehnen="ozancanerd-ship-it")
+    sinks: list = [FileSink("data/repository_real/live/alerts.jsonl")]
+    for s_ in (push, tg):
+        if s_.available():
+            sinks.insert(0, s_)
+    if gh.available():
+        sinks.append(gh)
+    if len(sinks) == 1:
+        print("::warning::Kein Weg aufs Telefon — weder Web Push, Telegram noch GitHub-Issue.")
         return False
-    n = Notifier([tg, FileSink("data/repository_real/live/alerts.jsonl")], max_per_window=20)
+    n = Notifier(sinks, max_per_window=20)
     return n.notify(
         Notification(
             severity=Severity.CRITICAL if severity_high else Severity.WARNING,
@@ -703,7 +719,7 @@ def main() -> int:
         body += zusatz
         print(body)
         ok = _send(body, title=f"Wochenstand {plan['date']}")
-        print(f"\nTelegram: {'gesendet' if ok else 'nicht gesendet'}")
+        print(f"\nVersand: {'gesendet' if ok else 'nicht gesendet'}")
         return 0
 
     ok = _send(
@@ -711,7 +727,7 @@ def main() -> int:
         title=f"Tagesplan {plan['date']}",
         severity_high=bool(d["buy"] or d["sell"]),
     )
-    print(f"\nTelegram: {'gesendet' if ok else 'unterdrueckt (dedup/rate-limit)'}")
+    print(f"\nVersand: {'gesendet' if ok else 'unterdrueckt (dedup/rate-limit)'}")
     return 0
 
 
