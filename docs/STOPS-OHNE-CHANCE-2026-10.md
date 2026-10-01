@@ -55,8 +55,8 @@ sofort). Das ist kein Muster, sondern Rauschen → **keine Regel**.
 | B | n = 77, Ø −0,105 R | n = 90, Ø +0,018 R |
 
 A− war in **beiden** Hälften nicht besser als B+ (zusammen −0,23 R je Trade schlechter,
-Permutationstest p = 0,15 → nicht belastbar). B lag in beiden Hälften etwas unter B+ —
-das passt zur bestehenden Regel „B+ nur bei bewährter Setup-Art, B nie".
+Permutationstest p = 0,15 → nicht belastbar). B lag in beiden Hälften etwas unter B+.
+(Korrektur abends: das Gewinner-Tor vom 01.10. ließ B+ gar nicht mehr durch — siehe unten.)
 
 ## Entscheidung
 
@@ -71,3 +71,53 @@ das passt zur bestehenden Regel „B+ nur bei bewährter Setup-Art, B nie".
    Setup-Art sortiert. Vorher nicht.
 3. Aktien bleiben, wie sie sind: Aktien Long gesperrt (eigene Bilanz −3,3 R aus 6),
    Aktien-Shorts nur mit bewährter Setup-Art.
+
+## Nachtrag 01.10. abends — Tageszeit, Wartezeit, Weg zum Einstieg
+
+Frage (Ozan: „bessere Kaufsignale"): laufen die beiden freien Setup-Arten besser, wenn
+der Einstieg zu einer bestimmten Tageszeit, am Wochenende, nach kurzer oder langer
+Wartezeit oder nach einem bestimmten Rücklauf kommt? Einstiegszeit aus den M15-Kerzen
+(erste Kerze ab Aufnahme, die den Einstiegskurs enthält), Weg zum Einstieg in R aus dem
+Kurs bei Aufnahme. Alle 633 Nachspiel-Trades zugeordnet.
+
+| Aufteilung (freie Setups) | In-Sample | Out-of-Sample |
+|---|---|---|
+| Einstieg 1–8 h nach Aufnahme | Ø +0,331 R (n = 42) | Ø −0,038 R (n = 42) |
+| Einstieg sofort (< 1 h) | Ø −0,132 R (n = 179) | Ø −0,004 R (n = 147) |
+| Einstieg 16–24 UTC | Ø +0,137 R (n = 99) | Ø −0,130 R (n = 82) |
+| Einstieg 08–16 UTC | Ø −0,167 R (n = 75) | Ø +0,067 R (n = 64) |
+| Rücklauf 0,25–0,75 R bis zum Einstieg | Ø +0,167 R (n = 38) | Ø −0,107 R (n = 20) |
+| Wochenende | Ø +0,096 R (n = 60) | Ø −0,043 R (n = 54) |
+
+**Jede Aufteilung, die In-Sample gut aussieht, kippt Out-of-Sample.** Das ist genau das
+Muster, vor dem die Studie schützen soll: eine Regel daraus hätte die Vergangenheit
+schöner gemacht und die Zukunft nicht. → **Keine Regel**, nichts geändert.
+
+Mitgefunden und behoben: der Stop-Alarm (Issue #188, Zcash) nannte als „Ergebnis" den
+tiefsten Kurs der Prüfstunde (−1,42 R). Mit einer Stop-Order ist man am Stop draußen
+(−1,11 R am tatsächlichen Einstieg; die Bilanz zählt einen Stop als −1 R). Jetzt: „Ergebnis laut
+Plan …; zwischendurch lief der Kurs bis …".
+
+## Nachtrag 01.10. abends — B+ bei bewährter Setup-Art wieder frei
+
+Beim Live-Check fiel auf: die einzige freie Setup-Art „Ausbruch aus der Basis" ist **nur
+wegen ihrer B+-Trades bewährt** — geklingelt hätten aber nur A−-Trades, denn das
+Gewinner-Tor vom 01.10. hatte B+ mit gesperrt („strengere Auswahl, kein Beweis").
+
+| „Ausbruch aus der Basis" | eigene Bilanz | Nachspiel In-Sample | Nachspiel Out-of-Sample |
+|---|---|---|---|
+| B+ | 11 Trades, **+3,8 R** | n = 60, Ø +0,020 R | n = 41, Ø **+0,102 R** |
+| A− | 2 Trades, −0,7 R | n = 24, Ø −0,053 R | n = 11, Ø −0,493 R |
+
+B+ ist in der eigenen Bilanz **und** in beiden Hälften des Nachspiels nicht schlechter
+als A− — das ist die Bedingung, unter der hier eine Regel geändert wird.
+
+**Geändert:** B+ klingelt wieder, aber nur bei einer in der eigenen Bilanz bewährten
+Setup-Art (`alarm_tor.B_PLUS_BEI_BEWAEHRT`). Unverändert: B nie, höchstens drei Alarme am
+Tag, derselbe Coin einmal in 48 Stunden, Aktien Long gesperrt.
+
+**Zurücknehmen**, wenn die B+-Alarme nach zehn entschiedenen Trades unter Profitfaktor 1
+liegen.
+
+Nicht geändert: A− bleibt frei, obwohl es im Nachspiel bei dieser Art in beiden Hälften
+negativ war — 35 Trades sind zu wenig, um eine bessere Note auszusperren.
