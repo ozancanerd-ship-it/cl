@@ -251,7 +251,10 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 /* Jede Kennzahl in einer eigenen Kapsel — nebeneinander gesetzte Zahlen ohne
    Rahmen verschwimmen auf dem Handy zu einer Zeile Zahlensalat. */
 .kpi>span{background:var(--sunk); border:1px solid var(--rule); border-radius:7px;
-  padding:3px 8px; white-space:nowrap}
+  padding:3px 8px; white-space:nowrap; max-width:100%}
+/* Lange Kapseln (Sektor, Kursziel, 52 Wochen) liefen am Handy rechts aus dem Bild.
+   Kurze bleiben einzeilig, lange duerfen umbrechen. */
+@media (max-width:640px){.kpi>span{white-space:normal}}
 .kpi b{color:var(--ink); font-weight:600}
 .kpi .up{color:var(--long)} .kpi .dn{color:var(--bad)}
 .warnz{margin-top:8px; font-size:11.5px; color:var(--warn); line-height:1.45;
@@ -592,6 +595,14 @@ a{color:var(--accent); text-underline-offset:3px}
 .opp-mehr>summary::-webkit-details-marker{display:none}
 .opp-mehr>summary::before{content:"▸ "; color:var(--accent)}
 .opp-mehr[open]>summary::before{content:"▾ "}
+.mc-liste{display:flex; flex-direction:column; gap:2px; margin-top:6px}
+.mc{padding:8px 2px; border-top:1px solid var(--rule); cursor:pointer}
+.mc:first-child{border-top:0}
+.mc-k{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; font-size:14px}
+.mc-k .mc-p{margin-left:auto; font-size:12.5px; color:var(--ink-2)}
+.mc-s{font-size:12.5px; color:var(--ink-2); line-height:1.45; margin-top:2px}
+.mc-s.up{color:var(--long); font-weight:600} .mc-s.warn{color:var(--warn)}
+.mc-plan{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--accent-2); margin-top:3px; letter-spacing:.02em}
 </style>
 </head>
 <body>
@@ -1693,6 +1704,7 @@ function zeichneStatus(){
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
     ${depotZeile()}
+    ${sicherText(meineCoinsKasten)}
     ${topSignal()}
     ${makroKasten()}
     ${stimmungKasten()}
@@ -1704,6 +1716,8 @@ function zeichneStatus(){
   if (top) top.addEventListener('click', ()=>waehle(top.dataset.sym));
   const dz = $('depotzeile');
   if (dz) dz.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); });
+  document.querySelectorAll('#meinecoins [data-sym]').forEach(el =>
+    el.addEventListener('click', ()=>waehle(el.dataset.sym)));
   // Das Alter steht in der Kopfzeile. Ist es zu hoch, steht es dort auch in Farbe —
   // graue Kleinschrift hat siebzehn Stunden Stillstand nicht auffallen lassen.
   const kopfzeile = $('stempel');
@@ -1755,6 +1769,132 @@ function depotZeile(){
     <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">Bewertet nach relativer
       Stärke in der eigenen Klasse, nicht nach Einstiegs-Score — läuft bei jedem Kurs neu.</p>
   </div>`;
+}
+
+/* ============================================ DEINE COINS UND DIE GROSSEN
+
+   Ozan, 01.10.: „Bitcoin, Ethereum, Solana — ich hab bis jetzt nicht einen einzigen
+   Alarm von denen gesehen … und von den Coins, die ich selber benutze, auch nicht,
+   sondern von irgendwelchen anderen."
+
+   Genau das stand nirgends: WARUM zu genau diesen Werten nichts kommt. Die Rangliste
+   zeigt nur, was ein Setup hat; was keins hat, verschwindet im Rest. Hier stehen die
+   drei Grossen und jeder Coin aus dem Depot immer ganz oben, mit dem einen Satz, der
+   den Stand erklaert — und mit dem Platz im „Big Plan" (der Momentum-Regel im Reiter
+   Plan), wo der Wert dazugehoert. Erfunden wird nichts: steht hier „kein Einstieg",
+   gibt es gerade keinen, der sich messbar gelohnt hat. */
+const KERN_COINS = ['BTCUSD', 'ETHUSD', 'SOLUSD'];
+function sicherText(fn){ try { return fn() || ''; } catch(e){ console.error(e); return ''; } }
+function _basisCoin(k){ return String(k||'').toUpperCase().replace(/(USDT|USDC|USD|EUR|-YFD)$/,''); }
+function keinTradeSatz(r){
+  const ren = (r.zusatz && r.zusatz.renditen) || {};
+  const m1 = ren.r21, m3 = ren.r63;
+  const lauf = (m1 != null && m3 != null)
+    ? `${pct(m1,1)} in einem Monat, ${pct(m3,0)} in drei` : '';
+  const b = String(r.begruendung || '');
+  if (/Invalidierung/.test(b)){
+    if (m1 != null && m3 != null && m1 > 0 && m3 > 0)
+      return `Steigt (${lauf}) ohne Rücksetzer — keine Stop-Marke, deshalb noch kein Einstieg.`;
+    if (m1 != null && m3 != null && m1 < 0 && m3 < 0)
+      return `Fällt (${lauf}) ohne klare Struktur — weder ein Einstieg noch ein Short mit sauberer Marke.`;
+    return 'Seitwärts ohne klare Richtung auf den Zeitebenen — kein Einstieg mit sauberer Stop-Marke.'
+      + (lauf ? ` (${lauf})` : '');
+  }
+  return b || 'kein Einstieg';
+}
+function meineCoinsDaten(){
+  if (!S) return [];
+  const liste = [];
+  const dazu = (sym, depot) => {
+    const r = scanRow(sym);
+    const k = r ? r.instrument : String(sym).toUpperCase();
+    const da = liste.find(x => _basisCoin(x.k) === _basisCoin(k));
+    if (da){ da.depot = da.depot || depot; return; }
+    liste.push({k, r, depot});
+  };
+  for (const k of KERN_COINS) dazu(k, false);
+  let depot = [];
+  try { depot = depotKryptoSymbole(); } catch(e){}
+  for (const d of depot) dazu(d, true);
+  const plan = new Map(((P && P.positions) || []).map(x => [_basisCoin(x.instrument), x]));
+  const imPlanUniversum = new Set(['BTC','ETH','BNB']);
+  return liste.slice(0, 14).map(({k, r, depot}) => {
+    const live = L.get(k);
+    const kurs = live ? live.p : (r ? r.kurs : null);
+    const basis = _basisCoin(k);
+    let status = '', kl = 'nu';
+    if (!r){ status = 'Nicht im Scan — bei Kraken zu wenig Umsatz oder nicht gelistet.'; }
+    else if (r.alarm && r.alarm.ja){
+      status = `${r.richtung==='long'?'KAUFEN':'SHORT'} ab ${num(r.einstieg, digits(r.einstieg))} — geht aufs Handy.`;
+      kl = 'up';
+    } else if (r.handelbar){
+      status = `Setup da (Note ${r.note}), aber kein Alarm: ${(r.alarm && r.alarm.grund) || ''}`;
+      kl = 'warn';
+    } else if (r.urteil === 'WATCH'){
+      status = 'Beobachten — ' + (r.bremse || r.begruendung || 'noch nicht reif');
+    } else {
+      status = keinTradeSatz(r);
+    }
+    const pl = plan.get(basis);
+    const planSatz = pl ? `Big Plan: drin (${num(pl.eur,0)} €)`
+      : (imPlanUniversum.has(basis) ? 'Big Plan: gerade nicht drin' : '');
+    const m1 = r && r.zusatz && r.zusatz.renditen ? r.zusatz.renditen.r21 : null;
+    return {k, r, depot, kurs, live: !!live, status, kl, planSatz, m1, name: name(k)};
+  });
+}
+function meineCoinsKasten(){
+  const daten = meineCoinsDaten();
+  if (!daten.length) return '';
+  const zeilen = daten.map(x => `<div class="mc" data-sym="${esc(x.k)}">
+      <div class="mc-k"><b>${esc(x.name)}</b>${x.depot?' <span class="mini-tag">DEPOT</span>':''}
+        <span class="mono mc-p">${x.kurs!=null?num(x.kurs, digits(x.kurs)):'—'}${x.live?' <span class="up" style="font-size:9.5px">LIVE</span>':''}</span>
+        ${x.m1!=null?`<span class="mono ${x.m1>=0?'up':'dn'}" style="font-size:11px">${pct(x.m1,1)} / 1 M</span>`:''}</div>
+      <div class="mc-s ${x.kl}">${esc(x.status)}</div>
+      ${x.planSatz?`<div class="mc-plan">${esc(x.planSatz)}</div>`:''}
+    </div>`).join('');
+  return `<div class="karte" style="margin:10px 0 0" id="meinecoins">
+    <h3 style="margin-top:0">Deine Coins und die Großen
+      <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12px">warum (k)ein Signal</span></h3>
+    <div class="mc-liste">${zeilen}</div>
+    <p style="margin:9px 0 0;font-size:12px;color:var(--ink-3)"><strong>Warum nicht einfach
+      hinterherkaufen, wenn es steigt?</strong> Genau das ist nachgerechnet: „kaufen, wenn der Coin
+      über einen und drei Monate im Plus ist" hat 2024 gut verdient, 2025 aber 35 R verloren und
+      2026 bisher ±0 (docs/TREND-SWING-STUDIE). Der Scanner wartet deshalb auf einen Rücksetzer
+      mit klarer Marke. Ein Alarm kommt nur, wenn ein Setup durchs Gewinner-Tor geht — Setup-Art
+      in deiner eigenen Bilanz bewährt, Note ab A−. Antippen öffnet den Chart.</p>
+  </div>`;
+}
+
+/* Fuer den Chat ohne Schluessel: dieselben Saetze wie im Kasten, als Text. */
+function meineCoinsText(){
+  const daten = meineCoinsDaten();
+  if (!daten.length) return 'Der Scan ist noch nicht geladen.';
+  return daten.map(x => `**${x.name}**${x.depot?' (Depot)':''} — ${x.status}${x.planSatz?' · '+x.planSatz:''}`)
+    .join('\n\n');
+}
+function warumKeinAlarmText(){
+  if (!S) return 'Der Scan ist noch nicht geladen.';
+  const g = S.gesamt || [];
+  const handelbar = g.filter(o => o.handelbar);
+  const klingeln = g.filter(o => o.alarm && o.alarm.ja);
+  const R = S.alarm_regeln || {};
+  const frei = R.frei || [];
+  let t = `Gerade haben **${handelbar.length}** von ${g.length} Werten ein handelbares Setup; `
+    + `**${klingeln.length}** davon gehen durchs Gewinner-Tor aufs Handy.`;
+  if (klingeln.length) t += ' Das sind: ' + klingeln.slice(0,5).map(o => name(o.instrument)).join(', ') + '.';
+  t += '\n\nEin Alarm kommt nur, wenn die Setup-Art sich in deiner eigenen Bilanz bewährt hat '
+    + '(mindestens 6 entschiedene Trades, im Plus, Profitfaktor ab 1,5) und die Note mindestens A− ist. '
+    + (frei.length ? `Frei sind gerade: ${frei.join(', ')}.` : 'Gerade ist keine Setup-Art frei.')
+    + '\n\nSo steht es bei deinen Coins und den Großen:\n\n' + meineCoinsText();
+  return t;
+}
+function bigPlanText(){
+  if (!P || !(P.positions||[]).length) return 'Der Big Plan (Momentum-Regel) hat gerade keine Positionen.';
+  return `Der **Big Plan** ist die Momentum-Regel im Reiter Plan — kein Chart-Setup, sondern: was über `
+    + `Monate steigt, wird gehalten, nach Schwankung gewichtet. Stand ${String(P.date||'')}: `
+    + `${P.n_long} von ${P.n_total} Werten im Aufwärtstrend.\n\n`
+    + P.positions.map(x => `**${name(x.instrument)}** — ${num(x.eur,0)} € (${x.state==='full'?'voll':'teilweise'})`).join('\n')
+    + '\n\nÄndert sich der Plan (kaufen oder verkaufen), kommt das seit 01.10. auch per Mail und GitHub-App.';
 }
 
 /* Das beste Setup ganz oben, sobald man die App oeffnet. Ozans Endbild aus dem
@@ -6675,6 +6815,10 @@ function urteilFuer(o){
 
 function lokaleAntwort(frage){
   const t = (frage||'').toLowerCase();
+  if (/warum.*(kein|nicht|nie).*(alarm|signal)|kein(e|en)?\s+(alarm|signal)|nie.*(alarm|signal)/.test(t))
+    return warumKeinAlarmText();
+  if (/meine\s+(coins|werte|krypto|kryptos)|die gro(ss|ß)en/.test(t)) return meineCoinsText();
+  if (/big\s*plan|\bplan\b|momentum/.test(t)) return bigPlanText();
   const o = findeWert(frage);
   if (o) return urteilFuer(o);
 
@@ -6744,6 +6888,8 @@ function lokaleAntwort(frage){
     if (muster.test(t)) return typeof antwort === 'function' ? antwort() : antwort;
   }
 
+  if (S) return warumKeinAlarmText() + '\n\n---\nFrag gern auch nach einem Wert beim Namen, '
+    + 'nach „Big Plan", „Bilanz" oder „mein Depot".';
   return 'Nenn mir einen Wert beim Namen — zum Beispiel „soll ich bei Bitcoin rein?" oder '
     + '„was ist mit NVIDIA?". Dann sage ich dir, was das System gerade dazu sieht: Note, Setup, '
     + 'Einstieg, Stop, Ziele, was dagegen spricht und wie oft so etwas bisher aufging.\n\n'
@@ -6818,40 +6964,33 @@ function zeichneChat(){
   const key = chatSchluessel();
   let h = '';
   if (!key){
-    h = `<div class="note-box warn" style="margin-top:0"><span class="nt">Gerade: vorbereitete Antworten</span>
-      <p><strong>Frei sprechen geht — aber erst mit deinem eigenen Schlüssel.</strong>
-      Ohne ihn erkennt die App nur Muster: <em>„wie steht Solana?"</em>,
-      <em>„was ist gerade gut?"</em>, <em>„wie steht mein Depot?"</em>. Die Zahlen darin
-      stimmen — sie kommen aus denselben Daten wie die anderen Reiter. Aber sie kann keine
-      Rückfrage stellen, nichts vergleichen und nicht auf deine letzte Antwort eingehen.</p>
-      <p style="margin-top:8px"><strong>Mit Schlüssel ist es ein richtiges Gespräch:</strong>
-      du fragst frei, sie fragt zurück, sie begründet, sie kennt deinen Depotstand und den
-      laufenden Scan. Einrichten dauert zwei Minuten — Feld weiter unten. Es kostet je
-      Frage ein paar Cent über dein eigenes Konto.</p></div>
-    <div class="karte">
-      <h3 style="margin-top:0">Optional: richtiges Gespräch einrichten</h3>
-      <p style="font-size:13px;color:var(--ink-2);margin:0 0 12px">Dieser Chat laeuft ueber
+    h = `<div class="note-box" style="margin-top:0"><span class="nt">Chat ohne Schlüssel — kostenlos</span>
+      <p>Der Chat antwortet aus den Daten dieser App: frag nach einem Wert
+      (<em>„wie steht Solana?"</em>), nach <em>„warum kein Alarm?"</em>, <em>„meine Coins"</em>,
+      <em>„was ist gerade gut?"</em>, <em>„Big Plan"</em>, <em>„wie ist die Bilanz?"</em> oder
+      <em>„wie steht mein Depot?"</em>. Es kostet nichts und braucht keinen Schlüssel, und
+      deine Daten verlassen dabei das Gerät nicht.</p></div>
+    <details class="karte klapp" style="margin-top:10px">
+      <summary><h3 style="display:inline">Optional: freies Gespräch mit eigenem Schlüssel</h3>
+        <span class="klapp-hint">kostet je Frage ein paar Cent über ein eigenes API-Konto — nicht nötig</span></summary>
+      <p style="font-size:13px;color:var(--ink-2);margin:10px 0 12px">Dieser Chat laeuft ueber
       deinen <strong>eigenen API-Schluessel</strong>. Genau deshalb funktioniert er auch dann,
       wenn dein Limit im normalen Claude-Chat erreicht ist — die Abrechnung laeuft ueber dein
       Konto, nicht ueber die Sitzung.</p>
       <div class="note-box warn" style="margin:0 0 12px"><span class="nt">Das wird oft uebersehen</span>
       <p style="margin:0">Die API wird <strong>getrennt abgerechnet</strong>. Ein Pro- oder
       Max-Abo enthaelt <strong>kein</strong> API-Guthaben. Ohne Guthaben antwortet der Schluessel
-      mit „credit balance is too low" — der Schluessel ist dann richtig, nur das Konto leer.
-      Guthaben laedst du unter <span class="mono">console.anthropic.com → Billing</span> auf.</p>
-      <p style="margin:8px 0 0">Der Schluessel beginnt mit <span class="mono">sk-ant-api03-</span>.
-      Ein Schluessel aus der Claude-App oder aus dem Browser ist etwas anderes und funktioniert hier nicht.</p></div>
+      mit „credit balance is too low" — der Schluessel ist dann richtig, nur das Konto leer.</p></div>
       <p style="font-size:12.5px;color:var(--ink-3);margin:0 0 12px">Der Schluessel bleibt
       <strong>ausschliesslich in diesem Browser</strong>. Er geht nie ins Repository und nie
-      auf die oeffentliche Seite — das Repo ist oeffentlich, ein Schluessel darin waere binnen
-      Stunden fremd benutzt.</p>
+      auf die oeffentliche Seite.</p>
       <div class="rowx" style="border:0;padding:0"><input id="chat_key" type="password"
         placeholder="sk-ant-..." autocomplete="off" spellcheck="false"></div>
       <p style="margin:12px 0 0"><button class="btn prim" id="chat_save">Speichern und pruefen</button>
         <a class="btn" style="margin-left:8px;text-decoration:none;display:inline-block"
            href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Schluessel holen</a></p>
       <div id="chat_meld"></div>
-    </div>`;
+    </details>`;
     $('chat').innerHTML = h;
     $('chat_save').addEventListener('click', async ()=>{
       // Leerzeichen und Zeilenumbrueche mit abschneiden: beim Kopieren aus der Konsole
@@ -6907,7 +7046,8 @@ function chatAnhaengen(mitSchluessel){
   </div>
   <p style="margin:10px 0 0;font-size:11.5px;color:var(--ink-3)">
     Antwort aus den Daten dieser Seite · <button class="link" id="chat_reset">Verlauf leeren</button></p>`;
-  $('chat').appendChild(kasten);
+  const opt = $('chat').querySelector('details');
+  if (opt) $('chat').insertBefore(kasten, opt); else $('chat').appendChild(kasten);
   chatVerdrahten(mitSchluessel);
 }
 
@@ -6981,12 +7121,9 @@ async function chatSenden(){
        sie kann „wie steht Solana" und „was ist gerade gut", aber keine Rückfrage und
        keinen Vergleich. Das gehört an JEDE dieser Antworten drangeschrieben, nicht nur
        in einen Kasten weiter oben, den man einmal liest und dann nie wieder. */
-    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content:
-      lokaleAntwort(frage)
-      + '\n\n---\n*Das ist eine vorbereitete Antwort aus deinen eigenen Daten — sie kann '
-      + 'keine Rückfrage stellen und nicht frei mit dir reden. Dafür fehlt der eigene '
-      + 'Schlüssel; das Feld dafür steht unter diesem Chat. Danach kannst du hier alles '
-      + 'fragen wie in einem normalen Gespräch.*'};
+    // Seit 01.10. ohne Werbe-Fusszeile fuer den Schluessel: Ozan hat kein API-Guthaben
+    // und will keins — der Chat soll ohne funktionieren, nicht um eins betteln.
+    CHAT_VERLAUF[CHAT_VERLAUF.length-1] = {role:'assistant', content: lokaleAntwort(frage)};
     chatMalen();
     return;
   }
