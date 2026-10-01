@@ -85,7 +85,7 @@ ART_TITEL = {
     "stop_nach": "Stop nachziehen",
     "zahlen": "Quartalszahlen stehen an",
     "zahlen_ko": "Quartalszahlen — Knock-out-Risiko",
-    "entwarnung": "Entwarnung — früherer Stop-Alarm hinfällig",
+    "entwarnung": "früherer Stop-Alarm hinfällig — nicht deswegen verkaufen",
 }
 #: Diese Arten verlangen JETZT eine Entscheidung und bekommen die Klingel auch oeffentlich.
 DRINGEND = {"stop", "ziel", "ko", "puffer_kritisch", "puffer_eng", "zahlen_ko", "entwarnung"}
