@@ -426,6 +426,9 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .karte.gut{border-color:rgba(43,232,165,.28); background:linear-gradient(135deg,var(--long-bg),var(--glass))}
 .karte.warn{border-color:rgba(255,182,72,.28)}
 .karte.bad{border-color:rgba(255,92,122,.28)}
+/* Das Urteil oben rechts auf einer Depot-Karte — in der Farbe der Handlung */
+.karte > h3 .note.bad{color:var(--bad)} .karte > h3 .note.warn{color:var(--warn)}
+.karte > h3 .note.gut{color:var(--long)}
 .zt{display:flex; gap:8px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace; font-size:11px;
   color:var(--ink-2); margin-top:11px; padding-top:11px; border-top:1px solid var(--rule)}
 /* Nur die direkten Kinder sind Kaertchen — ein Zusatz IN einem Kaertchen („5× · 60 %“)
@@ -1226,6 +1229,31 @@ function frischeAuf(){
   pruefeStillstand();
 }
 
+/* Eine Meldung auf den Bildschirm — auch auf dem iPhone.
+
+   Bis 01.10. stand hier überall ``new Notification(...)``. Safari auf dem iPhone kennt
+   diesen Konstruktor in einer Home-Bildschirm-App nicht: er wirft, und weil jeder Aufruf
+   in try/catch steckt, verschwand die Meldung still — die App „war aktiviert" und
+   meldete trotzdem nichts. Der Weg, den iOS kennt, ist die Meldung über den Service
+   Worker (``registration.showNotification``). Erst dorthin, nur als Rückfall der alte Weg. */
+function meldung(titel, opts){
+  const o = Object.assign({icon:'icon.png', badge:'icon.png', data:{url:location.href}}, opts || {});
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  } catch(e){ return; }
+  const alt = () => { try { new Notification(titel, o); } catch(e){} };
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration){
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg && reg.showNotification) reg.showNotification(titel, o).catch(alt);
+        else alt();
+      }).catch(alt);
+      return;
+    }
+  } catch(e){}
+  alt();
+}
+
 /* ============================== ALARM FUER DIE HANDLUNG IM DEPOT
 
    „Ich will auch Alarme bekommen, wenn er sagt verkauf das aus meinem Depot oder geh
@@ -1261,7 +1289,7 @@ function pruefeAktionsAlarme(){
       const wieviel = (a.menge != null)
         ? `${a.art==='nachlegen'?'Kaufen':'Verkaufen'}: ${num(a.menge, a.menge<1?4:2)} ≈ ${num(a.euro,0)} €. `
         : '';
-      new Notification(`${AKTION_WORT[a.art]} · ${posName(b)}`,
+      meldung(`${AKTION_WORT[a.art]} · ${posName(b)}`,
         {body: wieviel + a.titel, tag: key});
     } catch(e){}
   }
@@ -1287,7 +1315,7 @@ function pruefeStillstand(){
   _stillstandGemeldet = true;
   try {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    new Notification('Die Analyse steht — seit ' + altersText(), {
+    meldung('Die Analyse steht — seit ' + altersText(), {
       body: 'Der Scan läuft normalerweise alle zehn Minuten. Solange er steht, zeigt die '
           + 'App keine Einstiege mehr an. Dein Depot wird mit Live-Kursen weiter bewertet.',
       tag: key});
@@ -1314,12 +1342,15 @@ function pruefeDepotAlarme(){
     try { b = bewertePosition(p); } catch(e){ continue; }
     const schritt = naechsterSchritt(p, planKurs(b), b.w);
     if (!schritt || (schritt.stufe !== 'stop' && schritt.stufe !== 'ziel')) continue;
+    // Ein alter, zu enger Setup-Stop wird erst korrigiert (stopsPflegen), nicht gemeldet.
+    const pl0 = p.plan || {};
+    if (schritt.stufe === 'stop' && pl0.art !== 'halte' && pl0.art !== 'einstand' && pl0.quelle === 'app' && !pl0.gekauft && !pl0.korrigiert) continue;
     const key = 'verkauf:' + p.sym + ':' + (schritt.marke || 'stop');
     if (gemeldetLaden()[key]) continue;
     gemeldetMerken(key);
     try {
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
-      new Notification(`VERKAUFEN · ${name(p.sym)}`, {body: schritt.titel + ' — ' + schritt.text, tag: key});
+      meldung(`VERKAUFEN · ${name(p.sym)}`, {body: schritt.titel + ' — ' + schritt.text, tag: key});
     } catch(e){}
   }
 }
@@ -1369,7 +1400,7 @@ function pruefeUrteilWechsel(){
     try {
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
       const rat = positionsRat(b);
-      new Notification(
+      meldung(
         (URTEIL_DRINGEND.has(b.urteil) ? 'PRÜFEN · ' : 'Beobachten · ') + name(p.sym)
           + ' → ' + b.urteil,
         {body: (rat.saetze||[])[0] || ('Neue Einschätzung: ' + b.urteil), tag: key});
@@ -1400,7 +1431,7 @@ function pruefeTerminAlarme(){
     gemeldetMerken(key);
     try {
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') continue;
-      new Notification(`In ${Math.round(min)} Min: ${t.titel} (${t.land})`, {
+      meldung(`In ${Math.round(min)} Min: ${t.titel} (${t.land})`, {
         body: 'Wichtiger Termin. Bis er durch ist, nichts Neues aufmachen — und bei '
             + 'laufenden Positionen den Stop im Blick behalten.', tag: key});
     } catch(e){}
@@ -3735,7 +3766,7 @@ function naechsterSchritt(pos, kurs, wPos){
         text:(basis ? `${wer} bei ${num(kurs,d)}${w}. ` : '')
           + `Kein festes Ziel, aber ein Stop ${basis ? 'auf ' + (pl.basis_name || 'den Basiswert') + ' ' : ''}bei ${num(pl.stop,d)}${w} — `
           + `${weg.toFixed(1).replace('.',',')} % entfernt. Laufen lassen — läuft der Kurs `
-          + 'davon, zieht die App den Stop nach (nur nach oben, nie zurück). Verkauft wird, '
+          + `davon, zieht die App den Stop nach (${lang ? 'nur nach oben' : 'bei einem Short nur nach unten'}, nie zurück). Verkauft wird, `
           + 'wenn der Stop fällt, nicht wenn es sich unangenehm anfühlt.'};
     }
     return {stufe:'fertig', titel:'Alle Ziele erreicht',
@@ -3783,10 +3814,20 @@ function planKurs(b){
      * der Halte-Stop (Chandelier aus Tageskerzen) — fuer JEDEN Wert mit Kerzen.
    Seit dem 27.09. steht der zweite in jeder Scan-Zeile. Vorher blieb eine Position ohne
    frisches Setup ganz ohne Stop — und damit ohne Verkaufsalarm. */
-function stopKandidaten(r, lang, kurs, um){
+/* Seit 01.10.: die Invalidierung eines Setups nur noch fuer Positionen, die ueber ein
+   Signal gekauft wurden (``mitSetup``) — und nur, wenn das Setup in DIESELBE Richtung
+   zeigt. Vorher nahm die App jede Invalidierung unter dem Kurs, auch die eines SHORTS,
+   dessen These der Kurs gerade ueberrollt hatte. Bei Sei lag der Long-Stop so bei
+   0,07243 — direkt unter dem Kurs —, und die Karte rief „Stop gerissen — alles
+   verkaufen" bei einem Coin, der staerker lief als drei Viertel seiner Klasse.
+   Fuer gehaltene Positionen gilt nur noch der Halte-Stop: er ist der einzige, der gemessen
+   ist (docs/HALTE-STOP-STUDIE-2026-09.md). Eine Setup-Marke ist fuer einen NEUEN Einstieg
+   gebaut, eng, mit 1 bis 3 % Abstand — als Stop fuer eine laufende Position verkauft sie
+   im Rauschen, und zwei Wochen spaeter steht der Kurs hoeher. */
+function stopKandidaten(r, lang, kurs, um, mitSetup){
   const aus = [];
   if (!r || kurs == null || !isFinite(kurs)) return aus;
-  const inv = um(r.invalidierung);
+  const inv = mitSetup && r.richtung === (lang ? 'long' : 'short') ? um(r.invalidierung) : null;
   if (inv != null && isFinite(inv) && (lang ? inv < kurs : inv > kurs))
     aus.push({stop: inv, art: 'setup', grund: 'die laufende Analyse (Invalidierung des Setups)'});
   const h = r.halte || {};
@@ -3835,7 +3876,7 @@ function stopVorschlag(b){
   const r = b.row;
   if (!r || b.kurs == null) return null;
   const um = (v) => v == null ? null : inPositionsWaehrung(r, v, pos);
-  const k = stopKandidaten(r, lang, b.kurs, um);
+  const k = stopKandidaten(r, lang, b.kurs, um, !!(pos.plan && pos.plan.gekauft));
   if (!k.length) return null;
   const best = k.reduce((a, c) => (lang ? c.stop > a.stop : c.stop < a.stop) ? c : a);
   const mitZielen = best.art === 'setup';   // der Halte-Stop hat keine Ziele
@@ -3905,6 +3946,21 @@ function stopPflege(b){
   }
 
   const besser = (a, c) => lang ? a > c : a < c;   // „weiter in Sicherheit"
+
+  /* Einmalige Korrektur (01.10.): Stops, die die App frueher aus einer Setup-Marke gesetzt
+     hat, auf einer Position, die NICHT ueber ein Signal gekauft wurde. Sie waren zu eng und
+     teils aus der falschen Richtung (siehe stopKandidaten). Sie wandern auf den gemessenen
+     Halte-Stop — das ist die einzige Stelle, an der ein Stop weiter weg rueckt, und sie
+     steht deshalb ausdruecklich in der Liste „Beim Broker eintragen". Ein Stop, den Ozan
+     selbst gesetzt hat, bleibt unangetastet. */
+  // Auch ohne ``art`` (Stops aus der Zeit, bevor die App die Herkunft mitschrieb): was die
+  // App gesetzt hat und weder Halte-Stop noch Einstand ist, war eine Setup-Marke.
+  if (pl.art !== 'halte' && pl.art !== 'einstand' && pl.quelle === 'app' && !pl.gekauft && !pl.korrigiert){
+    if (v && v.art === 'halte' && (lang ? v.stop < kurs : v.stop > kurs))
+      return {art:'korrektur', von:pl.stop, stop:v.stop, ebene, halteArt:'halte',
+        grund:'korrigiert: die alte Marke kam aus einem kurzfristigen Setup und lag zu eng '
+          + '— für eine gehaltene Position gilt der gemessene Halte-Stop'};
+  }
   let ziel = null, grund = '', art = pl.art || null;
 
   // Ziel 1 durch → auf den Einstieg. Ab da kann der Trade nichts mehr kosten.
@@ -3940,7 +3996,7 @@ function stopsPflegen(bew){
   let geaendert = false;
   for (const b of bew){
     const p = stopPflege(b);
-    if (!p || (p.art !== 'neu' && p.art !== 'nachziehen')) continue;
+    if (!p || (p.art !== 'neu' && p.art !== 'nachziehen' && p.art !== 'korrektur')) continue;
     const pos = a.find(x => posSchluessel(x) === posSchluessel(b.pos));
     if (!pos) continue;
     const ebene = p.ebene || (pos.plan && pos.plan.ebene) || 'position';
@@ -3959,6 +4015,7 @@ function stopsPflegen(bew){
       // Teilverkauf wieder auferstehen lassen.
       ...(p.art === 'neu' ? {tp1:p.tp1 ?? null, tp2:p.tp2 ?? null, tp3:p.tp3 ?? null} : {}),
       quelle: (vorher.quelle === 'selbst') ? 'selbst_nachgezogen' : 'app',
+      ...(p.art === 'korrektur' ? {korrigiert: Date.now()} : {}),
       gesetzt: Date.now(),
       /* Offen, bis Ozan sagt, dass die Order beim Broker liegt.
 
@@ -3968,7 +4025,7 @@ function stopsPflegen(bew){
          ueberhaupt aufmacht. Dann haette die App brav einen Stop ueberwacht, den es beim
          Broker nie gab. Der Merker bleibt deshalb stehen, bis er abgehakt wird. */
       broker_offen: {von: alt, stop: p.stop, grund: p.grund || '', zeit: Date.now(),
-                     ebene},
+                     ebene, korrektur: p.art === 'korrektur'},
     };
     geaendert = true;
     geschehen.push({b, art:p.art, von:alt, stop:p.stop, grund:p.grund, selbst:!!p.selbst});
@@ -4014,7 +4071,9 @@ function stopKasten(geschehen, bew){
         const d = digits(b.kurs || o.stop || 1);
         const z = waehrungsZeichen(b.w);
         return `<p style="margin:8px 0 0;font-size:13px">
-          <strong>${esc(posName(b))}</strong> — Stop ${o.von != null
+          <strong>${esc(posName(b))}</strong> — Stop ${o.korrektur
+            ? `von ${num(o.von,d)}${z} auf <strong>${num(o.stop,d)}${z}</strong> setzen (weiter weg — Korrektur)`
+            : o.von != null
             ? `von ${num(o.von,d)}${z} auf <strong>${num(o.stop,d)}${z}</strong> nachziehen`
             : `neu auf <strong>${num(o.stop,d)}${z}</strong>`}
           <span style="color:var(--ink-3)">· ${esc(o.grund||'')}</span>
@@ -5131,8 +5190,35 @@ function entscheidungsKasten(b, stand){
   return aktionsKasten(b, stand, a) + (hatPlan ? '' : ausstiegsKasten(b, null));
 }
 
-function ratKasten(b){
+/* EIN Urteil je Position (Ozan, 01.10.: „Stop gerissen, ich soll alles verkaufen, aber
+   oben rechts steht STARK HALTEN"). Das Schild oben, der Kasten „Warum" und die Liste
+   „Was jetzt zu tun ist" sagen jetzt dasselbe. Verlangt der Plan eine Handlung (Stop,
+   Ziel, Knock-out), gewinnt sie — eine feste Marke schlägt eine Einschätzung. Die
+   Stärke-Bewertung steht dann als Begründung daneben, nicht als zweites Urteil. */
+function kartenUrteil(b, a){
+  if (a && a.art === 'raus') return {wort:'VERKAUFEN', kl:'bad', aktion:a};
+  if (a && a.art === 'teilverkauf') return {wort:'TEIL VERKAUFEN', kl:'warn', aktion:a};
+  if (a && a.art === 'nachlegen') return {wort:'NACHLEGEN', kl:'gut', aktion:a};
+  return {wort:b.urteil, kl:b.kl, aktion:null};
+}
+function ratKasten(b, ku){
   const rat = positionsRat(b);
+  const a = ku && ku.aktion;
+  if (a && (a.art === 'raus' || a.art === 'teilverkauf')){
+    const stark = rat.stufe === 'gut';
+    const vorweg = a.art === 'raus'
+      ? (stark ? `Die Stärke allein spräche fürs ${rat.kopf === 'Halten' ? 'Halten' : 'Weiterlaufen'} — `
+           + 'aber eine feste Marke ist erreicht, und die schlägt jede Einschätzung. '
+         : 'Auch die Einschätzung spricht nicht mehr für die Position — und eine feste Marke ist erreicht. ')
+        + 'Genau dafür ist der Stop da: er wird nicht nachverhandelt. Danach kommt der Wert auf '
+        + 'die Wiedereinstiegs-Liste — der Stop ist ein Urteil über den Moment, nicht über den Wert.'
+      : 'Ein Ziel ist erreicht: ein Teil wird verkauft, der Rest läuft mit nachgezogenem Stop '
+        + 'weiter. Das ist der Plan, kein Ausstieg.';
+    return `<div class="note-box ${a.art === 'raus' ? 'bad' : 'warn'}" style="margin:10px 0 0">
+      <span class="nt">Warum · ${esc(AKTION_WORT[a.art])}</span>
+      <p style="margin:0 0 4px">${esc(vorweg)}</p>
+      ${rat.saetze.map(x=>`<p style="margin:0 0 4px;color:var(--ink-2)">${esc(x)}</p>`).join('')}</div>`;
+  }
   const farbe = rat.stufe === 'bad' ? 'bad' : (rat.stufe === 'warn' ? 'warn' : '');
   return `<div class="note-box ${farbe}" style="margin:10px 0 0">
     <span class="nt">Warum · ${esc(rat.kopf)}</span>
@@ -5817,10 +5903,12 @@ function zeichnePortfolio(){
          derselben Funktion wie der Depotwert oben — eine Zahl, ein Rechenweg. */
       const posWertEUR = inEuro(b, b.wert);
       const posWertEigen = (b.w !== 'EUR' && b.wert != null) ? b.wert : null;
-      return `<div class="karte ${b.kl}">
+      let ku;
+      try { ku = kartenUrteil(b, positionsAktion(b, stand)); } catch(e){ ku = kartenUrteil(b, null); }
+      return `<div class="karte ${ku.kl}">
         <h3>${esc(posName(b))}${posWertEUR!=null?` <span style="font-weight:600;color:var(--ink)">· ${num(posWertEUR, posWertEUR<100?2:0)} €</span>`:''}
           <span class="mono" style="font-weight:400;color:var(--ink-3)">${esc(b.pos.konto||'')}</span>
-          <span style="float:right" class="note ${b.kl==='gut'?'gut':''}">${esc(b.urteil)}</span></h3>
+          <span style="float:right" class="note ${ku.kl==='gut'?'gut':ku.kl==='bad'?'bad':ku.kl==='warn'?'warn':''}">${esc(ku.wort)}</span></h3>
         <div class="kpi">
           ${b.pos.menge?`<span>Menge <b>${num(b.pos.menge, 6)}</b></span>`:''}
           ${(posWertEUR!=null && b.kurs!=null)?`<span>Wert <b>${num(posWertEUR, posWertEUR<100?2:0)} €</b>${
@@ -5836,7 +5924,7 @@ function zeichnePortfolio(){
         ${r ? '' : basisKasten(b)}
         ${hebelKasten(b)}
         ${entscheidungsKasten(b, stand)}
-        ${ratKasten(b)}
+        ${ratKasten(b, ku)}
         ${mehrKasten(b)}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
           ${r?` · <button class="link" data-zeig="${esc(r.instrument)}">Chart ansehen</button>`:''}
@@ -6277,7 +6365,7 @@ function benachrichtige(x){
   try {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     const d = digits(x.w.einstieg);
-    new Notification(`${x.lang?'KAUFEN':'VERKAUFEN'} ${name(x.w.instrument)} · ${x.w.note}`, {
+    meldung(`${x.lang?'KAUFEN':'VERKAUFEN'} ${name(x.w.instrument)} · ${x.w.note}`, {
       body: `Einstieg ${num(x.w.einstieg,d)} erreicht\nStop ${num(x.w.stop,d)}`
             + (x.w.tp1!=null?` · Ziel ${num(x.w.tp1,d)}`:'')
             // Ohne diesen Zusatz sieht ein Alarm auf Scanbasis aus wie einer auf
