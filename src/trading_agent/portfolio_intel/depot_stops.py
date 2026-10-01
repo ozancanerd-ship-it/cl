@@ -19,9 +19,11 @@ DIE REGELN — IN DIESER REIHENFOLGE
 2. **Stop gerissen** → verkaufen. Keine Nachverhandlung.
 3. **Ziel erreicht** → ein Drittel verkaufen; nach Ziel 1 wandert der Stop auf den
    Einstieg, nach Ziel 2 auf Ziel 1.
-4. **Stop setzen / nachziehen.** Kandidaten: die Invalidierung der laufenden Analyse und
-   der Halte-Stop (Chandelier, ``scanner/halte_stop.py``). Genommen wird die engere
-   gueltige Marke. Ein Stop wandert NUR in Richtung Sicherheit und nie auf oder ueber den
+4. **Stop setzen / nachziehen.** Kandidat ist der Halte-Stop (Chandelier,
+   ``scanner/halte_stop.py``) — der einzige gemessene. Die Invalidierung eines Setups zaehlt
+   nur bei einer Position, die ueber ein Signal gekauft wurde (``plan.gekauft``), und nur,
+   wenn das Setup in dieselbe Richtung zeigt (seit 01.10., siehe ``_kandidaten``). Genommen
+   wird die engere gueltige Marke. Ein Stop wandert NUR in Richtung Sicherheit und nie auf oder ueber den
    Kurs. Kleine Schritte (< 0,4 %) werden nicht gemacht — die Ordergebuehr frisst sie.
 
 Turbos werden auf dem **Basiswert** gefuehrt: „wenn TSMC unter X faellt, raus". Eine
@@ -220,12 +222,22 @@ class Lage:
     zahlen: dict[str, Any] | None = None
 
 
-def _kandidaten(row: dict[str, Any], lang: bool, kurs: float, conv: Any) -> list[tuple[float, str]]:
-    """Gueltige Stopmarken aus der Analyse — schon auf der Ebene der Position."""
+def _kandidaten(
+    row: dict[str, Any], lang: bool, kurs: float, conv: Any, *, mit_setup: bool = False
+) -> list[tuple[float, str]]:
+    """Gueltige Stopmarken aus der Analyse — schon auf der Ebene der Position.
+
+    Bis 01.10. zaehlte jede Invalidierung, die auf der richtigen SEITE des Kurses lag —
+    in der Annahme, die eines Short-Setups liege immer ueber dem Kurs. Hat der Kurs die
+    Short-These aber gerade ueberrollt, liegt sie darunter und wurde zum Long-Stop direkt
+    unter dem Kurs (Sei: Stop 0,07243 bei Kurs 0,0725, „Stop gerissen — alles verkaufen").
+    Jetzt: Richtung des Setups muss passen, und Setup-Marken gelten nur fuer Positionen aus
+    einem Signal (``mit_setup``). Fuer gehaltene Positionen ist der Halte-Stop der einzige
+    gemessene Stop; eine Setup-Marke ist fuer einen neuen Einstieg gebaut und zu eng.
+    """
     aus: list[tuple[float, str]] = []
-    inv = conv(_zahl(row.get("invalidierung")))
-    # Die Invalidierung zaehlt nur, wenn sie zur Richtung der Position passt: bei einem
-    # Short-Setup liegt sie ueber dem Kurs und waere fuer eine Long-Position Unsinn.
+    passt = str(row.get("richtung") or "") == ("long" if lang else "short")
+    inv = conv(_zahl(row.get("invalidierung"))) if mit_setup and passt else None
     if inv is not None and (inv < kurs if lang else inv > kurs):
         aus.append((inv, "die laufende Analyse (Invalidierung des Setups)"))
     halte = row.get("halte") or {}
@@ -323,7 +335,8 @@ def lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
     lg = Lage(pos, key, name, lang, "position", kurs, w, row, eurusd=eurusd)
     lg.zahlen = (row.get("info") or {}).get("zahlen")
     if kurs is not None:
-        lg.kandidaten = _kandidaten(row, lang, kurs, conv)
+        gekauft = bool((pos.get("plan") or {}).get("gekauft"))
+        lg.kandidaten = _kandidaten(row, lang, kurs, conv, mit_setup=gekauft)
     return lg
 
 
@@ -332,7 +345,7 @@ def lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
 
 @dataclass
 class Ereignis:
-    art: str  # stop | ziel | ko | puffer_kritisch | puffer_eng | stop_neu | stop_nach
+    art: str  # stop | ziel | ko | puffer_kritisch | puffer_eng | stop_neu | stop_nach | entwarnung
     key: str
     name: str
     text: str
@@ -464,6 +477,23 @@ def pflegen(
             Ereignis("zahlen_ko" if knapp else "zahlen", lg.key, wer, text, knapp, marke=wann)
         )
 
+    plan = pos.get("plan") or {}
+    # Einmalige Korrektur (01.10.): Stops aus einer Setup-Marke auf Positionen, die nicht
+    # ueber ein Signal gekauft wurden, waren zu eng und teils aus der falschen Richtung
+    # (siehe ``_kandidaten``). Sie fallen weg — auch ein darauf beruhendes „ausgestoppt" —,
+    # und der Halte-Stop wird neu gesetzt. Selbst gesetzte Stops bleiben unberuehrt.
+    korrektur = False
+    war_ausgestoppt = bool(st.get("ausgestoppt"))
+    if (
+        lg.ebene == "position"
+        and not plan.get("gekauft")
+        and int(st.get("regel") or 1) < 2
+        and "Invalidierung" in str(st.get("quelle") or "")
+    ):
+        for k in ("stop", "gemeldet_stop", "ausgestoppt", "quelle"):
+            st.pop(k, None)
+        korrektur = True
+    st["regel"] = 2
     if st.get("ausgestoppt"):
         # Nach dem Stop wird nicht neu gesetzt: die Position gehoert verkauft. Kommt der
         # Wert wieder, ist das ein Fall fuer die Wiedereinstiegs-Liste, nicht fuer einen
@@ -473,9 +503,18 @@ def pflegen(
     stop = _zahl(st.get("stop"))
     if st.get("ebene") and st.get("ebene") != lg.ebene:
         stop = None  # Ebene gewechselt (alter Eintrag) — neu beginnen
-    plan = pos.get("plan") or {}
     plan_ebene = str(plan.get("ebene") or "position")
     plan_stop = _zahl(plan.get("stop")) if plan_ebene == lg.ebene else None
+    # Eine Setup-Marke, die die App frueher in den Depot-Text geschrieben hat, gilt aus
+    # demselben Grund nicht mehr (selbst gesetzte oder nachgezogene Stops schon).
+    if (
+        plan_stop is not None
+        and plan.get("art") not in ("halte", "einstand")
+        and plan.get("quelle") == "app"
+        and not plan.get("gekauft")
+        and not plan.get("korrigiert")
+    ):
+        plan_stop = None
     # Den Stop aus dem Depot-Text (die App hat ihn gesetzt oder Ozan selbst) nie
     # unterbieten: der hoehere von beiden gilt.
     if plan_stop is not None and (stop is None or besser(plan_stop, stop)):
@@ -557,7 +596,13 @@ def pflegen(
                     wer,
                     f"Stop {'auf ' + lg.name + ' ' if lg.ebene == 'basis' else ''}bei "
                     f"{_fmt(neu)}{z} ({_pct(abs(kurs - neu) / kurs * 100)} "
-                    f"{'unter' if lang else 'über'} dem Kurs von {_fmt(kurs)}{z}) — {grund}.",
+                    f"{'unter' if lang else 'über'} dem Kurs von {_fmt(kurs)}{z}) — {grund}."
+                    + (
+                        " Korrektur: die frühere, zu enge Marke aus einem Setup gilt nicht "
+                        "mehr — ein Stop-Alarm, der darauf beruhte, ist hinfällig."
+                        if korrektur
+                        else ""
+                    ),
                     False,
                     werte={"stop": neu, "kurs": kurs, "ebene": lg.ebene},
                 )
@@ -568,6 +613,24 @@ def pflegen(
             stop = neu
     st["stop"] = stop
     st["ebene"] = lg.ebene
+    if korrektur and war_ausgestoppt:
+        # Ein „Stop gerissen" ist schon rausgegangen — auf einer Marke, die nicht haette
+        # gelten duerfen. Das muss Ozan genauso deutlich hoeren wie den Alarm selbst.
+        ev.append(
+            Ereignis(
+                "entwarnung",
+                lg.key,
+                wer,
+                "Der frühere Stop-Alarm war hinfällig: die Marke kam aus einem kurzfristigen "
+                "Setup und lag zu eng (teils aus der Gegenrichtung). Nicht deswegen verkaufen. "
+                + (
+                    f"Der gemessene Halte-Stop liegt bei {_fmt(stop)}{z}."
+                    if stop is not None
+                    else "Die Analyse gibt gerade keine neue Marke her."
+                ),
+                True,
+            )
+        )
     if stop is None:
         st["hinweis"] = lg.hinweis or "die Analyse gibt gerade keine Marke her"
         return st, ev
