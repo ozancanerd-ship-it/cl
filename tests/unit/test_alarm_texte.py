@@ -147,3 +147,16 @@ def test_analyse_lobt_den_umsatz_nur_wenn_er_gross_ist():
     assert not any("gross genug" in s for s in klein["warum_jetzt"])
     gross = kommentar(Chance(), [], [], zusatz={"umsatz_24h": 25_000_000})
     assert any("25 Mio USDT Tagesumsatz" in s for s in gross["warum_jetzt"])
+
+
+def test_wartende_wache_bekommt_den_umsatz_nachgetragen_ohne_den_plan_zu_aendern():
+    """Wachen von vor dem 01.10. haben keinen Umsatz gespeichert (z. B. DCRUSD)."""
+    w = Wachliste()
+    w.aufnehmen([_zeile()], jetzt=T0)
+    alt = w.wachen["DCRUSD"]
+    assert alt.umsatz_24h is None
+    stop, ziel = alt.stop, alt.tp1
+    w.aufnehmen([_zeile(umsatz=190_000.0)], jetzt=T0 + timedelta(minutes=10))
+    neu = w.wachen["DCRUSD"]
+    assert neu.umsatz_24h == 190_000.0
+    assert (neu.stop, neu.tp1, neu.aufgenommen) == (stop, ziel, alt.aufgenommen)
