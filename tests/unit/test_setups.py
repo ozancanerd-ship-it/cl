@@ -198,6 +198,11 @@ def test_rueckeroberung_nach_liquiditaetsgriff() -> None:
     per_tf = _per_tf(vorher + griff)
     treffer = alle_setups(per_tf, 101.7, Direction.LONG, atr=1.0)
     assert any(s.art == "RUECKEROBERUNG" for s in treffer), [s.art for s in treffer]
+    # Der Ausloeser sagt bei einem Long, dass ein Fall DARUNTER die Idee erledigt — und
+    # nennt die Marke mit deutschem Komma (bis 01.10.: „darueber hinaus", „98.7500").
+    r = next(s for s in treffer if s.art == "RUECKEROBERUNG")
+    assert "Faellt er wieder darunter, ist die Idee erledigt" in r.trigger, r.trigger
+    assert "98,75" in r.trigger and "hinaus" not in r.trigger
 
 
 def test_ohne_griff_keine_rueckeroberung() -> None:
