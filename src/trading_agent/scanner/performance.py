@@ -366,6 +366,9 @@ class Bericht:
     nicht_ausgeloest: int = 0
     #: Eingestiegen, aber ohne bekannten Ausgang beendet (Kursausfall) — nicht mitgezaehlt.
     ohne_ergebnis: int = 0
+    #: Je Klasse nach PLAN (Drittel-Regel) — dieselbe Regel wie „Deine Alarme" und die
+    #: Summe oben, damit sich die Zahlen auf der Karte zusammenzaehlen lassen.
+    je_klasse_plan: dict[str, Kennzahlen] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -385,6 +388,7 @@ class Bericht:
             "je_meldung": {k: v.as_dict() for k, v in self.je_meldung.items()},
             "nicht_ausgeloest": self.nicht_ausgeloest,
             "ohne_ergebnis": self.ohne_ergebnis,
+            "je_klasse_plan": {k: v.as_dict() for k, v in self.je_klasse_plan.items()},
         }
 
 
@@ -405,11 +409,28 @@ def _gruppiere(
     return {k: rechne(v) for k, v in sorted(eimer.items())}
 
 
+#: So heissen die Klassen in der App.
+KLASSE_NAME = {"krypto": "Coins", "aktien": "Aktien", "gold": "Gold"}
+
+
+def _z(x: float, stellen: int = 1, vorzeichen: bool = True) -> str:
+    """Zahl mit deutschem Komma — „+2,8", „-0,07"."""
+    roh = f"{x:+.{stellen}f}" if vorzeichen else f"{x:.{stellen}f}"
+    return roh.replace(".", ",")
+
+
+def _anzahl(n: int, einzahl: str, mehrzahl: str) -> str:
+    return f"{n} {einzahl if n == 1 else mehrzahl}"
+
+
 def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list[str]:
     """Die Auswertung in Klartext — das, was man jemandem sagen würde.
 
-    Bewusst ohne Beschönigung. Wenn das Ergebnis schlecht ist, steht das hier, und es
-    steht zuerst.
+    Bewusst ohne Beschönigung: ein Verlust steht als Verlust da. Seit 02.10. steht er aber
+    mit seiner Herkunft da. Vorher hiess der erste Satz nur „Über 39 Signale hat das
+    System 2,8 R verloren" — ohne dass man sah, dass die Coins im Plus lagen und der ganze
+    Verlust aus Aktien-Kaeufen kam, die nie aufs Handy gingen. Ozan las daraus, das System
+    verliere Geld; das, was er bekommen hat, lag im Plus.
     """
     aus: list[str] = []
     ganz = je_regel.get("ganz")
@@ -417,31 +438,63 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
     if ganz is None or ganz.anzahl == 0:
         return ["Noch kein abgeschlossener Trade — es gibt nichts auszuwerten."]
 
-    richtung = "verloren" if ganz.summe_r < 0 else "gewonnen"
+    # Hauptregel ist der PLAN aus den Alarmen (Drittel an jedem Ziel). Bis 02.10. stand
+    # hier „alles oder nichts" — eine Regel, nach der kein Alarm handelt; die Karte zeigte
+    # oben −2,8 R, die Chips darunter (nach Plan) zusammen −4,3 R.
+    plan = drittel if drittel is not None and drittel.anzahl else ganz
+    richtung = "verloren" if plan.summe_r < 0 else "gewonnen"
     aus.append(
-        f"Über {ganz.anzahl} abgeschlossene Signale hat das System {abs(ganz.summe_r):.1f} R "
-        f"{richtung} — im Schnitt {ganz.erwartungswert:+.2f} R je Trade."
+        f"{'Alle ' + str(plan.anzahl) + ' beobachteten Signale' if plan.anzahl != 1 else 'Das eine beobachtete Signal'}"
+        " zusammen — auch die, die nie aufs Handy "
+        f"gingen: nach Plan {_z(abs(plan.summe_r), vorzeichen=False)} R {richtung}, im "
+        f"Schnitt {_z(plan.erwartungswert or 0.0, 2)} R je Trade."
     )
-    if not ganz.belastbar:
+
+    # Woher das Ergebnis kommt — je Klasse, nach derselben Regel wie die Summe oben.
+    je: dict[str, list[float]] = {}
+    for e in ergebnisse:
+        je.setdefault(e.klasse or "?", []).append(e.r_drittel)
+    if len(je) > 1:
+        teile = sorted(je.items(), key=lambda kv: -sum(kv[1]))
+
+        def wie(k: str, v: list[float]) -> str:
+            return f"{KLASSE_NAME.get(k, k)} ({_z(sum(v))} R aus {len(v)})"
+
+        plus = [(k, v) for k, v in teile if sum(v) > 0]
+        minus = [(k, v) for k, v in teile if sum(v) < 0]
+        if plus and minus and plan.summe_r < 0:
+            einzahl = len(plus) == 1 and plus[0][0] == "gold"
+            aus.append(
+                f"Der Verlust kommt aus {' und '.join(wie(k, v) for k, v in reversed(minus))}; "
+                f"{' und '.join(wie(k, v) for k, v in plus)} "
+                f"{'liegt' if einzahl else 'liegen'} im Plus. Fürs Alarm-Tor zählt deshalb "
+                "jede Setup-Art nur in ihrer eigenen Klasse: ein Verlust bei Aktien bremst "
+                "keinen Coin-Alarm, und eine Klasse, die verliert, klingelt nicht."
+            )
+        else:
+            aus.append("Je Klasse: " + " · ".join(wie(k, v) for k, v in teile) + ".")
+
+    if not plan.belastbar:
         aus.append(
             f"Das sind weniger als {GENUG} Trades. Die Zahlen zeigen, was passiert ist, "
             "aber sie tragen noch keine Aussage über den kommenden Monat."
         )
 
     if drittel is not None and abs(drittel.summe_r - ganz.summe_r) > 0.5:
+        vergleich = f"{_z(ganz.summe_r)} R statt {_z(drittel.summe_r)} R"
         if drittel.summe_r > ganz.summe_r:
             aus.append(
-                f"Mit Teilverkauf am ersten Ziel und Stop auf Einstand wären es "
-                f"{drittel.summe_r:+.1f} R gewesen, also besser. Der Unterschied kommt fast "
-                "vollständig aus Trades, die kurz im Plus waren und danach voll zurückliefen."
+                f"Alles auf einmal (ganze Position bis Ziel 3 oder Stop) wären es {vergleich} "
+                "gewesen — der Plan war besser. Der Unterschied kommt aus Trades, die kurz "
+                "im Plus waren und danach voll zurückliefen."
             )
         else:
             aus.append(
-                f"Mit Teilverkauf am ersten Ziel und Stop auf Einstand wären es "
-                f"{drittel.summe_r:+.1f} R gewesen, also weniger. Der Teilverkauf gibt Gewinn "
-                "ab, wenn Trades nach Ziel 1 bis ans letzte Ziel weiterlaufen — dafür schützt "
-                "er vor dem vollen Rücklauf. Welche Regel über mehrere Marktphasen besser ist, "
-                "klärt die Signal-Studie (X0 gegen X1)."
+                f"Alles auf einmal (ganze Position bis Ziel 3 oder Stop) wären es {vergleich} "
+                "gewesen. In diesen Wochen liefen viele Trades nach Ziel 1 bis ans letzte "
+                "Ziel — dann kostet der Teilverkauf Gewinn. Über 19 Monate Nachspiel lagen "
+                "beide Regeln gleichauf; der Plan bleibt, weil nach Ziel 1 kein Verlust mehr "
+                "möglich ist."
             )
 
     mfe = [e.mfe for e in ergebnisse]
@@ -449,8 +502,9 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
     if mfe:
         anteil = len(nie) / len(mfe) * 100
         aus.append(
-            f"{len(nie)} von {len(mfe)} Trades ({anteil:.0f} %) kamen nie auch nur "
-            f"{IM_PLUS_AB:.1f} R ins Plus."
+            f"{len(nie)} von {_anzahl(len(mfe), 'Trade', 'Trades')} ({anteil:.0f} %) "
+            f"{'kam' if len(nie) == 1 else 'kamen'} nie auch nur "
+            f"{_z(IM_PLUS_AB, vorzeichen=False)} R ins Plus."
         )
         if anteil >= 45:
             aus.append(
@@ -459,12 +513,13 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
                 "Stop, sondern beim Einstieg selbst."
             )
 
-    if ganz.max_rueckgang_r < -5:
+    if plan.max_rueckgang_r < -5:
+        rg = plan.max_rueckgang_r
         aus.append(
-            f"Der tiefste Rückgang in der Reihenfolge lag bei {ganz.max_rueckgang_r:.1f} R, "
-            f"die längste Verlustserie bei {ganz.verlustserie} Trades hintereinander. "
-            "Bei 0,5 % Risiko je Trade wäre das ein Konto-Rückgang, den man aushält — "
-            "bei 2 % nicht mehr."
+            f"Der tiefste Rückgang aller Signale hintereinander lag bei {_z(rg)} R, die "
+            f"längste Verlustserie bei {plan.verlustserie} Trades. Bei 0,5 % Risiko je "
+            f"Trade wären das rund {_z(rg * 0.5, 0)} % aufs Konto — tragbar; bei 2 % "
+            f"wären es {_z(rg * 2.0, 0)} %."
         )
 
     # Der Schluss-Satz steht immer da, auch und gerade wenn die Zahlen gut aussehen.
@@ -480,7 +535,7 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
     aus.append(
         "Das ist ein Vorlauf aus einem einzigen Marktabschnitt"
         + (
-            f", zu {anteil_schwer * 100:.0f} % aus {schwerpunkt}"
+            f", zu {anteil_schwer * 100:.0f} % aus {KLASSE_NAME.get(schwerpunkt, schwerpunkt)}"
             if schwerpunkt and anteil_schwer >= 0.6
             else ""
         )
@@ -488,6 +543,25 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
         "Dafür braucht es mehrere Marktphasen."
     )
     return aus
+
+
+def _satz_handy(alle: list[Ergebnis]) -> list[str]:
+    """Was Ozan tatsaechlich bekommen hat — steht vor allem anderen."""
+    handy = [e for e in alle if e.gezaehlt and e.gemeldet]
+    if not handy:
+        return []
+    werte = [e.r_drittel for e in handy]
+    s = sum(werte)
+    plus = sum(1 for v in werte if v > 0)
+    stops = sum(1 for e in handy if e.zustand == "stop")
+    satz = (
+        f"Deine Alarme (aufs Handy): {_anzahl(len(handy), 'Trade', 'Trades')}, zusammen "
+        f"{_z(s)} R nach Plan ({_z(s / len(handy), 2)} R je Trade) — {plus} im Plus, "
+        f"{_anzahl(stops, 'Stop', 'Stops')}."
+    )
+    if len(handy) < 10:
+        satz += " Noch zu wenige für ein Urteil; jeder weitere Alarm zählt hier mit."
+    return [satz]
 
 
 #: Unter so vielen gemessenen Fällen wird eine Haltedauer nicht ausgewiesen. Ein Median
@@ -572,6 +646,7 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
         je_regel=je_regel,
         je_note=_gruppiere(ergebnisse, lambda e: e.note),
         je_klasse=_gruppiere(ergebnisse, lambda e: e.klasse),
+        je_klasse_plan=_gruppiere(ergebnisse, lambda e: e.klasse, "drittel"),
         je_setup=_gruppiere(ergebnisse, lambda e: e.setup),
         je_meldung=_gruppiere(
             ergebnisse, lambda e: "aufs_handy" if e.gemeldet else "nur_app", "drittel"
@@ -603,33 +678,33 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
             }
             for e in reversed(alle)
         ),
-        saetze=tuple(_saetze(ergebnisse, je_regel) + _saetze_zaehlung(alle)),
+        saetze=tuple(_satz_handy(alle) + _saetze(ergebnisse, je_regel) + _saetze_zaehlung(alle)),
     )
 
 
 def _saetze_zaehlung(alle: list[Ergebnis]) -> list[str]:
-    """Was NICHT mitgezaehlt wurde, und was die Handy-Alarme allein gebracht haben."""
+    """Was NICHT mitgezaehlt wurde."""
     aus: list[str] = []
     nie = sum(1 for e in alle if not e.eingestiegen)
     ausfall = [e for e in alle if e.eingestiegen and e.ohne_ergebnis]
     if nie:
         aus.append(
-            f"{nie} Setups haben ihren Einstieg nie erreicht — kein Trade, kein Geld im "
-            "Markt, deshalb nicht mitgezählt."
+            f"{_anzahl(nie, 'Setup hat seinen', 'Setups haben ihren')} Einstieg nie erreicht — "
+            "kein Trade, kein Geld im Markt, deshalb nicht mitgezählt."
         )
     if ausfall:
         namen = ", ".join(sorted({e.instrument for e in ausfall})[:8])
-        aus.append(
-            f"{len(ausfall)} Trades liefen, als der Wächter sie mangels Kurs schloss ({namen}). "
-            "Ihr Ausgang ist unbekannt — sie stehen in der Liste, zählen aber nicht."
-        )
-    handy = [e.r_drittel for e in alle if e.gezaehlt and e.gemeldet]
-    if handy:
-        s = sum(handy)
-        aus.append(
-            f"Nur die Alarme, die aufs Handy gingen: {len(handy)} Trades, zusammen "
-            f"{s:+.1f} R nach Plan ({s / len(handy):+.2f} R je Trade)."
-        )
+        if len(ausfall) == 1:
+            aus.append(
+                f"1 Trade lief noch, als der Wächter ihn mangels Kurs schloss ({namen}). "
+                "Sein Ausgang ist unbekannt — er steht in der Liste, zählt aber nicht."
+            )
+        else:
+            aus.append(
+                f"{len(ausfall)} Trades liefen noch, als der Wächter sie mangels Kurs schloss "
+                f"({namen}). Ihr Ausgang ist unbekannt — sie stehen in der Liste, zählen "
+                "aber nicht."
+            )
     return aus
 
 
@@ -637,6 +712,7 @@ __all__ = [
     "ABGESCHLOSSEN",
     "GENUG",
     "IM_PLUS_AB",
+    "KLASSE_NAME",
     "REGELN",
     "ZIEL_R",
     "Bericht",

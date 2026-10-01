@@ -123,6 +123,22 @@ NUR_BEWAEHRT = True
 #: Trades unter Profitfaktor 1 liegen.
 B_PLUS_BEI_BEWAEHRT = True
 
+#: Eine Setup-Art wird in IHRER Klasse beurteilt (01.10. nachts).
+#:
+#: Bis dahin zaehlte fuer „bewaehrt" die Bilanz der Setup-Art ueber alle Klassen. Dann
+#: entschieden Aktien-Trades darueber, ob ein Coin-Alarm klingelt — und zwar Aktien-KAEUFE,
+#: die selbst nie klingeln (Aktien Long ist gesperrt). Der Fall: „Rueckeroberung nach
+#: Liquiditaetsgriff" bei Coins 6 Trades, +5,2 R, Profitfaktor 6,2 — bei Aktien 4 Kaeufe,
+#: −4,0 R. Zusammen PF 1,2, also „nicht bewaehrt", und Decred (A−) stieg am 01.10. ohne
+#: Alarm ein. Ein Aktienverlust sagt nichts darueber, wie ein Coin-Setup laeuft.
+#:
+#: Jetzt: bewaehrt oder gesperrt wird je Klasse entschieden (``klasse_setup``), dazu
+#: weiter die Sperre je Klasse und Richtung (``Aktien Long``). Zu wenige Faelle in der
+#: eigenen Klasse heisst „offen" — die anderen Klassen springen nicht ein.
+BILANZ_JE_KLASSE = True
+
+_KLASSE_NAME = {"krypto": "Coins", "aktien": "Aktien", "gold": "Gold"}
+
 NOTEN_A = frozenset({"A+", "A", "A−", "A-", "A_PLUS", "A_MINUS"})
 NOTEN_B_PLUS = frozenset({"B+", "B_PLUS"})
 _NOTE_PUNKTE = {"A+": 3, "A_PLUS": 3, "A": 2, "A−": 1, "A-": 1, "A_MINUS": 1, "B+": 0, "B_PLUS": 0}
@@ -289,7 +305,7 @@ def _anzeige(schluessel: str) -> str:
     if art == "setup":
         return f"„{rest}“"
     klasse, _, zweites = rest.partition("|")
-    kl = {"krypto": "Coins", "aktien": "Aktien", "gold": "Gold"}.get(klasse, klasse)
+    kl = _KLASSE_NAME.get(klasse, klasse)
     if art == "klasse_setup":
         return f"„{zweites}“ bei {kl}"
     return f"{kl} {'Long' if zweites == 'long' else 'Short'}"
@@ -381,9 +397,16 @@ def pruefe(
     )
 
     # 3. Bilanz — vor der Note, weil die Note von ihr abhaengt.
-    gruppen = [stand.get(k) for k in _schluessel(setup, klasse, richtung)]
+    je_klasse = BILANZ_JE_KLASSE and bool(klasse) and bool(setup)
+    schluessel = _schluessel(setup, klasse, richtung)
+    if je_klasse:
+        schluessel = [k for k in schluessel if not k.startswith("setup:")]
+        art_schluessel: str | None = f"klasse_setup:{klasse}|{setup}"
+    else:
+        art_schluessel = f"setup:{setup}" if setup else None
+    gruppen = [stand.get(k) for k in schluessel]
     gesperrt = [g for g in gruppen if g is not None and g.urteil == "gesperrt"]
-    art = stand.get(f"setup:{setup}") if setup else None
+    art = stand.get(art_schluessel) if art_schluessel else None
     bewaehrt = art is not None and art.urteil == "bewaehrt"
     if gesperrt:
         g = gesperrt[0]
@@ -400,7 +423,8 @@ def pruefe(
             Punkt(
                 "bilanz",
                 False,
-                f"„{setup or '—'}“ hat sich noch nicht bewaehrt ({bisher}) — Alarm erst ab "
+                f"{_anzeige(art_schluessel) if art_schluessel else '„—“'} hat sich noch nicht "
+                f"bewaehrt ({bisher}) — Alarm erst ab "
                 f"{MIN_FAELLE} Trades im Plus mit Profitfaktor ab "
                 f"{BEWAEHRT_PF:.1f}".replace(".", ","),
             )
@@ -646,6 +670,33 @@ def fuers_telefon(
 
 def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
     """Fuer die App: die Bilanz je Setup-Art mit Urteil, und die festen Schwellen."""
+    if BILANZ_JE_KLASSE:
+        # „Ausbruch aus der Basis · Coins" — so, wie das Tor tatsaechlich entscheidet.
+        je_klasse: dict[str, Any] = {}
+        for k, v in sorted(stand.items()):
+            if not k.startswith("klasse_setup:"):
+                continue
+            klasse, _, setup = k.removeprefix("klasse_setup:").partition("|")
+            je_klasse[f"{setup} · {_KLASSE_NAME.get(klasse, klasse)}"] = v.as_dict()
+        gesperrt_k = sorted(
+            _anzeige(k)
+            for k, v in stand.items()
+            if v.urteil == "gesperrt" and not k.startswith("setup:")
+        )
+        return {
+            "min_faelle": MIN_FAELLE,
+            "min_crv": MIN_CRV,
+            "min_ziel1_pct": dict(MIN_ZIEL1_PCT),
+            "max_je_tag": MAX_JE_TAG,
+            "sperre_je_wert_h": int(SPERRE_JE_WERT.total_seconds() // 3600),
+            "setup_arten": je_klasse,
+            "gesperrt": gesperrt_k,
+            "nur_bewaehrt": NUR_BEWAEHRT,
+            "b_plus_bei_bewaehrt": B_PLUS_BEI_BEWAEHRT,
+            "bilanz_je_klasse": True,
+            "bewaehrt_pf": BEWAEHRT_PF,
+            "frei": sorted(k for k, v in je_klasse.items() if v.get("urteil") == "bewaehrt"),
+        }
     arten = {
         k.removeprefix("setup:"): v.as_dict()
         for k, v in sorted(stand.items())
@@ -680,6 +731,7 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
 
 
 __all__ = [
+    "BILANZ_JE_KLASSE",
     "B_PLUS_BEI_BEWAEHRT",
     "MAX_JE_TAG",
     "MIN_CRV",
