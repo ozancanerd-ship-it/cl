@@ -400,10 +400,14 @@ def kommentar(
         warum_jetzt.append(
             f"Relative Staerke {float(rs):.0f} von 100 innerhalb der eigenen Klasse."
         )
-    if z.get("umsatz_24h"):
+    # Bis 01.10. stand hier fuer JEDEN Wert „… gross genug, um wieder herauszukommen" —
+    # auch bei 0,1 Mio („0 Mio USDT Tagesumsatz — gross genug"), zwei Zeilen unter der
+    # Warnung „duenn fuer schnelle Ausstiege". Ein Grund FUER den Trade ist der Umsatz
+    # nur, wenn er wirklich gross ist; sonst steht er bei den Warnungen.
+    if z.get("umsatz_24h") and float(z["umsatz_24h"]) >= 5_000_000:
         warum_jetzt.append(
             f"{float(z['umsatz_24h']) / 1e6:.0f} Mio USDT Tagesumsatz — gross genug, "
-            "um wieder herauszukommen."
+            "um jederzeit wieder herauszukommen."
         )
 
     erwartung: list[str] = []

@@ -163,15 +163,24 @@ def baue_plan(
             "muesste so klein sein, dass sich der Aufwand nicht lohnt."
         )
 
+    # Bei einem Short wird nicht „verkauft", sondern geschlossen: direkt gehalten heisst
+    # das zurueckkaufen, ueber einen Short-Schein den Schein verkaufen (01.10., MDLZ).
+    tun = "verkaufen" if lang else "schliessen"
+    wie = (
+        ""
+        if lang
+        else " (direkt gehalten: zurueckkaufen; ueber einen Short-Schein: den Schein-Anteil "
+        "verkaufen)"
+    )
     schritte = (
         f"Einstieg bei {_fmt(einstieg)} — die Position in drei gleiche Teile denken.",
         f"Stop bei {_fmt(stop)}. Das ist 1 R = {_fmt(r, einstieg)} ({_zahl(risiko_pct)} % vom "
         "Einstieg). Alles danach wird in R gerechnet, nicht in Euro.",
-        f"Ziel 1 bei {_fmt(tp1)} ({_zahl(r1)} R): erstes Drittel verkaufen, Stop auf den "
+        f"Ziel 1 bei {_fmt(tp1)} ({_zahl(r1)} R): erstes Drittel {tun}{wie}, Stop auf den "
         f"Einstieg {_fmt(einstieg)} — ab hier kann der Trade nichts mehr kosten.",
-        f"Ziel 2 bei {_fmt(tp2)} ({_zahl(crv)} R): zweites Drittel verkaufen, Stop auf "
+        f"Ziel 2 bei {_fmt(tp2)} ({_zahl(crv)} R): zweites Drittel {tun}, Stop auf "
         f"Ziel 1 ({_fmt(tp1)}) nachziehen.",
-        f"Ziel 3 bei {_fmt(tp3)} ({_zahl(r3)} R): den Rest verkaufen. Der Trade ist fertig.",
+        f"Ziel 3 bei {_fmt(tp3)} ({_zahl(r3)} R): den Rest {tun}. Der Trade ist fertig.",
     )
 
     ausstiege = (

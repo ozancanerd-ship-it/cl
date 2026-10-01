@@ -861,7 +861,11 @@ def _warnungen(
             "die Position wird dadurch klein"
         )
     if umsatz is not None and float(umsatz) < 5_000_000:
-        w.append(f"nur {float(umsatz) / 1e6:.1f} Mio USDT Umsatz — duenn fuer schnelle Ausstiege")
+        mio = f"{float(umsatz) / 1e6:.1f}".replace(".", ",")
+        w.append(
+            f"nur {mio} Mio USDT Umsatz am Tag — duenn fuer schnelle Ausstiege, "
+            "nur mit Limit-Order handeln"
+        )
 
     # Klassische Indikatoren auf der Swing-Ebene: ueberdehnter RSI, Divergenz,
     # duennes Volumen, Kurs gegen den uebergeordneten Durchschnitt.

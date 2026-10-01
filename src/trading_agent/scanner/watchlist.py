@@ -138,6 +138,9 @@ class Wache:
     #: ging als +2,17 R in die Statistik, obwohl der Plan nur +0,33 R gebracht hat.
     raus_erreicht: list[str] | None = None
     raus_kurs: float | None = None
+    #: Umsatz der letzten 24 Stunden bei der Aufnahme (USD/USDT). Nur fuer den Hinweis
+    #: im Kaufalarm, dass ein duenner Markt eine Limit-Order braucht.
+    umsatz_24h: float | None = None
 
     @property
     def long(self) -> bool:
@@ -191,6 +194,7 @@ class Wache:
             "ausstiegskurs": self.ausstiegskurs,
             "raus_erreicht": (list(self.raus_erreicht) if self.raus_erreicht is not None else None),
             "raus_kurs": self.raus_kurs,
+            "umsatz_24h": self.umsatz_24h,
         }
 
     @property
@@ -233,11 +237,61 @@ class Ereignis:
 
 
 def _fmt(v: float | None) -> str:
+    """Preis mit deutschem Komma — wie in der App.
+
+    Bis 01.10. stand hier ``57.78`` mit Punkt, in derselben Meldung wie „+6,2 %" und
+    „≈ 49,31 €". Auf dem Handy liest man das als zwei verschiedene Zahlensysteme.
+    """
     if v is None:
         return "—"
-    a = abs(v)
-    n = 2 if a >= 10 else 4 if a >= 1 else 6
-    return f"{v:,.{n}f}".replace(",", " ")
+    from trading_agent.scanner.plan import preis_de
+
+    return preis_de(float(v))
+
+
+def _r(v: float, stellen: int = 2) -> str:
+    """„+1,57 R" — R mit Vorzeichen und deutschem Komma."""
+    return f"{v:+.{stellen}f} R".replace(".", ",")
+
+
+#: Unter diesem Tagesumsatz (USD/USDT) steht im Kaufalarm ein Hinweis zur Order-Art.
+#: KEINE Sperre: in der eigenen Bilanz liefen Coins unter 1 Mio nicht schlechter als
+#: der Rest (docs/LIQUIDITAET-STUDIE-2026-10.md) — der Spread kostete dort 0,01-0,04 R.
+#: Was bleibt, ist die Ausfuehrung: in einem duennen Buch kostet eine Market-Order mehr
+#: als der angezeigte Spread.
+DUENN_UMSATZ = 1_000_000.0
+
+
+def _umsatz(z: dict[str, Any]) -> float | None:
+    roh = (z.get("zusatz") or {}).get("umsatz_24h")
+    try:
+        return float(roh) if roh is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _mio(v: float) -> str:
+    return f"{v / 1e6:.2f}".replace(".", ",") if v < 1e5 else f"{v / 1e6:.1f}".replace(".", ",")
+
+
+def schliessen_wort(w: Wache) -> str:
+    """Was man bei einem Teilausstieg TUT. Bei einem Short heisst es nicht „verkaufen".
+
+    01.10.: „ZIEL 1 Mondelez (MDLZ) — Teil verkaufen. Ein Drittel verkaufen …" — fuer
+    einen Short. Wer den Short direkt haelt, muss zurueckkaufen; wer ihn ueber einen
+    Short-Schein haelt, verkauft den Schein. Beides steht jetzt da.
+    """
+    return "verkaufen" if w.long else "schliessen"
+
+
+def _wie_short_schliessen(w: Wache, wieviel: str) -> str:
+    if w.long:
+        return ""
+    if w.klasse == "aktien":
+        return f" (beim Short-Schein: {wieviel} des Scheins verkaufen)"
+    if w.klasse == "krypto":
+        return f" (beim Terminkontrakt: {wieviel} zurueckkaufen)"
+    return ""
 
 
 def _abstand(w: Wache, v: float | None) -> str:
@@ -318,7 +372,7 @@ def einstieg_text(
 
     z.append(f"Stop      {_fmt(w.stop)}{eur(w.stop)} {_abstand(w, w.stop)}")
     for name, v, rat in (
-        ("Ziel 1", w.tp1, "  → ein Drittel verkaufen, Stop auf Einstieg"),
+        ("Ziel 1", w.tp1, f"  → ein Drittel {schliessen_wort(w)}, Stop auf Einstieg"),
         ("Ziel 2", w.tp2, "  → zweites Drittel"),
         ("Ziel 3", w.tp3, ""),
     ):
@@ -328,6 +382,12 @@ def einstieg_text(
         z.append(f"Chance-Risiko 1:{w.rr:.1f}".replace(".", ","))
     if aktie and w.eurusd:
         z.append("Trade Republic handelt in Euro — die Euro-Werte sind umgerechnet.")
+    if w.klasse == "krypto" and w.umsatz_24h is not None and w.umsatz_24h < DUENN_UMSATZ:
+        z.append(
+            f"Duenner Markt: nur {_mio(w.umsatz_24h)} Mio USD Umsatz am Tag. Ein- und "
+            "Ausstieg mit Limit-Order, nicht zum Marktpreis — sonst kostet allein die "
+            "Order einen Teil des Gewinns."
+        )
     if bestaetigt:
         z += ["", f"Bestaetigt: {bestaetigt}"]
     if warum:
@@ -355,11 +415,13 @@ def _plan_text(w: Wache) -> str:
     for name, v in (("Ziel 1", w.tp1), ("Ziel 2", w.tp2), ("Ziel 3", w.tp3)):
         if v is not None:
             r = w.r_bei(v)
-            zeilen.append(f"{name}    {_fmt(v)}" + (f"   ({r:+.1f}R)" if r else ""))
+            zeilen.append(f"{name}    {_fmt(v)}" + (f"   ({_r(r, 1)})" if r else ""))
     if w.rr:
-        zeilen.append(f"CRV       1:{w.rr:.2f}")
+        zeilen.append(f"CRV       1:{w.rr:.2f}".replace(".", ","))
     if w.einstieg > 0:
-        zeilen.append(f"Risiko    {w.risiko / w.einstieg * 100:.1f} % vom Einstieg")
+        zeilen.append(
+            f"Risiko    {w.risiko / w.einstieg * 100:.1f} % vom Einstieg".replace(".", ",")
+        )
     if w.rs is not None:
         zeilen.append(f"Rel. St.  {w.rs:.0f}/100 in der eigenen Klasse")
     if w.these:
@@ -533,6 +595,7 @@ class Wachliste:
                 name=str(z.get("name") or ""),
                 broker=str(z.get("broker") or ""),
                 eurusd=(float(z["eurusd"]) if z.get("eurusd") else None),
+                umsatz_24h=_umsatz(z),
             )
             if w.risiko <= 0 or w.richtung not in ("long", "short"):
                 continue
@@ -731,8 +794,8 @@ class Wachliste:
                         titel=f"STOP  {w.wer} — raus",
                         text=(
                             f"{w.wer} hat den Stop bei {_fmt(w.stop)} beruehrt.\n"
-                            f"Ergebnis {w.schlechtestes_r:.2f}R, bestes zwischendurch "
-                            f"{w.bestes_r:+.2f}R.\nDie These ist damit beendet."
+                            f"Ergebnis {_r(w.schlechtestes_r)}, bestes zwischendurch "
+                            f"{_r(w.bestes_r)}.\nDie These ist damit beendet."
                         ),
                         dedup_key=f"stop:{name}:{w.aufgenommen}",
                     )
@@ -752,25 +815,32 @@ class Wachliste:
                     w.schutz = basis_kurs
                 elif marke == "TP2" and w.tp1 is not None:
                     w.schutz = w.tp1
+                tun = schliessen_wort(w)
                 rat = {
-                    "TP1": "Ein Drittel verkaufen und den Stop auf den Einstieg "
-                    f"({_fmt(basis_kurs)}) ziehen — ab hier kann der Trade nicht mehr "
-                    "verlieren.",
-                    "TP2": "Zweites Drittel verkaufen. Rest laufen lassen, Stop auf Ziel 1 "
-                    f"({_fmt(w.tp1)}) nachziehen.",
-                    "TP3": "Letztes Ziel erreicht — Rest verkaufen. Das war der Plan.",
+                    "TP1": f"Ein Drittel {tun}"
+                    + _wie_short_schliessen(w, "ein Drittel")
+                    + f" und den Stop auf den Einstieg ({_fmt(basis_kurs)}) ziehen — ab "
+                    "hier kann der Trade nicht mehr verlieren.",
+                    "TP2": f"Zweites Drittel {tun}"
+                    + _wie_short_schliessen(w, "das zweite Drittel")
+                    + f". Rest laufen lassen, Stop auf Ziel 1 ({_fmt(w.tp1)}) nachziehen.",
+                    "TP3": f"Letztes Ziel erreicht — Rest {tun}"
+                    + _wie_short_schliessen(w, "den Rest")
+                    + ". Das war der Plan.",
                 }[marke]
                 nummer = marke[-1]
+                r_ziel = w.r_bei(ziel)
                 ereignisse.append(
                     Ereignis(
                         art="TP",
                         instrument=name,
                         dringend=marke != "TP3",
                         titel=f"ZIEL {nummer}  {w.wer} — "
-                        + ("Rest verkaufen" if marke == "TP3" else "Teil verkaufen"),
+                        + (f"Rest {tun}" if marke == "TP3" else f"Teil {tun}"),
                         text=(
-                            f"{w.wer} hat Ziel {nummer} bei {_fmt(ziel)} erreicht "
-                            f"({w.r_bei(ziel):+.2f}R).\n{rat}"
+                            f"{w.wer} hat Ziel {nummer} bei {_fmt(ziel)} erreicht"
+                            + (f" ({_r(r_ziel)})" if r_ziel is not None else "")
+                            + f".\n{rat}"
                         ),
                         dedup_key=f"{marke.lower()}:{name}:{w.aufgenommen}",
                     )
@@ -881,6 +951,7 @@ class Wachliste:
 
 
 __all__ = [
+    "DUENN_UMSATZ",
     "ENDZUSTAENDE",
     "HALTBARKEIT",
     "MIN_STOP_ANTEIL",
@@ -890,4 +961,5 @@ __all__ = [
     "Wachliste",
     "Zustand",
     "einstieg_text",
+    "schliessen_wort",
 ]
