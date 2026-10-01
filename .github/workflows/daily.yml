@@ -86,7 +86,7 @@ permissions:
 
 jobs:
   tagesplan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # fest: ubuntu-latest wechselt ab 19.10.2026 auf Ubuntu 26
     timeout-minutes: 36
     concurrency:
       group: scan
@@ -410,7 +410,7 @@ jobs:
   veroeffentlichen:
     needs: tagesplan
     if: github.event.schedule != '*/5 * * * *'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # fest: ubuntu-latest wechselt ab 19.10.2026 auf Ubuntu 26
     timeout-minutes: 10
     concurrency:
       group: pages
@@ -433,10 +433,23 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        # Pages antwortet ab und zu mit 502 („Failed to create deployment", zuletzt
+        # 30.09. 20:21 UTC). Dann einmal nach einer Pause nochmal statt rot und eine
+        # Seite, die bis zum naechsten Lauf stehen bleibt.
+        continue-on-error: true
         with:
           # Nicht ewig auf die Pages-Umgebung warten. Ohne Grenze steht der Job in
           # „Waiting", das Zeitlimit oben greift dort nicht, und der naechste Lauf
           # stellt sich dahinter an. Lieber ein fehlgeschlagener Deploy als eine
           # Warteschlange, die den Scan mitnimmt.
           timeout: 300000
+          error_count: 5
+      - name: Kurz warten vor dem zweiten Versuch
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 45
+      - id: nochmal
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 240000
           error_count: 5
