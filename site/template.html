@@ -584,6 +584,14 @@ a{color:var(--accent); text-underline-offset:3px}
 .hero-t{font-size:25px}
 .hero-short{margin:8px 0 10px;font-size:12.5px;line-height:1.45;color:var(--ink-2);background:var(--sunk);border:1px solid var(--rule);border-radius:10px;padding:7px 10px}
 .hero-short b{color:var(--ink)}
+/* Marktkarte: das Wichtigste offen, der Rest auf Antippen (01.10.). Vorher war jede Karte
+   einen Handybildschirm lang, mit derselben Makro-Warnung auf jeder einzelnen. */
+.opp-mehr{margin-top:8px; border-top:1px dashed var(--rule); padding-top:6px}
+.opp-mehr>summary{list-style:none; cursor:pointer; font-family:"JetBrains Mono",monospace;
+  font-size:10.5px; letter-spacing:.06em; color:var(--ink-3); padding:3px 0}
+.opp-mehr>summary::-webkit-details-marker{display:none}
+.opp-mehr>summary::before{content:"▸ "; color:var(--accent)}
+.opp-mehr[open]>summary::before{content:"▾ "}
 </style>
 </head>
 <body>
@@ -2362,7 +2370,6 @@ function oppZeile(o, rang){
       <div style="font-family:'Space Grotesk',Inter,sans-serif;font-weight:600;font-size:13.5px;
                   color:var(--ink);margin-bottom:3px">${kopf}${
         st?` <span style="font-weight:400;font-size:11px;color:var(--ink-3)">${esc(st.qualitaet)}</span>`:''}</div>
-      ${st?`<div style="font-size:12.5px;color:var(--ink-2);line-height:1.45">${esc(st.these)}</div>`:''}
       <div class="kpi">
         <span data-px="${esc(o.instrument)}">Kurs <b>${preis(o,'kurs',kurs,d)}</b>${
           live?` <span class="${live.pct>=0?'up':'dn'}">${pct(live.pct,2)}</span>`:''}</span>
@@ -2382,7 +2389,15 @@ function oppZeile(o, rang){
         ${M.tp2!=null?`<span>Ziel 2 <b>${preis(o,'tp2',M.tp2,d)}</b></span>`:''}
         ${M.tp3!=null?`<span>Ziel 3 <b>${preis(o,'tp3',M.tp3,d)}</b></span>`:''}
       </div>
-      ${o.broker?`<div class="muz" style="margin-top:6px">Kaufen bei <strong>${esc(o.broker)}</strong>${
+      ${(()=>{ const gg = glGegenDepot(o.instrument);
+        return gg && gg.r >= 0.7 ? `<div class="muz" style="margin-top:7px;color:var(--warn)">Schon im
+          Depot: im Kern dieselbe Wette wie <strong>${esc(gg.name)}</strong>.</div>` : ''; })()}
+      <details class="opp-mehr"><summary>${(()=>{
+        const n = (o.warnungen||[]).length;
+        return 'Details' + (st ? ' · These und Auslöser' : '') + (n ? ` · ${n} Hinweis${n===1?'':'e'}` : '');
+      })()}</summary>
+      ${st?`<div style="font-size:12.5px;color:var(--ink-2);line-height:1.45;margin-top:6px">${esc(st.these)}</div>`:''}
+      ${o.broker?`<div class="muz" style="margin-top:6px">${o.richtung==='short'?'Short über':'Kaufen bei'} <strong>${esc(o.broker)}</strong>${
         istAktie(o) ? (eurWert(o,'kurs')?' · EUR':' · <span style="color:var(--warn)">USD — Eurokurs fehlt gerade</span>')
                     : (o.waehrung?` · ${esc(o.waehrung)}`:'')}${
         eurHinweis(o)?' · '+eurHinweis(o):''}</div>`:''}
@@ -2408,6 +2423,7 @@ function oppZeile(o, rang){
       ${st&&st.trigger?`<div class="muz" style="margin-top:7px"><span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</div>`:''}
       ${(o.muster||[]).length?`<div class="muz">Muster: ${o.muster.map(m=>esc(m.name)+' ('+m.zeitebene+')').join(' · ')}</div>`:''}
       ${(o.warnungen||[]).length?`<div class="warnz">${o.warnungen.slice(0,3).map(esc).join('<br>')}</div>`:''}
+      </details>
     </div>
   </div>`;
 }
@@ -2465,7 +2481,11 @@ function zeichneRadar(){
          Rangliste, ${nachgezogen===1?'ist':'sind'} aber gerade einsteigbar —
          ${nachgezogen===1?'er ist':'sie sind'} deshalb oben mit aufgeführt` : ''}.</p>`:'');
   $('radar').querySelectorAll('.opp').forEach(el=>
-    el.addEventListener('click',()=>waehle(el.dataset.sym)));
+    el.addEventListener('click',ev=>{
+      // Aufklappen der Details ist kein Wechsel in den Chart.
+      if (ev.target.closest && ev.target.closest('.opp-mehr')) return;
+      waehle(el.dataset.sym);
+    }));
 }
 
 function aktualisiereRadarKurse(){
