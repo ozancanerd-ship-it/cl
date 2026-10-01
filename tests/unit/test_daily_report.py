@@ -276,3 +276,26 @@ def test_render_abgleich_nennt_beide_richtungen() -> None:
     assert "REDUZIEREN" in txt
     assert "KAUFEN" in txt
     assert "AUSSERHALB DER REGEL" in txt
+
+
+def test_tagesplan_ohne_jeden_kanal_meldet_das(monkeypatch, capsys) -> None:
+    """01.10.: der Plan ging nur an Telegram. Jetzt mehrere Wege — und ohne jeden Weg
+    sagt der Lauf es laut, statt still „nicht gesendet" zu schreiben."""
+    import importlib.util
+    from pathlib import Path
+
+    for k in (
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_ID",
+        "VAPID_PRIVATE_KEY",
+        "PUSH_ABOS",
+        "GITHUB_TOKEN",
+        "GITHUB_REPOSITORY",
+    ):
+        monkeypatch.delenv(k, raising=False)
+    pfad = Path(__file__).resolve().parents[2] / "scripts" / "daily_report.py"
+    spec = importlib.util.spec_from_file_location("dr_send", pfad)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)  # type: ignore[union-attr]
+    assert m._send("x", title="Tagesplan test", severity_high=True) is False
+    assert "Kein Weg aufs Telefon" in capsys.readouterr().out
