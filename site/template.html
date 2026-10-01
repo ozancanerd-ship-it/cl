@@ -2176,8 +2176,10 @@ function warumKeinAlarmText(){
   let t = `Gerade haben **${handelbar.length}** von ${g.length} Werten ein handelbares Setup; `
     + `**${klingeln.length}** davon gehen durchs Gewinner-Tor aufs Handy.`;
   if (klingeln.length) t += ' Das sind: ' + klingeln.slice(0,5).map(o => name(o.instrument)).join(', ') + '.';
-  t += '\n\nEin Alarm kommt nur, wenn die Setup-Art sich in deiner eigenen Bilanz bewährt hat '
-    + '(mindestens 6 entschiedene Trades, im Plus, Profitfaktor ab 1,5) und die Note mindestens A− ist. '
+  t += '\n\nEin Alarm kommt nur, wenn die Setup-Art sich in deiner eigenen Bilanz bewährt hat — '
+    + 'gezählt in ihrer eigenen Klasse, Coins für Coins und Aktien für Aktien '
+    + '(mindestens 6 entschiedene Trades, im Plus, Profitfaktor ab 1,5) — und die Note mindestens '
+    + (R.b_plus_bei_bewaehrt ? 'B+' : 'A−') + ' ist. '
     + (frei.length ? `Frei sind gerade: ${frei.join(', ')}.` : 'Gerade ist keine Setup-Art frei.')
     + '\n\nSo steht es bei deinen Coins und den Großen:\n\n' + meineCoinsText();
   return t;
@@ -6702,7 +6704,7 @@ function alarmRegelnBlock(){
   };
   return `<div class="note-box warn" style="margin-top:22px"><span class="nt">Was aufs Handy geht — und was nicht</span>
     ${R && R.nur_bewaehrt ? `<p><strong>Gewinner-Tor: ein Einstieg klingelt nur, wenn sich seine
-    Setup-Art in deiner eigenen Bilanz bewährt hat</strong> — mindestens ${R.min_faelle} entschiedene
+    Setup-Art in deiner eigenen Bilanz bewährt hat</strong>${R.bilanz_je_klasse ? ' — und zwar in derselben Klasse: Coins zählen für Coins, Aktien für Aktien' : ''} — mindestens ${R.min_faelle} entschiedene
     Trades, unterm Strich im Plus, Profitfaktor ab ${String(R.bewaehrt_pf).replace('.',',')}. Dazu Note
     ${R.b_plus_bei_bewaehrt ? 'ab B+ (B klingelt nie)' : 'ab A− (B+ klingelt nicht)'}, Chance-Risiko ab 1:${R.min_crv}, Ziel 1 weit genug weg, dass nach
     Gebühren etwas bleibt. ${(R.frei||[]).length
@@ -7363,10 +7365,11 @@ function lokaleAntwort(frage){
 
   if (/bilanz|ergebnis|wie lief|performance|trefferquote/.test(t)){
     if (!PF || !PF.abgeschlossen) return 'Es ist noch kein Signal abgeschlossen — es gibt noch nichts zu bilanzieren.';
-    const g = (PF.je_regel||{}).ganz || {};
-    return `Über ${PF.abgeschlossen} abgeschlossene Signale steht das System bei **${g.summe_r} R** `
-      + `(${Math.round((g.trefferquote||0)*100)} % Treffer). ${Math.round((PF.nie_im_plus||0)*100)} % der Trades `
-      + 'kamen nie ins Plus — das ist ein Einstiegsproblem, kein Zielproblem. Alle Zahlen stehen im Reiter Bilanz.';
+    // Dieselben Saetze wie die Bilanz-Karte (Alarme zuerst, dann alle Signale und woher).
+    // Vorher stand hier fest „das ist ein Einstiegsproblem" — auch bei 18 % Fehlstarts.
+    const st = (PF.saetze || []).slice(0, 4);
+    return (st.length ? st.join('\n\n') : `Über ${PF.abgeschlossen} abgeschlossene Signale.`)
+      + '\n\nAlle Zahlen stehen im Reiter Bilanz.';
   }
   if (/was.*(jetzt|gerade|kaufen|rein)|beste|chance|empfehl/.test(t)){
     const gut = (S?.gesamt||[]).filter(x=>x.handelbar).slice(0,3);
@@ -7696,25 +7699,45 @@ function bilanzKasten(){
   if (!PF || !PF.abgeschlossen) return `<h2>Eigene Bilanz</h2>
     <div class="karte"><p style="margin:0;font-size:13px;color:var(--ink-3)">
     Noch kein abgeschlossener Trade ausgewertet.</p></div>`;
-  const g = (PF.je_regel||{}).ganz || {};
-  const d = (PF.je_regel||{}).drittel || {};
+  // Alles nach PLAN (Drittel-Regel), wie die Alarme und die Chips darunter: Alarme plus
+  // „nur in der App" ergibt genau die Summe — vorher stand oben „alles oder nichts".
+  const g0 = (PF.je_regel||{}).ganz || {};
+  const g = (PF.je_regel||{}).drittel || g0;
+  const h = (PF.je_meldung||{}).aufs_handy || null;
   const minus = (g.summe_r || 0) < 0;
+  /* 02.10., Ozans Screenshot: die Karte war rot und fing mit „Über 39 Signale hat das
+     System 2,8 R verloren" an. Was er tatsächlich bekommen hatte — die Alarme aufs
+     Handy — lag im Plus, und der ganze Verlust kam aus Aktien-Käufen, die nie
+     geklingelt haben. Jetzt steht zuerst, was bei ihm ankam, daneben das Gesamtbild
+     und darunter, aus welcher Klasse es kommt. Nichts davon ist geschönt: ist die
+     Alarm-Bilanz negativ, ist die Karte rot. */
+  const hs = h ? (h.summe_r || 0) : null;
+  const ton = hs == null ? (minus ? 'bad' : 'gut') : (hs < 0 ? 'bad' : (minus ? 'warn' : 'gut'));
+  const r1 = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1).replace('.', ',')} R`;
+  const kl = PF.je_klasse_plan || PF.je_klasse || {};
+  const KN = {krypto:'Coins', aktien:'Aktien', gold:'Gold'};
+  const klassen = Object.entries(kl).filter(([, v]) => v && v.anzahl)
+    .sort((a, b) => (b[1].summe_r || 0) - (a[1].summe_r || 0));
   return `<h2>Eigene Bilanz</h2>
-  <div class="karte ${minus?'bad':'gut'}">
+  <div class="karte ${ton}">
     <div class="status" style="margin-top:0">
-      <div><div class="k">Ergebnis</div>
-        <div class="v ${minus?'':'gut'}" style="${minus?'color:var(--bad)':''}">${(g.summe_r||0).toFixed(1)} R</div>
+      <div><div class="k">Deine Alarme</div>
+        ${h ? `<div class="v ${hs >= 0 ? 'gut' : 'schlecht'}">${r1(hs)}</div>
+        <div class="n">${h.anzahl} aufs Handy · ${Math.round((h.trefferquote||0)*100)} % im Plus</div>`
+        : `<div class="v mittel">—</div><div class="n">noch kein Alarm entschieden</div>`}</div>
+      <div><div class="k">Alle Signale</div>
+        <div class="v ${minus ? 'schlecht' : 'gut'}">${r1(g.summe_r || 0)}</div>
         <div class="n">${PF.abgeschlossen} abgeschlossen · ${PF.offen} offen</div></div>
-      <div><div class="k">je Trade</div>
-        <div class="v ${minus?'':'gut'}" style="${minus?'color:var(--bad)':''}">${(g.erwartungswert||0).toFixed(2)}</div>
-        <div class="n">Erwartungswert in R</div></div>
       <div><div class="k">Treffer</div>
         <div class="v ${(g.trefferquote||0)>=0.4?'gut':'mittel'}">${Math.round((g.trefferquote||0)*100)} %</div>
-        <div class="n">mit Teilverkauf ${Math.round((d.trefferquote||0)*100)} %</div></div>
+        <div class="n">je Trade ${(g.erwartungswert||0).toFixed(2).replace('.', ',')} R</div></div>
       <div><div class="k">Rückgang</div>
-        <div class="v mittel">${(g.max_rueckgang_r||0).toFixed(1)} R</div>
+        <div class="v mittel">${(g.max_rueckgang_r||0).toFixed(1).replace('.', ',')} R</div>
         <div class="n">längste Serie ${g.verlustserie||0}</div></div>
     </div>
+    ${klassen.length > 1 ? `<div class="zt" style="margin-top:12px">${klassen.map(([k, v]) =>
+      `<span>${esc(KN[k] || k)} <b class="${(v.summe_r||0) > 0 ? 'up' : (v.summe_r||0) < 0 ? 'dn' : ''}">${r1(v.summe_r || 0)}</b>
+        <span style="color:var(--ink-3)">${v.anzahl}×</span></span>`).join('')}</div>` : ''}
     ${handyZeile()}
     <ul class="satzliste" style="margin-top:14px">${(PF.saetze||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
   </div>`;
