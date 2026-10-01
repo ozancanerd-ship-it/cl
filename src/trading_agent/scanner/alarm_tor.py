@@ -106,6 +106,23 @@ BEWAEHRT_PF = 1.5
 #: Tor sicher leistet: weniger Alarme, und keiner mehr fuer eine Art ohne Erfolgsnachweis.
 NUR_BEWAEHRT = True
 
+#: B+ klingelt wieder — aber NUR bei einer bewaehrten Setup-Art (01.10. abends).
+#:
+#: Das Gewinner-Tor hatte B+ mit gesperrt („strengere Auswahl, kein Beweis"). Nachgemessen
+#: (docs/STOPS-OHNE-CHANCE-2026-10.md) traegt das nicht:
+#:
+#: * Eigene Bilanz, „Ausbruch aus der Basis" — die einzige freie Art: B+ 11 Trades
+#:   +3,8 R, A− 2 Trades −0,7 R. Die Art ist ueberhaupt nur wegen ihrer B+-Trades
+#:   bewaehrt; geklingelt haetten aber nur die A−-Trades.
+#: * 19-Monats-Nachspiel, dieselbe Art: B+ In-Sample Ø +0,02 R (n 60), Out-of-Sample
+#:   Ø +0,10 R (n 41); A− −0,05 R (n 24) und −0,49 R (n 11). B+ in BEIDEN Haelften nicht
+#:   schlechter — das ist die Bedingung, unter der hier eine Regel geaendert wird.
+#:
+#: Was bleibt: die Setup-Art muss sich in der eigenen Bilanz bewaehrt haben, B klingelt nie,
+#: hoechstens drei Alarme am Tag. Zuruecknehmen, wenn die B+-Alarme nach zehn entschiedenen
+#: Trades unter Profitfaktor 1 liegen.
+B_PLUS_BEI_BEWAEHRT = True
+
 NOTEN_A = frozenset({"A+", "A", "A−", "A-", "A_PLUS", "A_MINUS"})
 NOTEN_B_PLUS = frozenset({"B+", "B_PLUS"})
 _NOTE_PUNKTE = {"A+": 3, "A_PLUS": 3, "A": 2, "A−": 1, "A-": 1, "A_MINUS": 1, "B+": 0, "B_PLUS": 0}
@@ -400,7 +417,7 @@ def pruefe(
     nk = note_kurz(note)
     if note in NOTEN_A:
         punkte.append(Punkt("note", True, f"Note {nk}"))
-    elif note in NOTEN_B_PLUS and bewaehrt and not NUR_BEWAEHRT:
+    elif note in NOTEN_B_PLUS and bewaehrt and (B_PLUS_BEI_BEWAEHRT or not NUR_BEWAEHRT):
         punkte.append(
             Punkt("note", True, f"Note {nk} — reicht, weil sich die Setup-Art bewaehrt hat")
         )
@@ -412,7 +429,7 @@ def pruefe(
                 f"Note {nk or '—'} — Alarm erst ab A−"
                 + (
                     " (B+ nur bei bewaehrter Setup-Art)"
-                    if note in NOTEN_B_PLUS and not NUR_BEWAEHRT
+                    if note in NOTEN_B_PLUS and (B_PLUS_BEI_BEWAEHRT or not NUR_BEWAEHRT)
                     else ""
                 ),
             )
@@ -656,12 +673,14 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
         "setup_arten": arten,
         "gesperrt": gesperrt,
         "nur_bewaehrt": NUR_BEWAEHRT,
+        "b_plus_bei_bewaehrt": B_PLUS_BEI_BEWAEHRT,
         "bewaehrt_pf": BEWAEHRT_PF,
         "frei": sorted(k for k, v in arten.items() if v.get("urteil") == "bewaehrt"),
     }
 
 
 __all__ = [
+    "B_PLUS_BEI_BEWAEHRT",
     "MAX_JE_TAG",
     "MIN_CRV",
     "MIN_FAELLE",

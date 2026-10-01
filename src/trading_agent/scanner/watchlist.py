@@ -274,6 +274,23 @@ def _mio(v: float) -> str:
     return f"{v / 1e6:.2f}".replace(".", ",") if v < 1e5 else f"{v / 1e6:.1f}".replace(".", ",")
 
 
+def _stop_ergebnis(w: Wache) -> str:
+    """Was der Stop laut Plan gekostet hat — nicht der schlechteste Kurs der Stunde.
+
+    01.10., Issue #188: „Ergebnis −1,42 R" fuer Zcash. Das war der tiefste Kurs in der
+    Pruefstunde, nicht das Ergebnis: mit einer Stop-Order ist man am Stop draussen
+    (gemessen am tatsaechlichen Einstieg −1,11 R; die Bilanz zaehlt einen Stop als −1 R).
+    Der tiefere Kurs ist trotzdem eine Information — er steht dahinter, als das, was er ist.
+    """
+    plan = w.r_bei(w.stop)
+    satz = f"Ergebnis laut Plan {_r(plan)} (Stop-Order am Stop)" if plan is not None else ""
+    if plan is not None and w.schlechtestes_r < plan - 0.05:
+        satz += f"; zwischendurch lief der Kurs bis {_r(w.schlechtestes_r)}"
+    if w.bestes_r > 0:
+        satz += f"; bestes zwischendurch {_r(w.bestes_r)}"
+    return (satz + ".") if satz else ""
+
+
 def schliessen_wort(w: Wache) -> str:
     """Was man bei einem Teilausstieg TUT. Bei einem Short heisst es nicht „verkaufen".
 
@@ -800,9 +817,9 @@ class Wachliste:
                         dringend=True,
                         titel=f"STOP  {w.wer} — raus",
                         text=(
-                            f"{w.wer} hat den Stop bei {_fmt(w.stop)} beruehrt.\n"
-                            f"Ergebnis {_r(w.schlechtestes_r)}, bestes zwischendurch "
-                            f"{_r(w.bestes_r)}.\nDie These ist damit beendet."
+                            f"{w.wer} hat den Stop bei {_fmt(w.stop)} beruehrt — raus.\n"
+                            + _stop_ergebnis(w)
+                            + "\nDie These ist damit beendet."
                         ),
                         dedup_key=f"stop:{name}:{w.aufgenommen}",
                     )
