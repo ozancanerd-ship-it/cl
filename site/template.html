@@ -2155,7 +2155,7 @@ function meineCoinsKasten(){
       über einen und drei Monate im Plus ist" hat 2024 gut verdient, 2025 aber 35 R verloren und
       2026 bisher ±0 (docs/TREND-SWING-STUDIE). Der Scanner wartet deshalb auf einen Rücksetzer
       mit klarer Marke. Ein Alarm kommt nur, wenn ein Setup durchs Gewinner-Tor geht — Setup-Art
-      in deiner eigenen Bilanz bewährt, Note ab A−. Antippen öffnet den Chart.</p>
+      in deiner eigenen Bilanz bewährt, Note ab B+. Antippen öffnet den Chart.</p>
   </div>`;
 }
 
@@ -6704,7 +6704,7 @@ function alarmRegelnBlock(){
     ${R && R.nur_bewaehrt ? `<p><strong>Gewinner-Tor: ein Einstieg klingelt nur, wenn sich seine
     Setup-Art in deiner eigenen Bilanz bewährt hat</strong> — mindestens ${R.min_faelle} entschiedene
     Trades, unterm Strich im Plus, Profitfaktor ab ${String(R.bewaehrt_pf).replace('.',',')}. Dazu Note
-    ab A− (B+ klingelt nicht), Chance-Risiko ab 1:${R.min_crv}, Ziel 1 weit genug weg, dass nach
+    ${R.b_plus_bei_bewaehrt ? 'ab B+ (B klingelt nie)' : 'ab A− (B+ klingelt nicht)'}, Chance-Risiko ab 1:${R.min_crv}, Ziel 1 weit genug weg, dass nach
     Gebühren etwas bleibt. ${(R.frei||[]).length
       ? `Frei sind gerade: <strong>${R.frei.map(esc).join(', ')}</strong>.`
       : 'Gerade ist <strong>keine</strong> Setup-Art frei — dann klingelt nichts, und das ist Absicht.'}
