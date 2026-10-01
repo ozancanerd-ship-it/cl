@@ -548,6 +548,13 @@ class Wachliste:
                 # Laufender Trade: Plan bleibt, wie er war.
                 if vorhanden.zustand != Zustand.WARTET.value:
                     continue
+                # Der Umsatz gehoert nicht zum Vertrag (Einstieg, Stop, Ziele bleiben fest)
+                # und darf frisch sein — er steht nur als Hinweis im Kaufalarm. So bekommen
+                # auch Wachen von vor dem 01.10. (damals ohne Umsatz gespeichert) den
+                # Hinweis zum duennen Markt, wenn ihr Einstieg kommt.
+                frisch = _umsatz(z)
+                if frisch is not None:
+                    vorhanden.umsatz_24h = frisch
                 neuer_einstieg = z.get("einstieg")
                 if neuer_einstieg is None or vorhanden.einstieg <= 0:
                     continue
