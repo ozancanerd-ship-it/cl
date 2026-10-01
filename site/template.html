@@ -193,6 +193,7 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.03em}
 .status .v.gut{color:var(--long); text-shadow:0 0 22px rgba(43,232,165,.35)}
 .status .v.mittel{color:var(--warn)} .status .v.aus{color:var(--ink-3)}
+.status .v.schlecht{color:var(--bad)}
 @media (max-width:640px){.status{grid-template-columns:repeat(2,1fr); gap:8px}}
 
 /* ---------- Filterknoepfe ---------- */
@@ -3594,10 +3595,16 @@ function bewertePosition(pos){
                  : (pos.einstand_manuell != null ? pos.einstand_manuell : null);
   const gv = (wert != null && einstand != null) ? wert - einstand : null;
   const gvPct = (gv != null && einstand) ? gv / einstand * 100 : null;
+  /* R misst gegen DEINEN Stop. Bis 01.10. stand hier die Invalidierung des frischen
+     Scan-Setups — bei Mondelez die eines SHORTS, gegen eine gekaufte Position: „R −1,11"
+     auf einer Karte, die gleichzeitig „kein Stop" sagte. Ohne eigenen Stop kein R, und
+     liegt der Stop schon im Gewinn, gibt es kein Risiko mehr, gegen das man messen kann. */
   let r = null;
-  if (row && row.invalidierung != null && pos.einstieg){
-    const risiko = Math.abs(pos.einstieg - inPositionsWaehrung(row, row.invalidierung, pos));
-    if (risiko > 0 && kurs != null) r = (kurs - pos.einstieg) / risiko;
+  const eigenerStop = pos.plan && pos.plan.stop != null && isFinite(pos.plan.stop) ? pos.plan.stop : null;
+  const posKurz = (pos.plan && pos.plan.richtung === 'short') || pos.hebel_richtung === 'short';
+  if (eigenerStop != null && pos.einstieg && kurs != null && !(pos.plan && pos.plan.ebene === 'basis')){
+    const risiko = posKurz ? eigenerStop - pos.einstieg : pos.einstieg - eigenerStop;
+    if (risiko > 0) r = (posKurz ? pos.einstieg - kurs : kurs - pos.einstieg) / risiko;
   }
   const score = row ? row.score : null;
   const halt = haltUrteil(row);
@@ -4208,7 +4215,11 @@ function positionsRat(b){
   }
 
   const h = b.halt || haltUrteil(r);
-  const gegen = r.richtung === 'short';
+  /* „Gegen" heisst: das Setup zeigt gegen DEINE Position. Eine gekaufte Position gegen
+     ein Short-Setup, ein Short-Schein gegen ein Long-Setup. */
+  const posKurz = (pos.plan && pos.plan.richtung === 'short') || pos.hebel_richtung === 'short';
+  const gegen = r.richtung === (posKurz ? 'long' : 'short');
+  const mit = r.richtung === (posKurz ? 'short' : 'long');
   const score = r.score;
   const klasse = r.klasse === 'aktien' ? 'Aktien' : (r.klasse === 'krypto' ? 'Coins' : 'Werte');
 
@@ -4249,7 +4260,7 @@ function positionsRat(b){
 
   if (gegen){
     if (stufe === 'gut') stufe = 'warn';
-    saetze.push('Dazu kommt: die Analyse sieht hier gerade ein Setup nach UNTEN. Du hältst '
+    saetze.push(`Dazu kommt: die Analyse sieht hier gerade ein Setup nach ${posKurz ? 'OBEN' : 'UNTEN'}. Du hältst `
       + 'also gegen die Richtung, die das System sieht. Kein Verkaufsbefehl — aber der Moment, '
       + 'in dem ein Stop im Depot stehen sollte.');
   }
@@ -4260,7 +4271,13 @@ function positionsRat(b){
      auf H4 nicht frisch" bei Aktien am Wochenende. Oben bleibt nur, was entscheidet. */
   const mehr = [];
   if (score != null){
-    if (score >= 52){
+    /* Bis 01.10. hiess ein hoher Score immer „Zukauf vertretbar" — auch wenn er zu einem
+       SHORT gehoerte. Bei Mondelez stand beides auf derselben Karte: „Setup nach unten"
+       und „hier wäre sogar ein Zukauf vertretbar". */
+    if (gegen){
+      mehr.push(`Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — aber für die `
+        + 'Gegenrichtung. Für einen Zukauf spricht das nicht.');
+    } else if (score >= 52 && mit){
       saetze.push(`Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — hier wäre heute `
         + 'sogar ein Zukauf vertretbar.');
     } else {
@@ -5581,7 +5598,7 @@ function depotGesundheit(stand){
   // Fehlt die Gleichlauf-Messung, wird auf die vier anderen Teile hochgerechnet.
   const da = Object.values(pk).filter(v => v != null);
   const wert = Math.round(da.reduce((s, v) => s + v, 0) / (da.length * 20) * 100);
-  return {wert, pk, schutz, eff, groesste, hebelOk, ohneTermin,
+  return {wert, pk, schutz, eff, groesste, hebelOk, ohneTermin, gehebelt: gehebelt.length,
           ohneStop: teile.filter(b => !hatSchutz(b))};
 }
 function gesundheitKasten(stand){
@@ -5593,7 +5610,7 @@ function gesundheitKasten(stand){
     <span class="val" style="font-family:inherit;font-weight:400;text-align:right">
     <b>${p == null ? '—' : p + '/20'}</b> <span style="color:var(--ink-3)">${satz}</span></span></div>`;
   const tun = [];
-  if (g.pk.schutz < 16 && g.ohneStop.length)
+  if (g.ohneStop.length)
     tun.push(`Stop setzen für ${g.ohneStop.slice(0,4).map(b => esc(posName(b))).join(', ')}`);
   if (g.pk.klumpen < 10) tun.push('die größte Position verkleinern');
   if (g.pk.hebel < 16) tun.push('Scheine mit knappem Knock-out-Puffer verkleinern');
@@ -5603,7 +5620,7 @@ function gesundheitKasten(stand){
     ${z('Schutz', g.pk.schutz, `${Math.round(g.schutz*100)} % des Geldes mit Stop oder weitem Puffer`)}
     ${z('Streuung', g.pk.streuung, g.eff != null ? `${g.eff.toFixed(1).replace('.',',')} unabhängige Wetten` : 'Gleichlauf noch nicht gemessen')}
     ${z('Klumpen', g.pk.klumpen, `größte Position ${g.groesste.toFixed(0)} % des Depots`)}
-    ${z('Hebel', g.pk.hebel, `${Math.round(g.hebelOk*100)} % des gehebelten Geldes ≥ ${KO_PUFFER_ENG} % vom Knock-out`)}
+    ${z('Hebel', g.pk.hebel, g.gehebelt ? `${Math.round(g.hebelOk*100)} % des gehebelten Geldes ≥ ${KO_PUFFER_ENG} % vom Knock-out` : 'kein Hebel im Depot')}
     ${z('Termine', g.pk.termine, `${Math.round(g.ohneTermin*100)} % ohne Quartalszahlen in 7 Tagen`)}
     ${tun.length ? `<p style="margin:8px 0 0;font-size:13px"><strong>Was sie hebt:</strong> ${tun.join('; ')}.</p>` : ''}
     <p style="margin:6px 0 0;font-size:12px;color:var(--ink-3)">Fünf Teile zu je 20 Punkten —
@@ -5683,23 +5700,26 @@ function zeichnePortfolio(){
   const groesste = bew.slice().sort((a,b)=>(inEuro(b,b.wert)||0)-(inEuro(a,a.wert)||0))[0];
   const konz = (groesste && gesamt) ? (inEuro(groesste, groesste.wert)||0)/gesamt*100 : 0;
 
-  let h = `<div class="note-box"><span class="nt">Wo dein Depot liegt</span>
-    <p>Deine Positionen liegen in diesem Browser. Sie gehen nicht ins öffentliche Repo und
+  /* Wer das Depot aufmacht, will zuerst Wert und Handlungsbedarf sehen — der Hinweis, wo
+     die Daten liegen, steht jetzt unten bei „Mac und iPhone gleich halten". */
+  const woLiegt = `<div class="note-box"><span class="nt">Wo dein Depot liegt</span>
+    <p style="margin:0">Deine Positionen liegen in diesem Browser. Sie gehen nicht ins öffentliche Repo und
     nicht auf die öffentliche Seite. ${WA && WA.aktiv
       ? 'Für den Wächter rund um die Uhr liegt eine Kopie als <strong>Geheimnis</strong> bei '
         + 'GitHub (DEPOT_CODE) — dort ist sie für niemanden lesbar, auch nicht in den Protokollen.'
-      : 'Auf einem anderen Gerät bringst du sie über den Reiter Sync hin.'}</p></div><div id="pf_waechter"></div>`;
+      : 'Auf einem anderen Gerät bringst du sie über den Reiter Sync hin.'}</p></div>`;
+  let h = `<div id="pf_waechter"></div>`;
 
   if (bew.length){
     h += `<div class="status">
       <div><div class="k">Depotwert</div><div class="v">${num(gesamt,0)} €*</div>
         <div class="n">${bew.length} Position(en)</div></div>
-      <div><div class="k">Gewinn / Verlust</div><div class="v ${gv>=0?'gut':'aus'}">${num(gv,0)}</div>
+      <div><div class="k">Gewinn / Verlust</div><div class="v ${gv>=0?'gut':'schlecht'}">${gv>=0?'+':'−'}${num(Math.abs(gv),0)} €</div>
         <div class="n">${einstand?pct(gv/einstand*100,1):'—'}</div></div>
       <div><div class="k">Konzentration</div><div class="v ${konz>35?'mittel':'gut'}">${konz.toFixed(0)} %</div>
         <div class="n">größte: ${esc(groesste?name(groesste.pos.sym):'—')}</div></div>
       <div><div class="k">Aufteilung</div><div class="v" style="font-size:14px;font-family:'JetBrains Mono',monospace">
-        ${Object.entries(jeKlasse).map(([k,v])=>`${k.slice(0,3)} ${gesamt?Math.round(v/gesamt*100):0}%`).join('<br>')||'—'}</div></div>
+        ${Object.entries(jeKlasse).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc({krypto:'Krypto',aktien:'Aktien',gold:'Gold',fx:'Devisen',unbekannt:'Sonstiges'}[k]||k)} ${gesamt?Math.round(v/gesamt*100):0} %`).join('<br>')||'—'}</div></div>
     </div>
     <p class="leer" style="padding:6px 0">* alles in Euro umgerechnet${kursEU?` (${num(kursEU,4)} $/€)`:''} —
       Kurse kommen für Krypto live von der Börse, für Aktien aus dem letzten Scan.
@@ -5742,11 +5762,22 @@ function zeichnePortfolio(){
             sofort neu</span></p>`:''}
       </div>`;
     }).join('')
-    : `<div class="karte gut"><h3>Nichts zu tun</h3>
+    : (() => {
+      /* „Die Stops stehen" darf nur dastehen, wenn sie stehen. Vorher stand das auch bei
+         einer Position ohne Stop — zwei Kästen über der Warnung „ohne Stop". */
+      const ohne = bew.filter(b => !istBar(b.pos) && b.kurs != null
+        && !(b.pos.plan && b.pos.plan.stop != null) && !(b.hebel && b.hebel.puffer_pct >= KO_PUFFER_ENG * 2));
+      return ohne.length
+        ? `<div class="karte warn"><h3>Fast nichts — ${ohne.length === 1 ? 'ein Stop fehlt' : ohne.length + ' Stops fehlen'}</h3>
+           <p style="margin:4px 0 0;font-size:13px">Kein Stop gerissen, kein Ziel erreicht. Aber
+           <strong>${ohne.map(b => esc(posName(b))).join(', ')}</strong> ${ohne.length === 1 ? 'hat' : 'haben'}
+           keinen Stop — dort meldet sich die App nicht, wenn es eng wird. Unten auf der Karte eine
+           Marke eintragen: dahin, wo der Grund, aus dem du gekauft hast, nicht mehr gilt.</p></div>`
+        : `<div class="karte gut"><h3>Nichts zu tun</h3>
        <p style="margin:4px 0 0;font-size:13px">Keine Position verlangt gerade eine Handlung.
        Kein Stop gerissen, kein Ziel erreicht, kein Knock-out, der jetzt Handeln verlangt — und nichts,
        wo sich Nachlegen rechnen würde. Die Stops stehen und werden nachgezogen; Nichtstun
-       ist hier das Ergebnis, nicht die Lücke.</p></div>`;
+       ist hier das Ergebnis, nicht die Lücke.</p></div>`; })();
 
     h += glKasten(stand);
 
@@ -5799,7 +5830,7 @@ function zeichnePortfolio(){
           ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}${z}</b>${b.live?' <span class="up">live</span>':''}</span>`
             :`<span>Wert <b>${num(b.wert,2)} €</b> <span style="color:var(--ink-3)">von dir eingetragen</span></span>`}
           ${b.gvPct!=null?`<span>G/V <b class="${b.gvPct>=0?'up':'dn'}">${pct(b.gvPct,1)}</b></span>`:''}
-          ${b.r!=null?`<span>R <b class="${b.r>=0?'up':'dn'}">${b.r.toFixed(2)}R</b></span>`:''}
+          ${b.r!=null?`<span title="gemessen am Abstand Einstieg → dein Stop">Stand <b class="${b.r>=0?'up':'dn'}">${b.r>=0?'+':'−'}${Math.abs(b.r).toFixed(2).replace('.',',')} R</b></span>`:''}
         </div>
         ${zahlenHinweis(b)}
         ${r ? '' : basisKasten(b)}
@@ -5867,6 +5898,7 @@ function zeichnePortfolio(){
     </div>
 
     <h2>Mac und iPhone gleich halten</h2>
+    ${woLiegt}
     <div class="karte">
       <p style="margin:0 0 10px;font-size:13.5px">Dein Depot liegt im Speicher dieses Geräts.
       Damit auf dem iPhone dasselbe steht wie hier, gibt es den eigenen Reiter
