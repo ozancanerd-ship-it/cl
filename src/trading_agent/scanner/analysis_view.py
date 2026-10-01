@@ -26,6 +26,7 @@ from typing import Any
 
 from trading_agent.analysis.indicators import berechne as indikatoren_berechnen
 from trading_agent.core.enums import Direction, Timeframe
+from trading_agent.scanner.plan import preis_de
 
 #: Reihenfolge, in der die Zeitebenen ueberall auftauchen: gross nach klein.
 #: Die Woche steht VOR dem Tag: sie ist die langsamste Ebene und damit die, gegen die
@@ -301,23 +302,32 @@ def _tf_satz(
         teile[0] += f" (Staerke {stark:.2f})"
     if letzter is not None:
         art = _v(getattr(letzter, "kind", None)).upper()
+        art = {"CHOCH": "CHoCH"}.get(art, art)
         rr = _v(getattr(letzter, "direction", None))
         pfeil = "nach oben" if rr == "bullish" else "nach unten"
         teile.append(
-            f"letzter {art} {pfeil} bei {float(getattr(letzter, 'broken_level_price', 0.0)):g}"
+            f"letzter {art} {pfeil} bei {preis_de(float(getattr(letzter, 'broken_level_price', 0.0)))}"
         )
     if pd:
-        zone = {
-            "premium": "im teuren Drittel",
-            "discount": "im guenstigen Drittel",
-            "equilibrium": "in der Mitte",
-        }.get(pd["zone"], pd["zone"])
-        teile.append(f"Kurs {zone} der Spanne")
+        # Neutral formuliert: „guenstig" stimmt nur fuer einen Kauf. Und eine Lage
+        # ausserhalb der Spanne (Position < 0 oder > 1) ist kein „Drittel" mehr.
+        lage = pd.get("position")
+        if isinstance(lage, (int, float)) and lage < 0:
+            teile.append("Kurs unter der Spanne")
+        elif isinstance(lage, (int, float)) and lage > 1:
+            teile.append("Kurs ueber der Spanne")
+        else:
+            zone = {
+                "premium": "im oberen (teuren) Drittel",
+                "discount": "im unteren (guenstigen) Drittel",
+                "equilibrium": "in der Mitte",
+            }.get(pd["zone"], pd["zone"])
+            teile.append(f"Kurs {zone} der Spanne")
     ziele = []
     if oben is not None:
-        ziele.append(f"{oben:g} darueber ({(oben / kurs - 1) * 100:+.1f} %)")
+        ziele.append(f"{preis_de(oben)} darueber ({(oben / kurs - 1) * 100:+.1f} %)")
     if unten is not None:
-        ziele.append(f"{unten:g} darunter ({(unten / kurs - 1) * 100:+.1f} %)")
+        ziele.append(f"{preis_de(unten)} darunter ({(unten / kurs - 1) * 100:+.1f} %)")
     if ziele:
         teile.append("naechste Liquiditaet " + " und ".join(ziele))
     return ", ".join(teile) + "."
@@ -403,14 +413,18 @@ def kommentar(
     if richtung is not None and ziel:
         wohin = "steigt" if richtung is Direction.LONG else "faellt"
         erwartung.append(
-            f"Erwartet wird, dass der Kurs von {kurs:g} in Richtung {ziel:g} {wohin} "
+            f"Erwartet wird, dass der Kurs von {preis_de(kurs)} in Richtung {preis_de(ziel, kurs)} {wohin} "
             f"({(ziel / kurs - 1) * 100:+.1f} %)."
         )
         if tp2:
             erwartung.append(
-                f"Laeuft es weiter, liegt das naechste Liquiditaetsziel bei {tp2:g} "
+                f"Laeuft es weiter, liegt das naechste Liquiditaetsziel bei {preis_de(tp2, kurs)} "
                 f"({(tp2 / kurs - 1) * 100:+.1f} %)"
-                + (f", danach {tp3:g} ({(tp3 / kurs - 1) * 100:+.1f} %)." if tp3 else ".")
+                + (
+                    f", danach {preis_de(tp3, kurs)} ({(tp3 / kurs - 1) * 100:+.1f} %)."
+                    if tp3
+                    else "."
+                )
             )
     if not erwartung:
         erwartung.append(
@@ -422,7 +436,7 @@ def kommentar(
     if inval and richtung is not None:
         seite = "unter" if richtung is Direction.LONG else "ueber"
         was_waere_falsch.append(
-            f"Die {rt}-These ist hinfaellig, sobald der Kurs {seite} {inval:g} schliesst "
+            f"Die {rt}-These ist hinfaellig, sobald der Kurs {seite} {preis_de(inval, kurs)} schliesst "
             f"({(inval / kurs - 1) * 100:+.1f} % von hier)."
         )
     gegen = [zl for zl in zeilen if zl["regime_roh"] in ("trend_up", "trend_down")]

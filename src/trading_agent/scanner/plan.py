@@ -7,15 +7,22 @@ kleinere Teil des Handwerks. Der groessere ist: wann nehme ich Gewinn mit, wann 
 den Stop nach, wann steige ich aus, obwohl das Ziel nicht erreicht ist. Ohne diese Regeln
 bekommt man ein gutes Signal und trotzdem ein schlechtes Ergebnis.
 
-Die Regeln hier sind das, was in der Praxisliteratur uebereinstimmend beschrieben wird:
+Die Schritte beschreiben GENAU die Regeln, nach denen die Wachliste klingelt und die
+Bilanz zaehlt — nicht mehr und nicht weniger:
 
 * Position in Drittel teilen. Erstes Drittel am ersten Ziel, zweites am zweiten,
-  letztes Drittel laeuft mit nachgezogenem Stop.
-* Nach dem ersten Ziel Stop auf Einstand. Ab da kann der Trade nichts mehr kosten.
-* Nachziehen entweder unter jedes neue hoehere Tief oder 2 ATR unter das Hoch —
-  nicht beides gleichzeitig, sonst wird man von der engeren Regel ausgestoppt.
-* Zeit-Stop: passiert nach ein bis zwei Wochen nichts, ist das Kapital besser woanders.
+  letztes am dritten.
+* Nach dem ersten Ziel Stop auf Einstand, nach dem zweiten auf Ziel 1.
+* Vorzeitig raus nur aus zwei Gruenden: Stop beruehrt, oder die Analyse dreht in die
+  Gegenrichtung (Alarm „AUSSTEIGEN"). Die Ausstiegs-Studie (docs/AUSSTIEG-STUDIE-2026-10.md)
+  hat diese zweite Regel gemessen: sie kostet nichts.
 * Risiko ueber rund 10 % vom Einstiegskurs ist kein Swing-Trade mehr, sondern eine Wette.
+
+Bis 01.10. stand hier mehr: ein Trailing-Stop von 2 ATR fuer das letzte Drittel, ein
+Zeit-Stop nach 12 Tagen und „Rest reduzieren bei einer Gegenkerze". Keine dieser Regeln
+hat je einen Alarm ausgeloest, keine wurde gemessen, und „reduzieren" ist genau der
+Teilverkaufs-Rat, den die Gegenthese-Studie verworfen hat. Ein Plan, der etwas anderes
+sagt als die Alarme, ist schlechter als keiner — man weiss nicht, welchem man folgt.
 
 ZIELE AUS DER STRUKTUR ODER AUS DEM RISIKO
 
@@ -35,10 +42,6 @@ from typing import Any
 R_ZIELE = (1.0, 2.0, 3.5)
 #: Ueber diesem Anteil des Einstiegskurses ist der Stop zu weit fuer einen Swing-Trade.
 MAX_RISIKO_PCT = 10.0
-#: Nach so vielen Tagen ohne Fortschritt ist das Kapital woanders besser aufgehoben.
-ZEIT_STOP_TAGE = 12
-#: Abstand des nachgezogenen Stops zum Hoch, in ATR.
-TRAIL_ATR = 2.0
 #: Wie viel weiter als die Untergrenze ein Strukturziel hoechstens liegen darf, in R.
 #: Alles dahinter ist zu weit weg, um noch ein Ziel dieses Trades zu sein.
 ZIEL_SPIELRAUM_R = 1.5
@@ -80,12 +83,21 @@ class Handelsplan:
         }
 
 
-def _fmt(x: float) -> str:
-    if x >= 1000:
-        return f"{x:,.2f}".replace(",", " ")
-    if x >= 1:
-        return f"{x:.4g}"
-    return f"{x:.6g}"
+def _fmt(x: float, bezug: float | None = None) -> str:
+    """Preis mit deutschem Komma und so vielen Stellen, wie die App sie zeigt.
+
+    Vorher ``:.4g`` — daraus wurde „59.56" und „0.805" mitten in einer Seite mit „59,56".
+    ``bezug``: die Stellenzahl richtet sich nach diesem Preis (fuer 1 R = 0,81 bei einem
+    Kurs von 58, nicht 0,80500).
+    """
+    a = abs(bezug if bezug is not None else x)
+    n = 2 if a >= 10 else 4 if a >= 1 else 5 if a >= 0.01 else 8
+    roh = f"{x:,.{n}f}"
+    return roh.replace(",", "\u202f").replace(".", ",").replace("\u202f", ".")
+
+
+def _zahl(x: float, n: int = 1) -> str:
+    return f"{x:.{n}f}".replace(".", ",")
 
 
 def baue_plan(
@@ -151,35 +163,22 @@ def baue_plan(
             "muesste so klein sein, dass sich der Aufwand nicht lohnt."
         )
 
-    trail = (
-        f"2 ATR ({_fmt(TRAIL_ATR * atr)}) unter dem hoechsten erreichten Kurs"
-        if atr > 0 and lang
-        else (
-            f"2 ATR ({_fmt(TRAIL_ATR * atr)}) ueber dem tiefsten erreichten Kurs"
-            if atr > 0
-            else "unter jedem neuen hoeheren Tief"
-        )
-    )
-
     schritte = (
-        f"Einstieg bei {_fmt(einstieg)} — ein Drittel, ein Drittel, ein Drittel geplant.",
-        f"Stop bei {_fmt(stop)}. Das ist 1 R = {_fmt(r)} ({risiko_pct:.1f} % vom Einstieg). "
-        "Alles danach wird in R gerechnet, nicht in Euro.",
-        f"Erstes Drittel raus bei {_fmt(tp1)} ({r1:.1f} R). Danach Stop sofort auf Einstand "
-        f"{_fmt(einstieg)} — ab hier kann der Trade nichts mehr kosten.",
-        f"Zweites Drittel raus bei {_fmt(tp2)} ({crv:.1f} R). Stop auf {_fmt(tp1)} nachziehen.",
-        f"Letztes Drittel laeuft. Stop nachziehen: {trail}. Ziel {_fmt(tp3)} ({r3:.1f} R), "
-        "aber der Trailing-Stop entscheidet, nicht die Zahl.",
+        f"Einstieg bei {_fmt(einstieg)} — die Position in drei gleiche Teile denken.",
+        f"Stop bei {_fmt(stop)}. Das ist 1 R = {_fmt(r, einstieg)} ({_zahl(risiko_pct)} % vom "
+        "Einstieg). Alles danach wird in R gerechnet, nicht in Euro.",
+        f"Ziel 1 bei {_fmt(tp1)} ({_zahl(r1)} R): erstes Drittel verkaufen, Stop auf den "
+        f"Einstieg {_fmt(einstieg)} — ab hier kann der Trade nichts mehr kosten.",
+        f"Ziel 2 bei {_fmt(tp2)} ({_zahl(crv)} R): zweites Drittel verkaufen, Stop auf "
+        f"Ziel 1 ({_fmt(tp1)}) nachziehen.",
+        f"Ziel 3 bei {_fmt(tp3)} ({_zahl(r3)} R): den Rest verkaufen. Der Trade ist fertig.",
     )
 
     ausstiege = (
-        f"Stop bei {_fmt(stop)} wird ausgeloest — Trade beendet, keine Diskussion.",
-        f"Nach {ZEIT_STOP_TAGE} Tagen ohne Fortschritt raus. Kapital, das steht, "
-        "kostet die naechste Gelegenheit.",
-        "Gegenteilige Kerze auf der 4-Stunden-Ebene mit Volumen (bei Long: "
-        "Umkehrkerze am Hoch) — Rest reduzieren, ohne auf den Stop zu warten.",
-        "Bricht die Struktur in die Gegenrichtung, ist die These falsch. Raus, auch "
-        "wenn der Stop noch nicht erreicht ist.",
+        f"Der Kurs beruehrt den Stop bei {_fmt(stop)} (nach Ziel 1 den Einstand, nach "
+        "Ziel 2 das Ziel 1) — raus, keine Diskussion.",
+        "Die Analyse dreht in die Gegenrichtung (Strukturbruch) — der Alarm sagt "
+        "AUSSTEIGEN, dann raus zum Marktkurs, auch wenn der Stop noch nicht erreicht ist.",
     )
 
     return Handelsplan(
@@ -197,12 +196,14 @@ def baue_plan(
     )
 
 
+#: Oeffentlicher Name fuer andere Module (Analyse-Saetze): derselbe Preis-Formatierer.
+preis_de = _fmt
+
 __all__ = [
     "MAX_RISIKO_PCT",
     "R_ZIELE",
-    "TRAIL_ATR",
-    "ZEIT_STOP_TAGE",
     "ZIEL_SPIELRAUM_R",
     "Handelsplan",
     "baue_plan",
+    "preis_de",
 ]
