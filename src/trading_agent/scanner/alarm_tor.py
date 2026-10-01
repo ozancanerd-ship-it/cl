@@ -89,6 +89,23 @@ SPERRE_JE_WERT = timedelta(hours=48)
 #: Ab dieser Bilanz gilt eine Setup-Art als bewaehrt (Profitfaktor mit Drittel-Regel).
 BEWAEHRT_PF = 1.5
 
+#: Gewinner-Tor (01.10.). Ozan: „nicht einfach bei jedem Setup einen Alarm, sondern erst,
+#: wenn es wirklich ein Gewinner ist." Bis dahin klingelte jede Setup-Art, die noch nicht
+#: GESPERRT war — also auch jede, ueber die die eigene Bilanz noch gar nichts wusste. Am
+#: 30.09. waren das drei Aktien-Shorts „Ruecksetzer im Trend": eine Art mit −1,3 R aus 4
+#: Trades in der eigenen Bilanz und der schwaechsten Bilanz beider Haelften im 19-Monats-
+#: Nachspiel (docs/SIGNAL-STUDIE-2026-09.md).
+#:
+#: Jetzt klingelt nur noch eine Setup-Art, die sich in der eigenen Bilanz BEWAEHRT hat
+#: (mindestens MIN_FAELLE entschiedene Trades, im Plus, Profitfaktor ab BEWAEHRT_PF), und
+#: nur mit Note ab A−. B+ klingelt nicht mehr. Beobachtet und gezaehlt wird weiter alles —
+#: eine Art, die sich bewaehrt, wird von selbst frei.
+#:
+#: Ehrlich dazu: das ist eine strengere Auswahl, kein Beweis. Die eigene Bilanz ist klein;
+#: das 19-Monats-Nachspiel hat fuer keinen Filter einen belastbaren Vorteil gezeigt. Was das
+#: Tor sicher leistet: weniger Alarme, und keiner mehr fuer eine Art ohne Erfolgsnachweis.
+NUR_BEWAEHRT = True
+
 NOTEN_A = frozenset({"A+", "A", "A−", "A-", "A_PLUS", "A_MINUS"})
 NOTEN_B_PLUS = frozenset({"B+", "B_PLUS"})
 _NOTE_PUNKTE = {"A+": 3, "A_PLUS": 3, "A": 2, "A−": 1, "A-": 1, "A_MINUS": 1, "B+": 0, "B_PLUS": 0}
@@ -354,6 +371,23 @@ def pruefe(
     if gesperrt:
         g = gesperrt[0]
         punkte.append(Punkt("bilanz", False, g.satz(_anzeige(g.schluessel))))
+    elif bewaehrt:
+        punkte.append(Punkt("bilanz", True, art.satz(_anzeige(art.schluessel))))
+    elif NUR_BEWAEHRT:
+        bisher = (
+            f"bisher {art.anzahl} Trades, zusammen {art.summe_r:+.1f} R".replace(".", ",")
+            if art is not None and art.anzahl
+            else "noch ohne entschiedene Trades"
+        )
+        punkte.append(
+            Punkt(
+                "bilanz",
+                False,
+                f"„{setup or '—'}“ hat sich noch nicht bewaehrt ({bisher}) — Alarm erst ab "
+                f"{MIN_FAELLE} Trades im Plus mit Profitfaktor ab "
+                f"{BEWAEHRT_PF:.1f}".replace(".", ","),
+            )
+        )
     elif art is not None:
         punkte.append(Punkt("bilanz", True, art.satz(_anzeige(art.schluessel))))
     else:
@@ -366,7 +400,7 @@ def pruefe(
     nk = note_kurz(note)
     if note in NOTEN_A:
         punkte.append(Punkt("note", True, f"Note {nk}"))
-    elif note in NOTEN_B_PLUS and bewaehrt:
+    elif note in NOTEN_B_PLUS and bewaehrt and not NUR_BEWAEHRT:
         punkte.append(
             Punkt("note", True, f"Note {nk} — reicht, weil sich die Setup-Art bewaehrt hat")
         )
@@ -376,7 +410,11 @@ def pruefe(
                 "note",
                 False,
                 f"Note {nk or '—'} — Alarm erst ab A−"
-                + (" (B+ nur bei bewaehrter Setup-Art)" if note in NOTEN_B_PLUS else ""),
+                + (
+                    " (B+ nur bei bewaehrter Setup-Art)"
+                    if note in NOTEN_B_PLUS and not NUR_BEWAEHRT
+                    else ""
+                ),
             )
         )
 
@@ -617,6 +655,9 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
         "sperre_je_wert_h": int(SPERRE_JE_WERT.total_seconds() // 3600),
         "setup_arten": arten,
         "gesperrt": gesperrt,
+        "nur_bewaehrt": NUR_BEWAEHRT,
+        "bewaehrt_pf": BEWAEHRT_PF,
+        "frei": sorted(k for k, v in arten.items() if v.get("urteil") == "bewaehrt"),
     }
 
 
@@ -625,6 +666,7 @@ __all__ = [
     "MIN_CRV",
     "MIN_FAELLE",
     "MIN_ZIEL1_PCT",
+    "NUR_BEWAEHRT",
     "SPERRE_JE_WERT",
     "Punkt",
     "Stand",
