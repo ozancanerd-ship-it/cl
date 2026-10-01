@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from trading_agent.core.enums import Direction, Timeframe
+from trading_agent.scanner.plan import preis_de
 
 #: Spanne der letzten Kerzen gegen die davor. Darunter gilt die Basis als eng.
 KONTRAKTION_GRENZE = 0.80
@@ -367,7 +368,7 @@ def _pruefe_ausbruch(
     kante = max(float(b.high) for b in fenster) if lang else min(float(b.low) for b in fenster)
     nah = (kurs >= kante - 0.6 * atr) if lang else (kurs <= kante + 0.6 * atr)
     if nah:
-        erfuellt.append(f"Kurs steht an der Kante der Basis ({kante:,.4f})".replace(",", " "))
+        erfuellt.append(f"Kurs steht an der Kante der Basis ({preis_de(kante)})")
     else:
         return None
 
@@ -386,7 +387,7 @@ def _pruefe_ausbruch(
         fehlt=tuple(fehlt),
         trigger=(
             f"Einstieg erst bei einem 4-Stunden-Schluss {'ueber' if lang else 'unter'} "
-            f"{kante:,.4f} — nicht beim Antippen.".replace(",", " ")
+            f"{preis_de(kante)} — nicht beim Antippen."
         ),
         qualitaet=guete,
         these=(
@@ -421,7 +422,7 @@ def _pruefe_rueckeroberung(
         return None
 
     erfuellt = [
-        f"das {'Tief' if lang else 'Hoch'} bei {marke:,.4f} wurde abgeraeumt".replace(",", " "),
+        f"das {'Tief' if lang else 'Hoch'} bei {preis_de(marke)} wurde abgeraeumt",
         "der Kurs steht wieder auf der richtigen Seite — die Bewegung wurde nicht bestaetigt",
     ]
     fehlt: list[str] = []
@@ -452,9 +453,13 @@ def _pruefe_rueckeroberung(
         name=NAME["RUECKEROBERUNG"],
         erfuellt=tuple(erfuellt),
         fehlt=tuple(fehlt),
+        # Bis 01.10.: „Fällt er wieder darüber hinaus ist die Idee erledigt" — bei einem
+        # Long falsch herum, und ``.replace(",", " ")`` frass das Komma im Satz statt nur
+        # die Tausenderstellen der Zahl.
         trigger=(
-            f"Der Kurs muss {'ueber' if lang else 'unter'} {marke:,.4f} bleiben. "
-            "Faellt er wieder darueber hinaus, ist die Idee erledigt.".replace(",", " ")
+            f"Der Kurs muss {'ueber' if lang else 'unter'} {preis_de(marke)} bleiben. "
+            f"{'Faellt er wieder darunter' if lang else 'Steigt er wieder darueber'}, "
+            "ist die Idee erledigt."
         ),
         qualitaet=guete,
         these=(
