@@ -105,10 +105,64 @@ def test_position_ohne_setup_bekommt_den_halte_stop() -> None:
     assert ueb["mit_stop"] == 1
 
 
-def test_die_engere_marke_gewinnt() -> None:
+def test_bei_einer_signal_position_gewinnt_die_engere_marke() -> None:
+    """Ueber ein Signal gekauft: die Invalidierung des Setups (gleiche Richtung) zaehlt mit."""
+    scan = _scan(_zeile("SOLUSD", 120.0, halte=100.0, inv=110.0, richtung="long"))
+    pos = [{"sym": "SOLUSD", "menge": 1, "plan": {"gekauft": "2026-10-01T08:00:00Z"}}]
+    stand, _, _ = pruefe_depot(pos, scan, {})
+    assert stand["positionen"]["SOLUSD|"]["stop"] == 110.0
+
+
+def test_gehaltene_position_bekommt_nur_den_halte_stop() -> None:
+    """Seit 01.10.: eine Setup-Marke ist fuer einen neuen Einstieg gebaut und zu eng fuer
+    eine Position, die man laengst haelt — gemessen ist nur der Halte-Stop."""
     scan = _scan(_zeile("SOLUSD", 120.0, halte=100.0, inv=110.0, richtung="long"))
     stand, _, _ = pruefe_depot([{"sym": "SOLUSD", "menge": 1}], scan, {})
-    assert stand["positionen"]["SOLUSD|"]["stop"] == 110.0
+    assert stand["positionen"]["SOLUSD|"]["stop"] == 100.0
+
+
+def test_short_invalidierung_wird_nie_zum_long_stop() -> None:
+    """Der Sei-Fall: der Kurs hat die Short-These ueberrollt, ihre Invalidierung liegt knapp
+    UNTER dem Kurs — und wurde zum Long-Stop. Ein Tick spaeter hiess es „Stop gerissen"."""
+    scan = _scan(_zeile("SEIUSD", 0.0725, halte=0.0599, inv=0.07243, richtung="short"))
+    pos = [{"sym": "SEIUSD", "menge": 467, "plan": {"gekauft": "2026-09-20T08:00:00Z"}}]
+    stand, _, _ = pruefe_depot(pos, scan, {})
+    assert stand["positionen"]["SEIUSD|"]["stop"] == 0.0599
+
+
+def test_alter_setup_stop_wird_korrigiert_samt_falschem_stop_alarm() -> None:
+    """Einmalige Korrektur: ein Stand mit einem Setup-Stop (auch schon „ausgestoppt") auf
+    einer gehaltenen Position faellt weg, der Halte-Stop wird neu gesetzt und gemeldet."""
+    alt = {
+        "positionen": {
+            "SEIUSD|": {
+                "stop": 0.07243,
+                "ebene": "position",
+                "quelle": "die laufende Analyse (Invalidierung des Setups)",
+                "ausgestoppt": True,
+                "erreicht": [],
+                "menge": 467,
+            }
+        }
+    }
+    pos = [
+        {"sym": "SEIUSD", "menge": 467, "plan": {"stop": 0.07243, "art": "setup", "quelle": "app"}}
+    ]
+    scan = _scan(_zeile("SEIUSD", 0.0724, halte=0.0599))
+    stand, ev, _ = pruefe_depot(pos, scan, alt)
+    st = stand["positionen"]["SEIUSD|"]
+    assert st["stop"] == 0.0599 and not st.get("ausgestoppt")
+    assert [e.art for e in ev] == ["stop_neu", "entwarnung"]
+    assert "Korrektur" in ev[0].text
+    # Beim naechsten Lauf passiert nichts mehr.
+    stand2, ev2, _ = pruefe_depot(pos, scan, stand)
+    assert ev2 == [] and stand2["positionen"]["SEIUSD|"]["stop"] == 0.0599
+
+
+def test_selbst_gesetzter_stop_bleibt_auch_bei_der_korrektur() -> None:
+    pos = [{"sym": "SOLUSD", "menge": 1, "plan": {"stop": 115.0, "quelle": "selbst"}}]
+    stand, _, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 120.0, halte=100.0)), {})
+    assert stand["positionen"]["SOLUSD|"]["stop"] == 115.0
 
 
 def test_stop_wandert_nur_nach_oben() -> None:
@@ -395,3 +449,44 @@ def test_der_waechter_legt_keine_ziele_an() -> None:
     scan = _scan(_zeile("SOLUSD", 120.0, halte=100.0, inv=110.0, richtung="long", ziel=125.0))
     stand, _, _ = pruefe_depot([{"sym": "SOLUSD", "menge": 1}], scan, {})
     assert not stand["positionen"]["SOLUSD|"].get("ziele")
+
+
+def test_falscher_stop_alarm_bekommt_eine_entwarnung() -> None:
+    """Ging auf der zu engen Setup-Marke schon „Stop gerissen" raus, kommt jetzt eine
+    Entwarnung — genauso laut wie der Alarm selbst, damit niemand deswegen verkauft."""
+    alt = {
+        "positionen": {
+            "SEIUSD|": {
+                "stop": 0.07243,
+                "ebene": "position",
+                "quelle": "die laufende Analyse (Invalidierung des Setups)",
+                "ausgestoppt": True,
+                "erreicht": [],
+                "menge": 467,
+            }
+        }
+    }
+    pos = [{"sym": "SEIUSD", "menge": 467}]
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SEIUSD", 0.0724, halte=0.0599)), alt)
+    arten = [e.art for e in ev]
+    assert "entwarnung" in arten
+    e = next(x for x in ev if x.art == "entwarnung")
+    assert e.dringend and "Nicht deswegen verkaufen" in e.text
+
+
+def test_oeffentlicher_betreff_nennt_die_handlung_nicht_den_wert() -> None:
+    from scripts.depot_wache import oeffentlicher_titel, texte
+
+    from trading_agent.portfolio_intel.depot_stops import Ereignis
+
+    neu = [
+        Ereignis("stop", "SEIUSD|", "Sei", "…", True),
+        Ereignis("ziel", "SOLUSD|", "Solana", "…", True),
+        Ereignis("stop", "OPUSD|", "Optimism", "…", True),
+    ]
+    titel = oeffentlicher_titel(neu)
+    assert titel == "DEPOT · VERKAUFEN (2) · TEIL VERKAUFEN"
+    _, _, klingel = texte(neu)
+    for name in ("Sei", "Solana", "Optimism", "SEIUSD"):
+        assert name not in titel and name not in klingel
+    assert "VERKAUFEN" in klingel

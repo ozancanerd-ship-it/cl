@@ -65,3 +65,19 @@ def test_eine_klasse_darf_die_liste_trotzdem_nicht_ganz_fuellen() -> None:
     jetzt = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
     liste.aufnehmen([_zeile(f"K{i}USD", klasse="krypto") for i in range(30)], jetzt=jetzt)
     assert len(liste.wachen) <= 24, "ohne jede Grenze wird die Liste zur Flut"
+
+
+def test_langsame_aktien_trades_sperren_die_coins_nicht_aus() -> None:
+    """Der Fall vom 01.10.: 30 aktive Wachen, 22 davon Aktien — die Grenze von 24 war voll,
+    und seit dem 29.09. kam kein einziges neues Setup mehr auf die Liste, auch kein Coin."""
+    liste = Wachliste()
+    jetzt = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
+    alt = [_zeile(f"A{i}", klasse="aktien") for i in range(15)]
+    alt += [_zeile(f"S{i}", klasse="aktien", richtung="short") for i in range(7)]
+    alt += [_zeile(f"K{i}USD") for i in range(7)] + [_zeile("KS0USD", richtung="short")]
+    liste.aufnehmen(alt, jetzt=jetzt)
+    for w in liste.wachen.values():
+        w.zustand = "aktiv"
+    assert len(liste.wachen) == 30
+    liste.aufnehmen([_zeile("SOLUSD"), _zeile("ETHUSD")], jetzt=jetzt)
+    assert "SOLUSD" in liste.wachen and "ETHUSD" in liste.wachen
