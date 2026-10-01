@@ -334,8 +334,29 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   transition:all .14s}
 .lb:hover{color:var(--ink-2); border-color:var(--rule-strong)}
 .lb[aria-pressed="true"]{background:var(--glass-2); color:var(--ink); border-color:var(--rule-strong)}
-#cv{display:block; width:100%; height:500px; touch-action:none; cursor:crosshair}
-@media (max-width:640px){#cv{height:400px}}
+/* pan-y: senkrecht wischen scrollt die Seite, waagerecht verschiebt den Chart, zwei Finger
+   zoomen. Vorher (none) blieb man auf dem Handy im Chart haengen — 400 px, auf denen die
+   Seite nicht mehr scrollte. */
+#cv{display:block; width:100%; height:500px; touch-action:pan-y; cursor:crosshair}
+@media (max-width:640px){#cv{height:420px}}
+.chart-q{margin-left:auto; font-size:10.5px; color:var(--ink-3); align-self:center; text-align:right}
+.chart-q b{font-weight:600; color:var(--accent-2)}
+.chart-q b.scan{color:var(--ink-2)} .chart-q b.skizze{color:var(--warn)}
+/* Die Plan-Leiste unter dem Chart: die fuenf Zahlen, die man fuer die Order braucht,
+   mit Abstand zum Kurs und R-Vielfachem. Auf dem Handy 2 + 3, sonst eine Zeile. */
+.planleiste{display:grid; grid-template-columns:repeat(6,1fr); margin-left:-1px;
+  border-top:1px solid var(--rule)}
+.pl{grid-column:span 2; padding:8px 10px 9px; min-width:0; box-shadow:inset 1px 0 0 var(--rule), inset 0 -1px 0 var(--rule)}
+.pl.ein,.pl.stop{grid-column:span 3}
+@media (min-width:560px){.planleiste{grid-template-columns:repeat(5,1fr)} .pl,.pl.ein,.pl.stop{grid-column:auto; box-shadow:inset 1px 0 0 var(--rule)}}
+.pl span{display:block; font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; font-weight:600}
+.pl.ein span{color:var(--accent-2)} .pl.stop span{color:var(--bad)} .pl.tp span{color:var(--long)}
+.pl b{display:block; font-family:"JetBrains Mono",monospace; font-size:13px; font-weight:600;
+  margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.pl i{display:block; font-style:normal; font-family:"JetBrains Mono",monospace; font-size:10px;
+  color:var(--ink-3); margin-top:1px; white-space:nowrap}
+.pl i.r{color:var(--ink-2)}
+.pl.ok{opacity:.55} .pl.ok b{text-decoration:line-through; text-decoration-thickness:1px}
 .legende{display:flex; gap:13px; flex-wrap:wrap; padding:9px 14px; border-top:1px solid var(--rule);
   font-size:10px; color:var(--ink-3); font-family:"JetBrains Mono",monospace; letter-spacing:.06em}
 .legende span{display:flex; align-items:center; gap:5px}
@@ -1356,20 +1377,26 @@ function livePreis(sym){ const e = L.get(sym); return e ? e.p : null; }
    Ausserdem lädt die Seite so nichts nach.
    ================================================================ */
 const chart = (()=>{
-  let cv = null, ctx = null, B = [], Z = null, C = null;
+  let cv = null, ctx = null, B = [], Z = null, C = null, P = null;
   let i0 = 0, anz = 120, hoverX = null, hoverY = null;
-  let ziehen = null, letzterPreis = null;
-  const EBENEN = {swings:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true, rsi:true};
+  let ziehen = null, kneifen = null, letzterPreis = null, wasserzeichen = '';
+  const EBENEN = {swings:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true, rsi:true, vol:true};
   const M = {l: 6, r: 62, t: 10, b: 22};
   /* Höhe des RSI-Streifens unter den Kerzen. 0 = aus. Der RSI teilt sich die
      Zeitachse mit dem Chart — sonst vergleicht man zwei verschiedene Ausschnitte. */
   let RSI_H = 62;
+  const MONO = '"JetBrains Mono",monospace';
 
   function farbe(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
-  function setze(kerzen, zeichnungTf, chance){
+  /* P ist der Handelsplan, der eingezeichnet wird: Einstieg, Stop, Ziele.
+     Im laufenden Trade ist das der VERTRAG aus dem Einstieg (fest, wie unter Alarme),
+     vorher der Vorschlag des letzten Scans. Vorher zeigte der Chart im laufenden Trade
+     die frischen Scan-Marken — ein anderer Stop als der, gegen den der Trade läuft. */
+  function setze(kerzen, zeichnungTf, chance, plan, titel){
     B = (kerzen||[]).map(k=>({t:k[0], o:k[1], h:k[2], l:k[3], c:k[4], v:k[5]}));
-    Z = zeichnungTf || null; C = chance || null;
+    Z = zeichnungTf || null; C = chance || null; P = plan || null;
+    wasserzeichen = titel || '';
     // 90 Kerzen als Startbild. Mehr sieht auf dem Handy nach Strichcode aus, und bei
     // H4 deckt das schon zwei Wochen ab — genug für einen Swing, ohne dass die
     // Preisachse so weit wird, dass man die Struktur nicht mehr liest.
@@ -1398,10 +1425,33 @@ const chart = (()=>{
     zeichne();
   }
 
-  function sicht(){
-    const a = Math.max(0, Math.min(i0, Math.max(0, B.length-5)));
-    return B.slice(a, a + anz);
+  function startIndex(){ return Math.max(0, Math.min(i0, Math.max(0, B.length-5))); }
+  function sicht(){ const a = startIndex(); return B.slice(a, a + anz); }
+  /* Rechts vom letzten Kerze bleibt Platz frei — dort steht der Plan als Kasten
+     (Risiko rot, Chance grün), ohne eine einzige Kerze zu verdecken. Nur wenn das
+     Ende der Reihe zu sehen ist; wer zurückblättert, braucht den Platz nicht. */
+  function freieSlots(v){
+    return startIndex() + v.length >= B.length ? Math.max(5, Math.round(v.length * 0.17)) : 0;
   }
+
+  /* Die Linien des Plans in einer Liste: [Name, Preis, Farbe, Art]. */
+  function planLinien(){
+    if (!P) return [];
+    const cLong = farbe('--long'), cBad = farbe('--bad'), cEin = farbe('--accent-2');
+    const erreicht = new Set(P.erreicht || []);
+    const l = [];
+    if (P.einstieg != null) l.push(['Einstieg', P.einstieg, cEin, 'ein']);
+    if (P.stop != null) l.push([P.schutz ? 'Schutz-Stop' : 'Stop', P.stop, cBad, 'stop']);
+    for (const [lab, k] of [['TP1','tp1'],['TP2','tp2'],['TP3','tp3']])
+      if (P[k] != null) l.push([lab, P[k], cLong, erreicht.has(lab) ? 'ok' : 'tp']);
+    return l.filter(x => isFinite(x[1]));
+  }
+  function rVon(p){
+    if (!P || P.einstieg == null || P.risiko == null || !(P.risiko > 0)) return null;
+    const lang = P.richtung !== 'short';
+    return ((lang ? p - P.einstieg : P.einstieg - p)) / P.risiko;
+  }
+
   /* Preisspanne der Ansicht.
      Wichtig ist die Reihenfolge: Der erlaubte Rahmen wird EINMAL aus den Kerzen
      bestimmt und danach nicht mehr verändert. Vorher wurde er in der Schleife
@@ -1421,19 +1471,39 @@ const chart = (()=>{
     let hi = khi, lo = klo;
     ausserhalb = [];
     const kandidaten = [];
-    if (EBENEN.ziele && C){
-      for (const [lab, k] of [['Kurs','kurs'],['TP1','ziel'],['TP2','tp2'],['TP3','tp3'],['Stop','invalidierung']])
-        if (C[k] != null) kandidaten.push([lab, C[k]]);
-    }
-    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[])) kandidaten.push([null, x.p]);
-    for (const [lab, p] of kandidaten){
+    if (EBENEN.ziele) for (const [lab, p, col] of planLinien()) kandidaten.push([lab, p, col]);
+    // Nur offene Liquidität zieht die Achse auf. Abgeholte Marken sind kein Ziel mehr.
+    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[]))
+      if (x.zustand === 'unswept') kandidaten.push([null, x.p]);
+    for (const [lab, p, col] of kandidaten){
       if (!isFinite(p)) continue;
-      if (p > maxHi || p < minLo){ if (lab) ausserhalb.push([lab, p, p > maxHi]); continue; }
+      if (p > maxHi || p < minLo){ if (lab) ausserhalb.push([lab, p, p > maxHi, col]); continue; }
       if (p > hi) hi = p;
       if (p < lo) lo = p;
     }
     const luft = (hi - lo) * 0.06;
     return {hi: hi + luft, lo: lo - luft};
+  }
+
+  /* Beschriftungen, die sich überlappen würden, auseinanderschieben — erst nach
+     unten, und was dann unten herausfällt, wieder nach oben. Die Linie bleibt am
+     echten Preis; nur das Schild weicht aus. */
+  function entzerre(items, abst, oben, unten){
+    items.sort((a,b)=>a.y-b.y);
+    for (const it of items) it.y = Math.max(oben, Math.min(unten, it.y));
+    for (let k=1;k<items.length;k++)
+      if (items[k].y - items[k-1].y < abst) items[k].y = items[k-1].y + abst;
+    const n = items.length;
+    if (n && items[n-1].y > unten){
+      items[n-1].y = unten;
+      for (let k=n-2;k>=0;k--) if (items[k+1].y - items[k].y < abst) items[k].y = items[k+1].y - abst;
+    }
+    return items;
+  }
+  function pille(x, y, w, h, r){
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+    ctx.fill();
   }
 
   function zeichne(){
@@ -1445,55 +1515,132 @@ const chart = (()=>{
     const rsiAn = EBENEN.rsi && Z && (Z.rsi||[]).length;
     const rsiH = rsiAn ? RSI_H : 0;
     const px = W - M.l - M.r, py = H - M.t - M.b - rsiH;
-    const X = i => M.l + (i + 0.5) * (px / v.length);
+    const frei = freieSlots(v), slots = v.length + frei, sw = px / slots;
+    const X = i => M.l + (i + 0.5) * sw;
     const Y = p => M.t + (hi - p) / (hi - lo) * py;
-    const bw = Math.max(1.2, Math.min(11, px / v.length * 0.68));
+    const bw = Math.max(1.2, Math.min(11, sw * 0.68));
+    const xEnde = M.l + v.length * sw;          // rechter Rand der Kerzen
+    const xRand = W - M.r;                      // rechter Rand der Zeichenfläche
 
     const cRule = farbe('--grid'), cInk = farbe('--ink'), cInk3 = farbe('--ink-3');
     const cLong = farbe('--long'), cBad = farbe('--bad'), cWick = farbe('--wick');
-    const cAcc = farbe('--accent'), cWarn = farbe('--warn'), cSurf = farbe('--surface');
+    const cAcc = farbe('--accent'), cWarn = farbe('--warn'), cBg = farbe('--bg');
+    const d = digits((hi+lo)/2);
 
-    // Raster + Preisachse
-    ctx.font = '10px "JetBrains Mono",monospace'; ctx.textBaseline = 'middle';
+    // Schilder an der Preisachse: erst sammeln, dann entzerren, dann zeichnen.
+    const achse = [];
+    const linien = EBENEN.ziele ? planLinien() : [];
+    for (const [lab, p, col, art] of linien){
+      const y = Y(p); if (y < M.t-1 || y > M.t+py+1) continue;
+      achse.push({y, y0: y, text: num(p, d), bg: col, fg: cBg, art});
+    }
+    if (letzterPreis != null){
+      const y = Y(letzterPreis);
+      if (y > M.t && y < M.t + py){
+        const auf = v.length ? v[v.length-1].c >= v[v.length-1].o : true;
+        achse.push({y, y0: y, text: num(letzterPreis, d), bg: cInk, fg: cBg, art: 'kurs', auf});
+      }
+    }
+    entzerre(achse, 16, M.t + 8, M.t + py - 8);
+
+    // Wasserzeichen: welcher Wert, welche Zeitebene — gross und kaum sichtbar.
+    if (wasserzeichen){
+      ctx.save();
+      ctx.fillStyle = cInk + '0c'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `700 ${Math.max(22, Math.min(46, px / 9))}px "Space Grotesk",Inter,sans-serif`;
+      ctx.fillText(wasserzeichen, M.l + px/2, M.t + py * 0.5);
+      ctx.restore();
+    }
+
+    // Raster + Preisachse. Eine Rasterzahl, die unter einem Schild läge, entfällt.
+    ctx.font = `10px ${MONO}`; ctx.textBaseline = 'middle';
     ctx.strokeStyle = cRule; ctx.lineWidth = 1;
-    const stufen = 5, d = digits((hi+lo)/2);
+    const stufen = 5;
     for (let k=0;k<=stufen;k++){
       const p = lo + (hi-lo)*k/stufen, y = Math.round(Y(p)) + 0.5;
-      ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(W-M.r, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(xRand, y); ctx.stroke();
+      if (achse.some(a => Math.abs(a.y - y) < 12)) continue;
       ctx.fillStyle = cInk3; ctx.textAlign = 'left';
-      ctx.fillText(num(p, d), W-M.r+5, y);
+      ctx.fillText(num(p, d), xRand+5, y);
+    }
+
+    // Volumen als blasse Säulen am Fuss der Kerzen
+    if (EBENEN.vol){
+      let vmax = 0; for (const b of v) if (b.v > vmax) vmax = b.v;
+      if (vmax > 0){
+        const vh = py * 0.13, basis = M.t + py;
+        for (let i=0;i<v.length;i++){
+          const b = v[i]; if (!(b.v > 0)) continue;
+          const h = Math.max(1, b.v / vmax * vh);
+          ctx.fillStyle = (b.c >= b.o ? cLong : cBad) + '1a';
+          ctx.fillRect(X(i) - bw/2, basis - h, bw, h);
+        }
+      }
     }
 
     // Zonen (hinter den Kerzen)
     if (EBENEN.zonen && Z) for (const z of (Z.zonen||[])){
       const y1 = Y(z.bis), y2 = Y(z.von);
-      if (y2 < M.t-40 || y1 > H-M.b+40) continue;
+      if (Math.max(y1,y2) < M.t-40 || Math.min(y1,y2) > M.t+py+40) continue;
       const lang = z.richtung === 'bullish' || z.richtung === 'long';
-      ctx.fillStyle = (lang ? cLong : cBad) + '1f';
+      ctx.fillStyle = (lang ? cLong : cBad) + '1c';
       ctx.fillRect(M.l, Math.min(y1,y2), px, Math.max(1.5, Math.abs(y2-y1)));
-      ctx.fillStyle = cInk3; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
-      if (Math.abs(y2-y1) > 9) ctx.fillText(z.art, M.l+3, Math.min(y1,y2)+6);
+      ctx.fillStyle = (lang ? cLong : cBad) + 'b0'; ctx.font = `9px ${MONO}`; ctx.textAlign = 'left';
+      if (Math.abs(y2-y1) > 9) ctx.fillText(z.art + (lang ? ' ↑' : ' ↓'), M.l+3, Math.min(y1,y2)+6);
     }
 
     // Premium / Discount
     if (EBENEN.pd && Z && Z.pd){
       const yh = Y(Z.pd.hoch), ym = Y(Z.pd.mitte), yl = Y(Z.pd.tief);
       ctx.strokeStyle = cAcc + '77'; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
-      for (const y of [yh, ym, yl]){ ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke(); }
+      for (const y of [yh, ym, yl]){ ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(xRand,y); ctx.stroke(); }
       ctx.setLineDash([]);
-      ctx.fillStyle = cAcc; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
+      ctx.fillStyle = cAcc; ctx.font = `9px ${MONO}`; ctx.textAlign = 'left';
       ctx.fillText('EQ', M.l+2, ym-6);
     }
 
-    // Liquidität
-    if (EBENEN.liq && Z) for (const x of (Z.liquiditaet||[])){
-      const y = Y(x.p); if (y < M.t-20 || y > H-M.b+20) continue;
-      const weg = x.zustand === 'swept';
-      ctx.strokeStyle = weg ? cInk3 + '55' : cWarn + 'aa';
-      ctx.setLineDash(weg ? [1,4] : [5,4]);
-      ctx.lineWidth = Math.min(2, 0.7 + (x.staerke||0)*1.6);
-      ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke();
-      ctx.setLineDash([]);
+    // Liquidität — nur was noch offen liegt. Abgeholte oder gebrochene Marken sind
+    // kein Magnet mehr und machten den Chart nur zum Strichcode.
+    if (EBENEN.liq && Z){
+      const KURZ = {pdh:'PDH', pdl:'PDL', equal_highs:'EQH', equal_lows:'EQL',
+                    swing_high:'BSL', swing_low:'SSL'};
+      const beschriftet = [];
+      for (const x of (Z.liquiditaet||[])){
+        if (x.zustand !== 'unswept') continue;
+        const y = Y(x.p); if (y < M.t-2 || y > M.t+py+2) continue;
+        ctx.strokeStyle = cWarn + 'b0'; ctx.setLineDash([5,4]);
+        ctx.lineWidth = Math.min(2, 0.8 + (x.staerke||0)*1.6);
+        ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(xEnde,y); ctx.stroke();
+        ctx.setLineDash([]);
+        if (frei && !linien.some(l => Math.abs(Y(l[1]) - y) < 11)
+                 && !beschriftet.some(b => Math.abs(b - y) < 10)){
+          beschriftet.push(y);
+          ctx.fillStyle = cWarn; ctx.font = `8.5px ${MONO}`; ctx.textAlign = 'left';
+          ctx.fillText(KURZ[x.typ] || '$', xEnde + 3, y - 5);
+        }
+      }
+    }
+
+    // Plan-Kasten im freien Bereich: Risiko (Einstieg→Stop) rot, Chance (Einstieg→
+    // letztes Ziel) grün. So sieht man auf einen Blick, wie viel man riskiert und
+    // wie viel drin ist — wie das Positions-Werkzeug in TradingView.
+    if (EBENEN.ziele && P && P.einstieg != null && frei){
+      const xa = xEnde + sw * 0.4, xb = xRand;
+      const yE = Y(P.einstieg);
+      const ziele = [P.tp1, P.tp2, P.tp3].filter(x => x != null && isFinite(x));
+      const weitestes = ziele.length ? ziele[ziele.length-1] : null;
+      if (P.stop != null){
+        const yS = Y(P.stop);
+        ctx.fillStyle = cBad + '24';
+        ctx.fillRect(xa, Math.min(yE,yS), xb-xa, Math.abs(yS-yE));
+      }
+      if (weitestes != null){
+        const yT = Y(weitestes);
+        const g = ctx.createLinearGradient(0, yE, 0, yT);
+        g.addColorStop(0, cLong + '14'); g.addColorStop(1, cLong + '38');
+        ctx.fillStyle = g;
+        ctx.fillRect(xa, Math.min(yE,yT), xb-xa, Math.abs(yT-yE));
+      }
     }
 
     // Kerzen
@@ -1506,79 +1653,100 @@ const chart = (()=>{
       ctx.fillRect(x - bw/2, Math.min(yo,yc), bw, Math.max(1.2, Math.abs(yc-yo)));
     }
 
-    // Swings
+    // Swings — Punkte für alle, Beschriftung nur für die letzten acht. Mehr ist auf
+    // dem Handy nicht lesbar, und die jüngste Struktur ist die, die zählt.
     if (EBENEN.swings && Z){
       const idx = new Map(v.map((b,i)=>[b.t, i]));
-      ctx.font = '9px "JetBrains Mono",monospace';
-      for (const s of (Z.swings||[])){
-        const i = idx.get(s.t); if (i == null) continue;
-        const x = X(i), y = Y(s.p);
+      const sichtbar = (Z.swings||[]).filter(s => idx.has(s.t));
+      const ab = Math.max(0, sichtbar.length - 8);
+      ctx.font = `9px ${MONO}`;
+      sichtbar.forEach((s, k)=>{
+        const x = X(idx.get(s.t)), y = Y(s.p);
         ctx.fillStyle = s.hoch ? cBad : cLong;
         ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 6.2832); ctx.fill();
-        if (s.label && s.label !== 'NONE'){
+        if (k >= ab && s.label && s.label !== 'NONE'){
           ctx.textAlign = 'center'; ctx.fillStyle = cInk3;
-          ctx.fillText(s.label, x, y + (s.hoch ? -9 : 12));
+          ctx.fillText(s.label === 'EQUAL' ? 'EQ' : s.label, x, y + (s.hoch ? -9 : 12));
         }
-      }
+      });
     }
 
     // Strukturbrüche
     if (EBENEN.brueche && Z){
       const idx = new Map(v.map((b,i)=>[b.t, i]));
-      ctx.font = '9px "JetBrains Mono",monospace';
+      ctx.font = `9px ${MONO}`;
       for (const br of (Z.brueche||[])){
         const i = idx.get(br.t);
         const y = Y(br.p);
-        if (y < M.t-20 || y > H-M.b+20) continue;
+        if (y < M.t-20 || y > M.t+py+20) continue;
         const lang = br.richtung === 'bullish';
         ctx.strokeStyle = (lang ? cLong : cBad) + 'cc'; ctx.setLineDash([6,3]); ctx.lineWidth = 1.4;
         const x0 = i == null ? M.l : X(i);
-        ctx.beginPath(); ctx.moveTo(Math.max(M.l, x0-40), y); ctx.lineTo(W-M.r, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(Math.max(M.l, x0-40), y); ctx.lineTo(xEnde, y); ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = lang ? cLong : cBad; ctx.textAlign = 'left';
-        ctx.fillText(br.art, Math.max(M.l+2, x0-38), y-4);
+        ctx.fillText(br.art === 'CHOCH' ? 'CHoCH' : br.art, Math.max(M.l+2, x0-38), y-4);
       }
     }
 
-    // Entry / Stop / Ziele
-    if (EBENEN.ziele && C){
-      const linien = [
-        ['Kurs', C.kurs, cInk],
-        ['TP1', C.ziel, cLong], ['TP2', C.tp2, cLong], ['TP3', C.tp3, cLong],
-        ['Stop', C.invalidierung, cBad],
-      ];
-      ctx.font = '9.5px "JetBrains Mono",monospace';
-      for (const [lab, p, col] of linien){
-        if (p == null || !isFinite(p)) continue;
-        const y = Y(p); if (y < M.t-14 || y > H-M.b+14) continue;
-        ctx.strokeStyle = col; ctx.lineWidth = lab==='Kurs' ? 1 : 1.6;
-        ctx.setLineDash(lab==='Kurs' ? [1,3] : []);
-        ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(W-M.r,y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = col; ctx.textAlign = 'left';
-        ctx.fillText(lab, M.l+3, y-4);
+    // Kurslinie über die ganze Breite
+    if (letzterPreis != null){
+      const y = Y(letzterPreis);
+      if (y > M.t && y < M.t + py){
+        ctx.strokeStyle = cInk + '99'; ctx.setLineDash([1,3]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(xRand, y); ctx.stroke(); ctx.setLineDash([]);
+        if (frei && v.length){
+          // Ein kleiner Puls am letzten Kurs: hier ist „jetzt".
+          ctx.fillStyle = cAcc + '33'; ctx.beginPath(); ctx.arc(X(v.length-1), y, 6, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = cAcc; ctx.beginPath(); ctx.arc(X(v.length-1), y, 2.6, 0, 6.2832); ctx.fill();
+        }
+      }
+    }
+
+    // Einstieg / Stop / Ziele als Linien, Schilder rechts im Kasten mit R-Vielfachem
+    if (linien.length){
+      const schilder = [];
+      for (const [lab, p, col, art] of linien){
+        const y = Y(p); if (y < M.t-1 || y > M.t+py+1) continue;
+        ctx.strokeStyle = art === 'ok' ? col + '66' : col;
+        ctx.lineWidth = art === 'ein' ? 1.3 : 1.5;
+        ctx.setLineDash(art === 'ok' ? [3,3] : art === 'ein' ? [7,3] : []);
+        ctx.beginPath(); ctx.moveTo(M.l,y); ctx.lineTo(xRand,y); ctx.stroke(); ctx.setLineDash([]);
+        const rr = art === 'ein' ? null : rVon(p);
+        const text = lab + (art === 'ok' ? ' ✓' : '') +
+          (rr != null ? ` ${rr >= 0 ? '+' : '−'}${Math.abs(rr).toFixed(1).replace('.',',')}R` : '');
+        schilder.push({y, text, col, art});
+      }
+      entzerre(schilder, 14, M.t + 7, M.t + py - 7);
+      ctx.font = `600 9.5px ${MONO}`; ctx.textBaseline = 'middle';
+      for (const s of schilder){
+        const w = ctx.measureText(s.text).width + 10;
+        const x = xRand - w - 3;
+        ctx.fillStyle = cBg + 'e0'; pille(x, s.y - 7, w, 14, 4);
+        ctx.fillStyle = s.col + (s.art === 'ok' ? '99' : '');
+        ctx.textAlign = 'left'; ctx.fillText(s.text, x + 5, s.y + 0.5);
       }
     }
 
     // Was ausserhalb der Ansicht liegt, als Marke am Rand — statt es zu verschweigen
     // oder dafür die Kerzen platt zu drücken.
     if (ausserhalb.length){
-      ctx.font = '9.5px "JetBrains Mono",monospace'; ctx.textAlign = 'right';
+      ctx.font = `9.5px ${MONO}`; ctx.textAlign = 'right';
       let obenN = 0, untenN = 0;
-      for (const [lab, p, oben] of ausserhalb){
-        const y = oben ? M.t + 10 + (obenN++)*13 : H - M.b - 8 - (untenN++)*13;
-        ctx.fillStyle = lab === 'Stop' ? cBad : cLong;
-        ctx.fillText(`${lab} ${num(p, d)} ${oben?'↑':'↓'}`, W - M.r - 6, y);
+      for (const [lab, p, oben, col] of ausserhalb){
+        const y = oben ? M.t + 10 + (obenN++)*13 : M.t + py - 8 - (untenN++)*13;
+        ctx.fillStyle = col || cLong;
+        ctx.fillText(`${lab} ${num(p, d)} ${oben?'↑':'↓'}`, xRand - 6, y);
       }
     }
 
-    // Letzter Kurs als Marke an der Achse
-    if (letzterPreis != null){
-      const y = Y(letzterPreis);
-      if (y > M.t && y < H-M.b){
-        ctx.fillStyle = cAcc; ctx.fillRect(W-M.r, y-8, M.r, 16);
-        ctx.fillStyle = cSurf; ctx.font = '10px "JetBrains Mono",monospace';
-        ctx.textAlign = 'left'; ctx.fillText(num(letzterPreis, d), W-M.r+4, y);
-      }
+    // Schilder an der Preisachse (Plan in Farbe, Kurs in Akzent) — Text in der
+    // Hintergrundfarbe auf vollem Grund, damit er in beiden Themen lesbar ist.
+    ctx.font = `600 10px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    for (const a of achse.sort((x,y)=> (x.art==='kurs') - (y.art==='kurs'))){
+      ctx.fillStyle = a.art === 'ok' ? a.bg + '88' : a.bg;
+      pille(xRand + 1, a.y - 8, M.r - 2, 16, 4);
+      ctx.fillStyle = a.fg; ctx.fillText(a.text, xRand + 5, a.y + 0.5);
     }
 
     // RSI-Streifen unter den Kerzen
@@ -1586,19 +1754,22 @@ const chart = (()=>{
       const alle = Z.rsi || [];
       // Die RSI-Reihe ist so lang wie die gezeigten Kerzen; dasselbe Fenster ausschneiden.
       const off = Math.max(0, B.length - alle.length);
-      const von = Math.max(0, i0 - off);
+      const von = Math.max(0, startIndex() - off);
       const werte = alle.slice(von, von + v.length);
       const yTop = M.t + py + 10, yH = rsiH - 14;
       const RY = r => yTop + (100 - r) / 100 * yH;
+      // Überkauft / überverkauft als blasse Bänder
+      ctx.fillStyle = cBad + '10'; ctx.fillRect(M.l, RY(100), xEnde - M.l, RY(70) - RY(100));
+      ctx.fillStyle = cLong + '10'; ctx.fillRect(M.l, RY(30), xEnde - M.l, RY(0) - RY(30));
       ctx.strokeStyle = cRule; ctx.lineWidth = 1;
       for (const lvl of [30, 50, 70]){
         const y = Math.round(RY(lvl)) + 0.5;
         ctx.setLineDash(lvl === 50 ? [1,3] : [3,3]);
-        ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(W-M.r, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(xRand, y); ctx.stroke();
       }
       ctx.setLineDash([]);
-      ctx.fillStyle = cInk3; ctx.font = '9px "JetBrains Mono",monospace'; ctx.textAlign = 'left';
-      ctx.fillText('70', W-M.r+5, RY(70)); ctx.fillText('30', W-M.r+5, RY(30));
+      ctx.fillStyle = cInk3; ctx.font = `9px ${MONO}`; ctx.textAlign = 'left';
+      ctx.fillText('70', xRand+5, RY(70)); ctx.fillText('30', xRand+5, RY(30));
       ctx.strokeStyle = cAcc; ctx.lineWidth = 1.4; ctx.beginPath();
       let begonnen = false;
       for (let i=0;i<werte.length;i++){
@@ -1611,62 +1782,107 @@ const chart = (()=>{
       const letzterR = werte.filter(r=>r!=null).slice(-1)[0];
       if (letzterR != null){
         ctx.fillStyle = letzterR >= 70 ? cBad : letzterR <= 30 ? cLong : cInk3;
-        ctx.textAlign = 'left'; ctx.font = '10px "JetBrains Mono",monospace';
-        ctx.fillText(`RSI ${letzterR.toFixed(0)}`, M.l+3, yTop - 1);
+        ctx.textAlign = 'left'; ctx.font = `10px ${MONO}`;
+        ctx.fillText(`RSI ${letzterR.toFixed(0)}${letzterR >= 70 ? ' · überkauft' : letzterR <= 30 ? ' · überverkauft' : ''}`, M.l+3, yTop - 1);
       }
     }
 
-    // Zeitachse
-    ctx.fillStyle = cInk3; ctx.font = '9.5px "JetBrains Mono",monospace'; ctx.textAlign = 'center';
+    // Zeitachse — keine Beschriftung, die am Rand abgeschnitten würde
+    ctx.fillStyle = cInk3; ctx.font = `9.5px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const schritt = Math.max(1, Math.floor(v.length/5));
     for (let i=0;i<v.length;i+=schritt){
       const t = v[i].t ? new Date(v[i].t) : null; if (!t) continue;
-      ctx.fillText(t.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}), X(i), H-M.b+11);
+      const text = t.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+      const hw = ctx.measureText(text).width / 2;
+      if (X(i) - hw < 1 || X(i) + hw > xRand) continue;
+      ctx.fillText(text, X(i), H-M.b+11);
     }
 
-    // Fadenkreuz
-    if (hoverX != null && hoverX > M.l && hoverX < W-M.r){
-      const i = Math.max(0, Math.min(v.length-1, Math.floor((hoverX-M.l)/(px/v.length))));
-      ctx.strokeStyle = cInk3 + '66'; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
+    // Fadenkreuz mit Preis- und Zeitschild
+    if (hoverX != null && hoverX > M.l && hoverX < xRand){
+      const i = Math.max(0, Math.min(v.length-1, Math.floor((hoverX-M.l)/sw)));
+      ctx.strokeStyle = cInk3 + '88'; ctx.setLineDash([2,3]); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(X(i), M.t); ctx.lineTo(X(i), H-M.b); ctx.stroke();
-      if (hoverY != null){ ctx.beginPath(); ctx.moveTo(M.l,hoverY); ctx.lineTo(W-M.r,hoverY); ctx.stroke(); }
+      const imPreis = hoverY != null && hoverY >= M.t && hoverY <= M.t + py;
+      if (imPreis){ ctx.beginPath(); ctx.moveTo(M.l,hoverY); ctx.lineTo(xRand,hoverY); ctx.stroke(); }
       ctx.setLineDash([]);
       const b = v[i], el = $('readout');
+      const p = imPreis ? hi - (hoverY-M.t)/py*(hi-lo) : null;
+      ctx.font = `600 10px ${MONO}`; ctx.textBaseline = 'middle';
+      if (p != null){
+        ctx.fillStyle = cInk3; pille(xRand + 1, hoverY - 8, M.r - 2, 16, 4);
+        ctx.fillStyle = cBg; ctx.textAlign = 'left'; ctx.fillText(num(p, d), xRand + 5, hoverY + 0.5);
+      }
+      if (b.t){
+        const text = new Date(b.t).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        const w = ctx.measureText(text).width + 10;
+        const x = Math.max(M.l, Math.min(xRand - w, X(i) - w/2));
+        ctx.fillStyle = cInk3; pille(x, H - M.b + 3, w, 16, 4);
+        ctx.fillStyle = cBg; ctx.textAlign = 'left'; ctx.fillText(text, x + 5, H - M.b + 11.5);
+      }
       if (el){
-        const p = hoverY != null ? hi - (hoverY-M.t)/py*(hi-lo) : null;
+        const rr = p != null ? rVon(p) : null;
         el.textContent =
           `${b.t ? new Date(b.t).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}` +
           `   O ${num(b.o,d)}  H ${num(b.h,d)}  L ${num(b.l,d)}  C ${num(b.c,d)}` +
-          (p != null ? `   ·   Cursor ${num(p,d)}` : '');
+          (b.v ? `  V ${kompakt(b.v)}` : '') +
+          (p != null ? `   ·   Cursor ${num(p,d)}` : '') +
+          (rr != null ? ` (${rr >= 0 ? '+' : '−'}${Math.abs(rr).toFixed(2).replace('.',',')} R)` : '');
       }
     }
+  }
+  function kompakt(x){
+    return x >= 1e9 ? (x/1e9).toFixed(1).replace('.',',') + ' Mrd'
+         : x >= 1e6 ? (x/1e6).toFixed(1).replace('.',',') + ' Mio'
+         : x >= 1e3 ? (x/1e3).toFixed(1).replace('.',',') + ' Tsd' : String(Math.round(x));
   }
 
   let globalGebunden = false;
   function binde(){
     cv = $('cv'); if (!cv) return;
     groesse();
+    const zoom = (neu, ankerRechts)=>{
+      const alt = anz;
+      anz = Math.round(Math.max(25, Math.min(B.length || 400, neu)));
+      i0 = ankerRechts
+        ? Math.max(0, ankerRechts - anz)
+        : Math.max(0, Math.min(B.length - anz, i0 + Math.round((alt - anz)/2)));
+      zeichne();
+    };
     cv.addEventListener('wheel', e=>{
       e.preventDefault();
-      const alt = anz;
-      anz = Math.round(Math.max(25, Math.min(B.length || 400, anz * (e.deltaY > 0 ? 1.15 : 0.87))));
-      i0 = Math.max(0, Math.min(B.length - anz, i0 + Math.round((alt - anz)/2)));
-      zeichne();
+      zoom(anz * (e.deltaY > 0 ? 1.15 : 0.87));
     }, {passive:false});
-    const runter = e=>{ ziehen = {x: (e.touches?e.touches[0]:e).clientX, i0}; };
+    const runter = e=>{
+      if (e.touches && e.touches.length === 2){
+        const [a, b] = e.touches;
+        kneifen = {d: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1, anz,
+                   rechts: Math.min(B.length, startIndex() + anz)};
+        ziehen = null; return;
+      }
+      ziehen = {x: (e.touches?e.touches[0]:e).clientX, i0};
+    };
     const bewegen = e=>{
+      if (e.touches && e.touches.length === 2 && kneifen){
+        const [a, b] = e.touches;
+        const dist = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1;
+        zoom(kneifen.anz * kneifen.d / dist, kneifen.rechts);
+        return;
+      }
+      if (kneifen) return;
       const t = e.touches ? e.touches[0] : e;
       const r = cv.getBoundingClientRect();
       hoverX = t.clientX - r.left; hoverY = t.clientY - r.top;
       if (ziehen){
+        const v = sicht();
         const px = r.width - M.l - M.r;
+        const sw = px / Math.max(1, v.length + freieSlots(v));
         const dx = t.clientX - ziehen.x;
-        i0 = Math.max(0, Math.min(Math.max(0,B.length - anz),
-             ziehen.i0 - Math.round(dx / (px / anz))));
+        i0 = Math.max(0, Math.min(Math.max(0,B.length - anz), ziehen.i0 - Math.round(dx / sw)));
       }
       zeichne();
     };
-    const hoch = ()=>{ ziehen = null; };
+    const hoch = e=>{ ziehen = null; if (!e.touches || e.touches.length < 2) kneifen = null; };
     cv.addEventListener('pointerdown', runter);
     cv.addEventListener('pointermove', bewegen);
     // Nur einmal aufs Fenster hängen: die Chart-Ansicht wird bei jedem Wechsel des
@@ -1676,6 +1892,11 @@ const chart = (()=>{
     cv.addEventListener('touchstart', runter, {passive:true});
     cv.addEventListener('touchmove', bewegen, {passive:true});
     cv.addEventListener('touchend', hoch);
+    cv.addEventListener('touchcancel', hoch);
+    // Doppeltipp / Doppelklick: zurück auf das Startbild
+    cv.addEventListener('dblclick', ()=>{
+      anz = Math.min(90, Math.max(40, B.length)); i0 = Math.max(0, B.length - anz); zeichne();
+    });
   }
   window.addEventListener('resize', ()=>groesse());
   return {setze, setzeLivePreis, zeichne, groesse, binde, ebene, ebenen};
@@ -2637,6 +2858,48 @@ function aktualisiereRadarKurse(){
 }
 
 /* ============================================================ CHART-ANSICHT */
+/* Der Plan im Chart folgt derselben Regel wie Alarme (ausRanking): vor dem Einstieg
+   der Vorschlag des letzten Scans, ab dem Einstieg der feste Vertrag. Vorher zeigte der
+   Chart bei einem laufenden Trade die frischen Scan-Marken — einen anderen Stop als den,
+   gegen den der Trade laeuft. Und den Einstieg zeigte er gar nicht. */
+function chartPlan(sym, c){
+  const w = ((WL && WL.wachen) || []).find(x => x.instrument === sym && x.zustand === 'aktiv');
+  if (w && w.stop != null && w.einstieg != null){
+    return {quelle: 'vertrag', richtung: w.richtung,
+      einstieg: w.einstiegskurs != null ? w.einstiegskurs : w.einstieg,
+      stop: w.schutz != null ? w.schutz : w.stop, schutz: w.schutz != null,
+      risiko: Math.abs(w.einstieg - w.stop),
+      tp1: w.tp1, tp2: w.tp2, tp3: w.tp3, erreicht: w.erreicht || [], seit: w.aufgenommen};
+  }
+  if (!c || !c.richtung || c.invalidierung == null) return null;
+  const ein = c.einstieg != null ? c.einstieg : c.kurs;
+  if (ein == null) return null;
+  return {quelle: 'scan', richtung: c.richtung, einstieg: ein, stop: c.invalidierung,
+    schutz: false, risiko: Math.abs(ein - c.invalidierung),
+    tp1: c.ziel, tp2: c.tp2, tp3: c.tp3, erreicht: []};
+}
+function planLeiste(P, kurs){
+  if (!P || P.einstieg == null) return '';
+  const d = digits(P.einstieg), lang = P.richtung !== 'short';
+  const er = new Set(P.erreicht || []);
+  const rText = r => `${r >= 0 ? '+' : '−'}${Math.abs(r).toFixed(1).replace('.', ',')} R`;
+  const jetztR = kurs && P.risiko > 0 ? (lang ? kurs - P.einstieg : P.einstieg - kurs) / P.risiko : null;
+  const felder = [['Einstieg', P.einstieg, 'ein'], [P.schutz ? 'Schutz' : 'Stop', P.stop, 'stop'],
+                  ['TP1', P.tp1, 'tp'], ['TP2', P.tp2, 'tp'], ['TP3', P.tp3, 'tp']]
+    .filter(f => f[1] != null && isFinite(f[1]));
+  return `<div class="planleiste">${felder.map(([lab, p, art]) => {
+    const abst = kurs ? (p - kurs) / kurs * 100 : null;
+    const r = art === 'ein' || !(P.risiko > 0) ? null
+      : (lang ? p - P.einstieg : P.einstieg - p) / P.risiko;
+    const ok = er.has(lab);
+    return `<div class="pl ${art}${ok ? ' ok' : ''}"><span>${lab}${ok ? ' ✓' : ''}</span>
+      <b>${num(p, d)}</b>
+      ${r != null ? `<i class="r">${rText(r)}</i>`
+        : `<i class="r">${P.quelle === 'vertrag' ? 'im Trade' : 'Limit'}</i>`}
+      <i>${art === 'ein' && P.quelle === 'vertrag' && jetztR != null ? 'jetzt ' + rText(jetztR)
+        : abst != null ? (art === 'ein' ? 'noch ' : '') + pct(abst, 1) : ''}</i></div>`;
+  }).join('')}</div>`;
+}
 function zeichneChartAnsicht(){
   if (!AKTIV){ $('chartansicht').innerHTML = `<p class="leer">Wähle oben im Markt einen Wert.</p>`; return; }
   const c = AKTIV.chance || {}, zg = AKTIV.zeichnung || {};
@@ -2655,9 +2918,11 @@ function zeichneChartAnsicht(){
   const kurs = live ? live.p : c.kurs;
   const d = digits(kurs);
   const E = chart.ebenen();
-  const lagen = [['swings','Swings'],['brueche','BOS/CHoCH'],['liq','Liquidität'],
-                 ['zonen','FVG/OB'],['pd','Premium/Discount'],['ziele','Entry/SL/TP'],
-                 ['rsi','RSI']];
+  const P = chartPlan(AKTIV.instrument, c);
+  const lagen = [['ziele','Entry/SL/TP'],['swings','Swings'],['brueche','BOS/CHoCH'],
+                 ['liq','Liquidität'],['zonen','FVG/OB'],['vol','Volumen'],['rsi','RSI'],
+                 ['pd','Premium/Discount']];
+  const beruehrung = matchMedia && matchMedia('(pointer: coarse)').matches;
   $('chartansicht').innerHTML = `
     <div class="chartbox">
       <div class="chart-h">
@@ -2668,26 +2933,32 @@ function zeichneChartAnsicht(){
       </div>
       <div class="tfbar" id="tfbar">${ebenen.map(t=>
         `<button class="tfb" data-tf="${t}" aria-pressed="${t===AKTIV_TF}">${t}</button>`).join('')}
-        <span style="margin-left:auto;font-size:10.5px;color:var(--ink-3);align-self:center">
-          ${AKTIV.live_quelle ? 'Kurs live · Analyse vom Scan' : 'Kurs und Analyse vom Scan'}
+        <span class="chart-q">${P && P.quelle === 'vertrag'
+          ? `<b>Vertrag seit ${P.seit ? new Date(P.seit).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : 'Einstieg'}</b>`
+          : P ? (c.handelbar === false ? '<b class="skizze">Skizze · kein handelbares Setup</b>'
+                                      : '<b class="scan">Plan vom Scan</b>') : ''}${P ? ' · ' : ''}${AKTIV.live_quelle ? 'Kurs live' : 'Kurs vom Scan'}
         </span>
       </div>
       <div class="layers" id="layers">${lagen.map(([k,t])=>
         `<button class="lb" data-l="${k}" aria-pressed="${!!E[k]}">${t}</button>`).join('')}</div>
-      <canvas id="cv"></canvas>
-      <div class="readout" id="readout">Ziehen zum Verschieben, Scrollen zum Zoomen.</div>
+      <canvas id="cv" aria-label="Chart ${esc(name(AKTIV.instrument))} ${esc(AKTIV_TF)}"></canvas>
+      ${planLeiste(P, kurs)}
+      <div class="readout" id="readout">${beruehrung
+        ? 'Waagerecht wischen verschiebt, zwei Finger zoomen, doppelt tippen setzt zurück.'
+        : 'Ziehen verschiebt, Mausrad zoomt, Doppelklick setzt zurück.'}</div>
       <div class="legende">
+        <span><i style="background:var(--accent-2)"></i>Einstieg</span>
         <span><i style="background:var(--long)"></i>Ziele / bullish</span>
         <span><i style="background:var(--bad)"></i>Stop / bearish</span>
-        <span><i style="background:var(--warn)"></i>Liquidität</span>
-        <span><i style="background:var(--accent)"></i>Premium/Discount</span>
+        <span><i style="background:var(--warn)"></i>offene Liquidität</span>
+        <span><i style="background:var(--ink)"></i>Kurs</span>
       </div>
     </div>
     ${c.begruendung?`<div class="note-box"><span class="nt">Note ${esc(c.note||'')}</span>
       <p>${esc(c.begruendung)}</p></div>`:''}`;
   const tf = zg[AKTIV_TF] || {};
   chart.binde();
-  chart.setze(tf.kerzen, tf, c);
+  chart.setze(tf.kerzen, tf, c, P, `${AKTIV.instrument} · ${AKTIV_TF}`);
   $('tfbar').querySelectorAll('.tfb').forEach(b=>b.addEventListener('click',()=>{
     AKTIV_TF = b.dataset.tf; zeichneChartAnsicht();
   }));
