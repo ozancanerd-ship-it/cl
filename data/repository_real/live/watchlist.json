@@ -1,5 +1,5 @@
 {
-  "stand": "2026-10-01T12:02:06.654352+00:00",
+  "stand": "2026-10-01T12:17:29.519054+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-09-21T16:22:53.113539+00:00",
@@ -404,7 +404,7 @@
       "tp2": 0.67652,
       "tp3": 0.6242300000000001,
       "trigger": "Der Kurs muss unter 0.7480 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ATOMUSD": {
@@ -512,17 +512,17 @@
       "tp2": 0.1063,
       "tp3": 0.11234999999999999,
       "trigger": "Der Kurs muss ueber 0.0931 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "AUTUSD": {
       "aufgenommen": "2026-10-01T11:07:24.242164+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.0,
+      "bestes_r": 0.01,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 4179.4,
       "einstieg_art": "Ruecklauf in FVG M15",
-      "einstiegskurs": null,
+      "einstiegskurs": 4176.8,
       "erreicht": [],
       "erwartet_pct": 1.65,
       "eurusd": 1.1341,
@@ -537,19 +537,19 @@
       "richtung": "short",
       "rr": 2.58,
       "rs": 6.6,
-      "schlechtestes_r": 0.0,
+      "schlechtestes_r": -0.19,
       "schutz": null,
       "score": 79.7,
       "setup": "Ruecksetzer im Trend",
       "stop": 4212.6,
       "these": "Abwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
-      "tor_grund": "",
+      "tor_grund": "„Ruecksetzer im Trend“ hat sich noch nicht bewaehrt (bisher 4 Trades, zusammen -1,3 R) — Alarm erst ab 6 Trades im Plus mit Profitfaktor ab 1,5",
       "tp1": 4110.4,
       "tp2": 4093.7999999999993,
       "tp3": 4063.199999999997,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
+      "zustand": "aktiv"
     },
     "AVAXUSD": {
       "aufgenommen": "2026-09-25T13:09:27.400835+00:00",
@@ -590,7 +590,7 @@
       "tp2": 11.791,
       "tp3": 12.679500000000004,
       "trigger": "Der Kurs muss ueber 10.0790 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "AVGO": {
@@ -736,7 +736,7 @@
       "tp2": 824.24,
       "tp3": 862.6700000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 773.4000 — nicht beim Antippen.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "BNBUSDT": {
@@ -1033,42 +1033,40 @@
       "zustand": "invalidiert"
     },
     "DCRUSD": {
-      "aufgenommen": "2026-09-19T02:13:01.962063+00:00",
-      "ausstiegskurs": 18.176,
-      "bestes_r": 2.3,
-      "broker": "",
-      "einstieg": 17.717,
+      "aufgenommen": "2026-10-01T12:17:05.035291+00:00",
+      "ausstiegskurs": null,
+      "bestes_r": 0.0,
+      "broker": "Bybit (USDT) oder Kraken (USD)",
+      "einstieg": 18.169,
       "einstieg_art": "sofort",
-      "einstiegskurs": 17.822,
-      "erreicht": [
-        "TP1"
-      ],
-      "erwartet_pct": 6.39,
-      "eurusd": null,
-      "gemeldet": "2026-09-19T02:13:01.962063+00:00",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 6.51,
+      "eurusd": 1.1341,
+      "gemeldet": "",
       "instrument": "DCRUSD",
       "klasse": "krypto",
-      "name": "",
-      "note": "B+",
+      "name": "DCR",
+      "note": "A−",
       "raus": false,
       "raus_erreicht": null,
       "raus_kurs": null,
       "richtung": "long",
-      "rr": 2.99,
-      "rs": 65.5,
-      "schlechtestes_r": -1.07,
+      "rr": 2.56,
+      "rs": 34.8,
+      "schlechtestes_r": 0.0,
       "schutz": null,
-      "score": 48.5,
-      "setup": "Ausbruch aus der Basis",
-      "stop": 17.052,
-      "these": "Der Kurs hat sich in einer engen Spanne beruhigt und bricht heraus. Die Idee lebt davon, dass der Bruch haelt — schliesst er zurueck in die Spanne, war es ein Fehlausbruch und der Trade ist erledigt.",
+      "score": 58.9,
+      "setup": "Rueckeroberung nach Liquiditaetsgriff",
+      "stop": 17.708,
+      "these": "Dort lagen die Stops. Sie wurden geholt, und der Kurs kam sofort zurueck — das ist die Stelle, an der eine Bewegung oft beginnt, weil die Gegenseite gerade ausgestoppt wurde.",
       "tor_grund": "",
-      "tp1": 18.85,
-      "tp2": 19.708,
-      "tp3": 20.044499999999996,
-      "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 17.4870 — nicht beim Antippen.",
-      "zuletzt": "2026-09-27T20:03:53.009552+00:00",
-      "zustand": "invalidiert"
+      "tp1": 18.75,
+      "tp2": 19.351,
+      "tp3": 19.782500000000006,
+      "trigger": "Der Kurs muss ueber 17.7300 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "DDOG": {
       "aufgenommen": "2026-09-21T18:17:16.430287+00:00",
@@ -2168,7 +2166,7 @@
       "tp2": 0.70955,
       "tp3": 0.7391499999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.6463 — nicht beim Antippen.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "MRK": {
@@ -3490,7 +3488,7 @@
       "tp2": 31.755,
       "tp3": 33.0651284934938,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "VZ": {
@@ -3598,7 +3596,7 @@
       "tp2": 0.0501,
       "tp3": 0.04889999999999997,
       "trigger": "Der Kurs muss unter 0.0597 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "WMT": {
@@ -3778,7 +3776,7 @@
       "tp2": 0.34397999999999995,
       "tp3": 0.3642599999999999,
       "trigger": "Der Kurs muss ueber 0.3168 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     },
     "XYZ": {
@@ -3850,7 +3848,7 @@
       "tp2": 1610.095,
       "tp3": 1717.065,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
-      "zuletzt": "2026-10-01T12:01:42.811765+00:00",
+      "zuletzt": "2026-10-01T12:17:05.035291+00:00",
       "zustand": "aktiv"
     }
   }
