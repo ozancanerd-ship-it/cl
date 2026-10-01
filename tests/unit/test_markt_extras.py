@@ -172,7 +172,9 @@ def test_termin_sperre_haelt_das_alarm_tor_zu() -> None:
     ohne = alarm_tor.pruefe_zeile(zeile, {})
     mit = alarm_tor.pruefe_zeile({**zeile, "termin_sperre": "Quartalszahlen Do 15.10."}, {})
     assert not mit.ja
-    assert "Quartalszahlen" in mit.grund
+    # Seit dem Gewinner-Tor (01.10.) kann ein anderer Grund zuerst stehen — die Sperre
+    # muss trotzdem als eigener, nicht erfuellter Punkt dabei sein.
+    assert any("Quartalszahlen" in p.satz for p in mit.punkte if not p.ok)
     assert any(p.name == "termin" for p in mit.punkte)
     assert not any(p.name == "termin" for p in ohne.punkte)
 

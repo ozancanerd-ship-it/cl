@@ -84,6 +84,44 @@ def test_gewinnende_setup_art_ist_bewaehrt() -> None:
 
 # ------------------------------------------------------------------ feste Pruefungen
 
+#: Eine Setup-Art mit Erfolgsnachweis: 4× bis Ziel 3, 2× Stop. Seit dem Gewinner-Tor
+#: (01.10.) klingelt nur noch, was so eine Bilanz hat.
+_BEWAEHRT = [_fertig("Ausbruch aus der Basis", "ziel_erreicht", ["TP1", "TP2", "TP3"])] * 4 + [
+    _fertig("Ausbruch aus der Basis", "stop")
+] * 2
+
+
+def _bewaehrt_stand() -> dict[str, at.Stand]:
+    return at.bilanz(_BEWAEHRT)
+
+
+def _liste_mit_bilanz() -> Wachliste:
+    """Eine Wachliste, auf der „Ausbruch aus der Basis" schon bewaehrt ist."""
+    from trading_agent.scanner.watchlist import Wache
+
+    liste = Wachliste()
+    for i, d in enumerate(_BEWAEHRT):
+        liste.wachen[f"HIST{i}USD"] = Wache(
+            instrument=f"HIST{i}USD",
+            klasse="krypto",
+            richtung="long",
+            note="A",
+            einstieg=100.0,
+            einstieg_art="sofort",
+            stop=95.0,
+            tp1=105.0,
+            tp2=110.0,
+            tp3=117.5,
+            score=70.0,
+            rr=3.5,
+            erwartet_pct=17.5,
+            zustand=d["zustand"],
+            erreicht=list(d["erreicht"]),
+            einstiegskurs=100.0,
+            setup="Ausbruch aus der Basis",
+        )
+    return liste
+
 
 def _pruefe(**kw: Any) -> at.Tor:
     basis = {
@@ -93,7 +131,7 @@ def _pruefe(**kw: Any) -> at.Tor:
         "richtung": "long",
         "crv": 3.0,
         "ziel1_pct": 5.0,
-        "stand": {},
+        "stand": _bewaehrt_stand(),
     }
     basis.update(kw)
     return at.pruefe(**basis)
@@ -111,13 +149,43 @@ def test_ohne_benanntes_setup_kein_alarm() -> None:
     assert "kein benanntes Setup" in t.grund
 
 
-def test_b_plus_nur_bei_bewaehrter_setup_art() -> None:
-    assert not _pruefe(note="B+").ja
-    wachen = [_fertig("Ausbruch aus der Basis", "ziel_erreicht", ["TP1", "TP2", "TP3"])] * 4
-    wachen += [_fertig("Ausbruch aus der Basis", "stop")] * 2
-    t = _pruefe(note="B+", stand=at.bilanz(wachen))
-    assert t.ja, t.grund
-    assert "bewaehrt" in t.bilanz_satz
+def test_b_plus_klingelt_nicht_mehr() -> None:
+    """Gewinner-Tor: B+ klingelt auch bei bewaehrter Setup-Art nicht mehr."""
+    t = _pruefe(note="B+")
+    assert not t.ja
+    assert "ab A−" in t.grund
+
+
+def test_setup_art_ohne_erfolgsnachweis_klingelt_nicht() -> None:
+    """Gewinner-Tor (01.10.): eine Art, ueber die die eigene Bilanz nichts weiss, klingelt
+    nicht mehr — auch mit A+ nicht."""
+    t = _pruefe(note="A+", stand={})
+    assert not t.ja
+    assert "noch nicht bewaehrt" in t.grund
+
+
+def test_setup_art_im_minus_unter_der_mindestzahl_klingelt_nicht() -> None:
+    """Der Fall vom 30.09.: „Ruecksetzer im Trend", 4 Trades, −1,3 R — vorher „offen" und
+    damit frei, jetzt ohne Alarm."""
+    wachen = [_fertig("Ruecksetzer im Trend", "stop", klasse="aktien", richtung="short")] * 3
+    wachen.append(
+        _fertig("Ruecksetzer im Trend", "invalidiert", ["TP1"], klasse="aktien", richtung="short")
+    )
+    t = _pruefe(
+        note="A",
+        setup="Ruecksetzer im Trend",
+        klasse="aktien",
+        richtung="short",
+        stand=at.bilanz(wachen),
+    )
+    assert not t.ja
+    assert "4 Trades" in t.grund
+
+
+def test_regeln_nennen_die_freien_setup_arten() -> None:
+    r = at.regeln_uebersicht(_bewaehrt_stand())
+    assert r["nur_bewaehrt"] is True
+    assert r["frei"] == ["Ausbruch aus der Basis"]
 
 
 def test_b_klingelt_nie() -> None:
@@ -209,7 +277,7 @@ def test_einstieg_mit_b_note_bleibt_in_der_app() -> None:
 
 
 def test_guter_einstieg_klingelt_mit_vollem_plan() -> None:
-    liste = Wachliste()
+    liste = _liste_mit_bilanz()
     liste.aufnehmen([_zeile("LINKUSD")], jetzt=T0)
     ev = liste.pruefen(_kurs("LINKUSD", 101.0, 99.5), jetzt=T0 + timedelta(minutes=15))
     raus, _ = at.fuers_telefon(ev, liste.wachen, raus_vorher={}, jetzt=T0)
@@ -224,7 +292,7 @@ def test_guter_einstieg_klingelt_mit_vollem_plan() -> None:
 
 
 def test_folgealarme_nur_fuer_gemeldete_trades() -> None:
-    liste = Wachliste()
+    liste = _liste_mit_bilanz()
     liste.aufnehmen([_zeile("LINKUSD")], jetzt=T0)
     ev = liste.pruefen(_kurs("LINKUSD", 101.0, 99.5), jetzt=T0 + timedelta(minutes=15))
     at.fuers_telefon(ev, liste.wachen, raus_vorher={}, jetzt=T0)
@@ -237,7 +305,7 @@ def test_folgealarme_nur_fuer_gemeldete_trades() -> None:
 def test_nachgezogener_stop_nach_ziel_1() -> None:
     """HBAR am 23.09.: Ziel 1, danach zurueck unter den Einstieg. Laut eigenem Rat war
     der Rest bei ±0 raus — gemeldet wurde spaeter ein voller Stop mit −1 R."""
-    liste = Wachliste()
+    liste = _liste_mit_bilanz()
     liste.aufnehmen([_zeile("HBARUSD", name="Hedera")], jetzt=T0)
     ev = liste.pruefen(_kurs("HBARUSD", 101.0, 99.5), jetzt=T0 + timedelta(minutes=15))
     at.fuers_telefon(ev, liste.wachen, raus_vorher={}, jetzt=T0)
@@ -261,7 +329,7 @@ def test_nachgezogener_stop_nach_ziel_1() -> None:
 
 def test_analyse_dreht_waehrend_des_trades() -> None:
     """Vorher: nie dringend (Zustand wurde vor der Pruefung umgesetzt), nie aufs Telefon."""
-    liste = Wachliste()
+    liste = _liste_mit_bilanz()
     liste.aufnehmen([_zeile("SOLUSD", name="Solana")], jetzt=T0)
     ev = liste.pruefen(_kurs("SOLUSD", 101.0, 99.5), jetzt=T0 + timedelta(minutes=15))
     at.fuers_telefon(ev, liste.wachen, raus_vorher={}, jetzt=T0)
@@ -288,7 +356,7 @@ def test_derselbe_coin_kommt_nur_einmal_auf_die_liste() -> None:
 
 
 def test_tagesdeckel_laesst_die_besten_durch() -> None:
-    liste = Wachliste()
+    liste = _liste_mit_bilanz()
     zeilen = [_zeile(f"C{i}USD", note="A−") for i in range(4)]
     zeilen.append(_zeile("TOPUSD", note="A+"))
     liste.aufnehmen(zeilen, jetzt=T0)

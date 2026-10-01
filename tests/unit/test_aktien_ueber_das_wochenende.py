@@ -83,9 +83,14 @@ def test_krypto_bleibt_bei_dreissig_stunden() -> None:
     assert m._raeume_zombies(liste, {}, SONNTAG_NACHT) == 1
 
 
-def test_umstieg_uebernimmt_nur_gute_laufende_trades() -> None:
+def test_umstieg_uebernimmt_nur_gute_laufende_trades(monkeypatch) -> None:
     """Beim ersten Lauf mit dem Alarm-Tor tragen die alten Wachen kein ``gemeldet``.
-    Laufende, die heute durchs Tor kaemen, klingeln weiter; der Rest bleibt in der App."""
+    Laufende, die heute durchs Tor kaemen, klingeln weiter; der Rest bleibt in der App.
+
+    Der Umstieg war am 26.09. — mit dem Tor von damals (ohne Erfolgsnachweis-Pflicht)."""
+    from trading_agent.scanner import alarm_tor
+
+    monkeypatch.setattr(alarm_tor, "NUR_BEWAEHRT", False)
     m = _modul()
     gut = _wache("AAVEUSD", "krypto", FREITAG_ABEND)
     gut.setup = "Ausbruch aus der Basis"
