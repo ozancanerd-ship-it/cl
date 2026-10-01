@@ -194,7 +194,8 @@ def test_regeln_nennen_die_freien_setup_arten() -> None:
     r = at.regeln_uebersicht(_bewaehrt_stand())
     assert r["nur_bewaehrt"] is True
     assert r["b_plus_bei_bewaehrt"] is True
-    assert r["frei"] == ["Ausbruch aus der Basis"]
+    assert r["frei"] == ["Ausbruch aus der Basis · Coins"]
+    assert r["bilanz_je_klasse"] is True
 
 
 def test_b_klingelt_nie() -> None:
@@ -222,7 +223,9 @@ def test_zu_kleines_crv_und_zu_wenig_raum() -> None:
     t = _pruefe(ziel1_pct=0.4)
     assert not t.ja and "Gebuehren" in t.grund
     # Aktien haben eine niedrigere Schwelle (niedrigere Kosten).
-    assert _pruefe(klasse="aktien", ziel1_pct=1.2).ja
+    # Seit 01.10. zaehlt die Bilanz je Klasse — also eine bewaehrte Aktien-Bilanz dazu.
+    aktien = at.bilanz([{**w, "klasse": "aktien"} for w in _BEWAEHRT])
+    assert _pruefe(klasse="aktien", ziel1_pct=1.2, stand=aktien).ja
 
 
 # ------------------------------------------------------------------ Deckel
@@ -420,3 +423,50 @@ def test_laufender_trade_ist_nach_dem_schutz_stop_entschieden() -> None:
     st = at.bilanz([d])["setup:Y"]
     assert st.anzahl == 1
     assert round(st.summe_r, 3) == round(1 / 3, 3)
+
+
+# ------------------------------------------------------------------ Bilanz je Klasse
+
+
+_RUECK = "Rueckeroberung nach Liquiditaetsgriff"
+
+
+def _decred_fall() -> dict[str, at.Stand]:
+    """01.10.: Coins 6 Trades, Profitfaktor ueber 6 — Aktien-Kaeufe 4 Stops."""
+    coins = (
+        [_fertig(_RUECK, "ziel_erreicht", ["TP1", "TP2", "TP3"])] * 3
+        + [_fertig(_RUECK, "stop")] * 1
+        + [_fertig(_RUECK, "invalidiert", ["TP1"])] * 2
+    )
+    aktien = [_fertig(_RUECK, "stop", klasse="aktien")] * 4
+    return at.bilanz(coins + aktien)
+
+
+def test_aktienverluste_sperren_kein_coin_setup() -> None:
+    """Der Decred-Fall: zusammengerechnet „nicht bewaehrt", in der eigenen Klasse klar."""
+    stand = _decred_fall()
+    assert stand[f"setup:{_RUECK}"].urteil != "bewaehrt"  # alte Rechnung
+    t = _pruefe(setup=_RUECK, note="A−", stand=stand)
+    assert t.ja, t.grund
+    assert "bei Coins" in t.bilanz_satz
+
+
+def test_aktien_setup_wird_an_aktien_gemessen() -> None:
+    stand = _decred_fall()
+    t = _pruefe(setup=_RUECK, note="A", klasse="aktien", richtung="short", stand=stand)
+    assert not t.ja
+    assert "bei Aktien" in t.grund
+
+
+def test_zu_wenige_faelle_in_der_eigenen_klasse_heisst_offen() -> None:
+    """Gold hat einen Trade — die Coin-Bilanz springt nicht ein."""
+    t = _pruefe(klasse="gold", stand=_bewaehrt_stand())
+    assert not t.ja
+    assert "bei Gold" in t.grund and "noch nicht bewaehrt" in t.grund
+
+
+def test_regeln_zeigen_setup_arten_je_klasse() -> None:
+    r = at.regeln_uebersicht(_decred_fall())
+    assert r["setup_arten"][f"{_RUECK} · Coins"]["urteil"] == "bewaehrt"
+    assert r["setup_arten"][f"{_RUECK} · Aktien"]["anzahl"] == 4
+    assert r["frei"] == [f"{_RUECK} · Coins"]
