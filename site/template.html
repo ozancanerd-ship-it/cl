@@ -306,6 +306,45 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .steps li:last-child{padding-bottom:0}
 .steps li:last-child::after{display:none}
 .exits{list-style:none; margin:8px 0 0; padding:0}
+/* Laufender Trade im Analyse-Reiter: Vertrag, Fortschritt, naechster Schritt */
+.vertrag-karte{border-color:rgba(76,141,255,.38);
+  background:linear-gradient(150deg, rgba(76,141,255,.10), var(--glass) 60%)}
+.vk-kopf{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.vk-tag{font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent-2); font-weight:600}
+.vk-seit{font-size:12.5px; color:var(--ink-2)}
+.vk-r{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:20px; font-weight:650}
+.vk-r.up{color:var(--long)} .vk-r.dn{color:var(--bad)}
+.vk-hinweis{margin:12px 0 0; font-size:12px; color:var(--ink-3); line-height:1.5}
+.steps.vertrag li.ok{color:var(--ink-3)}
+.steps.vertrag li.ok::before{content:"✓"; color:var(--long); border-color:var(--long)}
+.steps.vertrag li.jetzt::before{content:"→"; color:var(--accent-2); border-color:var(--accent-2);
+  box-shadow:0 0 0 4px rgba(76,141,255,.14)}
+.ok-tag{font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--long); margin-left:4px}
+.fl{margin:16px 2px 4px; position:relative}
+.fl-bahn{position:relative; height:8px; border-radius:6px; background:var(--sunk);
+  box-shadow:inset 0 0 0 1px var(--rule)}
+.fl-fill{position:absolute; top:0; bottom:0; border-radius:6px}
+.fl-fill.plus{background:linear-gradient(90deg, rgba(43,232,165,.25), var(--long))}
+.fl-fill.minus{background:linear-gradient(270deg, rgba(255,92,122,.25), var(--bad))}
+.fl-m{position:absolute; top:-3px; width:2px; height:14px; margin-left:-1px; border-radius:1px;
+  background:var(--ink-3)}
+.fl-m.stop{background:var(--bad)} .fl-m.ein{background:var(--accent-2)} .fl-m.tp{background:var(--long)}
+.fl-m.ok{opacity:.45}
+.fl-jetzt{position:absolute; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%;
+  background:var(--ink); box-shadow:0 0 0 3px var(--bg), 0 0 14px rgba(255,255,255,.35)}
+.fl-jetzt span{position:absolute; bottom:17px; left:50%; transform:translateX(-50%); white-space:nowrap;
+  font-family:"JetBrains Mono",monospace; font-size:10.5px; font-weight:650}
+.fl-jetzt.plus span{color:var(--long)} .fl-jetzt.minus span{color:var(--bad)}
+.fl-lab{position:relative; height:16px; margin-top:7px}
+.fl-lab span{position:absolute; transform:translateX(-50%); font-family:"JetBrains Mono",monospace;
+  font-size:9.5px; color:var(--ink-3); white-space:nowrap}
+.fl-lab span.stop{color:var(--bad)} .fl-lab span.ein{color:var(--accent-2)} .fl-lab span.tp{color:var(--long)}
+.fl-lab span:first-child{transform:none} .fl-lab span:last-child{transform:translateX(-100%)}
+.note-box.klapp.erkl>summary{display:block}
+.note-box.klapp.erkl .klapp-hint{display:inline; margin-left:6px}
+.note-box.klapp.erkl[open] .klapp-hint{display:none}
 .exits li{position:relative; padding-left:19px; margin-bottom:7px; font-size:12.5px;
   color:var(--ink-2); line-height:1.45}
 .exits li::before{content:"→"; position:absolute; left:0; color:var(--bad);
@@ -2871,12 +2910,66 @@ function chartPlan(sym, c){
       risiko: Math.abs(w.einstieg - w.stop),
       tp1: w.tp1, tp2: w.tp2, tp3: w.tp3, erreicht: w.erreicht || [], seit: w.aufgenommen};
   }
-  if (!c || !c.richtung || c.invalidierung == null) return null;
-  const ein = c.einstieg != null ? c.einstieg : c.kurs;
-  if (ein == null) return null;
-  return {quelle: 'scan', richtung: c.richtung, einstieg: ein, stop: c.invalidierung,
-    schutz: false, risiko: Math.abs(ein - c.invalidierung),
-    tp1: c.ziel, tp2: c.tp2, tp3: c.tp3, erreicht: []};
+  if (!c || !c.richtung) return null;
+  /* Vor dem Einstieg: dieselben Zahlen, die ein Alarm nennen wuerde — aus dem
+     Handelsplan (Ziel 1 nie naeher als 1 R), sonst die rohen Scan-Marken. Vorher zeigte
+     der Chart hier die Liquiditaetsziele, der Alarm aber die Plan-Ziele. */
+  const pl = c.plan || null;
+  const ein = pl && pl.einstieg != null ? pl.einstieg : (c.einstieg != null ? c.einstieg : c.kurs);
+  const stop = pl && pl.stop != null ? pl.stop : c.invalidierung;
+  if (ein == null || stop == null) return null;
+  return {quelle: 'scan', richtung: c.richtung, einstieg: ein, stop,
+    schutz: false, risiko: Math.abs(ein - stop),
+    tp1: pl ? pl.tp1 : c.ziel, tp2: pl ? pl.tp2 : c.tp2, tp3: pl ? pl.tp3 : c.tp3, erreicht: []};
+}
+
+/* Wie weit ist der Trade? Eine Leiste von Stop (−1 R) bis Ziel 3, mit den Marken und
+   dem Kurs als Punkt. Auf einen Blick: wie nah am Stop, wie nah am naechsten Ziel. */
+function fortschrittsLeiste(P, kurs){
+  if (!P || !(P.risiko > 0) || kurs == null) return '';
+  const lang = P.richtung !== 'short';
+  const R = p => (lang ? p - P.einstieg : P.einstieg - p) / P.risiko;
+  const marken = [['Stop', P.stop, 'stop'], ['Einstieg', P.einstieg, 'ein'],
+                  ['TP1', P.tp1, 'tp'], ['TP2', P.tp2, 'tp'], ['TP3', P.tp3, 'tp']]
+    .filter(m => m[1] != null && isFinite(m[1])).map(m => ({lab: m[0], r: R(m[1]), art: m[2]}));
+  const jetzt = R(kurs);
+  const lo = Math.min(-1, jetzt, ...marken.map(m => m.r)), hi = Math.max(jetzt, ...marken.map(m => m.r));
+  const X = r => ((r - lo) / (hi - lo || 1) * 100).toFixed(2);
+  const er = new Set(P.erreicht || []);
+  const null0 = X(0), jx = X(Math.max(lo, Math.min(hi, jetzt)));
+  const links = Math.min(+null0, +jx), breite = Math.abs(+jx - +null0);
+  return `<div class="fl" role="img" aria-label="Stand ${jetzt.toFixed(1)} R">
+    <div class="fl-bahn">
+      <i class="fl-fill ${jetzt >= 0 ? 'plus' : 'minus'}" style="left:${links}%;width:${breite}%"></i>
+      ${marken.map(m => `<i class="fl-m ${m.art}${er.has(m.lab) ? ' ok' : ''}" style="left:${X(m.r)}%"></i>`).join('')}
+      <b class="fl-jetzt ${jetzt >= 0 ? 'plus' : 'minus'}" style="left:${jx}%"><span>${jetzt >= 0 ? '+' : '−'}${Math.abs(jetzt).toFixed(1).replace('.', ',')} R</span></b>
+    </div>
+    <div class="fl-lab">${(() => { let zuletzt = -99;
+      // Liegen zwei Marken fast aufeinander (Schutz-Stop = Einstieg), nur eine beschriften.
+      return marken.map(m => { const x = +X(m.r); if (x - zuletzt < 9) return ''; zuletzt = x;
+        return `<span class="${m.art}${er.has(m.lab) ? ' ok' : ''}" style="left:${x}%">${m.lab === 'Einstieg' ? '0' : m.lab}</span>`; }).join(''); })()}</div>
+  </div>`;
+}
+
+/* Die Schritte des laufenden Trades — dieselben Regeln, nach denen die Wachliste
+   klingelt (watchlist.py) und die Bilanz zaehlt. Erreichtes ist abgehakt. */
+function vertragsSchritte(P, kurs){
+  const d = digits(P.einstieg), lang = P.richtung !== 'short';
+  const er = new Set(P.erreicht || []);
+  const rT = p => { const r = (lang ? p - P.einstieg : P.einstieg - p) / P.risiko;
+    return `${r >= 0 ? '+' : '−'}${Math.abs(r).toFixed(1).replace('.', ',')} R`; };
+  const weg = p => kurs ? ` <span class="nu">(${pct((p - kurs) / kurs * 100, 1)} vom Kurs)</span>` : '';
+  const zeilen = [];
+  if (P.tp1 != null) zeilen.push(['TP1', `<b>Ziel 1 · ${num(P.tp1, d)}</b> (${rT(P.tp1)})${er.has('TP1') ? '' : weg(P.tp1)} — erstes Drittel verkaufen, Stop auf den Einstieg ${num(P.einstieg, d)}.`]);
+  if (P.tp2 != null) zeilen.push(['TP2', `<b>Ziel 2 · ${num(P.tp2, d)}</b> (${rT(P.tp2)})${er.has('TP2') ? '' : weg(P.tp2)} — zweites Drittel verkaufen, Stop auf Ziel 1${P.tp1 != null ? ' (' + num(P.tp1, d) + ')' : ''}.`]);
+  if (P.tp3 != null) zeilen.push(['TP3', `<b>Ziel 3 · ${num(P.tp3, d)}</b> (${rT(P.tp3)})${er.has('TP3') ? '' : weg(P.tp3)} — den Rest verkaufen. Fertig.`]);
+  const naechstes = zeilen.find(z => !er.has(z[0]));
+  return `<ol class="steps vertrag">${zeilen.map(([m, t]) =>
+      `<li class="${er.has(m) ? 'ok' : naechstes && naechstes[0] === m ? 'jetzt' : ''}">${t}${er.has(m) ? ' <span class="ok-tag">erreicht</span>' : ''}</li>`).join('')}</ol>
+    <ul class="exits">
+      <li>Der Kurs berührt den ${P.schutz ? 'Schutz-Stop' : 'Stop'} bei <b>${num(P.stop, d)}</b>${weg(P.stop)} — raus, keine Diskussion.</li>
+      <li>Die Analyse dreht in die Gegenrichtung — dann kommt der Alarm <b>AUSSTEIGEN</b>: raus zum Marktkurs, auch vor dem Stop.</li>
+    </ul>`;
 }
 function planLeiste(P, kurs){
   if (!P || P.einstieg == null) return '';
@@ -2995,25 +3088,52 @@ function zeichneAnalyse(){
   const c = AKTIV.chance || {}, K = AKTIV.kommentar, M = AKTIV.muster || [];
   const live = L.get(AKTIV.instrument);
   const kurs = live ? live.p : c.kurs, d = digits(kurs);
+  const P = chartPlan(AKTIV.instrument, c);
+  const imTrade = P && P.quelle === 'vertrag';
 
   let h = `<div class="karte ${c.handelbar?'gut':(c.urteil==='WATCH'?'warn':'')}">
     <h3>${esc(name(AKTIV.instrument))} — ${esc(c.note||'—')}${c.richtung?' '+c.richtung.toUpperCase():''}</h3>
     <div class="kpi">
       <span>Score <b>${(c.score||0).toFixed(0)}/100</b></span>
       ${c.confidence?`<span>Confidence <b>${Math.round(c.confidence*100)} %</b></span>`:''}
-      ${c.rr?`<span>CRV <b>1:${c.rr.toFixed(2)}</b></span>`:''}
+      ${crvVon(c)!=null?`<span>CRV <b>1:${crvVon(c).toFixed(1).replace('.', ',')}</b></span>`:''}
       ${bewegungSpan(c)}
       <span>Profil <b>${esc(c.profil||'')}</b></span>
     </div>
     <div class="zt">
       <span>Kurs <b>${num(kurs,d)}</b>${live?' <span style="color:var(--long)">live</span>':''}</span>
-      ${c.ziel!=null?`<span>TP1 <b>${num(c.ziel,d)}</b></span>`:''}
-      ${c.tp2!=null?`<span>TP2 <b>${num(c.tp2,d)}</b></span>`:''}
-      ${c.tp3!=null?`<span>TP3 <b>${num(c.tp3,d)}</b></span>`:''}
-      ${c.invalidierung!=null?`<span>Stop <b>${num(c.invalidierung,d)}</b></span>`:''}
+      ${!imTrade && P ? `<span>Einstieg <b>${num(P.einstieg,d)}</b></span>
+        <span>Stop <b>${num(P.stop,d)}</b></span>
+        ${[['TP1',P.tp1],['TP2',P.tp2],['TP3',P.tp3]].filter(x=>x[1]!=null)
+          .map(([l,v])=>`<span>${l} <b>${num(v,d)}</b></span>`).join('')}` : ''}
     </div>
     ${c.begruendung?`<p style="margin:9px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(c.begruendung)}</p>`:''}
   </div>`;
+
+  /* Laeuft hier ein Trade, gehoert er nach oben — mit SEINEN Zahlen. Bis 01.10. stand
+     im Analyse-Reiter auch bei einem laufenden Trade nur der frische Scan-Plan: ein
+     anderer Einstieg, ein anderer Stop, andere Ziele. Wer dem gefolgt waere, haette
+     einen zweiten Trade aufgemacht oder den Stop an die falsche Stelle gelegt. */
+  if (imTrade){
+    const jetztR = (P.richtung !== 'short' ? kurs - P.einstieg : P.einstieg - kurs) / P.risiko;
+    h = `<div class="karte vertrag-karte">
+      <div class="vk-kopf"><span class="vk-tag">Dein laufender Trade</span>
+        <span class="vk-seit">${P.richtung === 'short' ? 'SHORT' : 'LONG'} seit ${P.seit ? new Date(P.seit).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : '—'}</span>
+        <b class="vk-r ${jetztR >= 0 ? 'up' : 'dn'}">${jetztR >= 0 ? '+' : '−'}${Math.abs(jetztR).toFixed(2).replace('.', ',')} R</b></div>
+      ${fortschrittsLeiste(P, kurs)}
+      <div class="zt" style="margin-top:12px">
+        <span>Einstieg <b>${num(P.einstieg,d)}</b></span>
+        <span>${P.schutz ? 'Schutz-Stop' : 'Stop'} <b>${num(P.stop,d)}</b></span>
+        ${[['TP1',P.tp1],['TP2',P.tp2],['TP3',P.tp3]].filter(x=>x[1]!=null)
+          .map(([l,v])=>`<span>${l} <b>${num(v,d)}</b>${(P.erreicht||[]).includes(l)?' ✓':''}</span>`).join('')}
+      </div>
+      <h3 style="margin-top:14px">So läuft er weiter</h3>
+      ${vertragsSchritte(P, kurs)}
+      <p class="vk-hinweis">Diese Zahlen sind der Vertrag aus dem Einstieg und bleiben fest — genau
+        danach kommen die Alarme. Alles darunter beschreibt den Markt <em>jetzt</em>, also einen
+        <strong>neuen</strong> Einstieg. Nicht nachkaufen.</p>
+    </div>` + h;
+  }
 
   // --- Das Setup. Die Karte steht ganz oben, weil sie die erste Frage beantwortet:
   // was ist das hier fuer ein Trade? Alles Weitere haengt daran.
@@ -3045,20 +3165,24 @@ function zeichneAnalyse(){
   // scheitern Trades in der Praxis, nicht am Einstieg.
   const PL = c.plan || null;
   if (PL){
-    h += `<h2>So wird gehandelt</h2>
-      <div class="karte">
+    h += imTrade
+      ? `<details class="karte klapp"><summary><h3>Plan für einen neuen Einstieg</h3>
+          <span class="klapp-hint">Gilt nicht für deinen laufenden Trade — nur zum Vergleich</span></summary>`
+      : `<h2>So wird gehandelt</h2>
+      <div class="karte">`;
+    h += `
         <div class="kpi" style="margin-top:0">
           <span>Einstieg <b>${num(PL.einstieg,d)}</b></span>
           <span>Stop <b>${num(PL.stop,d)}</b></span>
           <span>1 R <b>${num(PL.r,d)}</b></span>
-          <span>Risiko <b>${PL.risiko_pct.toFixed(1)} %</b></span>
-          <span>CRV <b>1:${PL.crv.toFixed(1)}</b></span>
+          <span>Risiko <b>${PL.risiko_pct.toFixed(1).replace('.', ',')} %</b></span>
+          <span>CRV <b>1:${PL.crv.toFixed(1).replace('.', ',')}</b></span>
         </div>
         <ol class="steps">${(PL.schritte||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
         <h3 style="margin-top:16px">Wann raus, bevor ein Ziel erreicht ist</h3>
         <ul class="exits">${(PL.ausstiege||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
         ${PL.untauglich?`<div class="note-box bad" style="margin-bottom:0"><span class="nt">Nicht handelbar</span><p style="margin:0">${esc(PL.untauglich)}</p></div>`:''}
-      </div>`;
+      ${imTrade ? '</details>' : '</div>'}`;
   }
 
   // Die Warnungen aus der SCAN-Zeile: sie ist juenger als die Detaildatei und traegt seit
@@ -3084,10 +3208,12 @@ function zeichneAnalyse(){
         <td class="${rk}">${I.rsi!=null?`${I.rsi.toFixed(0)}`:'<span class="nu">—</span>'}
           ${I.rsi_divergenz?`<br><span class="nu" style="font-size:11px">Div. ${I.rsi_divergenz==='baerisch'?'↓':'↑'}</span>`:''}
           ${I.volumen_x!=null?`<br><span class="nu" style="font-size:11px">Vol ${I.volumen_x.toFixed(1)}×</span>`:''}</td>
-        <td>${br?`${esc(br.art)} <span class="${br.richtung==='bullish'?'up':'dn'}">${br.richtung==='bullish'?'↑':'↓'}</span><br>
+        <td>${br?`${esc(br.art === 'CHOCH' ? 'CHoCH' : br.art)} <span class="${br.richtung==='bullish'?'up':'dn'}">${br.richtung==='bullish'?'↑':'↓'}</span><br>
           <span class="nu" style="font-size:11px">${num(br.preis,d)}</span>`:'<span class="nu">—</span>'}</td>
-        <td>${z.pd?`${esc({premium:'teuer',discount:'günstig',equilibrium:'Mitte'}[z.pd.zone]||z.pd.zone)}<br>
-          <span class="nu" style="font-size:11px">${(z.pd.position*100).toFixed(0)} %</span>`:'<span class="nu">—</span>'}</td>
+        <td>${z.pd?(z.pd.position < 0 ? 'unter der Spanne'
+          : z.pd.position > 1 ? 'über der Spanne'
+          : `${esc({premium:'oben (teuer)',discount:'unten (günstig)',equilibrium:'Mitte'}[z.pd.zone]||z.pd.zone)}<br>
+          <span class="nu" style="font-size:11px">${(z.pd.position*100).toFixed(0)} %</span>`):'<span class="nu">—</span>'}</td>
         <td><span class="nu" style="font-size:11px">
           ${z.liquiditaet_oben!=null?'↑ '+num(z.liquiditaet_oben,d):''}
           ${z.liquiditaet_unten!=null?'<br>↓ '+num(z.liquiditaet_unten,d):''}</span></td>
@@ -3099,14 +3225,15 @@ function zeichneAnalyse(){
     h += `<h2>Indikatoren</h2>`;
     h += mitInd.map(z=>`<div class="rowx"><span class="lab mono">${esc(z.tf)}</span>
       <span class="val" style="font-family:inherit;font-weight:400;text-align:right">${esc((z.indikatoren||{}).satz||'')}</span></div>`).join('');
-    h += `<div class="note-box"><span class="nt">Was der RSI hier ist — und was nicht</span>
+    h += `<details class="note-box klapp erkl"><summary><span class="nt">Was der RSI hier ist — und was nicht</span>
+      <span class="klapp-hint">antippen</span></summary>
       <p>Ein RSI von 78 heißt <strong>nicht</strong> „verkaufen". In einem starken Trend
       bleibt er wochenlang oben, und wer dort short geht, steht gegen die Bewegung. Er
       geht hier als Kontext ein und erzeugt höchstens eine Warnung — wie alles andere
       auch: <em>gesetzt, nicht an Ergebnissen optimiert.</em></p>
       <p>Die einzige RSI-Aussage, die mehr ist als „hoch" oder „tief", ist die
       <strong>Divergenz</strong>: der Kurs macht ein neues Extrem, die Kraft dahinter
-      nicht mit. Die steht in der Tabelle oben als „Div. ↑/↓".</p></div>`;
+      nicht mit. Die steht in der Tabelle oben als „Div. ↑/↓".</p></details>`;
   }
 
   if (M.length){
@@ -3117,7 +3244,7 @@ function zeichneAnalyse(){
       ${(m.linien||[]).length?`<div class="zt">${m.linien.map(l=>`<span>${esc(l.name)} <b>${num(l.preis,d)}</b></span>`).join('')}</div>`:''}
     </div>`).join('');
     h += `<div class="note-box"><span class="nt">Wichtig</span>
-      <p>Ein erkanntes Muster ist <strong>kein Handelssignal</strong>. Es beschreibt die Form
+      <p style="margin:0">Ein erkanntes Muster ist <strong>kein Handelssignal</strong>. Es beschreibt die Form
       des Charts und geht als Kontext in die Bewertung ein. Ob ein Muster historisch trägt,
       ist eine eigene Frage und hier nicht beantwortet.</p></div>`;
   }
@@ -3130,7 +3257,12 @@ function zeichneAnalyse(){
     h += block('Beobachtung', K.was_ich_sehe);
     h += block('Warum jetzt', K.warum_jetzt, 'gut');
     h += block('Was erwartet wird', K.erwartung);
-    h += block('Was die These widerlegen würde', K.was_waere_falsch, 'bad');
+    /* Was schon oben steht (Auslöser und Fehlendes im Setup, „Was dagegen spricht"),
+       kommt hier nicht ein zweites und drittes Mal. Vorher stand „noch kein echter
+       Rücksetzer" bei Mondelez viermal auf der Seite. */
+    const schon = new Set([...(warn||[]), ...((ST && ST.fehlt) || []),
+      ...((ST && ST.fehlt) || []).map(x => 'Fehlt noch: ' + x), ...(ST && ST.trigger ? [ST.trigger] : [])]);
+    h += block('Was die These widerlegen würde', (K.was_waere_falsch || []).filter(x => !schon.has(x)), 'bad');
   }
 
   h += `<h2>Wie der Score zustande kommt</h2>`;
