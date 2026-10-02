@@ -7718,6 +7718,10 @@ function bilanzKasten(){
   const KN = {krypto:'Coins', aktien:'Aktien', gold:'Gold'};
   const klassen = Object.entries(kl).filter(([, v]) => v && v.anzahl)
     .sort((a, b) => (b[1].summe_r || 0) - (a[1].summe_r || 0));
+  // Je Woche (seit 02.10., als das Archiv alle Trades seit 05.09. zurückbrachte): damit
+  // die chaotische erste Septemberwoche nicht als Dauerzustand gelesen wird.
+  const wochen = Object.entries(PF.je_woche_plan || {}).filter(([, v]) => v && v.anzahl)
+    .sort((a, b) => a[0].localeCompare(b[0]));
   return `<h2>Eigene Bilanz</h2>
   <div class="karte ${ton}">
     <div class="status" style="margin-top:0">
@@ -7737,6 +7741,9 @@ function bilanzKasten(){
     </div>
     ${klassen.length > 1 ? `<div class="zt" style="margin-top:12px">${klassen.map(([k, v]) =>
       `<span>${esc(KN[k] || k)} <b class="${(v.summe_r||0) > 0 ? 'up' : (v.summe_r||0) < 0 ? 'dn' : ''}">${r1(v.summe_r || 0)}</b>
+        <span style="color:var(--ink-3)">${v.anzahl}×</span></span>`).join('')}</div>` : ''}
+    ${wochen.length > 1 ? `<div class="zt" style="margin-top:8px">${wochen.map(([k, v]) =>
+      `<span>${esc(k)} <b class="${(v.summe_r||0) > 0 ? 'up' : (v.summe_r||0) < 0 ? 'dn' : ''}">${r1(v.summe_r || 0)}</b>
         <span style="color:var(--ink-3)">${v.anzahl}×</span></span>`).join('')}</div>` : ''}
     ${handyZeile()}
     <ul class="satzliste" style="margin-top:14px">${(PF.saetze||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
