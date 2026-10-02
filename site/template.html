@@ -3335,6 +3335,8 @@ function zeichneAnalyse(){
    So bekommt Ozan trotzdem das Cockpit: gerechnet wird im Geraet, hochgeladen nichts.
    ============================================================ */
 const SPEICHER = 'desk.positionen.v1';
+// „1 Position“, „8 Positionen“ — statt „Position(en)“.
+const posAnz = n => `${n} ${Number(n) === 1 ? 'Position' : 'Positionen'}`;
 function ladePositionen(){
   try { const r = localStorage.getItem(SPEICHER); const a = r ? JSON.parse(r) : [];
         return Array.isArray(a) ? a : []; } catch(e){ return []; }
@@ -3379,6 +3381,11 @@ function muenzeVon(sym){
 const SCHEIN_MUSTER = /^(TURBO|KO|MINI|FAKTOR|OPEN|CALL|PUT)-|-(LONG|SHORT)$/i;
 function istSchein(pos){
   return !!pos && (pos.ko != null || !!pos.basis || SCHEIN_MUSTER.test(String(pos.sym||'')));
+}
+/* Ein Short direkt auf den Wert (Terminkontrakt, Margin) — kein Schein. */
+function istKurzDirekt(pos){
+  return !!pos && !istSchein(pos)
+    && ((pos.plan && pos.plan.richtung === 'short') || pos.hebel_richtung === 'short');
 }
 function scanRowGenau(sym){
   return (S?.gesamt||[]).find(o => o.instrument === sym) || null;
@@ -3507,18 +3514,20 @@ function marktbreite(){
    Der Score bleibt auf der Karte sichtbar — er sagt weiterhin etwas darueber, ob man HEUTE
    nachkaufen wuerde. Er entscheidet nur nicht mehr ueber das Halten. */
 const RS_FUEHRER = 70, RS_MITTE = 45, RS_SCHWACH = 25;
-function haltUrteil(row){
+function haltUrteil(row, kurz = false){
   if (!row) return null;
-  const rs = row.rs;
+  // Bei einem direkten Short ist Schwäche gut: die relative Stärke wird gespiegelt
+  // (wie beim Basiswert eines Short-Scheins), und „gegen" ist dann ein LONG-Setup.
+  const rs = row.rs == null ? null : (kurz ? 100 - row.rs : row.rs);
   const ren = (row.zusatz && row.zusatz.renditen) || {};
-  const gegen = row.richtung === 'short';
+  const gegen = row.richtung === (kurz ? 'long' : 'short');
   if (rs == null){
     const t = ren.r21;
-    if (t == null) return {urteil:'HALTEN', kl:'', rs:null, ren, gegen,
+    if (t == null) return {urteil:'HALTEN', kl:'', rs:null, ren, gegen, kurz,
                            grund:'zu wenig Historie für einen Klassenvergleich'};
-    return t >= 0
-      ? {urteil:'HALTEN', kl:'gut', rs:null, ren, gegen, grund:'eigene Rendite positiv'}
-      : {urteil:'BEOBACHTEN', kl:'warn', rs:null, ren, gegen, grund:'eigene Rendite negativ'};
+    return (kurz ? t <= 0 : t >= 0)
+      ? {urteil:'HALTEN', kl:'gut', rs:null, ren, gegen, kurz, grund:'eigene Rendite positiv'}
+      : {urteil:'BEOBACHTEN', kl:'warn', rs:null, ren, gegen, kurz, grund:'eigene Rendite negativ'};
   }
   let urteil, kl;
   if (rs >= RS_FUEHRER)      { urteil = 'STARK HALTEN'; kl = 'gut'; }
@@ -3526,7 +3535,7 @@ function haltUrteil(row){
   else                       { urteil = 'BEOBACHTEN';   kl = 'warn'; }
   // Ein aktuelles Short-Setup im eigenen Wert hebt kein Halten auf, deckelt es aber.
   if (gegen && kl === 'gut'){ urteil = 'BEOBACHTEN'; kl = 'warn'; }
-  return {urteil, kl, rs, ren, gegen};
+  return {urteil, kl, rs, ren, gegen, kurz};
 }
 
 /* ======================================================= HEBEL / TURBO
@@ -3638,11 +3647,20 @@ function bewertePosition(pos){
      ausgelisteter Coin. Fuer die gibt es keinen Kurs — und ohne Kurs stand die Position
      vorher mit leerem Wert da, als waere sie nichts wert. Deshalb duerfen Wert und
      Einstand auch von Hand kommen; auf der Karte steht dann, dass es so ist. */
-  const wert = (kurs != null && pos.menge) ? kurs * pos.menge
-             : (pos.wert_manuell != null ? pos.wert_manuell : null);
+  const markt = (kurs != null && pos.menge) ? kurs * pos.menge
+              : (pos.wert_manuell != null ? pos.wert_manuell : null);
   const einstand = pos.einstieg && pos.menge ? pos.einstieg * pos.menge
                  : (pos.einstand_manuell != null ? pos.einstand_manuell : null);
-  const gv = (wert != null && einstand != null) ? wert - einstand : null;
+  /* Ein direkter Short (Signal „Gekauft" auf ein Short-Setup, Terminkontrakt oder Margin)
+     verdient, wenn der Kurs FÄLLT. Bis 02.10. rechnete die Karte ihn wie einen Kauf:
+     Ethereum short ab 4.800 bei 2.724 stand als „−43 %" da, darunter „Du liegst 43 % im
+     Minus" — bei einem Trade, der 43 % im Plus war. Ein Short-SCHEIN ist davon nicht
+     betroffen: sein Preis steigt, wenn der Basiswert fällt. */
+  const kurzDirekt = istKurzDirekt(pos);
+  const gv = (markt != null && einstand != null) ? (kurzDirekt ? einstand - markt : markt - einstand) : null;
+  // Wert eines ungehebelten Shorts: was beim Schliessen da ist (Einsatz plus Ergebnis).
+  // Mit Margin bleibt es beim Nominalwert — wie bei einer gehebelten Long-Position.
+  const wert = (kurzDirekt && !pos.hebel && gv != null) ? einstand + gv : markt;
   const gvPct = (gv != null && einstand) ? gv / einstand * 100 : null;
   /* R misst gegen DEINEN Stop. Bis 01.10. stand hier die Invalidierung des frischen
      Scan-Setups — bei Mondelez die eines SHORTS, gegen eine gekaufte Position: „R −1,11"
@@ -3656,7 +3674,7 @@ function bewertePosition(pos){
     if (risiko > 0) r = (posKurz ? pos.einstieg - kurs : kurs - pos.einstieg) / risiko;
   }
   const score = row ? row.score : null;
-  const halt = haltUrteil(row);
+  const halt = haltUrteil(row, kurzDirekt);
   let urteil = halt ? halt.urteil : 'UNBEKANNT';
   let kl = halt ? halt.kl : '';
 
@@ -3736,6 +3754,8 @@ function zieleGelten(pl){
   if (pl.gekauft) return true;
   return pl.quelle === 'selbst' || pl.quelle === 'analyse' || pl.quelle === 'selbst_nachgezogen';
 }
+// Unter diesem Abstand (in % des Kurses) gilt ein Stop als nah — nur für den Text.
+const STOP_NAH_PCT = 2;
 function naechsterSchritt(pos, kurs, wPos){
   const pl = pos && pos.plan;
   if (!pl || kurs == null || !isFinite(kurs)) return null;
@@ -3780,12 +3800,26 @@ function naechsterSchritt(pos, kurs, wPos){
     // Teilverkaufs-Regeln (ko_eng, gegen) — die beenden keinen Plan.
     if (pl.stop != null && !['TP1','TP2','TP3'].some(m => erledigt.has(m))){
       const weg = Math.abs(kurs - pl.stop) / kurs * 100;
+      /* Bis 02.10. stand hier bei jedem Abstand „Laufen lassen" — auch bei Mondelez, 0,0 %
+         über dem frisch gesetzten Halte-Stop. Das ist kein Halten mehr, sondern ein Stop,
+         der gleich fällt. Die Regel bleibt dieselbe (verkauft wird, wenn er fällt); die
+         Karte sagt nur ehrlich, wie nah das ist. */
+      if (weg < STOP_NAH_PCT){
+        return {stufe:'halten', nah:true, titel:'Halten — aber der Stop ist nah',
+          text:(basis ? `${wer} bei ${num(kurs,d)}${w}. ` : '')
+            + `Nur noch ${weg.toFixed(1).replace('.',',')} % bis zum Stop bei ${num(pl.stop,d)}${w}. `
+            + (lang ? 'Der Stop gilt: fällt der Kurs darunter, wird verkauft — nicht nachverhandelt. '
+                    : 'Der Stop gilt: steigt der Kurs darüber, wird geschlossen — nicht nachverhandelt. ')
+            + 'Am sichersten liegt er als Stop-Order beim Broker; dann passiert es auch, wenn du '
+            + 'nicht hinschaust.'};
+      }
       return {stufe:'halten', titel:'Halten — Stop steht',
         text:(basis ? `${wer} bei ${num(kurs,d)}${w}. ` : '')
           + `Kein festes Ziel, aber ein Stop ${basis ? 'auf ' + (pl.basis_name || 'den Basiswert') + ' ' : ''}bei ${num(pl.stop,d)}${w} — `
           + `${weg.toFixed(1).replace('.',',')} % entfernt. Laufen lassen — läuft der Kurs `
-          + `davon, zieht die App den Stop nach (${lang ? 'nur nach oben' : 'bei einem Short nur nach unten'}, nie zurück). Verkauft wird, `
-          + 'wenn der Stop fällt, nicht wenn es sich unangenehm anfühlt.'};
+          + `davon, zieht die App den Stop nach (${lang ? 'nur nach oben' : 'bei einem Short nur nach unten'}, nie zurück). `
+          + (lang ? 'Verkauft wird, wenn der Stop fällt' : 'Geschlossen wird, wenn der Kurs den Stop erreicht')
+          + ', nicht wenn es sich unangenehm anfühlt.'};
     }
     return {stufe:'fertig', titel:'Alle Ziele erreicht',
       text:'Es gibt keinen Plan mehr. Entweder schliessen oder bewusst neu entscheiden.'};
@@ -4291,7 +4325,7 @@ function positionsRat(b){
           + 'oder die Datenquelle war stumm.' ]};
   }
 
-  const h = b.halt || haltUrteil(r);
+  const h = b.halt || haltUrteil(r, istKurzDirekt(pos));
   /* „Gegen" heisst: das Setup zeigt gegen DEINE Position. Eine gekaufte Position gegen
      ein Short-Setup, ein Short-Schein gegen ein Long-Setup. */
   const posKurz = (pos.plan && pos.plan.richtung === 'short') || pos.hebel_richtung === 'short';
@@ -4299,6 +4333,20 @@ function positionsRat(b){
   const mit = r.richtung === (posKurz ? 'short' : 'long');
   const score = r.score;
   const klasse = r.klasse === 'aktien' ? 'Aktien' : (r.klasse === 'krypto' ? 'Coins' : 'Werte');
+  /* Zukauf nur mit demselben Tor wie ein Alarm (02.10.).
+
+     Vorher reichte „Score ab 52 in deine Richtung" fuer den Satz „hier wäre heute sogar ein
+     Zukauf vertretbar" — auch bei Note WATCH, also ohne handelbares Setup. Bei Bitcoin,
+     Dash und Zcash stand er so auf derselben Karte wie „Schlusslicht … nicht nachkaufen".
+     Ein Zukauf ist ein Kauf wie jeder andere: er braucht ein handelbares Setup in deine
+     Richtung, dessen Setup-Art sich in der eigenen Bilanz bewährt hat (``alarm.ja`` aus dem
+     Scan — dieselben Prüfungen wie fürs Handy). Sonst sagt die Karte: nicht nachkaufen. */
+  const zukauf = !!(mit && r.handelbar && r.alarm && r.alarm.ja === true);
+  const nichtNach = zukauf
+    ? ` ${posKurz ? 'Aufstocken' : 'Nachkaufen'} nur über das bewährte Setup unten — mit eigenem Stop, nicht wegen des Kurses.`
+    : null;
+  const posStop = (pos.plan && pos.plan.stop != null && isFinite(pos.plan.stop)
+                   && (pos.plan.ebene || 'position') === 'position') ? pos.plan.stop : null;
 
   if (h && h.rs != null){
     const rs = h.rs;
@@ -4306,7 +4354,21 @@ function positionsRat(b){
     const lauf = [];
     if (monat != null) lauf.push(`${monat>=0?'+':''}${monat.toFixed(0)} % im letzten Monat`);
     if (quartal != null) lauf.push(`${quartal>=0?'+':''}${quartal.toFixed(0)} % im Quartal`);
-    if (rs >= RS_FUEHRER){
+    const lz = lauf.length ? ` (${lauf.join(', ')})` : '';
+    if (h.kurz){
+      // Short: ``rs`` ist schon gespiegelt — hoch heisst hier „schwach, gut für dich".
+      if (rs >= RS_MITTE){
+        stufe = 'gut';
+        saetze.push(`Für deinen Short läuft es: schwächer als ${rs.toFixed(0)} % der ${klasse}${lz}. `
+          + (rs >= RS_FUEHRER ? 'Schwäche hält meist über Wochen an — nicht vorzeitig zurückkaufen.'
+                              : 'Kein Grund zu schliessen, aber auch keiner aufzustocken.'));
+      } else {
+        stufe = 'warn';
+        saetze.push(`Gegen deinen Short: stärker als ${(100-rs).toFixed(0)} % der ${klasse}${lz}. `
+          + (nichtNach ? nichtNach.trim() : 'Nicht aufstocken.') + ' Geschlossen wird über den '
+          + 'Stop oder wenn die Analyse gegen dich dreht — nicht über den Tabellenplatz.');
+      }
+    } else if (rs >= RS_FUEHRER){
       stufe = 'gut';
       saetze.push(`Läuft besser als ${rs.toFixed(0)} % der gescannten ${klasse}`
         + (lauf.length?` (${lauf.join(', ')})`:'') + '. Relative Stärke hält meist über Wochen '
@@ -4320,26 +4382,45 @@ function positionsRat(b){
       stufe = 'warn';
       saetze.push(`Nachzügler: nur besser als ${rs.toFixed(0)} % der ${klasse}`
         + (lauf.length?` (${lauf.join(', ')})`:'') + '. Wenn der Rest der Klasse läuft und dieser '
-        + 'Wert nicht, gibt es dafür meistens einen Grund. Beobachten, nicht nachkaufen.');
+        + 'Wert nicht, gibt es dafür meistens einen Grund.'
+        + (nichtNach || ' Beobachten, nicht nachkaufen.'));
     } else {
       stufe = 'warn';
       saetze.push(`Schlusslicht: schwächer als ${(100-rs).toFixed(0)} % der ${klasse}`
-        + (lauf.length?` (${lauf.join(', ')})`:'') + '. Nicht nachkaufen. Ein Verkaufsgrund ist '
+        + (lauf.length?` (${lauf.join(', ')})`:'') + '.' + (nichtNach || ' Nicht nachkaufen.')
+        + ' Ein Verkaufsgrund ist '
         + 'das allein aber nicht: in den eigenen Daten liefen Schlusslichter danach im Schnitt '
         + 'nicht schlechter als der Rest ihrer Klasse. Raus geht es über deinen Stop oder wenn '
         + 'die Analyse gegen dich dreht — nicht über den Tabellenplatz.');
     }
   } else if (h){
     stufe = h.kl === 'bad' ? 'bad' : (h.kl === 'warn' ? 'warn' : 'gut');
-    saetze.push('Für einen Vergleich mit der eigenen Klasse fehlt die Historie — '
-      + (h.grund || 'zu wenig Daten') + '.');
+    /* Bis 02.10.: „… fehlt die Historie — eigene Rendite negativ" — bei Gold (PAX), das
+       27 % im Plus lag. Gemeint war die Rendite des Werts im letzten Monat, nicht die der
+       Position. Jetzt steht die Zahl da, und wofür sie gilt. */
+    const m21 = h.ren && h.ren.r21, m63 = h.ren && h.ren.r63;
+    if (m21 != null){
+      const lauf = [`${m21>=0?'+':''}${m21.toFixed(0)} % im letzten Monat`];
+      if (m63 != null) lauf.push(`${m63>=0?'+':''}${m63.toFixed(0)} % im Quartal`);
+      saetze.push(`Für einen Vergleich mit der eigenen Klasse gibt es zu wenige Werte im Scan. `
+        + `Für sich allein: ${lauf.join(', ')} — `
+        + ((h.kurz ? m21 <= 0 : m21 >= 0) ? (h.kurz ? 'das trägt deinen Short.' : 'der Wert trägt.')
+                    : 'der Wert läuft gerade gegen dich.' + (nichtNach || (h.kurz ? ' Nicht aufstocken.' : ' Nicht nachkaufen.'))));
+    } else {
+      saetze.push('Für einen Vergleich mit der eigenen Klasse fehlt die Historie — '
+        + (h.grund || 'zu wenig Daten') + '.');
+    }
   }
 
   if (gegen){
     if (stufe === 'gut') stufe = 'warn';
+    const d0 = digits(posStop || r.kurs || 1);
     saetze.push(`Dazu kommt: die Analyse sieht hier gerade ein Setup nach ${posKurz ? 'OBEN' : 'UNTEN'}. Du hältst `
-      + 'also gegen die Richtung, die das System sieht. Kein Verkaufsbefehl — aber der Moment, '
-      + 'in dem ein Stop im Depot stehen sollte.');
+      + 'also gegen die Richtung, die das System sieht. Kein Verkaufsbefehl — '
+      + (posStop != null
+        ? `dein Stop bei ${num(posStop, d0)}${waehrungsZeichen(b.w)} entscheidet, nicht die Gegenanalyse `
+          + '(bei Coins nachgemessen: solche Lagen liefen danach nicht schlechter als ihre Klasse).'
+        : 'aber der Moment, in dem ein Stop im Depot stehen sollte.'));
   }
   /* Was nicht jeden Tag auf jeder Karte stehen muss, kommt in ``mehr`` — die Karte
      klappt es auf Wunsch auf. Ozan, 28.09.: „die Analysen gefallen mir nicht." Beim
@@ -4351,15 +4432,22 @@ function positionsRat(b){
     /* Bis 01.10. hiess ein hoher Score immer „Zukauf vertretbar" — auch wenn er zu einem
        SHORT gehoerte. Bei Mondelez stand beides auf derselben Karte: „Setup nach unten"
        und „hier wäre sogar ein Zukauf vertretbar". */
+    const setupName = r.setup && r.setup.name ? `„${r.setup.name}“` : 'Setup';
     if (gegen){
       mehr.push(`Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — aber für die `
         + 'Gegenrichtung. Für einen Zukauf spricht das nicht.');
-    } else if (score >= 52 && mit){
-      saetze.push(`Einstiegsseite: Score ${score.toFixed(0)} (Note ${r.note}) — hier wäre heute `
-        + 'sogar ein Zukauf vertretbar.');
+    } else if (zukauf){
+      saetze.push(`Einstiegsseite: ${setupName} in deine Richtung, Note ${r.note} — und diese `
+        + 'Setup-Art hat sich in der eigenen Bilanz bewährt (dieselbe Prüfung wie für einen Alarm). '
+        + 'Ein Zukauf wäre vertretbar, mit eigenem Stop wie jeder neue Trade.');
+    } else if (mit && r.handelbar){
+      const grund = (r.alarm && r.alarm.grund) || 'die Setup-Art hat sich in der eigenen Bilanz noch nicht bewährt';
+      mehr.push(`Einstiegsseite: ${setupName} in deine Richtung (Note ${r.note}), aber kein Alarm: `
+        + `${grund}. Für einen Zukauf reicht das nicht — fürs Halten sagt es nichts.`);
     } else {
-      mehr.push(`Einstiegsseite: Score ${score.toFixed(0)} — kein frisches Setup. Das ist eine `
-        + 'Aussage über den Einstieg, nicht über das Halten; für einen Zukauf fehlt gerade der Anlass.');
+      mehr.push('Einstiegsseite: gerade kein handelbares Setup'
+        + (r.deckel ? ` (${r.deckel})` : '') + '. Das ist eine Aussage über einen neuen Einstieg, '
+        + 'nicht über das Halten; für einen Zukauf fehlt der Anlass.');
     }
   }
 
@@ -4775,7 +4863,7 @@ async function fuelleWaechter(el){
   if (!gleich && pos.length){
     el.innerHTML = `<div class="note-box warn" style="margin:10px 0 0">
       <span class="nt">Wächter läuft — kennt aber einen anderen Stand</span>
-      <p style="font-size:13px">Der Lauf auf GitHub prüft ${WA.positionen} Position(en), dieses
+      <p style="font-size:13px">Der Lauf auf GitHub prüft ${posAnz(WA.positionen)}, dieses
       Gerät führt ${pos.length}. Seit dem Hinterlegen hast du gekauft, verkauft oder die Menge
       geändert — für die neuen Werte meldet er sich nicht. <strong>Sync → Depot kopieren</strong>,
       dann bei <a href="${link}/DEPOT_CODE" target="_blank" rel="noopener">DEPOT_CODE</a>
@@ -4827,7 +4915,7 @@ function zeichneSync(){
   <h2>1 · Auf dem Gerät mit dem aktuellen Stand</h2>
   <div class="karte">
     <p style="margin:0 0 10px;font-size:13.5px">Hier stehen gerade
-    <strong>${pos.length} Position(en)</strong>. Kopier sie — auf dem Mac landet der Text in
+    <strong>${posAnz(pos.length)}</strong>. Kopier sie — auf dem Mac landet der Text in
     der Zwischenablage, und wenn iPhone und Mac am selben Apple-Konto hängen, kannst du ihn
     drüben direkt einsetzen.</p>
     <p style="margin:0"><button class="btn" id="sy_copy" style="font-size:16px;padding:14px 20px">
@@ -4939,7 +5027,8 @@ function positionsAktion(b, stand){
   const teil = (anteilMenge, grund, art, dringend, titel) => {
     let menge = pos.menge * anteilMenge;
     const jeStueckEU = (stand && stand.kursEU && b.w !== 'EUR') ? b.kurs / stand.kursEU : b.kurs;
-    let euro = menge * jeStueckEU;
+    // Bei einem direkten Short ist der Wert Einsatz plus Ergebnis, nicht Stück mal Kurs.
+    let euro = (istKurzDirekt(pos) && wertEU != null) ? anteilMenge * wertEU : menge * jeStueckEU;
     let zusatz = '';
     // Zu kleine Order: entweder ganz raus oder auf eine sinnvolle Grösse anheben. Wenn
     // daraus ein voller Ausstieg wird, muss auch die Überschrift das sagen — sonst steht
@@ -5006,12 +5095,13 @@ function positionsAktion(b, stand){
     return teil(1.0, (pos.plan && pos.plan.ebene === 'basis') ? schritt.text
       : `Der Kurs steht bei ${num(b.kurs,d)}${z}, dein Stop lag bei `
       + `${num(pos.plan.stop,d)}${z}. Die Idee ist widerlegt — hier wird nicht nachverhandelt.`,
-      'raus', true, 'Alles verkaufen — Stop gerissen');
+      'raus', true, istKurzDirekt(pos) ? 'Alles schliessen (zurückkaufen) — Stop gerissen'
+                                       : 'Alles verkaufen — Stop gerissen');
   }
   if (schritt && schritt.stufe === 'ziel'){
     return {...teil(1/3, `${schritt.marke} ist erreicht. Ein Drittel raus, den Stop auf deinen `
       + 'Einstieg ziehen — ab da kann der Trade nichts mehr kosten.',
-      'teilverkauf', true, `${schritt.marke} erreicht — ein Drittel verkaufen`), marke:schritt.marke};
+      'teilverkauf', true, `${schritt.marke} erreicht — ein Drittel ${istKurzDirekt(pos) ? 'schliessen' : 'verkaufen'}`), marke:schritt.marke};
   }
 
   const rs = b.halt && b.halt.rs;
@@ -5058,9 +5148,10 @@ function positionsAktion(b, stand){
      0,3 Punkte schlechter — verlangt war mindestens 1,0 Punkte schlechter in beiden Hälften.
      Ein Teilverkauf ohne gemessenen Vorteil kostet nur Gebühr, Spread und Steuer. Verkauft
      wird über den Stop oder eine gedrehte Analyse der eigenen Position. */
-  const gegenHinweis = (r && r.richtung === 'short' && r.handelbar && (rs == null || rs < RS_MITTE))
-    ? ' Die Analyse zeigt gerade ein Setup nach unten — gemessen ist das kein Grund, Teile zu '
-      + 'verkaufen (solche Lagen liefen danach nicht schlechter als die Klasse). Der Stop entscheidet.'
+  const kurzPos = istKurzDirekt(pos);
+  const gegenHinweis = (r && r.richtung === (kurzPos ? 'long' : 'short') && r.handelbar && (rs == null || rs < RS_MITTE))
+    ? ` Die Analyse zeigt gerade ein Setup nach ${kurzPos ? 'oben' : 'unten'} — gemessen ist das kein Grund, Teile zu `
+      + `${kurzPos ? 'schliessen' : 'verkaufen'} (bei Coins liefen solche Lagen danach nicht schlechter als die Klasse). Der Stop entscheidet.`
     : '';
 
   /* 4 — Schlusslicht der eigenen Klasse: bis 27.09. „ein Drittel verkaufen". Nachgemessen
@@ -5068,8 +5159,11 @@ function positionsAktion(b, stand){
      Klasse, siehe haltUrteil). Ein Teilverkauf ohne gemessenen Vorteil kostet nur Gebühr,
      Spread und bei Gewinnen Steuer. Deshalb hier nur noch der Hinweis, nicht nachzukaufen. */
   const schlusslicht = rs != null && rs < RS_SCHWACH
-    ? ` ${posName(b)} ist schwächer als ${(100-rs).toFixed(0)} % der ${klasseName} — nicht `
-      + 'nachkaufen; verkauft wird über den Stop oder eine gedrehte Analyse, nicht über den Tabellenplatz.'
+    ? (kurzPos
+      ? ` ${posName(b)} ist stärker als ${(100-rs).toFixed(0)} % der ${klasseName} — gegen deinen Short; nicht `
+        + 'aufstocken, geschlossen wird über den Stop oder eine gedrehte Analyse.'
+      : ` ${posName(b)} ist schwächer als ${(100-rs).toFixed(0)} % der ${klasseName} — nicht `
+        + 'nachkaufen; verkauft wird über den Stop oder eine gedrehte Analyse, nicht über den Tabellenplatz.')
     : '';
 
   /* 5 — Klumpenrisiko: seit 28.09. ein Hinweis, kein Verkaufsauftrag.
@@ -5086,14 +5180,17 @@ function positionsAktion(b, stand){
     const t = teil(runter, '', 'trimmen', false, '');
     hinweis = `Klumpen: diese Position ist ${anteil.toFixed(0)} % deines Depots — ein einzelner `
       + 'Wert entscheidet damit spürbar über dein Ergebnis. Wenn du das Risiko senken willst: '
-      + `${num(t.menge, t.menge<1?6:4)} Stück (≈ ${num(t.euro,0)} €) bringen sie auf ${MAX_GEWICHT} %. `
+      + `${num(t.menge, t.menge<1?6:4)} Stück (≈ ${num(t.euro,0)} €) ${kurzPos ? 'schliessen' : 'verkaufen'} bringt sie auf ${MAX_GEWICHT} %. `
       + 'Das senkt die Schwankung, nicht die Chance — deshalb nur ein Hinweis.';
   }
 
   // 6 — nachlegen. Nur in Stärke, nur mit Setup, nur mit Stop.
   const stop = (pos.plan && pos.plan.stop != null) ? pos.plan.stop
              : (r && r.invalidierung != null ? inPositionsWaehrung(r, r.invalidierung, pos) : null);
-  const setzt = r && r.handelbar && r.score >= 52 && r.richtung !== 'short';
+  // Seit 02.10. mit demselben Tor wie ein Alarm: Nachlegen ist ein Kauf — es braucht eine
+  // Setup-Art, die sich in der eigenen Bilanz bewährt hat (siehe positionsRat).
+  const setzt = r && r.handelbar && r.score >= 52 && r.richtung !== 'short'
+    && !!(r.alarm && r.alarm.ja === true);
   if (!inSchonfrist && rs != null && rs >= RS_FUEHRER && setzt && stop != null && stop < b.kurs
       && anteil != null && anteil < ZIEL_GEWICHT && stand && stand.gesamt){
     const risikoJeStueck = b.kurs - stop;
@@ -5173,7 +5270,7 @@ function aktionsKasten(b, stand, a){
   const farbe = AKTION_FARBE[a.art] || '';
   const zahl = (a.menge != null && a.euro != null)
     ? `<div class="kpi" style="margin-top:8px">
-         <span>${a.art==='nachlegen'?'kaufen':'verkaufen'} <b>${num(a.menge, a.menge<1?6:4)} Stück</b></span>
+         <span>${a.art==='nachlegen'?'kaufen':(istKurzDirekt(b.pos)?'schliessen':'verkaufen')} <b>${num(a.menge, a.menge<1?6:4)} Stück</b></span>
          <span>≈ <b>${num(a.euro,2)} €</b></span>
          ${a.anteil!=null?`<span>Anteil am Depot <b>${pctK(a.anteil)}</b></span>`:''}
        </div>` : '';
@@ -5184,7 +5281,7 @@ function aktionsKasten(b, stand, a){
               data-mengemarke="${esc(a.marke||'')}"
               data-mengekurs="${b.kurs!=null?b.kurs:''}">${
         a.art==='nachlegen' ? 'Gekauft — ins Depot übernehmen'
-                            : (a.art==='raus' ? 'Verkauft — Position schliessen'
+                            : (istKurzDirekt(b.pos) ? (a.art==='raus' ? 'Geschlossen — Position austragen' : 'Teil geschlossen — Menge anpassen') : a.art==='raus' ? 'Verkauft — Position schliessen'
                                               : 'Verkauft — Menge anpassen')}</button></p>` : '';
   return `<div class="note-box ${farbe}" style="margin:10px 0 0">
     <span class="nt">Was jetzt zu tun ist · ${esc(AKTION_WORT[a.art])}</span>
@@ -5264,8 +5361,8 @@ function mehrKasten(b){
   for (const x of (rat.mehr || [])) teile.push(`<p style="margin:6px 0 0">${esc(x)}</p>`);
   const pl = b.pos.plan || {};
   if (pl.art === 'halte'){
-    teile.push(`<p style="margin:6px 0 0">Halte-Stop (5× Tagesschwankung unter dem
-      22-Tage-Hoch): eine Versicherung gegen den Absturz, kein Renditebringer. Gemessen
+    teile.push(`<p style="margin:6px 0 0">Halte-Stop (5× Tagesschwankung ${(pl.richtung === 'short')
+      ? 'über dem 22-Tage-Tief' : 'unter dem 22-Tage-Hoch'}): eine Versicherung gegen den Absturz, kein Renditebringer. Gemessen
       (Studie 27.09.) hat er die schlimmsten Verläufe bei Coins etwa halbiert, in
       Aufwärtsphasen aber Rendite gekostet. Er wird nur nachgezogen, nie gelockert. Nach
       einem Stop kommt der Wert auf die Wiedereinstiegs-Liste.</p>`);
@@ -5407,7 +5504,7 @@ function glBuendel(bew, stand){
     // Short zählt mit umgekehrtem Vorzeichen: eine Short-Position gegen eine Long-
     // Position im selben Wert ist keine doppelte Wette, sondern gar keine.
     const richtung = (b.hebel && b.hebel.lang === false) ? -1
-                   : (b.pos.hebel_richtung === 'short' ? -1 : 1);
+                   : ((b.pos.hebel_richtung === 'short' || istKurzDirekt(b.pos)) ? -1 : 1);
     if (!nm || vola == null || !glVektoren().has(nm)){
       ohneMessung++; ohneMessungEU += gw.markt; continue;
     }
@@ -5586,7 +5683,7 @@ function glKasten(stand){
     weil Kurse dann stärker springen, als eine Normalverteilung kennt.${
     a.bar > 0 ? ` ${num(a.bar,0)} € Cash sind nicht dabei — das ist der Sinn von Cash:
     es bewegt sich nicht mit.` : ''}${
-    a.ohneMessung ? ` ${a.ohneMessung} Position(en) über ${num(a.ohneMessungEU,0)} €
+    a.ohneMessung ? ` ${posAnz(a.ohneMessung)} über ${num(a.ohneMessungEU,0)} €
     fehlen in der Rechnung — für sie gibt es keine Messreihe (ETF, ausgelisteter Coin,
     Schein ohne erkannten Basiswert). Das Risiko darunter ist nicht null, es ist
     ungemessen.` : ''}</p>`;
@@ -5817,7 +5914,7 @@ function zeichnePortfolio(){
   if (bew.length){
     h += `<div class="status">
       <div><div class="k">Depotwert</div><div class="v">${num(gesamt,0)} €*</div>
-        <div class="n">${bew.length} Position(en)</div></div>
+        <div class="n">${posAnz(bew.length)}</div></div>
       <div><div class="k">Gewinn / Verlust</div><div class="v ${gv>=0?'gut':'schlecht'}">${gv>=0?'+':'−'}${num(Math.abs(gv),0)} €</div>
         <div class="n">${einstand?pct(gv/einstand*100,1):'—'}</div></div>
       <div><div class="k">Konzentration</div><div class="v ${konz>35?'mittel':'gut'}">${konz.toFixed(0)} %</div>
@@ -5850,7 +5947,7 @@ function zeichnePortfolio(){
           <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">${esc(b.pos.konto||'')}</span></h3>
         <p style="margin:4px 0 0;font-size:14px"><strong>${esc(a.titel)}</strong></p>
         ${(a.menge!=null)?`<div class="kpi" style="margin-top:6px">
-          <span>${a.art==='nachlegen'?'kaufen':'verkaufen'} <b>${num(a.menge, a.menge<1?6:4)}</b></span>
+          <span>${a.art==='nachlegen'?'kaufen':(istKurzDirekt(b.pos)?'schliessen':'verkaufen')} <b>${num(a.menge, a.menge<1?6:4)}</b></span>
           <span>≈ <b>${num(a.euro,2)} €</b></span>
           <span>Anteil <b>${a.anteil!=null?pctK(a.anteil):'—'}</b></span></div>`:''}
         <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(a.text)}</p>
@@ -5860,7 +5957,7 @@ function zeichnePortfolio(){
                   data-mengemarke="${esc(a.marke||'')}"
                   data-mengekurs="${b.kurs!=null?b.kurs:''}">${
             a.art==='nachlegen' ? 'Gekauft — ins Depot übernehmen'
-                                : (a.art==='raus' ? 'Verkauft — Position schliessen'
+                                : (istKurzDirekt(b.pos) ? (a.art==='raus' ? 'Geschlossen — Position austragen' : 'Teil geschlossen — Menge anpassen') : a.art==='raus' ? 'Verkauft — Position schliessen'
                                                   : 'Verkauft — Menge anpassen')}</button>
           <span style="font-size:12px;color:var(--ink-3);margin-left:8px">rechnet danach
             sofort neu</span></p>`:''}
@@ -5871,12 +5968,27 @@ function zeichnePortfolio(){
          einer Position ohne Stop — zwei Kästen über der Warnung „ohne Stop". */
       const ohne = bew.filter(b => !istBar(b.pos) && b.kurs != null
         && !(b.pos.plan && b.pos.plan.stop != null) && !(b.hebel && b.hebel.puffer_pct >= KO_PUFFER_ENG * 2));
+      /* Stops, die gleich fallen können (02.10.): „Nichts zu tun — die Stops stehen" stand
+         auch da, als Mondelez 0,0 % über seinem Stop lag. Nichts zu tun stimmt weiter —
+         aber wer das liest, soll wissen, wo es als Nächstes knallen kann. */
+      const nah = bew.map(b => {
+        const pl = b.pos.plan, pk = planKurs(b);
+        if (!pl || pl.stop == null || !pk || istBar(b.pos)) return null;
+        return {b, weg: Math.abs(pk - pl.stop) / pk * 100};
+      }).filter(x => x && x.weg < STOP_NAH_PCT).sort((x, y) => x.weg - y.weg);
+      const nahSatz = nah.length
+        ? ` Nah am Stop: <strong>${nah.map(x => esc(posName(x.b)) + ' (' + pctK(x.weg) + ')').join(', ')}</strong>
+           — wird er erreicht, steht hier „Verkaufen". Am sichersten liegt der Stop als Order beim Broker.`
+        : '';
       return ohne.length
         ? `<div class="karte warn"><h3>Fast nichts — ${ohne.length === 1 ? 'ein Stop fehlt' : ohne.length + ' Stops fehlen'}</h3>
            <p style="margin:4px 0 0;font-size:13px">Kein Stop gerissen, kein Ziel erreicht. Aber
            <strong>${ohne.map(b => esc(posName(b))).join(', ')}</strong> ${ohne.length === 1 ? 'hat' : 'haben'}
            keinen Stop — dort meldet sich die App nicht, wenn es eng wird. Unten auf der Karte eine
-           Marke eintragen: dahin, wo der Grund, aus dem du gekauft hast, nicht mehr gilt.</p></div>`
+           Marke eintragen: dahin, wo der Grund, aus dem du gekauft hast, nicht mehr gilt.${nahSatz}</p></div>`
+        : nah.length
+        ? `<div class="karte warn"><h3>Nichts zu tun — aber ${nah.length === 1 ? 'ein Stop ist' : nah.length + ' Stops sind'} nah</h3>
+       <p style="margin:4px 0 0;font-size:13px">Kein Stop gerissen, kein Ziel erreicht, kein Knock-out.${nahSatz}</p></div>`
         : `<div class="karte gut"><h3>Nichts zu tun</h3>
        <p style="margin:4px 0 0;font-size:13px">Keine Position verlangt gerade eine Handlung.
        Kein Stop gerissen, kein Ziel erreicht, kein Knock-out, der jetzt Handeln verlangt — und nichts,
@@ -5891,7 +6003,8 @@ function zeichnePortfolio(){
     const zeilenUe = bew.map(b => {
       const eu = inEuro(b, b.wert);
       const pk = planKurs(b);
-      const st = b.pos.plan && b.pos.plan.stop != null && pk ? (pk - b.pos.plan.stop) / pk * 100 : null;
+      // Betrag: bei einem Short liegt der Stop über dem Kurs (vorher stand dann „−5,0 %").
+      const st = b.pos.plan && b.pos.plan.stop != null && pk ? Math.abs(pk - b.pos.plan.stop) / pk * 100 : null;
       return {b, eu, st};
     }).sort((x, y) => (y.eu || 0) - (x.eu || 0));
     h += `<h2>Auf einen Blick</h2>
@@ -5904,7 +6017,7 @@ function zeichnePortfolio(){
         <td style="text-align:right"><b>${eu!=null?num(eu, eu<100?2:0)+' €':'—'}</b></td>
         <td style="text-align:right">${eu!=null&&gesamt?(eu/gesamt*100).toFixed(1).replace('.',',')+' %':'—'}</td>
         <td style="text-align:right" class="${b.gvPct==null?'':b.gvPct>=0?'up':'dn'}">${b.gvPct!=null?pct(b.gvPct,1):'—'}</td>
-        <td style="text-align:right">${st!=null?st.toFixed(1).replace('.',',')+' %':'<span class="nu">kein Stop</span>'}</td>
+        <td style="text-align:right"${st!=null&&st<STOP_NAH_PCT?' class="dn" title="Stop ist nah"':''}>${st!=null?st.toFixed(1).replace('.',',')+' %':'<span class="nu">kein Stop</span>'}</td>
       </tr>`).join('')}
       <tr><td><b>Summe</b></td><td style="text-align:right"><b>${num(gesamt,0)} €</b></td><td></td>
         <td style="text-align:right" class="${gv>=0?'up':'dn'}">${einstand?pct(gv/einstand*100,1):'—'}</td><td></td></tr>
@@ -5960,7 +6073,11 @@ function zeichnePortfolio(){
        Jetzt braucht es zwei Dinge gleichzeitig: die Position muss in ihrer Klasse
        tatsaechlich hinterherlaufen (Schlusslicht), UND es muss ein handelbares Setup mit
        ordentlicher Note geben. Sonst ist Umschichten nur Gebuehren zahlen. */
-    const beste = (S?.gesamt||[]).filter(o=>o.handelbar && o.score >= 52)[0];
+    /* Seit 02.10. nur ein Setup, das auch klingeln würde (``alarm.ja``). Vorher stand hier
+       Arista (Aktie, Note A+) als Alternative — eine Setup-Art, die in der eigenen Bilanz
+       bei Aktien im Minus liegt und deshalb keinen Alarm bekommt. Dieselbe App kann nicht
+       zum Umschichten in etwas raten, wovor ihr eigenes Alarm-Tor gerade schweigt. */
+    const beste = (S?.gesamt||[]).filter(o=>o.handelbar && o.score >= 52 && o.alarm && o.alarm.ja === true)[0];
     const nachzuegler = bew.filter(b=>b.halt && b.halt.rs != null && b.halt.rs < RS_SCHWACH)
                            .sort((a,b)=>a.halt.rs - b.halt.rs)[0];
     if (beste && nachzuegler && beste.instrument !== nachzuegler.row?.instrument){
@@ -5968,8 +6085,9 @@ function zeichnePortfolio(){
         <p><strong>${esc(posName(nachzuegler))}</strong> ist das Schlusslicht deiner
         ${nachzuegler.row?.klasse === 'aktien' ? 'Aktien' : 'Coins'} — schwächer als
         ${(100-nachzuegler.halt.rs).toFixed(0)} % der Klasse. Gleichzeitig hat
-        <strong>${esc(name(beste.instrument))}</strong> ein handelbares Setup
-        (Score ${beste.score.toFixed(0)}, Note ${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+bewegungText(beste):''}).</p>
+        <strong>${esc(name(beste.instrument))}</strong> ein Setup, das die Prüfungen fürs Handy besteht
+        — die Setup-Art hat sich in der eigenen Bilanz bewährt
+        (Note ${esc(beste.note)}${beste.erwartete_bewegung_pct!=null?', erwartet '+bewegungText(beste):''}).</p>
         <p>Das ist ein Hinweis, keine Anweisung — und nichts wird automatisch umgeschichtet.
         Schlusslicht zu sein ist allein kein Verkaufsgrund (gemessen liefen Schlusslichter danach
         nicht schlechter als ihre Klasse). Wenn du aber Kapital für das Setup brauchst, ist das
@@ -6164,7 +6282,7 @@ function zeichnePortfolio(){
     const m = $('pf_meldung');
     if (m) m.innerHTML =
       `<p style="margin-top:10px;font-size:12.5px;color:${neu.length?'var(--long)':'var(--warn)'}">
-        ${neu.length} Position(en) übernommen.${fehler.length
+        ${posAnz(neu.length)} übernommen.${fehler.length
           ? ` <span style="color:var(--warn)">Nicht gelesen: ${fehler.map(esc).join(' · ')}</span>` : ''}</p>`;
   });
   const exp = $('pf_export');
@@ -6234,7 +6352,7 @@ function zeichnePlan(){
     wer sie vermischt, weiß hinterher nicht, worauf ein Ergebnis zurückgeht.</p></div>`;
   h += `<div class="status">
     <div><div class="k">Kapital</div><div class="v">${num(P.equity,0)} €</div>
-      <div class="n">${pos.length} Position(en) geplant</div></div>
+      <div class="n">${posAnz(pos.length)} geplant</div></div>
     <div><div class="k">Investiert</div><div class="v">${num(P.invested||0,0)} €</div>
       <div class="n">${P.equity?Math.round((P.invested||0)/P.equity*100):0} % vom Kapital</div></div>
     <div><div class="k">Cash</div><div class="v">${num((P.equity||0)-(P.invested||0),0)} €</div>
