@@ -1,5 +1,5 @@
 {
-  "stand": "2026-10-02T09:29:40.292059+00:00",
+  "stand": "2026-10-02T09:51:55.531520+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-10-01T18:48:28.858428+00:00",
@@ -565,7 +565,7 @@
       "tp3": 0.11234999999999999,
       "trigger": "Der Kurs muss ueber 0.0931 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "AUTUSD": {
@@ -602,7 +602,7 @@
       "tp3": 4063.199999999997,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "AVAXUSD": {
@@ -645,7 +645,7 @@
       "tp3": 12.679500000000004,
       "trigger": "Der Kurs muss ueber 10.0790 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "AVGO": {
@@ -799,12 +799,14 @@
     "BATUSD": {
       "aufgenommen": "2026-10-02T05:41:43.704605+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.84,
+      "bestes_r": 1.15,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.09056,
       "einstieg_art": "sofort",
       "einstiegskurs": 0.09109,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 4.45,
       "eurusd": 1.1327,
       "gemeldet": "",
@@ -819,7 +821,7 @@
       "rr": 2.0,
       "rs": 40.7,
       "schlechtestes_r": -0.26,
-      "schutz": null,
+      "schutz": 0.09109,
       "score": 54.3,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 0.08732,
@@ -830,7 +832,7 @@
       "tp3": 0.10190000000000002,
       "trigger": "Der Kurs muss ueber 0,08775 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 121031.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "BCHUSD": {
@@ -867,7 +869,7 @@
       "tp3": 354.695,
       "trigger": "Der Kurs muss ueber 302,59 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 1559979.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "BKNG": {
@@ -980,7 +982,7 @@
       "tp3": 862.6700000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 773.4000 — nicht beim Antippen.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "BNBUSDT": {
@@ -1091,13 +1093,13 @@
       "tp3": 0.09751499999999999,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,11984 — nicht beim Antippen.",
       "umsatz_24h": 1421557.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "CFGUSD": {
       "aufgenommen": "2026-10-02T06:00:12.122087+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.11,
+      "bestes_r": 0.13,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.1511,
       "einstieg_art": "sofort",
@@ -1128,7 +1130,7 @@
       "tp3": 0.17980000000000007,
       "trigger": "Der Kurs muss ueber 0,14570 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 173251.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "COP": {
@@ -1392,7 +1394,7 @@
       "tp3": 68.00449999999998,
       "trigger": "Der Kurs muss ueber 59,06 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 1146359.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "DCRUSD": {
@@ -1429,7 +1431,7 @@
       "tp3": 19.782500000000006,
       "trigger": "Der Kurs muss ueber 17.7300 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
       "umsatz_24h": 114632.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "DDOG": {
@@ -1881,7 +1883,7 @@
       "tp3": 0.0028445,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0,00236700 — nicht beim Antippen.",
       "umsatz_24h": 230561.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "GE": {
@@ -2109,7 +2111,7 @@
       "tp3": 101.50499999999997,
       "trigger": "",
       "umsatz_24h": 10878925.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "IBM": {
@@ -2520,7 +2522,7 @@
       "tp3": 73.195,
       "trigger": "Der Kurs muss ueber 66,20 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 6478266.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "MA": {
@@ -2710,7 +2712,7 @@
       "tp3": 0.7391499999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0.6463 — nicht beim Antippen.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "MRK": {
@@ -3086,7 +3088,7 @@
       "tp3": 0.15539999999999998,
       "trigger": "Der Kurs muss ueber 0,12780 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 549242.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "ORCAUSD": {
@@ -3540,7 +3542,7 @@
       "tp3": 0.0012374999999999997,
       "trigger": "Der Kurs muss ueber 0,00101200 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 108722.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "SEIUSD": {
@@ -3651,7 +3653,7 @@
       "tp3": 0.014308500000000007,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,01752 — nicht beim Antippen.",
       "umsatz_24h": 157199.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "SKYUSD": {
@@ -3801,7 +3803,7 @@
       "tp3": 128.48999999999995,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 36735790.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "SOLUSDT": {
@@ -4401,7 +4403,7 @@
       "tp3": 33.0651284934938,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "VZ": {
@@ -4697,7 +4699,7 @@
       "tp3": 0.3642599999999999,
       "trigger": "Der Kurs muss ueber 0.3168 bleiben. Faellt er wieder darueber hinaus  ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     },
     "XYZ": {
@@ -4771,7 +4773,7 @@
       "tp3": 1604.1700000000003,
       "trigger": "Der Kurs muss ueber 1.356,12 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 30728569.0,
-      "zuletzt": "2026-10-02T09:29:04.892637+00:00",
+      "zuletzt": "2026-10-02T09:51:20.086533+00:00",
       "zustand": "aktiv"
     }
   }
