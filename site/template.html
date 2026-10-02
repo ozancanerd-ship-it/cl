@@ -457,6 +457,23 @@ details.mehr[open] > summary::before{content:'▾ '}
 .qbar{height:5px; border-radius:3px; background:rgba(255,255,255,.07); overflow:hidden; margin-top:9px}
 .qbar i{display:block; height:100%; border-radius:3px;
   background:linear-gradient(90deg, var(--accent), var(--long)); box-shadow:0 0 10px rgba(0,229,255,.35)}
+.ka{background:linear-gradient(165deg, var(--glass-2), var(--glass)); border:1px solid rgba(43,232,165,.30);
+  border-radius:var(--radius); padding:13px 15px; margin:12px 0 14px; box-shadow:var(--tiefe)}
+.ka .nt{display:block; font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--long); font-weight:600; margin-bottom:4px}
+.ka-h{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; margin-bottom:6px}
+.ka-h .nt{flex-basis:100%}
+.ka-zahl{font-family:"Space Grotesk",Inter,sans-serif; font-size:15px; font-weight:600; color:var(--ink)}
+.ka-w{font-size:11.5px; color:var(--ink-3)}
+.ka-z{border-top:1px solid var(--rule); padding:9px 0 7px; cursor:pointer}
+.ka-k{display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; font-size:14px}
+.ka-k .mono{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--accent); letter-spacing:.06em}
+.ka-t{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink-3)}
+.ka-s{display:flex; gap:4px 12px; flex-wrap:wrap; font-size:12.5px; color:var(--ink-2); margin-top:4px}
+.ka-s .up{color:var(--long)} .ka-s .dn{color:var(--bad)} .ka-s .nu{color:var(--ink-2)}
+.ka-deckel{margin:8px 0 0; font-size:12.5px; color:var(--warn)}
+.ka-deckel .ka-link{text-decoration:underline; cursor:pointer}
+.ka-frei,.ka-leer{margin:8px 0 0; font-size:12px; color:var(--ink-3)}
 .alarm{background:linear-gradient(165deg, var(--glass-2), var(--glass));
   border:1px solid var(--rule); border-radius:var(--radius);
   padding:13px 15px 13px 17px; margin-bottom:9px; position:relative; overflow:hidden;
@@ -1998,6 +2015,7 @@ function zeichneStatus(){
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
     ${depotZeile()}
+    ${sicherText(kaufAlarmLeiste)}
     ${sicherText(meineCoinsKasten)}
     ${topSignal()}
     ${makroKasten()}
@@ -2008,6 +2026,8 @@ function zeichneStatus(){
       <p>Die Rangliste ist unvollständig — nicht der Markt ist ruhig, die Quelle schweigt.</p></div>` : ''}`;
   const top = $('topsignal');
   if (top) top.addEventListener('click', ()=>waehle(top.dataset.sym));
+  $('marktstatus').querySelectorAll('.ka [data-sym]').forEach(el =>
+    el.addEventListener('click', e => { e.stopPropagation(); waehle(el.dataset.sym); }));
   const dz = $('depotzeile');
   if (dz) dz.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); });
   document.querySelectorAll('#meinecoins [data-sym]').forEach(el =>
@@ -6856,6 +6876,135 @@ function alarmRegelnBlock(){
     rechnet dazwischen live weiter.</p></div>`;
 }
 
+/* ============================================ DEINE KAUFALARME — HEUTE UND DIESE WOCHE
+
+   02.10., 20:00 Uhr, Ozan: „Unsere App hat nicht einen einzigen Buy-Signal heute
+   angezeigt, das geht schon fünf Tage so."
+
+   Am selben Tag waren drei Kaufalarme rausgegangen — Zcash 07:01, Gala 09:10 (Ziel 1
+   zwei Stunden später erreicht), Dash 09:51. Die App hat sie gezeigt, aber an der
+   falschen Stelle: oben stand „Jetzt einsteigen — gerade kein Einstieg erreicht", die
+   Alarme selbst kamen erst nach zwei Erklärkästen und einer Liste ohne Alarm. Wer abends
+   öffnet, liest: nichts. Und es stand nirgends, dass nach drei Alarmen der Tagesdeckel
+   voll war — Bitcoin Cash kam deshalb nur in die App.
+
+   Diese Leiste steht deshalb ganz oben, auf der Startseite und unter Alarme, und
+   beantwortet drei Fragen auf einen Blick: Was ist heute gekommen? Wie steht es? Kann ich
+   noch einsteigen? Dazu die Woche, damit „fünf Tage nichts" sofort nachprüfbar ist. */
+function nochEinstiegGrenze(w, minCrv){
+  /* Bis zu welchem Kurs ist ein laufender Alarm noch ein Einstieg mit Chance-Risiko ab
+     1:minCrv? Gerechnet gegen das letzte Ziel und den ursprünglichen Stop — genau die
+     Marken, mit denen der Alarm selbst bewertet wurde. Long: (Z − p) ≥ c·(p − S)
+     ⇔ p ≤ (Z + c·S)/(1 + c). Short spiegelbildlich. */
+  const ziel = [w.tp3, w.tp2, w.tp1].find(v => v != null && isFinite(v));
+  if (ziel == null || w.stop == null || !isFinite(w.stop)) return null;
+  const c = minCrv || 2;
+  return (ziel + c * w.stop) / (1 + c);
+}
+function kaufAlarmLeiste(){
+  const wachen = (WL && WL.wachen) || [];
+  if (!WL) return '';
+  const R = (S && S.alarm_regeln) || {};
+  const maxTag = R.max_je_tag || 3, minCrv = R.min_crv || 2;
+  const jetzt = Date.now(), TAG = 864e5;
+  const heuteStr = new Date().toDateString();
+  const gemeldet = wachen.filter(w => w.gemeldet && isFinite(Date.parse(w.gemeldet)))
+    .sort((a,b) => Date.parse(b.gemeldet) - Date.parse(a.gemeldet));
+  const woche = gemeldet.filter(w => jetzt - Date.parse(w.gemeldet) < 7*TAG);
+  const heute = woche.filter(w => new Date(w.gemeldet).toDateString() === heuteStr);
+  const in24 = gemeldet.filter(w => jetzt - Date.parse(w.gemeldet) < TAG);
+  const deckelVoll = in24.length >= maxTag;
+  const frei = deckelVoll
+    ? Math.min(...in24.map(w => Date.parse(w.gemeldet))) + TAG : null;
+  // Was wegen des Deckels nicht klingeln durfte und noch offen ist.
+  const verdraengt = wachen.filter(w => !w.gemeldet && OFFEN.includes(w.zustand)
+    && /Einstiegs-Alarme in 24/.test(w.tor_grund || '')
+    && jetzt - Date.parse(w.aufgenommen || w.zuletzt || 0) < TAG);
+  const scanKurs = new Map((S?.gesamt || []).map(o => [o.instrument, o.kurs]));
+  const uhr = iso => new Date(iso).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  const tagUhr = iso => new Date(iso).toDateString() === heuteStr
+    ? 'heute ' + uhr(iso)
+    : new Date(iso).toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit'}) + ' ' + uhr(iso);
+
+  const zeile = w => {
+    const d = digits(w.einstieg), lang = w.richtung === 'long';
+    const st = kursStand(w.instrument, scanKurs.get(w.instrument));
+    const basis = w.einstiegskurs ?? w.einstieg;
+    const risiko = Math.abs(w.einstieg - w.stop);
+    const r = (st.kurs != null && risiko > 0) ? (lang ? st.kurs - basis : basis - st.kurs) / risiko : null;
+    const offen = w.zustand === 'aktiv' && !w.raus;
+    const wartet = w.zustand === 'wartet_auf_einstieg';
+    const erreicht = (w.erreicht || []).map(t => t.replace('TP', 'Ziel ')).join(', ');
+    let lageTxt, kl = 'nu';
+    if (offen || wartet){
+      lageTxt = wartet ? 'wartet auf den Einstieg'
+        : r != null ? `läuft ${r >= 0 ? '+' : ''}${r.toFixed(2).replace('.',',')} R` : 'läuft';
+      if (erreicht) lageTxt += ` · ${erreicht} ✓`;
+      kl = r == null ? 'nu' : r >= 0 ? 'up' : 'dn';
+    } else {
+      const pr = planR(w);
+      lageTxt = (w.raus && w.zustand === 'aktiv' ? 'nachgezogener Stop' : (ZUSTAND_TEXT[w.zustand] || w.zustand))
+        + (pr != null ? ` · ${pr >= 0 ? '+' : ''}${pr.toFixed(2).replace('.',',')} R nach Plan` : '');
+      kl = pr == null ? 'nu' : pr >= 0 ? 'up' : 'dn';
+    }
+    // Noch einsteigen? Nur für laufende Alarme ohne erreichtes Ziel.
+    let noch = '';
+    if ((offen || wartet) && !(w.erreicht || []).length && st.kurs != null){
+      const g = nochEinstiegGrenze(w, minCrv);
+      const geht = g != null && (lang ? st.kurs <= g && st.kurs > w.stop : st.kurs >= g && st.kurs < w.stop);
+      noch = g == null ? '' : geht
+        ? `<span class="up">Noch einsteigen: ja, ${lang ? 'bis' : 'ab'} <b>${num(g, d)}</b> (Chance-Risiko ab 1:${minCrv})</span>`
+        : `<span class="dn">Noch einsteigen: nein — ${lang ? 'über' : 'unter'} ${num(g, d)} ist das Chance-Risiko unter 1:${minCrv}</span>`;
+    } else if ((offen || wartet) && (w.erreicht || []).length){
+      noch = `<span style="color:var(--ink-3)">Noch einsteigen: nein — Ziel 1 ist durch, der Einstieg ist vorbei</span>`;
+    }
+    return `<div class="ka-z" data-sym="${esc(w.instrument)}">
+      <div class="ka-k"><b>${esc(wacheName(w))}</b>
+        <span class="mono">${lang ? 'KAUFEN' : 'SHORT'} · ${esc(w.note || '')}</span>
+        <span class="ka-t">${tagUhr(w.gemeldet)}</span></div>
+      <div class="ka-s"><span class="${kl}">${esc(lageTxt)}</span>
+        <span>Einstieg ${num(basis, d)} · Stop ${num(w.schutz != null ? w.schutz : w.stop, d)}${
+          st.kurs != null ? ` · Kurs ${num(st.kurs, d)}${st.live ? ' <span class="up">live</span>' : ''}` : ''}</span>
+        ${w.broker ? `<span style="color:var(--ink-3)">bei ${esc(w.broker)}</span>` : ''}</div>
+      ${noch ? `<div class="ka-s">${noch}</div>` : ''}
+    </div>`;
+  };
+
+  const tageOhne = (() => {
+    // Wie viele der letzten 5 Kalendertage hatten keinen Kaufalarm? Ehrlich gezählt.
+    const tage = new Set(woche.map(w => new Date(w.gemeldet).toDateString()));
+    let n = 0;
+    for (let i = 0; i < 5; i++){ if (!tage.has(new Date(jetzt - i*TAG).toDateString())) n++; }
+    return n;
+  })();
+
+  let kopf;
+  if (heute.length){
+    kopf = `Heute <b>${heute.length}</b> Kaufalarm${heute.length === 1 ? '' : 'e'} aufs Handy`;
+  } else if (woche.length){
+    kopf = `Heute noch kein Kaufalarm — der letzte kam <b>${tagUhr(woche[0].gemeldet)}</b>`;
+  } else {
+    kopf = 'In den letzten 7 Tagen kein Kaufalarm';
+  }
+  const liste = heute.length ? heute : woche.slice(0, 3);
+  const rest = woche.filter(w => !liste.includes(w));
+
+  return `<div class="ka">
+    <div class="ka-h"><span class="nt">Deine Kaufalarme</span>
+      <span class="ka-zahl">${kopf}</span>
+      <span class="ka-w">7 Tage: <b>${woche.length}</b> · an ${5 - tageOhne} der letzten 5 Tage mindestens einer</span></div>
+    ${liste.length ? liste.map(zeile).join('') : `<p class="ka-leer">Das Gewinner-Tor hat in dieser Woche nichts durchgelassen.
+      Die Kandidaten stehen unter „Kaufen ab …", jeweils mit dem Grund, warum sie nicht klingeln.</p>`}
+    ${rest.length ? `<details class="mehr"><summary>Früher in dieser Woche (${rest.length})</summary>
+      ${rest.map(zeile).join('')}</details>` : ''}
+    ${deckelVoll ? `<p class="ka-deckel"><b>Tagesdeckel voll:</b> ${in24.length} von ${maxTag} Kaufalarmen
+      in 24 Stunden sind raus. Der nächste darf ab <b>${tagUhr(new Date(frei).toISOString())}</b> aufs Handy.${
+      verdraengt.length ? ` Deshalb nur in der App: ${verdraengt.map(w =>
+        `<span class="ka-link" data-sym="${esc(w.instrument)}">${esc(wacheName(w))}</span> (${esc(w.note || '')}${w.setup ? ', ' + esc(w.setup) : ''})`).join(', ')}.` : ''}</p>`
+      : `<p class="ka-frei">${maxTag - in24.length} von ${maxTag} Kaufalarmen für die nächsten 24 Stunden noch frei.</p>`}
+  </div>`;
+}
+
 function zeichneAlarme(){
   // Dieselbe Quelle wie der Markt-Reiter — nicht dieselbe Rechnung noch einmal.
   const signale = [...rangLagen().values()];
@@ -6877,8 +7026,8 @@ function zeichneAlarme(){
   const warten = tot ? [] : signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
 
-  let h = altersBanner() + stoerungsBanner() + pushBlock();
-  h += `<div class="note-box" style="border-color:rgba(0,229,255,.28)">
+  let h = altersBanner() + stoerungsBanner() + sicherText(kaufAlarmLeiste) + pushBlock();
+  h += `<details class="mehr" style="margin-bottom:6px"><summary>Wie diese Seite funktioniert — Alarme = handeln, Markt = lesen</summary><div class="note-box" style="border-color:rgba(0,229,255,.28)">
     <span class="nt" style="color:var(--accent)">Hier wird gekauft</span>
     <p style="font-size:13.5px"><strong>Diese Seite ist die Handlungsliste.</strong> Was unter
     <em>„Jetzt einsteigen"</em> steht, ist da — Kurs an der Marke und bestätigt. Das kaufst du.
@@ -6902,7 +7051,7 @@ function zeichneAlarme(){
       ${S?`${(S.gesamt||[]).length} Werte, Analyse von ${zeit(S.erzeugt)}`:'—'}. Die Liste
       wird bei jedem Scan neu gebildet, die Reihenfolge und der Zustand ändern sich mit
       jedem Kurs. Es steht also nicht immer dasselbe da.</p>
-  </div>`;
+  </div></details>`;
 
   h += terminWarnung();
   h += `<h2>Jetzt einsteigen ${jetzt.length?`<span class="mono" style="font-size:12px;color:var(--ink-3)">${
@@ -6910,8 +7059,9 @@ function zeichneAlarme(){
     (()=>{ const a = jetzt.filter(x=>(x.o&&x.o.klasse)==='aktien').length;
            return a ? `, davon ${a} Aktien` : ''; })()}</span>`:''}</h2>`;
   h += jetzt.length ? jetzt.map(signalKarte).join('')
-    : `<div class="alarm"><div class="ah"><span>Gerade kein Einstieg erreicht</span></div>
-       <p>Kein Kurs steht in seiner Einstiegszone. Die Kandidaten stehen unten mit dem
+    : `<div class="alarm"><div class="ah"><span>Gerade kein neuer Einstieg</span></div>
+       <p>Kein neuer Kurs steht in seiner Einstiegszone. Was heute schon als Alarm kam,
+       steht ganz oben unter „Deine Kaufalarme" — mit „Noch einsteigen: bis …". Die Kandidaten stehen unten mit dem
        Preis, ab dem eingestiegen wird — dort kannst du eine Limit-Order legen, dann
        brauchst du gar keinen Alarm.</p></div>`;
 
