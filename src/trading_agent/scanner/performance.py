@@ -418,7 +418,12 @@ KLASSE_NAME = {"krypto": "Coins", "aktien": "Aktien", "gold": "Gold"}
 
 
 def _z(x: float, stellen: int = 1, vorzeichen: bool = True) -> str:
-    """Zahl mit deutschem Komma — „+2,8", „-0,07"."""
+    """Zahl mit deutschem Komma — „+2,8", „-0,07".
+
+    Erst auf zwei Stellen gerundet wie in ``performance.json`` (``summe_r``) — sonst stand
+    im Satz „KW38 +10,4 R" und auf dem Chip derselben Karte „+10,3 R" (10,3500… gegen 10,35).
+    """
+    x = round(float(x), max(2, stellen))
     roh = f"{x:+.{stellen}f}" if vorzeichen else f"{x:.{stellen}f}"
     return roh.replace(".", ",")
 

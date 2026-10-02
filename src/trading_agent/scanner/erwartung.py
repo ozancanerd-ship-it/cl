@@ -27,10 +27,21 @@ WELCHE GRUPPE GEZÄHLT WIRD
 
 Von fein nach grob, und es gewinnt die feinste Gruppe, die genug Fälle hat:
 
+0. Setup-Art **in ihrer Klasse** (z. B. „Rückeroberung bei Coins") — gezählt wie im
+   Alarm-Tor: nur entschiedene Trades (Stop, Ziel 1 oder alle Ziele)
 1. Setup **und** Note (z. B. „Ausbruch, Note A")
 2. nur das Setup
 3. nur die Note
 4. alle abgeschlossenen Signale
+
+Stufe 0 gibt es seit 02.10. Davor stand auf der Karte eines Dash-Alarms „Von 102
+Signalen der Note A− erreichten 13 % das erste Ziel … die Vergangenheit spricht gegen
+den Trade" — während derselbe Alarm klingelte, weil „Rückeroberung nach
+Liquiditätsgriff" bei Coins mit 24 Trades und +9,5 R im Plus lag. Die Note-Zahl kam fast
+ganz aus 91 Signalen ohne benanntes Setup aus der ersten Septemberhälfte. Zwei Zahlen,
+zwei Urteile auf einer Karte. Dazu kam ein stiller Fehler: der Scan fragte nach dem
+Kürzel der Setup-Art („RUECKEROBERUNG"), die Trades tragen den Namen — Stufe 1 und 2
+fanden deshalb nie etwas.
 
 Die Reihenfolge ist absichtlich so und nicht umgekehrt: je ähnlicher die Vergangenheit
 dem vorliegenden Fall ist, desto mehr sagt sie. Nur reicht die Ähnlichkeit eben oft
@@ -94,9 +105,7 @@ class Quote:
 
 def _quote(basis: str, gruppe: list[dict[str, Any]]) -> Quote:
     n = len(gruppe)
-    getroffen = {
-        z: sum(1 for t in gruppe if z in (t.get("erreicht") or ())) / n for z in ZIELE
-    }
+    getroffen = {z: sum(1 for t in gruppe if z in (t.get("erreicht") or ())) / n for z in ZIELE}
     return Quote(
         basis=basis,
         n=n,
@@ -109,10 +118,21 @@ def _quote(basis: str, gruppe: list[dict[str, Any]]) -> Quote:
     )
 
 
+#: Wie die App die Klassen nennt.
+KLASSE_NAME = {"krypto": "Coins", "aktien": "Aktien", "gold": "Gold"}
+
+
+def _entschieden(t: dict[str, Any]) -> bool:
+    """Wie im Alarm-Tor (``alarm_tor.bilanz``): Stop, alle Ziele oder wenigstens Ziel 1."""
+    zustand = str(t.get("zustand") or "")
+    return zustand in ("stop", "ziel_erreicht") or "TP1" in (t.get("erreicht") or ())
+
+
 def quoten(trades: list[dict[str, Any]] | None) -> dict[str, Quote]:
     """Die Häufigkeitstabelle über alle abgeschlossenen Trades.
 
-    Schlüssel: ``"setup:AUSBRUCH|note:A"``, ``"setup:AUSBRUCH"``, ``"note:A"``, ``"alle"``.
+    Schlüssel: ``"klasse:krypto|setup:<Name>"`` (nur entschiedene Trades, wie im
+    Alarm-Tor), ``"setup:<Name>|note:A"``, ``"setup:<Name>"``, ``"note:A"``, ``"alle"``.
     """
     if not trades:
         return {}
@@ -120,6 +140,9 @@ def quoten(trades: list[dict[str, Any]] | None) -> dict[str, Quote]:
     for t in trades:
         note = str(t.get("note") or "").strip()
         setup = str(t.get("setup") or "").strip()
+        klasse = str(t.get("klasse") or "").strip()
+        if klasse and setup and _entschieden(t):
+            eimer.setdefault(f"klasse:{klasse}|setup:{setup}", []).append(t)
         if note:
             eimer.setdefault(f"note:{note}", []).append(t)
         if setup:
@@ -133,22 +156,31 @@ def quoten(trades: list[dict[str, Any]] | None) -> dict[str, Quote]:
     for k, g in eimer.items():
         if k in namen:
             name = namen[k]
+        elif k.startswith("klasse:"):
+            kl, _, s = k[len("klasse:") :].partition("|setup:")
+            name = f"Signalen „{s}“ bei {KLASSE_NAME.get(kl, kl)}"
         elif k.startswith("setup:") and "|note:" in k:
             s, nt = k[len("setup:") :].split("|note:")
-            name = f"Signalen vom Typ {s.replace('_', ' ').title()} mit Note {nt}"
+            name = f"Signalen „{s}“ mit Note {nt}"
         elif k.startswith("setup:"):
-            name = f"Signalen vom Typ {k[len('setup:'):].replace('_', ' ').title()}"
+            name = f"Signalen „{k[len('setup:') :]}“"
         else:
-            name = f"Signalen der Note {k[len('note:'):]}"
+            name = f"Signalen der Note {k[len('note:') :]}"
         aus[k] = _quote(name, g)
     return aus
 
 
 def passende(
-    tabelle: dict[str, Quote], *, note: str | None, setup: str | None
+    tabelle: dict[str, Quote],
+    *,
+    note: str | None,
+    setup: str | None,
+    klasse: str | None = None,
 ) -> Quote | None:
     """Die feinste Gruppe mit genug Fällen — oder nichts."""
     kandidaten = []
+    if setup and klasse:
+        kandidaten.append(f"klasse:{klasse}|setup:{setup}")
     if setup and note:
         kandidaten.append(f"setup:{setup}|note:{note}")
     if setup:
@@ -213,6 +245,7 @@ def rechne(
     note: str | None,
     setup: str | None,
     tabelle: dict[str, Quote],
+    klasse: str | None = None,
 ) -> Erwartung:
     """Die Erwartung zu einem einzelnen Signal, fertig zum Anzeigen."""
     e = float(einstieg or 0.0)
@@ -220,7 +253,7 @@ def rechne(
     bis3 = _strecke(e, float(tp3), lang) if e and tp3 else None
     risiko = abs(_strecke(e, float(stop), lang) or 0.0) if e and stop else None
 
-    q = passende(tabelle, note=note, setup=setup)
+    q = passende(tabelle, note=note, setup=setup, klasse=klasse)
     saetze: list[str] = []
 
     if bis1 is not None:
