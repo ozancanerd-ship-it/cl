@@ -6857,8 +6857,12 @@ function alarmRegelnBlock(){
     Setup · Note ab A− (B+ nur, wenn sich die Setup-Art in der eigenen Bilanz bewährt hat) ·
     die Setup-Art hat bisher nicht unterm Strich verloren · Chance-Risiko ab
     1:${R ? R.min_crv : 2} · Ziel 1 weit genug weg, dass nach Gebühren etwas bleibt.</p>`}
-    <p><strong>Und höchstens ${R ? R.max_je_tag : 3} am Tag</strong>, derselbe Coin höchstens
-    einmal in ${R ? R.sperre_je_wert_h : 48} Stunden. Kommen mehr zusammen, gehen die besten raus.</p>
+    ${R && R.max_je_tag != null
+      ? `<p><strong>Und höchstens ${R.max_je_tag} am Tag</strong>, derselbe Coin höchstens
+         einmal in ${R.sperre_je_wert_h} Stunden. Kommen mehr zusammen, gehen die besten raus.</p>`
+      : `<p><strong>Keine Obergrenze pro Tag.</strong> Was durchs Tor kommt, klingelt — die
+         Auswahl macht allein die Qualität, nicht die Anzahl. Derselbe Coin höchstens einmal in
+         ${R ? R.sperre_je_wert_h : 48} Stunden, damit kein Wert dich mehrfach anklingelt.</p>`}
     <p><strong>Ziel, Stop, nachgezogener Stop und Ausstieg</strong> klingeln nur für Trades,
     deren Einstieg als Alarm kam — für alles andere hast du nichts im Markt.</p>
     ${arten.length ? `<p style="margin-top:10px"><strong>Bilanz je Setup-Art</strong>
@@ -6905,7 +6909,7 @@ function kaufAlarmLeiste(){
   const wachen = (WL && WL.wachen) || [];
   if (!WL) return '';
   const R = (S && S.alarm_regeln) || {};
-  const maxTag = R.max_je_tag || 3, minCrv = R.min_crv || 2;
+  const maxTag = (R.max_je_tag == null) ? null : R.max_je_tag, minCrv = R.min_crv || 2;
   const jetzt = Date.now(), TAG = 864e5;
   const heuteStr = new Date().toDateString();
   const gemeldet = wachen.filter(w => w.gemeldet && isFinite(Date.parse(w.gemeldet)))
@@ -6913,7 +6917,7 @@ function kaufAlarmLeiste(){
   const woche = gemeldet.filter(w => jetzt - Date.parse(w.gemeldet) < 7*TAG);
   const heute = woche.filter(w => new Date(w.gemeldet).toDateString() === heuteStr);
   const in24 = gemeldet.filter(w => jetzt - Date.parse(w.gemeldet) < TAG);
-  const deckelVoll = in24.length >= maxTag;
+  const deckelVoll = maxTag != null && in24.length >= maxTag;
   const frei = deckelVoll
     ? Math.min(...in24.map(w => Date.parse(w.gemeldet))) + TAG : null;
   // Was wegen des Deckels nicht klingeln durfte und noch offen ist.
@@ -7001,7 +7005,10 @@ function kaufAlarmLeiste(){
       in 24 Stunden sind raus. Der nächste darf ab <b>${tagUhr(new Date(frei).toISOString())}</b> aufs Handy.${
       verdraengt.length ? ` Deshalb nur in der App: ${verdraengt.map(w =>
         `<span class="ka-link" data-sym="${esc(w.instrument)}">${esc(wacheName(w))}</span> (${esc(w.note || '')}${w.setup ? ', ' + esc(w.setup) : ''})`).join(', ')}.` : ''}</p>`
-      : `<p class="ka-frei">${maxTag - in24.length} von ${maxTag} Kaufalarmen für die nächsten 24 Stunden noch frei.</p>`}
+      : maxTag != null
+        ? `<p class="ka-frei">${maxTag - in24.length} von ${maxTag} Kaufalarmen für die nächsten 24 Stunden noch frei.</p>`
+        : `<p class="ka-frei">Kein Tageslimit: jeder Einstieg, der durchs Gewinner-Tor kommt, geht aufs Handy —
+           egal ob einer am Tag oder fünf. Derselbe Coin höchstens einmal in ${R.sperre_je_wert_h || 48} Stunden.</p>`}
   </div>`;
 }
 

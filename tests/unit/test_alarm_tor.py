@@ -7,6 +7,8 @@ naechsten Umbau stillschweigend wieder aufweicht.
 
 from __future__ import annotations
 
+import pytest
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -237,7 +239,15 @@ def test_derselbe_coin_nicht_zweimal() -> None:
     assert "LINK" in t.grund
 
 
-def test_hoechstens_drei_am_tag() -> None:
+def test_kein_tagesdeckel_mehr() -> None:
+    """Seit 03.10.: gute Alarme werden nicht mehr nach Anzahl abgeschnitten."""
+    assert at.MAX_JE_TAG is None
+    verlauf = [(T0 - timedelta(hours=h), f"C{h}USD") for h in range(1, 9)]
+    assert at.deckel(_pruefe(), instrument="XUSD", verlauf=verlauf, jetzt=T0).ja
+
+
+def test_deckel_wirkt_wieder_wenn_gesetzt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(at, "MAX_JE_TAG", 3)
     verlauf = [(T0 - timedelta(hours=h), f"C{h}USD") for h in (1, 5, 9)]
     assert not at.deckel(_pruefe(), instrument="XUSD", verlauf=verlauf, jetzt=T0).ja
     alt = [(T0 - timedelta(hours=30), f"C{h}USD") for h in (1, 2, 3)]
@@ -367,7 +377,21 @@ def test_derselbe_coin_kommt_nur_einmal_auf_die_liste() -> None:
     assert set(liste.wachen) == {"LINKUSD"}
 
 
-def test_tagesdeckel_laesst_die_besten_durch() -> None:
+def test_alle_guten_gehen_raus_ohne_deckel() -> None:
+    liste = _liste_mit_bilanz()
+    zeilen = [_zeile(f"C{i}USD", note="A−") for i in range(4)]
+    zeilen.append(_zeile("TOPUSD", note="A+"))
+    liste.aufnehmen(zeilen, jetzt=T0)
+    kurse: dict[str, dict[str, float]] = {}
+    for n in liste.wachen:
+        kurse.update(_kurs(n, 101.0, 99.5))
+    ev = liste.pruefen(kurse, jetzt=T0 + timedelta(minutes=15))
+    raus, notizen = at.fuers_telefon(ev, liste.wachen, raus_vorher={}, jetzt=T0)
+    assert len(raus) == 5 and not notizen
+
+
+def test_tagesdeckel_laesst_die_besten_durch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(at, "MAX_JE_TAG", 3)
     liste = _liste_mit_bilanz()
     zeilen = [_zeile(f"C{i}USD", note="A−") for i in range(4)]
     zeilen.append(_zeile("TOPUSD", note="A+"))

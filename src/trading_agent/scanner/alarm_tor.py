@@ -42,8 +42,12 @@ Und zur Laufzeit, im Waechter:
 
 6. **Kein Doppel.** Derselbe Basiswert (LINK, egal ob USD oder USDT) hoechstens einmal
    in :data:`SPERRE_JE_WERT`.
-7. **Tagesdeckel.** Hoechstens :data:`MAX_JE_TAG` Einstiegs-Alarme in 24 Stunden. Kommen
-   mehr zusammen, gehen die mit der hoechsten Guete raus, der Rest steht in der App.
+7. **Kein Tagesdeckel (seit 03.10.).** Bis 02.10. gingen hoechstens drei Einstiege in
+   24 Stunden aufs Handy; am 02.10. kam Bitcoin Cash deshalb nur in die App. Ozan:
+   „soll mir nicht die Kaufanzahl begrenzen — wenn es sehr gute Alarme gibt, dann so
+   viele es gibt, aber nur, wo es sich wirklich lohnt." Die Auswahl macht jetzt allein
+   die Qualitaet (Pruefungen 1–5 und 6). :data:`MAX_JE_TAG` ist ``None``; wer wieder
+   einen Deckel will, setzt dort eine Zahl.
 
 Folgealarme (Ziel, Stop, Stop nachziehen, Ausstieg) klingeln nur fuer Trades, deren
 Einstieg auch gemeldet wurde. Fuer alles andere hat Ozan kein Geld im Markt.
@@ -80,8 +84,8 @@ MIN_CRV = 2.0
 #: Gebuehren hoeher sind (Kraken 0,4 % je Seite mit Limit-Order).
 MIN_ZIEL1_PCT: Mapping[str, float] = {"krypto": 1.5, "gold": 1.0, "aktien": 1.0}
 
-#: Hoechstens so viele Einstiegs-Alarme je 24 Stunden.
-MAX_JE_TAG = 3
+#: Hoechstens so viele Einstiegs-Alarme je 24 Stunden — ``None`` = kein Deckel (seit 03.10.).
+MAX_JE_TAG: int | None = None
 
 #: Derselbe Basiswert klingelt hoechstens einmal in diesem Zeitraum.
 SPERRE_JE_WERT = timedelta(hours=48)
@@ -577,7 +581,7 @@ def deckel(
                 "schon einen Einstiegs-Alarm bekommen",
             )
         )
-    if len(frisch) >= MAX_JE_TAG:
+    if MAX_JE_TAG is not None and len(frisch) >= MAX_JE_TAG:
         return tor.mit(
             Punkt(
                 "deckel",
@@ -605,7 +609,7 @@ def fuers_telefon(
     abgewiesenen. Gibt die zu sendenden Ereignisse zurueck und je abgewiesenem Einstieg
     einen Satz fuers Protokoll.
 
-    * ``EINSTIEG`` nur durch das Tor, die besten zuerst, mit Tagesdeckel.
+    * ``EINSTIEG`` nur durch das Tor, die besten zuerst (Tagesdeckel nur, wenn gesetzt).
     * Folgealarme (``TP``, ``STOP``, ``SCHUTZ``, ``AUSSTIEG``) nur fuer gemeldete Trades,
       die vor diesem Lauf nicht schon draussen waren. Stop und Schutz-Stop im selben
       Fenster: nur der Schutz-Stop — wer dem Plan folgt, ist dort raus.
