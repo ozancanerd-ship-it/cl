@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.scanner import erwartung as erw
 from trading_agent.scanner.performance import bericht
+from trading_agent.scanner.watchlist import archiv_laden, mit_archiv
 
 STAND = "data/repository_real/live/watchlist.json"
 
@@ -49,7 +50,11 @@ def main() -> int:
         except (OSError, json.JSONDecodeError) as exc:
             print(f"::warning::Wachliste nicht lesbar: {exc}")
 
-    b = bericht(daten, jetzt=datetime.now(UTC))
+    # Mit Archiv: jeder eingegangene Trade seit 05.09., auch wenn seine Wache inzwischen
+    # ueberschrieben oder aufgeraeumt wurde (siehe watchlist.ARCHIV_STAMM).
+    archiv = archiv_laden()
+    b = bericht(mit_archiv(daten, archiv), jetzt=datetime.now(UTC))
+    print(f"Bilanz: {b.abgeschlossen} gezaehlte Trades (Archiv: {len(archiv)} Eintraege)")
 
     # Die Trefferhaeufigkeiten kommen mit in die Datei — dieselbe Tabelle, die im Scan
     # neben jedem Signal steht. Damit laesst sich in der App nachschlagen, worauf die

@@ -34,7 +34,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.core.enums import Timeframe
-from trading_agent.scanner.watchlist import Wachliste
+from trading_agent.scanner.watchlist import Wachliste, archiv_anhaengen, archiv_laden
 
 STAND = "data/repository_real/live/watchlist.json"
 PROTOKOLL = "data/repository_real/live/alerts.jsonl"
@@ -309,6 +309,9 @@ async def main() -> int:
     jetzt = datetime.now(UTC)
     stand = _laden(args.stand)
     liste = Wachliste.from_dict(stand)
+    # Abgeschlossene Trades, die nicht mehr auf der Liste stehen — fuer die Bilanz im
+    # Alarm-Tor (02.10.: vorher sah das Tor nur die letzten 60, ohne ueberschriebene).
+    archiv = archiv_laden()
     scan = _laden(args.scan) or {}
     zeilen = scan.get("gesamt") or []
     # Welche Trades waren VOR diesem Lauf schon draussen (Schutz-Stop, Ausstieg)? Zu
@@ -368,6 +371,7 @@ async def main() -> int:
         jetzt=jetzt,
         erlaubt=AUFS_TELEFON,
         alle=args.alle_setups,
+        archiv=[*archiv, *liste.archiv_neu],
         # Quartalszahlen in den naechsten Tagen: der Scan sperrt den Einstieg (Masterplan §8).
         sperren={
             str(z.get("instrument")): str(z.get("termin_sperre"))
@@ -455,6 +459,9 @@ async def main() -> int:
     entfernt = liste.aufraeumen()
     if entfernt:
         print(f"{entfernt} alte Wache(n) entfernt")
+    if liste.archiv_neu and not args.dry_run:
+        n = archiv_anhaengen(liste.archiv_neu)
+        print(f"{n} abgeschlossene(r) Trade(s) ins Archiv")
 
     if not args.dry_run:
         p = Path(args.stand)

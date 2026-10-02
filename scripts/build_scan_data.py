@@ -564,14 +564,21 @@ def _wachliste_roh() -> dict[str, Any]:
     Bilanz wird im Tagesablauf **nach** dem Scan gerechnet, die Datei waere also einen
     Lauf alt. Dieselbe Quelle, nur ohne den Umweg.
     """
-    if not WACHLISTE.is_file():
+    from trading_agent.scanner.watchlist import archiv_laden, mit_archiv
+
+    daten: dict[str, Any] = {}
+    if WACHLISTE.is_file():
+        try:
+            roh = json.loads(WACHLISTE.read_text(encoding="utf-8"))
+            daten = roh if isinstance(roh, dict) else {}
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"  ::warning::Wachliste nicht lesbar: {exc}")
+    # Mit Archiv (02.10.): Alarm-Tor und Trefferquoten zaehlen jeden eingegangenen Trade,
+    # nicht nur die, deren Wache zufaellig noch auf der Liste steht.
+    archiv = archiv_laden()
+    if not daten and not archiv:
         return {}
-    try:
-        daten = json.loads(WACHLISTE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"  ::warning::Wachliste nicht lesbar: {exc}")
-        return {}
-    return daten if isinstance(daten, dict) else {}
+    return mit_archiv(daten, archiv)
 
 
 def _alarm_stand() -> dict[str, alarm_tor.Stand]:
@@ -737,15 +744,30 @@ def aktien_info_anhaengen(r: dict[str, Any], info: dict[str, Any], heute: Any) -
     """
     if not info:
         return
-    kompakt = {k: info[k] for k in ("sektor", "branche", "kursziel", "kursziel_tief",
-                                     "kursziel_hoch", "kursziel_3m_pct", "analysten",
-                                     "hoch52", "tief52", "marktwert", "dividende_pct")
-               if info.get(k) is not None}
+    kompakt = {
+        k: info[k]
+        for k in (
+            "sektor",
+            "branche",
+            "kursziel",
+            "kursziel_tief",
+            "kursziel_hoch",
+            "kursziel_3m_pct",
+            "analysten",
+            "hoch52",
+            "tief52",
+            "marktwert",
+            "dividende_pct",
+        )
+        if info.get(k) is not None
+    }
     z = info.get("zahlen") or {}
     tage = tage_bis(z.get("datum"), heute)
     if tage is not None and tage >= 0:
-        kompakt["zahlen"] = {**{k: z[k] for k in ("datum", "zeit", "eps_prognose") if z.get(k)},
-                             "tage": tage}
+        kompakt["zahlen"] = {
+            **{k: z[k] for k in ("datum", "zeit", "eps_prognose") if z.get(k)},
+            "tage": tage,
+        }
         # Wie weit diese Aktie an ihren letzten Terminen gesprungen ist (gemessen, 2024–26).
         bew = zahlen_ref.je_aktie(str(r.get("instrument") or ""))
         if bew:
@@ -784,18 +806,26 @@ def sektoren_rechnen(zeilen: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for sek, rs in je.items():
         if len(rs) < 3:
             continue
-        ren21 = sorted(float(x["zusatz"]["renditen"]["r21"]) for x in rs
-                       if (x.get("zusatz") or {}).get("renditen", {}).get("r21") is not None)
-        ren63 = sorted(float(x["zusatz"]["renditen"]["r63"]) for x in rs
-                       if (x.get("zusatz") or {}).get("renditen", {}).get("r63") is not None)
-        aus.append({
-            "sektor": sek,
-            "n": len(rs),
-            "rs": round(sum(float(x["rs"]) for x in rs) / len(rs), 1),
-            "r21_median": round(ren21[len(ren21) // 2], 2) if ren21 else None,
-            "r63_median": round(ren63[len(ren63) // 2], 2) if ren63 else None,
-            "fuehrer": [x["instrument"] for x in sorted(rs, key=lambda y: -float(y["rs"]))[:3]],
-        })
+        ren21 = sorted(
+            float(x["zusatz"]["renditen"]["r21"])
+            for x in rs
+            if (x.get("zusatz") or {}).get("renditen", {}).get("r21") is not None
+        )
+        ren63 = sorted(
+            float(x["zusatz"]["renditen"]["r63"])
+            for x in rs
+            if (x.get("zusatz") or {}).get("renditen", {}).get("r63") is not None
+        )
+        aus.append(
+            {
+                "sektor": sek,
+                "n": len(rs),
+                "rs": round(sum(float(x["rs"]) for x in rs) / len(rs), 1),
+                "r21_median": round(ren21[len(ren21) // 2], 2) if ren21 else None,
+                "r63_median": round(ren63[len(ren63) // 2], 2) if ren63 else None,
+                "fuehrer": [x["instrument"] for x in sorted(rs, key=lambda y: -float(y["rs"]))[:3]],
+            }
+        )
     aus.sort(key=lambda x: -x["rs"])
     for i, e in enumerate(aus, start=1):
         e["rang"] = i
@@ -1127,8 +1157,10 @@ async def main() -> int:
                 aktien_info_anhaengen(r, ai_werte[str(r.get("instrument"))], heute)
                 n_ai += 1
         gesperrt_ai = [str(r.get("instrument")) for r in kompakt_neu if r.get("termin_sperre")]
-        print(f"  Aktien-Info: {n_ai} Zeilen ergaenzt" + (
-            f" · Zahlen in den naechsten Tagen: {', '.join(gesperrt_ai)}" if gesperrt_ai else ""))
+        print(
+            f"  Aktien-Info: {n_ai} Zeilen ergaenzt"
+            + (f" · Zahlen in den naechsten Tagen: {', '.join(gesperrt_ai)}" if gesperrt_ai else "")
+        )
     sektoren = sektoren_rechnen(kompakt_neu + kompakt_alt)
     if sektoren:
         print("  Sektoren: " + " · ".join(f"{s['sektor']} {s['rs']:.0f}" for s in sektoren[:5]))
