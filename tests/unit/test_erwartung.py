@@ -116,3 +116,73 @@ def test_ohne_buch_keine_zahl_aber_ein_satz() -> None:
     )
     assert e.quote is None
     assert e.saetze
+
+
+def test_setup_art_in_ihrer_klasse_geht_vor_der_note():
+    """Dash, 02.10.: Der Alarm klingelte, weil „Rückeroberung" bei Coins im Plus lag — die
+    Karte zitierte aber die Note A− (−0,61 R aus 102, fast nur Signale ohne Setup-Namen).
+    Jetzt zählt zuerst die Setup-Art in ihrer Klasse, gezählt wie im Alarm-Tor."""
+    name = "Rueckeroberung nach Liquiditaetsgriff"
+    gut = [
+        {
+            "note": "A−",
+            "setup": name,
+            "klasse": "krypto",
+            "zustand": "ziel_erreicht",
+            "erreicht": ["TP1", "TP2", "TP3"],
+            "r_drittel": 2.0,
+        }
+    ] * 8 + [
+        {
+            "note": "A−",
+            "setup": name,
+            "klasse": "krypto",
+            "zustand": "stop",
+            "erreicht": [],
+            "r_drittel": -1.0,
+        }
+    ] * 6
+    # Ohne Ergebnis abgelaufen — zählt im Tor nicht, also auch hier nicht.
+    offen = [
+        {
+            "note": "A−",
+            "setup": name,
+            "klasse": "krypto",
+            "zustand": "abgelaufen",
+            "erreicht": [],
+            "r_drittel": 0.0,
+        }
+    ] * 5
+    schlecht = [
+        {
+            "note": "A−",
+            "setup": "",
+            "klasse": "krypto",
+            "zustand": "stop",
+            "erreicht": [],
+            "r_drittel": -1.0,
+        }
+    ] * 80
+    tab = erwartung.quoten(gut + offen + schlecht)
+    q = erwartung.passende(tab, note="A−", setup=name, klasse="krypto")
+    assert q is not None
+    assert q.n == 14
+    assert q.basis == "Signalen „Rueckeroberung nach Liquiditaetsgriff“ bei Coins"
+    assert q.schnitt_r > 0
+    e = erwartung.rechne(
+        einstieg=100.0,
+        stop=95.0,
+        tp1=110.0,
+        tp3=120.0,
+        lang=True,
+        note="A−",
+        setup=name,
+        klasse="krypto",
+        tabelle=tab,
+    )
+    text = " ".join(e.saetze)
+    assert "spricht hier also gegen" not in text
+    assert "bei Coins" in text
+    # Andere Klasse: dieselbe Setup-Art zählt dort nicht mit.
+    q_aktie = erwartung.passende(tab, note="A−", setup=name, klasse="aktien")
+    assert q_aktie is None or "bei Coins" not in q_aktie.basis

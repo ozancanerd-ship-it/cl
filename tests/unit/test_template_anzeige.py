@@ -22,6 +22,7 @@ Geprüft wird der echte Code aus ``site/template.html``, ausgeführt in Node.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -51,6 +52,13 @@ def _funktion(roh: str, name: str) -> str:
                 break
         i += 1
     return roh[start:anfang] + roh[anfang : i + 1]
+
+
+def _konstante(roh: str, name: str) -> str:
+    """Eine ``const``-Zeile der Vorlage (z. B. eine Schwelle, die eine Funktion braucht)."""
+    m = re.search(rf"const {name}\b[^\n]*\n", roh)
+    assert m, f"{name} nicht gefunden"
+    return m.group(0).rstrip("\n")
 
 
 def _umlaut_block() -> str:
@@ -144,6 +152,7 @@ def test_abgehakte_teilverkaufsregel_beendet_den_plan_nicht() -> None:
     teile = [
         "const digits = v => 2;",
         "const num = (v, d) => Number(v).toFixed(2);",
+        _konstante(roh, "STOP_NAH_PCT"),
         _funktion(roh, "waehrungsZeichen"),
         _funktion(roh, "zieleGelten"),
         _funktion(roh, "naechsterSchritt"),
@@ -169,6 +178,7 @@ def test_halten_text_nennt_die_waehrung() -> None:
     teile = [
         "const digits = v => 2;",
         "const num = (v, d) => Number(v).toFixed(2);",
+        _konstante(roh, "STOP_NAH_PCT"),
         _funktion(roh, "waehrungsZeichen"),
         _funktion(roh, "zieleGelten"),
         _funktion(roh, "naechsterSchritt"),
