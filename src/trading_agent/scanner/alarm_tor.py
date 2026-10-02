@@ -408,6 +408,14 @@ def pruefe(
     gesperrt = [g for g in gruppen if g is not None and g.urteil == "gesperrt"]
     art = stand.get(art_schluessel) if art_schluessel else None
     bewaehrt = art is not None and art.urteil == "bewaehrt"
+    if je_klasse and bewaehrt:
+        # Die eigene Bilanz der Setup-Art schlaegt die grobe Sperre „Klasse + Richtung".
+        # Seit das Archiv alle Trades seit 05.09. kennt (02.10.), steht „Coins Long" bei
+        # 168 Trades und −49 R — fast alles aus der ersten Woche, ohne Setup-Namen, mit
+        # bis zu 40 offenen Wachen. Die benannten Coin-Setups liegen im Plus (Ausbruch
+        # +5,7 R aus 18, Rueckeroberung +9,5 R aus 24). Die grobe Sperre wuerde genau die
+        # Setups stummschalten, die sich bewaehrt haben, wegen derer, die nie klingeln.
+        gesperrt = [g for g in gesperrt if not g.schluessel.startswith("klasse_richtung:")]
     if gesperrt:
         g = gesperrt[0]
         punkte.append(Punkt("bilanz", False, g.satz(_anzeige(g.schluessel))))
@@ -589,6 +597,7 @@ def fuers_telefon(
     erlaubt: Iterable[str] = ("EINSTIEG", "TP", "STOP", "SCHUTZ", "AUSSTIEG"),
     alle: bool = False,
     sperren: Mapping[str, str] | None = None,
+    archiv: Iterable[Mapping[str, Any]] = (),
 ) -> tuple[list[Any], list[str]]:
     """Welche Ereignisse aufs Telefon gehen — in ihrer Reihenfolge, Einstiege ergaenzt.
 
@@ -606,7 +615,15 @@ def fuers_telefon(
 
     erlaubt = set(erlaubt)
     folgen = erlaubt - {"EINSTIEG"}
-    stand = bilanz(w.as_dict() for w in wachen.values())
+    # Dazu das Archiv: abgeschlossene Trades, die nicht mehr auf der Liste stehen (02.10.).
+    aktuell = [w.as_dict() for w in wachen.values()]
+    da = {f"{d.get('instrument')}|{d.get('aufgenommen')}" for d in aktuell}
+    alt = [
+        a
+        for a in archiv
+        if isinstance(a, Mapping) and f"{a.get('instrument')}|{a.get('aufgenommen')}" not in da
+    ]
+    stand = bilanz([*aktuell, *alt])
     verlauf: list[tuple[datetime, str]] = []
     for w in wachen.values():
         if getattr(w, "gemeldet", ""):
@@ -678,8 +695,12 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
                 continue
             klasse, _, setup = k.removeprefix("klasse_setup:").partition("|")
             je_klasse[f"{setup} · {_KLASSE_NAME.get(klasse, klasse)}"] = v.as_dict()
+        # Eine Sperre je Klasse + Richtung gilt nicht fuer Setup-Arten, die sich in der
+        # Klasse bewaehrt haben (siehe ``pruefe``) — das steht dabei, sonst liest man
+        # „Coins Long gesperrt" neben „frei: Ausbruch · Coins".
         gesperrt_k = sorted(
             _anzeige(k)
+            + (" (außer bewährte Setup-Arten)" if k.startswith("klasse_richtung:") else "")
             for k, v in stand.items()
             if v.urteil == "gesperrt" and not k.startswith("setup:")
         )

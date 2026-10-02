@@ -369,6 +369,9 @@ class Bericht:
     #: Je Klasse nach PLAN (Drittel-Regel) — dieselbe Regel wie „Deine Alarme" und die
     #: Summe oben, damit sich die Zahlen auf der Karte zusammenzaehlen lassen.
     je_klasse_plan: dict[str, Kennzahlen] = field(default_factory=dict)
+    #: Je Kalenderwoche der Aufnahme, nach Plan — „KW37" usw. Damit eine schlechte erste
+    #: Woche nicht als Dauerzustand gelesen wird, und eine gute nicht als Beweis.
+    je_woche_plan: dict[str, Kennzahlen] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -389,6 +392,7 @@ class Bericht:
             "nicht_ausgeloest": self.nicht_ausgeloest,
             "ohne_ergebnis": self.ohne_ergebnis,
             "je_klasse_plan": {k: v.as_dict() for k, v in self.je_klasse_plan.items()},
+            "je_woche_plan": {k: v.as_dict() for k, v in self.je_woche_plan.items()},
         }
 
 
@@ -417,6 +421,42 @@ def _z(x: float, stellen: int = 1, vorzeichen: bool = True) -> str:
     """Zahl mit deutschem Komma — „+2,8", „-0,07"."""
     roh = f"{x:+.{stellen}f}" if vorzeichen else f"{x:.{stellen}f}"
     return roh.replace(".", ",")
+
+
+def _woche(e: Ergebnis) -> str:
+    """„KW37" — Kalenderwoche der Aufnahme, ``""`` ohne Datum."""
+    try:
+        d = datetime.fromisoformat(e.begonnen)
+    except (TypeError, ValueError):
+        return ""
+    return f"KW{d.isocalendar()[1]:02d}"
+
+
+def _wochen_satz(ergebnisse: list[Ergebnis]) -> list[str]:
+    je: dict[str, list[float]] = {}
+    for e in ergebnisse:
+        k = _woche(e)
+        if k:
+            je.setdefault(k, []).append(e.r_drittel)
+    if len(je) < 2:
+        return []
+    teile = sorted(je.items())
+    aus = [
+        "Je Woche (nach Aufnahme): "
+        + " · ".join(f"{k} {_z(sum(v))} R aus {len(v)}" for k, v in teile)
+        + "."
+    ]
+    gesamt = sum(sum(v) for _, v in teile)
+    schlimm_k, schlimm_v = min(teile, key=lambda kv: sum(kv[1]))
+    if gesamt < 0 and sum(schlimm_v) < 0.7 * gesamt:
+        rest = [r for k, v in teile if k > schlimm_k for r in v]
+        if rest:
+            aus.append(
+                f"Der größte Teil des Verlusts stammt aus {schlimm_k} "
+                f"({_z(sum(schlimm_v))} R aus {len(schlimm_v)} Trades). Seitdem: "
+                f"{_anzahl(len(rest), 'Trade', 'Trades')}, {_z(sum(rest))} R."
+            )
+    return aus
 
 
 def _anzahl(n: int, einzahl: str, mehrzahl: str) -> str:
@@ -474,6 +514,8 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
         else:
             aus.append("Je Klasse: " + " · ".join(wie(k, v) for k, v in teile) + ".")
 
+    aus.extend(_wochen_satz(ergebnisse))
+
     if not plan.belastbar:
         aus.append(
             f"Das sind weniger als {GENUG} Trades. Die Zahlen zeigen, was passiert ist, "
@@ -515,11 +557,17 @@ def _saetze(ergebnisse: list[Ergebnis], je_regel: dict[str, Kennzahlen]) -> list
 
     if plan.max_rueckgang_r < -5:
         rg = plan.max_rueckgang_r
+        halb, zwei = rg * 0.5, rg * 2.0
+
+        def konto(pct: float) -> str:
+            if pct <= -100:
+                return "mehr als das ganze Konto"
+            return f"rund {_z(pct, 0)} % aufs Konto" + (" — tragbar" if pct > -15 else "")
+
         aus.append(
             f"Der tiefste Rückgang aller Signale hintereinander lag bei {_z(rg)} R, die "
             f"längste Verlustserie bei {plan.verlustserie} Trades. Bei 0,5 % Risiko je "
-            f"Trade wären das rund {_z(rg * 0.5, 0)} % aufs Konto — tragbar; bei 2 % "
-            f"wären es {_z(rg * 2.0, 0)} %."
+            f"Trade wären das {konto(halb)}; bei 2 % {konto(zwei)}."
         )
 
     # Der Schluss-Satz steht immer da, auch und gerade wenn die Zahlen gut aussehen.
@@ -647,6 +695,7 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
         je_note=_gruppiere(ergebnisse, lambda e: e.note),
         je_klasse=_gruppiere(ergebnisse, lambda e: e.klasse),
         je_klasse_plan=_gruppiere(ergebnisse, lambda e: e.klasse, "drittel"),
+        je_woche_plan=_gruppiere(ergebnisse, _woche, "drittel"),
         je_setup=_gruppiere(ergebnisse, lambda e: e.setup),
         je_meldung=_gruppiere(
             ergebnisse, lambda e: "aufs_handy" if e.gemeldet else "nur_app", "drittel"

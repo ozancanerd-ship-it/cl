@@ -34,9 +34,11 @@ ZWEI EHRLICHE EINSCHRAENKUNGEN
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 #: Nach so vielen Tagen ohne Einstieg wird ein Setup verworfen. Ein Chartbild von
@@ -448,11 +450,102 @@ def _plan_text(w: Wache) -> str:
     return "\n".join(zeilen)
 
 
+#: Das Gedaechtnis der Bilanz (02.10.).
+#:
+#: Die Wachliste ist nach Instrument geschluesselt. Kam ein Wert nach einem
+#: abgeschlossenen Trade wieder auf die Liste, ueberschrieb die neue Wache die alte — und
+#: mit ihr den Trade. Dazu warf ``aufraeumen`` alles ueber 60 abgeschlossene Wachen weg.
+#: Nachgezaehlt aus der Git-Historie: 355 eingegangene, abgeschlossene Trades seit 05.09.,
+#: in der Bilanz standen noch 38. Verschwunden waren ausgerechnet Verlierer, die wieder
+#: aufgenommen wurden — Zcash zweimal ausgestoppt, beide Male als Alarm aufs Handy, und die
+#: App zeigte „Deine Alarme: 3 Trades, +1,5 R" statt 8 Trades, +1,9 R. Eine Bilanz, die
+#: ihre Verlierer vergisst, rechnet sich schoen.
+#:
+#: Jetzt geht kein eingegangener Trade mehr verloren: was ueberschrieben oder aufgeraeumt
+#: wird, kommt ins Archiv. ``ARCHIV_STAMM`` ist der aus der Git-Historie rekonstruierte
+#: Altbestand (fest, wird nie geschrieben), ``ARCHIV_LAUFEND`` waechst Zeile fuer Zeile.
+ARCHIV_STAMM = Path("data/repository_real/archiv/wachen_historie_2026-10-02.json")
+ARCHIV_LAUFEND = Path("data/repository_real/live/wachen_archiv.jsonl")
+
+
+def archiv_schluessel(d: dict[str, Any]) -> str:
+    return f"{d.get('instrument')}|{d.get('aufgenommen')}"
+
+
+def archiv_laden(stamm: Path | None = None, laufend: Path | None = None) -> list[dict[str, Any]]:
+    """Altbestand und laufendes Archiv, ohne Doppel (der spaetere Eintrag gewinnt)."""
+    aus: dict[str, dict[str, Any]] = {}
+    st = ARCHIV_STAMM if stamm is None else stamm
+    lf = ARCHIV_LAUFEND if laufend is None else laufend
+    try:
+        if st.is_file():
+            for d in json.loads(st.read_text(encoding="utf-8")):
+                if isinstance(d, dict):
+                    aus[archiv_schluessel(d)] = d
+    except (OSError, ValueError):
+        pass
+    try:
+        if lf.is_file():
+            for zeile in lf.read_text(encoding="utf-8").splitlines():
+                zeile = zeile.strip()
+                if not zeile:
+                    continue
+                try:
+                    d = json.loads(zeile)
+                except ValueError:
+                    continue
+                if isinstance(d, dict):
+                    aus[archiv_schluessel(d)] = d
+    except OSError:
+        pass
+    return list(aus.values())
+
+
+def archiv_anhaengen(eintraege: list[dict[str, Any]], laufend: Path | None = None) -> int:
+    """Neue Archiv-Eintraege anhaengen — jeder Trade genau einmal."""
+    if not eintraege:
+        return 0
+    lf = ARCHIV_LAUFEND if laufend is None else laufend
+    schon = {archiv_schluessel(d) for d in archiv_laden(Path("/nonexistent"), lf)}
+    neu = [d for d in eintraege if archiv_schluessel(d) not in schon]
+    if not neu:
+        return 0
+    lf.parent.mkdir(parents=True, exist_ok=True)
+    with lf.open("a", encoding="utf-8") as fh:
+        for d in neu:
+            fh.write(json.dumps(d, ensure_ascii=False, sort_keys=True) + "\n")
+    return len(neu)
+
+
+def mit_archiv(stand: dict[str, Any] | None, archiv: list[dict[str, Any]]) -> dict[str, Any]:
+    """Der Wachlisten-Zustand plus alle archivierten Trades — fuer Bilanz und Alarm-Tor.
+
+    Was noch auf der Liste steht, gewinnt; ein archivierter Trade kommt nur dazu, wenn
+    derselbe Trade (Instrument + Aufnahmezeit) nicht mehr auf der Liste steht.
+    """
+    roh = (stand or {}).get("wachen") or {}
+    wachen: dict[str, Any] = dict(roh) if isinstance(roh, dict) else {}
+    da = {archiv_schluessel(v) for v in wachen.values() if isinstance(v, dict)}
+    for a in archiv:
+        k = archiv_schluessel(a)
+        if k not in da:
+            wachen[f"archiv:{k}"] = a
+            da.add(k)
+    return {**(stand or {}), "wachen": wachen}
+
+
 class Wachliste:
     """Haelt die beobachteten Setups und leitet aus Kursbewegungen Ereignisse ab."""
 
     def __init__(self, wachen: dict[str, Wache] | None = None) -> None:
         self.wachen: dict[str, Wache] = dict(wachen or {})
+        #: In diesem Lauf archivierte Trades — der Aufrufer haengt sie mit
+        #: :func:`archiv_anhaengen` an die Archivdatei an.
+        self.archiv_neu: list[dict[str, Any]] = []
+
+    def _archivieren(self, w: Wache | None) -> None:
+        if w is not None and w.zustand in ENDZUSTAENDE and w.einstiegskurs is not None:
+            self.archiv_neu.append(w.as_dict())
 
     # ------------------------------------------------------------------ laden/speichern
     @classmethod
@@ -626,6 +719,8 @@ class Wachliste:
             if w.einstieg > 0 and w.risiko / w.einstieg < MIN_STOP_ANTEIL:
                 continue
             ersetzt = alt_einstieg.get(name)
+            # Ein abgeschlossener Trade desselben Werts wird nicht einfach ueberschrieben.
+            self._archivieren(self.wachen.get(name))
             self.wachen[name] = w
             # Was gerade aufgenommen wurde, zaehlt ab sofort mit. Vorher wurde
             # ``laufend`` einmal VOR der Schleife gebaut und nie fortgeschrieben — der
@@ -970,11 +1065,14 @@ class Wachliste:
         fertig.sort(reverse=True)
         weg = [k for _, k in fertig[behalten:]]
         for k in weg:
+            self._archivieren(self.wachen[k])
             del self.wachen[k]
         return len(weg)
 
 
 __all__ = [
+    "ARCHIV_LAUFEND",
+    "ARCHIV_STAMM",
     "DUENN_UMSATZ",
     "ENDZUSTAENDE",
     "HALTBARKEIT",
@@ -984,6 +1082,10 @@ __all__ = [
     "Wache",
     "Wachliste",
     "Zustand",
+    "archiv_anhaengen",
+    "archiv_laden",
+    "archiv_schluessel",
     "einstieg_text",
+    "mit_archiv",
     "schliessen_wort",
 ]
