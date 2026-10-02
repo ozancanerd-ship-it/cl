@@ -627,7 +627,10 @@ def _erwartung_anhaengen(r: dict[str, Any], tabelle: dict[str, erw.Quote]) -> No
         tp3=float(tp3) if tp3 else None,
         lang=str(r.get("richtung") or "long") == "long",
         note=str(r.get("note") or "") or None,
-        setup=str((setup or {}).get("art") or "") or None,
+        # Der NAME, nicht das Kuerzel: die Trades der Wachliste tragen den Namen
+        # („Rueckeroberung nach Liquiditaetsgriff"), mit „RUECKEROBERUNG" fand sich nie etwas.
+        setup=str((setup or {}).get("name") or "") or None,
+        klasse=str(r.get("klasse") or "") or None,
         tabelle=tabelle,
     )
     r["erwartung"] = e.as_dict()
