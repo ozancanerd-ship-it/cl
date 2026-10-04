@@ -158,8 +158,26 @@ jobs:
         # Sonntags zusaetzlich ein Wochenstand, auch wenn sich nichts geaendert hat.
         # Sonst kann es Wochen still bleiben, und dann weiss man nicht, ob nichts passiert
         # ist oder ob etwas kaputt ist.
+        # 04.10.: seit dem Taktgeber laufen volle Scans wirklich zweimal je Stunde — und
+        # der Wochenstand ging jede halbe Stunde raus. Jetzt nur, wenn in den letzten
+        # sechs Tagen noch keiner verschickt wurde (Protokoll: alerts.jsonl).
         run: |
-          if [ "$(date -u +%u)" = "7" ]; then
+          schon=$(python - <<'PY'
+          import json, datetime as dt, pathlib
+          f = pathlib.Path("data/repository_real/live/alerts.jsonl")
+          grenze = dt.datetime.now(dt.UTC) - dt.timedelta(days=6)
+          n = 0
+          for z in (f.read_text(encoding="utf-8").splitlines() if f.exists() else []):
+              try:
+                  e = json.loads(z)
+                  if str(e.get("title", "")).startswith("Wochenstand") and dt.datetime.fromisoformat(e["ts"]) > grenze:
+                      n += 1
+              except Exception:
+                  pass
+          print(n)
+          PY
+          )
+          if [ "$(date -u +%u)" = "7" ] && [ "$schon" = "0" ]; then
             python scripts/daily_report.py --send --weekly
           else
             python scripts/daily_report.py --send
