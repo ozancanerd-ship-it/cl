@@ -196,7 +196,7 @@ def test_regeln_nennen_die_freien_setup_arten() -> None:
     r = at.regeln_uebersicht(_bewaehrt_stand())
     assert r["nur_bewaehrt"] is True
     assert r["b_plus_bei_bewaehrt"] is True
-    assert r["frei"] == ["Ausbruch aus der Basis · Coins"]
+    assert r["frei"] == ["Ausbruch aus der Basis · Coins Long"]
     assert r["bilanz_je_klasse"] is True
 
 
@@ -491,6 +491,27 @@ def test_zu_wenige_faelle_in_der_eigenen_klasse_heisst_offen() -> None:
 
 def test_regeln_zeigen_setup_arten_je_klasse() -> None:
     r = at.regeln_uebersicht(_decred_fall())
-    assert r["setup_arten"][f"{_RUECK} · Coins"]["urteil"] == "bewaehrt"
-    assert r["setup_arten"][f"{_RUECK} · Aktien"]["anzahl"] == 4
-    assert r["frei"] == [f"{_RUECK} · Coins"]
+    assert r["setup_arten"][f"{_RUECK} · Coins Long"]["urteil"] == "bewaehrt"
+    assert r["setup_arten"][f"{_RUECK} · Aktien Long"]["anzahl"] == 4
+    assert r["frei"] == [f"{_RUECK} · Coins Long"]
+
+
+# ------------------------------------------------------------------ je Richtung (04.10.)
+
+
+def test_short_braucht_eigene_bilanz() -> None:
+    """04.10.: Kaeufe im Plus machten die Setup-Art „bewaehrt" — und die Shorts klingelten
+    mit, obwohl sie fast alle verloren. Jetzt zaehlt die eigene Richtung."""
+    kaeufe = [_fertig(_RUECK, "ziel_erreicht", ["TP1", "TP2", "TP3"])] * 7
+    shorts = [_fertig(_RUECK, "stop", richtung="short")] * 3
+    stand = at.bilanz(kaeufe + shorts)
+    assert stand[f"klasse_setup:krypto|{_RUECK}"].urteil == "bewaehrt"  # alte Rechnung
+    assert _pruefe(setup=_RUECK, richtung="long", stand=stand).ja
+    t = _pruefe(setup=_RUECK, richtung="short", stand=stand)
+    assert not t.ja
+    assert "Short" in t.grund
+
+
+def test_short_mit_eigener_bilanz_im_plus_klingelt() -> None:
+    shorts = [_fertig(_RUECK, "ziel_erreicht", ["TP1", "TP2", "TP3"], richtung="short")] * 6
+    assert _pruefe(setup=_RUECK, richtung="short", stand=at.bilanz(shorts)).ja

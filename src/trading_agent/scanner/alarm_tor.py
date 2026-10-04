@@ -141,6 +141,21 @@ B_PLUS_BEI_BEWAEHRT = True
 #: eigenen Klasse heisst „offen" — die anderen Klassen springen nicht ein.
 BILANZ_JE_KLASSE = True
 
+#: Und in IHRER Richtung (04.10.).
+#:
+#: Bis dahin zaehlte „Rueckeroberung · Coins" Kaeufe und Shorts zusammen. Eigene Bilanz
+#: Stand 04.10.: Kaeufe 20 Trades +15,8 R (70 % Gewinner), Shorts 13 Trades −9,3 R
+#: (15 % Gewinner) — zusammen „bewaehrt", also klingelten auch die Shorts. Am 03.10. kam so
+#: ein World-Liberty-Short durch („Ausbruch · Coins": 20 Kaeufe +8,3 R,
+#: Shorts kaum gezaehlt). Das 19-Monats-Nachspiel (docs/SIGNAL-STUDIE-2026-09.md) zeigt
+#: Shorts in BEIDEN Haelften im Minus (−0,087 R je Trade, n 147 und 180), Longs um null
+#: bis leicht plus. Eigene Bilanz und Nachspiel zeigen in dieselbe Richtung — die
+#: Bedingung, unter der hier eine Regel geaendert wird.
+#:
+#: Jetzt: bewaehrt heisst bewaehrt in Klasse UND Richtung (``klasse_setup_richtung``).
+#: Ein Short braucht seine eigene Bilanz im Plus.
+BILANZ_JE_RICHTUNG = True
+
 _KLASSE_NAME = {"krypto": "Coins", "aktien": "Aktien", "gold": "Gold"}
 
 NOTEN_A = frozenset({"A+", "A", "A−", "A-", "A_PLUS", "A_MINUS"})
@@ -250,6 +265,8 @@ def _schluessel(setup: str, klasse: str, richtung: str) -> list[str]:
         aus.append(f"setup:{setup}")
         if klasse:
             aus.append(f"klasse_setup:{klasse}|{setup}")
+            if richtung:
+                aus.append(f"klasse_setup_richtung:{klasse}|{setup}|{richtung}")
     if klasse and richtung:
         aus.append(f"klasse_richtung:{klasse}|{richtung}")
     return aus
@@ -312,6 +329,9 @@ def _anzeige(schluessel: str) -> str:
     kl = _KLASSE_NAME.get(klasse, klasse)
     if art == "klasse_setup":
         return f"„{zweites}“ bei {kl}"
+    if art == "klasse_setup_richtung":
+        setup, _, ri = zweites.partition("|")
+        return f"„{setup}“ bei {kl} {'Long' if ri == 'long' else 'Short'}"
     return f"{kl} {'Long' if zweites == 'long' else 'Short'}"
 
 
@@ -406,6 +426,10 @@ def pruefe(
     if je_klasse:
         schluessel = [k for k in schluessel if not k.startswith("setup:")]
         art_schluessel: str | None = f"klasse_setup:{klasse}|{setup}"
+        if BILANZ_JE_RICHTUNG and richtung:
+            # Die Klassen-Bilanz ueber beide Richtungen sperrt weiter mit, entscheidet aber
+            # nicht mehr ueber „bewaehrt" — das tut nur die eigene Richtung.
+            art_schluessel = f"klasse_setup_richtung:{klasse}|{setup}|{richtung}"
     else:
         art_schluessel = f"setup:{setup}" if setup else None
     gruppen = [stand.get(k) for k in schluessel]
@@ -695,6 +719,15 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
         # „Ausbruch aus der Basis · Coins" — so, wie das Tor tatsaechlich entscheidet.
         je_klasse: dict[str, Any] = {}
         for k, v in sorted(stand.items()):
+            if BILANZ_JE_RICHTUNG:
+                if not k.startswith("klasse_setup_richtung:"):
+                    continue
+                klasse, _, rest = k.removeprefix("klasse_setup_richtung:").partition("|")
+                setup, _, ri = rest.partition("|")
+                je_klasse[
+                    f"{setup} · {_KLASSE_NAME.get(klasse, klasse)} {'Long' if ri == 'long' else 'Short'}"
+                ] = v.as_dict()
+                continue
             if not k.startswith("klasse_setup:"):
                 continue
             klasse, _, setup = k.removeprefix("klasse_setup:").partition("|")
@@ -706,7 +739,9 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
             _anzeige(k)
             + (" (außer bewährte Setup-Arten)" if k.startswith("klasse_richtung:") else "")
             for k, v in stand.items()
-            if v.urteil == "gesperrt" and not k.startswith("setup:")
+            if v.urteil == "gesperrt"
+            and not k.startswith("setup:")
+            and not k.startswith("klasse_setup_richtung:")
         )
         return {
             "min_faelle": MIN_FAELLE,
@@ -757,6 +792,7 @@ def regeln_uebersicht(stand: Mapping[str, Stand]) -> dict[str, Any]:
 
 __all__ = [
     "BILANZ_JE_KLASSE",
+    "BILANZ_JE_RICHTUNG",
     "B_PLUS_BEI_BEWAEHRT",
     "MAX_JE_TAG",
     "MIN_CRV",
