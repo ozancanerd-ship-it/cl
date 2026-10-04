@@ -1,0 +1,91 @@
+name: Taktgeber
+
+# WARUM ES DIESEN WORKFLOW GIBT
+#
+# 04.10.2026, 14:37: in der App stand „Analyse 3 Std. 30 Min. alt". Die Laeufe selbst
+# waren alle gruen — sie fanden nur nicht mehr statt. GitHub hat die Zeitplaene
+# (alle 5 und alle 10 Minuten) ab dem 03.10. mittags fast komplett verschluckt: statt
+# rund zwoelf Laeufen je Stunde kam alle paar Stunden einer. Das ist dokumentiertes
+# Verhalten — geplante Workflows sind „best effort" und fallen unter Last weg.
+#
+# Ein workflow_dispatch faellt dagegen nicht weg. Dieser Workflow laeuft deshalb gut
+# fuenfeinhalb Stunden, gibt in dieser Zeit den Takt vor und startet sich am Ende selbst
+# neu. Ein stuendlicher Zeitplan holt ihn zurueck, falls die Kette doch einmal reisst.
+#
+# Takt (UTC-Minute, wie vorher die Zeitplaene):
+#   :25 und :55      voll      (Aktien, Krypto, Gold, Veroeffentlichung)
+#   :02, :12, …      krypto    (nur Krypto und Gold, Veroeffentlichung)
+#   alle 5 Minuten   waechter  (nur Marken pruefen, keine Veroeffentlichung)
+#
+# Laeuft gerade ein Scan, wird NICHT nachgeschoben: ein neuer Dispatch wuerde einen
+# wartenden Lauf aus der Warteschlange werfen (gleiche concurrency-Gruppe). Ein
+# verpasster voller oder Krypto-Scan wird nachgeholt, sobald der laufende fertig ist;
+# ein verpasster Waechter nicht — der naechste kommt in fuenf Minuten.
+#
+# Kosten: keine — das Repo ist oeffentlich, Actions-Minuten sind dort frei.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 * * * *"
+
+permissions:
+  actions: write   # den Scan-Workflow und sich selbst starten
+  contents: read
+
+concurrency:
+  group: taktgeber
+  cancel-in-progress: false
+
+jobs:
+  takt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - name: Takt geben
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -u
+          start=$(date +%s)
+          dauer=$((5*3600 + 30*60))
+          letzte=""
+          offen=""   # verpasster Lauf, der nachgeholt werden soll: voll > krypto > waechter
+          rang() { case "$1" in voll) echo 3;; krypto) echo 2;; waechter) echo 1;; *) echo 0;; esac; }
+          beschaeftigt() {
+            n=$(gh run list -w daily.yml -L 10 --json status \
+                  --jq '[.[]|select(.status!="completed")]|length' 2>/dev/null || echo err)
+            [ "$n" = "err" ] && return 0     # im Zweifel: nicht stoeren
+            [ "$n" -gt 0 ]
+          }
+          while [ $(( $(date +%s) - start )) -lt $dauer ]; do
+            m=$((10#$(date -u +%M)))
+            slot=$(date -u +%H%M)
+            if [ "$slot" != "$letzte" ]; then
+              modus=""
+              if [ $((m % 30)) -eq 25 ]; then modus=voll
+              elif [ $((m % 10)) -eq 2 ]; then modus=krypto
+              elif [ $((m % 5)) -eq 0 ]; then modus=waechter
+              fi
+              if [ -n "$modus" ]; then
+                letzte=$slot
+                [ "$(rang "$modus")" -gt "$(rang "$offen")" ] && offen=$modus
+              fi
+            fi
+            if [ -n "$offen" ]; then
+              if beschaeftigt; then
+                # Waechter verfaellt, Scans warten
+                [ "$offen" = "waechter" ] && offen=""
+              else
+                echo "$(date -u +%H:%M) → $offen"
+                gh workflow run daily.yml --ref main -f modus="$offen" \
+                  || echo "::warning::Dispatch $offen fehlgeschlagen"
+                offen=""
+                sleep 20   # bis der neue Lauf in der Liste steht
+              fi
+            fi
+            sleep 20
+          done
+          echo "Schicht vorbei — naechster Taktgeber"
+          gh workflow run taktgeber.yml --ref main
