@@ -279,6 +279,7 @@ def phase_b(args: argparse.Namespace) -> None:
     liste = Wachliste()
     archiv: dict[str, dict[str, Any]] = {}
     umstaende: dict[str, dict[str, Any]] = {}
+    einstieg_um: dict[str, str] = {}
     start = datetime.fromisoformat(args.start)
     ende = datetime.fromisoformat(args.ende)
     takte = set(je_zeit)
@@ -327,6 +328,12 @@ def phase_b(args: argparse.Namespace) -> None:
                 }
                 kerzen[w.instrument] = bars
             n_ev += len(liste.pruefen(kurse, jetzt=t, kerzen=kerzen))
+            # Wann der Einstieg kam (04.10.) — braucht die Ausstiegs-Studie, um den Kursweg
+            # ab dem Einstieg nachzuspielen. Die Wache selbst kennt nur den Einstiegskurs.
+            for w in offen:
+                k_e = f"{w.instrument}|{w.aufgenommen}"
+                if w.einstiegskurs is not None and k_e not in einstieg_um:
+                    einstieg_um[k_e] = iso
         for k, w in liste.wachen.items():
             if w.zustand in ENDZUSTAENDE or w.einstiegskurs is not None:
                 archiv[f"{k}|{w.aufgenommen}"] = w.as_dict()
@@ -337,6 +344,7 @@ def phase_b(args: argparse.Namespace) -> None:
     for schluessel, w in archiv.items():
         w = dict(w)
         w["umstaende"] = umstaende.get(schluessel, {})
+        w["einstieg_um"] = einstieg_um.get(schluessel)
         zeilen_aus.append(w)
     (out / "wachen.json").write_text(json.dumps(zeilen_aus, ensure_ascii=False), encoding="utf-8")
     print(f"{len(zeilen_aus)} Wachen, {n_ev} Ereignisse -> {out / 'wachen.json'}")
