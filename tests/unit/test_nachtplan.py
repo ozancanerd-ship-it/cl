@@ -176,3 +176,36 @@ def test_turbo_stop_auf_basiswert_wird_in_schein_preis_umgerechnet():
     assert "8," in text or "8 " in text
     assert "umgerechnet" in text
     assert "120" in text  # der Basiswert-Preis steht als Erklaerung dabei
+
+
+def test_ueberdehnt_und_im_plus_warnt():
+    """Ozan, 07.10. 23:45: MET war +37 % in 24 Std., H4-RSI 83 ("ueberdehnt") — die App
+    hat das nicht von sich aus gesagt, er musste explizit danach fragen. Jetzt soll der
+    Nacht-Plan genau diesen Fall von selbst markieren: im Plus + von der Analyse als
+    ueberdehnt eingestuft -> Hinweis, Stufe mindestens 'warn'."""
+    b = _b(plan={"stop": 160.0})
+    b["row"]["warnungen"] = ["H4-RSI 83 — die Bewegung ist bereits ueberdehnt"]
+    b["gvPct"] = 37.3
+    r = _lauf(b)
+    assert r["stufe"] in ("warn", "bad")
+    assert any("überdehnt" in w for w in r["warn"])
+    assert any("37" in w for w in r["warn"])
+
+
+def test_ueberdehnt_ohne_gewinn_bleibt_still():
+    """Dieselbe Warnung, aber die Position steht nicht im Plus -> kein Hinweis. Die
+    Warnung ist "sichere den Gewinn", nicht "diese Position ist riskant" — ohne Gewinn
+    gibt es nichts zu sichern, das waere eine andere Aussage."""
+    b = _b(plan={"stop": 160.0})
+    b["row"]["warnungen"] = ["H4-RSI 83 — die Bewegung ist bereits ueberdehnt"]
+    b["gvPct"] = -5.0
+    r = _lauf(b)
+    assert not any("überdehnt" in w for w in r["warn"])
+
+
+def test_im_plus_ohne_ueberdehnt_warnung_bleibt_still():
+    b = _b(plan={"stop": 160.0})
+    b["row"]["warnungen"] = []
+    b["gvPct"] = 37.3
+    r = _lauf(b)
+    assert not any("überdehnt" in w for w in r["warn"])

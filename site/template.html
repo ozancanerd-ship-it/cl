@@ -6337,6 +6337,16 @@ function nachtZeile(b, stand){
     if (stufe === 'gut') stufe = 'warn';
     warn.push(`Quartalszahlen ${zt.tage === 0 ? 'heute' : 'morgen'} — typische Bewegung ±${num((zt.bewegung||{}).median || 0, 1)} %, im Extrem ${num((zt.bewegung||{}).max || 0, 1)} %. Ein Stop schützt vor einer Kurslücke NICHT: er wird zum ersten Kurs danach ausgeführt.`);
   }
+  // 5 — Ueberdehnt UND im Plus: genau der Fall vom 07.10. (MET, +37 % in 24 Std., H4-RSI
+  // 83). Die Analyse schreibt "ueberdehnt" schon in die Warnungen (scanner/chart_score.py,
+  // analysis/indicators.py) — hier nur gelesen, nichts neu erfunden. Kein Verkaufs-Zwang,
+  // nur der Hinweis, den Ozan sonst jedes Mal selbst erfragen musste.
+  const ueberdehntWarnung = (rr && Array.isArray(rr.warnungen))
+    ? rr.warnungen.find(w => /ueberdehnt/i.test(w)) : null;
+  if (ueberdehntWarnung && b.gvPct != null && b.gvPct > 15){
+    if (stufe === 'gut') stufe = 'warn';
+    warn.push(`Im Plus (${b.gvPct >= 0 ? '+' : '−'}${Math.abs(b.gvPct).toFixed(0)} %) UND laut Analyse überdehnt: „${ueberdehntWarnung}" — ein Teil des Gewinns ist nur gesichert, wenn der Stop nah genug am Kurs steht. Weit entfernter Stop schützt vor dem Totalausfall, nicht vor einem Rücksetzer.`);
+  }
   if (!ns && pl.stop != null && stufe === 'gut') stufe = 'warn';
   return {b, name, eu, stufe, zeilen, warn, verlustStop, br, konto};
 }
