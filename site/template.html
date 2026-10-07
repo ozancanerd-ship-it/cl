@@ -2652,8 +2652,11 @@ function notenbankKasten(){
     <ul class="nb-l">${Object.entries(NB_KLASSE).map(([k, n]) => `<li><b>${n}</b> — ${esc(((NB.einordnung||{}).wirkung||{})[k] || '')}</li>`).join('')}</ul>
     ${depot}
     ${taktik ? `<p style="margin-top:8px"><strong>Taktik</strong></p><ul class="nb-l">${taktik}</ul>` : ''}
-    <p style="margin-top:8px;color:var(--ink-3)">Einordnung nach der üblichen Lehrbuch-Richtung —
-      <strong>Hinweis, kein Signal</strong>. Ob sie in unseren Daten wirklich trägt, ist nicht gemessen.</p>
+    <p style="margin-top:8px">Gemessen (14 Fed-Sitzungen seit 2025): an Beschlusstagen war die 24-h-Spanne bei
+      Bitcoin im Schnitt <strong>4,2 % statt 3,3 %</strong>, bei Ethereum 6,5 % statt 5,2 % — die Märkte
+      <em>schwanken</em> an solchen Tagen stärker.</p>
+    <p style="margin-top:8px;color:var(--ink-3)">Die <em>Richtung</em> (straff = Gegenwind) ist die übliche Lehrbuch-Einordnung —
+      <strong>Hinweis, kein Signal</strong>; für 14 Ereignisse nicht belegbar.</p>
   </div>`;
 }
 
@@ -8645,7 +8648,7 @@ const STRATEGIEN = [
   ['BTC-Trend als Filter fuer Alt-Trades', 'EXPERIMENTAL', 'Richtung stimmt, Abstand nicht abgesichert — nur Anzeige', 'EINSTIEG-FAKTOREN-STUDIE-2026-10'],
   ['Gold-Tageshandel (Asien-Range, Sweep)', 'GESPERRT', 'OOS −0,06 / −0,57 R, Bootstrap negativ', 'GOLD-DAYTRADING-STUDIE-2026-10'],
   ['Mean Reversion (Bollinger + RSI, 1 h)', 'GESPERRT', 'alle Varianten negativ, OOS −0,13 bis −0,29 R', 'MEAN-REVERSION-STUDIE-2026-10'],
-  ['Notenbank-Einordnung (Fed/EZB/BoE)', 'EXPERIMENTAL', 'Lehrbuch-Richtung, Wirkung in unseren Daten nicht gemessen — nur Hinweis', 'Notenbanken-Karte'],
+  ['Notenbank-Einordnung (Fed/EZB/BoE)', 'EXPERIMENTAL', 'Richtung = Lehrbuch, nicht belegt; Schwankung an Fed-Tagen ca. +25 % gemessen (14 Sitzungen)', 'NOTENBANK-VOLATILITAET-2026-10'],
   ['Nachlegen / Teilverkauf nach Nachzuegler-Regeln', 'GESPERRT', 'frueher Studien: kein messbarer Nutzen — nur Hinweise, keine Regel', 'AUSSTIEG-STUDIE-2026-10'],
 ];
 function strategieKasten(){
