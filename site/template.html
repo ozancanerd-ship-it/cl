@@ -4881,14 +4881,14 @@ function geheimnisLink(){
   } catch(e){}
   return `https://github.com/${owner}/${repo}/settings/secrets/actions`;
 }
-const KANAL_TEXT = {push:'Push aufs Handy', telegram:'Telegram', mail:'Mail über GitHub (ohne Einzelheiten)'};
+const KANAL_TEXT = {push:'Push aufs Handy', telegram:'Telegram', email:'E-Mail mit allen Einzelheiten', mail:'Mail über GitHub (ohne Einzelheiten)'};
 async function fuelleWaechter(el){
   if (!el) return;
   const pos = ladePositionen();
   if (!WA){ el.innerHTML = ''; return; }
   const link = geheimnisLink();
   const kan = (WA.kanaele || []).map(k => KANAL_TEXT[k] || k);
-  const privat = (WA.kanaele || []).some(k => k === 'push' || k === 'telegram');
+  const privat = (WA.kanaele || []).some(k => k === 'push' || k === 'telegram' || k === 'email');
   const kanSatz = kan.length
     ? `Meldung per: ${esc(kan.join(', '))}.` + (privat ? '' : ' Für die Einzelheiten direkt aufs '
       + 'Handy fehlt noch Push (Reiter Alarme → „Alarme aufs Handy").')

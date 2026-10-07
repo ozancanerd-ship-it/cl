@@ -549,10 +549,15 @@ def pflegen(
             if plan.get(m) is not None:
                 ziele[m] = _zahl(plan.get(m))
     erledigt = set(pos.get("erledigt") or []) | set(st.get("erreicht") or [])
+    menge = _zahl(pos.get("menge"))
+    offen = 3 - len({"TP1", "TP2", "TP3"} & erledigt)
     for marke, teil in (("TP1", "ein Drittel"), ("TP2", "das zweite Drittel"), ("TP3", "den Rest")):
         ziel = _zahl(ziele.get(marke.lower()))
         if ziel is None or marke in erledigt:
             continue
+        if menge and menge > 0 and offen > 0:
+            stk = menge / offen
+            teil += f" (ca. {stk:.4g} Stück von {menge:.6g})"
         if kurs >= ziel if lang else kurs <= ziel:
             erledigt.add(marke)
             st["erreicht"] = sorted(set(st.get("erreicht") or []) | {marke})

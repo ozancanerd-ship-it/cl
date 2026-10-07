@@ -151,6 +151,58 @@ class TelegramSink(Sink):
         self.sent += 1
 
 
+class EmailSink(Sink):
+    """Echte Mail mit vollem Text ueber SMTP (z. B. Gmail mit App-Passwort).
+
+    Nur aktiv, wenn ``SMTP_USER`` und ``SMTP_PASS`` gesetzt sind. Empfaenger ist
+    ``MAIL_TO`` (sonst der Absender selbst). Der volle Text — Name, Stueckzahl — geht nur
+    ueber diesen Weg, nie ueber das oeffentliche Repository."""
+
+    name = "email"
+
+    def __init__(
+        self,
+        *,
+        min_severity: Severity = Severity.INFO,
+        transport: object | None = None,
+    ) -> None:
+        self._user = get_secret("SMTP_USER", allow_keychain=False)
+        self._pass = get_secret("SMTP_PASS", allow_keychain=False)
+        self._to = os.environ.get("MAIL_TO", "").strip()
+        self._host = os.environ.get("SMTP_HOST", "").strip() or "smtp.gmail.com"
+        try:
+            self._port = int(os.environ.get("SMTP_PORT", "") or 465)
+        except ValueError:
+            self._port = 465
+        self.min_severity = min_severity
+        self._transport = transport  # Callable(msg) -> None; None => echter SMTP-Versand
+        self.sent = 0
+
+    def available(self) -> bool:
+        return self._user.present and self._pass.present
+
+    def deliver(self, note: Notification) -> None:
+        if not self.available() or note.severity < self.min_severity:
+            return
+        from email.message import EmailMessage
+
+        msg = EmailMessage()
+        absender = self._user.reveal()
+        msg["From"] = absender
+        msg["To"] = self._to or absender
+        msg["Subject"] = note.title
+        msg.set_content(note.body or note.title)
+        if self._transport is not None:
+            self._transport(msg)  # type: ignore[operator]
+        else:  # pragma: no cover - echter Netzwerk-Pfad
+            import smtplib
+
+            with smtplib.SMTP_SSL(self._host, self._port, timeout=20) as srv:
+                srv.login(absender, self._pass.reveal())
+                srv.send_message(msg)
+        self.sent += 1
+
+
 #: Der oeffentliche VAPID-Schluessel. Er gehoert in die Seite und darf oeffentlich sein —
 #: das ist der Sinn des Verfahrens. Der zugehoerige private Schluessel steht
 #: ausschliesslich in einem GitHub-Secret und niemals im Code.

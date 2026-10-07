@@ -57,6 +57,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from trading_agent.ops.notify import (
+    EmailSink,
     GitHubIssueSink,
     Notification,
     Notifier,
@@ -364,8 +365,9 @@ def main() -> int:
     roh = os.environ.get("DEPOT_CODE", "").strip()
     push = WebPushSink(min_severity=Severity.INFO)
     tg = TelegramSink(min_severity=Severity.INFO)
+    mail = EmailSink(min_severity=Severity.INFO)
     gh = GitHubIssueSink(erwaehnen="ozancanerd-ship-it")
-    kanaele = [n for n, s in (("push", push), ("telegram", tg), ("mail", gh)) if s.available()]
+    kanaele = [n for n, s in (("push", push), ("telegram", tg), ("email", mail), ("mail", gh)) if s.available()]
 
     if not roh:
         print("kein DEPOT_CODE hinterlegt — der Depot-Waechter bleibt still.")
@@ -450,6 +452,8 @@ def main() -> int:
             sinks.append(push)
         if tg.available():
             sinks.append(tg)
+        if mail.available():
+            sinks.append(mail)
         if sinks:
             Notifier(sinks, max_per_window=10, dedup_window_s=0.0).notify(
                 Notification(
