@@ -29,7 +29,9 @@ def test_minichart_steht_auf_der_karte_und_holt_kerzen_gepuffert() -> None:
     assert "${hebelKasten(b)}\n        ${miniChart(b)}" in s
     assert "api.kraken.com/0/public/OHLC" in s
     assert "600000" in s  # hoechstens alle 10 Minuten
-    assert "if (!b || istBar(b.pos) || istSchein(b.pos)) return '';" in s
+    assert "if (!b || istBar(b.pos)) return '';" in s
+    # Aktien und Scheine: Verlauf aus dem Scan (Gleichlauf-Block, Feld k)
+    assert "S.gleichlauf.k" in s
 
 
 def test_depot_grafik_steht_ueber_der_tabelle() -> None:

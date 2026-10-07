@@ -5954,23 +5954,46 @@ function mcLaden(paar){
     .finally(() => { MC_LADEN.delete(paar); try { if (typeof zeichnePortfolio === 'function') zeichnePortfolio(); } catch(e){} });
 }
 function miniChart(b){
-  if (!b || istBar(b.pos) || istSchein(b.pos)) return '';
-  const pr = krakenPaar(b.pos.sym);
-  if (!pr) return '';
-  const paar = pr.replace('/', '');
-  mcLaden(paar);
-  const e = MC_CACHE.get(paar);
-  if (!e) return `<div class="mc"><span class="nu" style="font-size:12px">Verlauf wird geladen …</span></div>`;
-  if (e.fehler) return '';
+  if (!b || istBar(b.pos)) return '';
+  const schein = istSchein(b.pos);
+  const pr = schein ? null : krakenPaar(b.pos.sym);
+  let e = null, titel = '90 Tage', basisKurs = null;
+  if (pr){
+    const paar = pr.replace('/', '');
+    mcLaden(paar);
+    e = MC_CACHE.get(paar);
+    if (!e) return `<div class="mc"><span class="nu" style="font-size:12px">Verlauf wird geladen …</span></div>`;
+    if (e.fehler) e = null;
+  }
+  if (!e){
+    // Kein Kraken-Verlauf (Aktie, Schein): die Schlusskurse aus dem Scan (Gleichlauf-Block).
+    const k = S && S.gleichlauf && S.gleichlauf.k;
+    const nm = glNameFuer(b);
+    const reihe = k && nm ? k[nm] : null;
+    if (!reihe || reihe.length < 20) return '';
+    e = {c: reihe.map(c => ({c, h: c, l: c}))};
+    titel = `${reihe.length} Handelstage`;
+    if (schein){
+      if (b.hebel && b.hebel.basisKurs != null) basisKurs = b.hebel.basisKurs;
+      titel += ' · Verlauf des Basiswerts' + (b.hebel && b.hebel.basisName ? ' ' + b.hebel.basisName : '');
+    }
+  }
   const pl = b.pos.plan || {};
   const lang = !istKurzDirekt(b.pos);
   const marken = [];
   const add = (lab, v, art) => { if (v != null && isFinite(v) && v > 0) marken.push({lab, v: +v, art}); };
-  add('Einstieg', b.pos.einstieg, 'ein');
-  add(pl.schutz != null ? 'Schutz' : 'Stop', pl.stop, 'stop');
-  add('Ziel 1', pl.tp1, 'tp'); add('Ziel 2', pl.tp2, 'tp'); add('Ziel 3', pl.tp3, 'tp');
-  if (b.hebel && b.hebel.art === 'margin') add('Liquidation', b.hebel.liquidation, 'stop');
-  const cs = e.c, kurs = b.kurs != null ? b.kurs : cs[cs.length-1].c;
+  if (schein){
+    // Marken des Scheins stehen in der Waehrung des Basiswerts: Knock-out und Basis-Stop.
+    add('Knock-out', b.pos.ko, 'stop');
+    if (pl.ebene === 'basis') add('Stop', pl.stop, 'stop');
+  } else {
+    add('Einstieg', b.pos.einstieg, 'ein');
+    add(pl.schutz != null ? 'Schutz' : 'Stop', pl.stop, 'stop');
+    add('Ziel 1', pl.tp1, 'tp'); add('Ziel 2', pl.tp2, 'tp'); add('Ziel 3', pl.tp3, 'tp');
+    if (b.hebel && b.hebel.art === 'margin') add('Liquidation', b.hebel.liquidation, 'stop');
+  }
+  const kursX = schein ? basisKurs : b.kurs;
+  const cs = e.c, kurs = kursX != null ? kursX : cs[cs.length-1].c;
   let lo = Math.min(...cs.map(x => x.l), kurs), hi = Math.max(...cs.map(x => x.h), kurs);
   // Marken weit ausserhalb quetschen sonst den Verlauf zusammen: nur bis +/- 35 % Abstand.
   const nah = marken.filter(m => m.v >= lo * 0.65 && m.v <= hi * 1.35);
@@ -5996,7 +6019,7 @@ function miniChart(b){
     <path class="mc-f ${plus ? 'plus' : 'minus'}" d="${flaeche}"/>
     <path class="mc-p" d="${linie}"/>${mk}
     <circle class="mc-k" cx="${X(cs.length-1).toFixed(1)}" cy="${jy.toFixed(1)}" r="3"/>
-  </svg><div class="nu" style="font-size:11px">90 Tage${aus ? ` · ${aus} Marke${aus>1?'n':''} weit ausserhalb, nicht eingezeichnet` : ''}${lang ? '' : ' · Short'}</div></div>`;
+  </svg><div class="nu" style="font-size:11px">${esc(titel)}${aus ? ` · ${aus} Marke${aus>1?'n':''} weit ausserhalb, nicht eingezeichnet` : ''}${lang ? '' : ' · Short'}</div></div>`;
 }
 
 /* ============================================================ DEPOT-GRAFIK

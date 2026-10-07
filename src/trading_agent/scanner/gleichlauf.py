@@ -117,6 +117,7 @@ def baue(reihen: dict[str, dict[date, float]]) -> dict[str, Any] | None:
 
     z_je: dict[str, str] = {}
     sd_je: dict[str, float] = {}
+    k_je: dict[str, list[float]] = {}
     for name, reihe in reihen.items():
         kurse = [reihe.get(t) for t in tage]
         vorhanden = sum(1 for k in kurse if k is not None)
@@ -147,6 +148,9 @@ def baue(reihen: dict[str, dict[date, float]]) -> dict[str, Any] | None:
         # Tagesschwankung in Prozent — die Groesse, mit der die App aus Gewichten und
         # Korrelationen das Tagesrisiko des Depots in Euro rechnet.
         sd_je[name] = round(sd * 100, 4)
+        # Die Schlusskurse selbst (5 gueltige Stellen) — fuer die Mini-Charts in der App,
+        # damit auch Aktien und Scheine einen Verlauf bekommen (Kraken liefert nur Coins).
+        k_je[name] = [float(f"{x:.5g}") for x in gefuellt]
 
     if len(z_je) < 5:
         return None
@@ -157,4 +161,5 @@ def baue(reihen: dict[str, dict[date, float]]) -> dict[str, Any] | None:
         "mitte": 128,
         "z": z_je,
         "sd": sd_je,
+        "k": k_je,
     }

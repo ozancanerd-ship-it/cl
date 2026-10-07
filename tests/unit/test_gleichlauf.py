@@ -188,3 +188,17 @@ def test_aktien_ueberleben_ein_feld_mit_kryptomehrheit() -> None:
         assert f"AKT{j}" in block["z"], "Aktien duerfen nicht aus dem Raster fallen"
     for j in range(12):
         assert f"K{j}USD" in block["z"]
+
+
+def test_block_traegt_die_schlusskurse() -> None:
+    from datetime import date, timedelta
+
+    start = date(2026, 1, 1)
+    reihen = {
+        f"X{i}": {start + timedelta(days=d): 100.0 + i + d * 0.5 + (d % 3) for d in range(100)}
+        for i in range(6)
+    }
+    blk = gl.baue(reihen)
+    assert blk is not None and "k" in blk
+    assert set(blk["k"]) == set(blk["z"])
+    assert len(blk["k"]["X0"]) == blk["tage"] + 1
