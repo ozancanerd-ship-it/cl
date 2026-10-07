@@ -325,6 +325,15 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
   box-shadow:0 0 0 4px rgba(76,141,255,.14)}
 .ok-tag{font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.1em;
   text-transform:uppercase; color:var(--long); margin-left:4px}
+.mc{margin:10px 0 2px}
+.mc svg{width:100%;height:auto;display:block;overflow:visible}
+.mc-p{fill:none;stroke:var(--ink-2);stroke-width:1.4;stroke-linejoin:round}
+.mc-f{stroke:none}.mc-f.plus{fill:var(--long-bg)}.mc-f.minus{fill:var(--bad-bg)}
+.mc-l{stroke-width:1;stroke-dasharray:3 3}
+.mc-l.ein{stroke:var(--accent-2)}.mc-l.stop{stroke:var(--bad)}.mc-l.tp{stroke:var(--long)}
+.mc-t{font:9px "JetBrains Mono",monospace;fill:var(--ink-3)}
+.mc-t.ein{fill:var(--accent-2)}.mc-t.stop{fill:var(--bad)}.mc-t.tp{fill:var(--long)}.mc-t.kurs{fill:var(--ink)}
+.mc-k{fill:var(--ink);stroke:var(--bg,#000);stroke-width:1.5}
 .fl{margin:16px 2px 4px; position:relative}
 .fl-bahn{position:relative; height:8px; border-radius:6px; background:var(--sunk);
   box-shadow:inset 0 0 0 1px var(--rule)}
@@ -3680,7 +3689,18 @@ function bewertePosition(pos){
   const gv = (markt != null && einstand != null) ? (kurzDirekt ? einstand - markt : markt - einstand) : null;
   // Wert eines ungehebelten Shorts: was beim Schliessen da ist (Einsatz plus Ergebnis).
   // Mit Margin bleibt es beim Nominalwert — wie bei einer gehebelten Long-Position.
-  const wert = (kurzDirekt && !pos.hebel && gv != null) ? einstand + gv : markt;
+  let wert = (kurzDirekt && !pos.hebel && gv != null) ? einstand + gv : markt;
+  /* Margin (Zcash 5x, Raydium 3x): im Depot zaehlt das EIGENE Geld, nicht der Nominalwert.
+     Bis 07.10. stand Zcash mit 150 $ im Depotwert, eingesetzt waren aber 30 $. Zwei
+     Positionen machten das Depot dadurch ~190 € reicher, als es ist — und jede Prozent-
+     angabe (Anteil, Klumpen, Aufteilung) rechnete mit der falschen Basis. Eigenes Geld =
+     Einsatz (Nominal ÷ Hebel) plus Gewinn bzw. Verlust. Der Nominalwert bleibt als
+     ``nominal`` erhalten (Marktgewicht, Gleichlauf). */
+  let nominal = null;
+  if (pos.ko == null && Number(pos.hebel) > 1 && markt != null && einstand != null && gv != null){
+    nominal = markt;
+    wert = einstand / Number(pos.hebel) + gv;
+  }
   const gvPct = (gv != null && einstand) ? gv / einstand * 100 : null;
   /* R misst gegen DEINEN Stop. Bis 01.10. stand hier die Invalidierung des frischen
      Scan-Setups — bei Mondelez die eines SHORTS, gegen eine gekaufte Position: „R −1,11"
@@ -3737,7 +3757,7 @@ function bewertePosition(pos){
       }
     }
   }
-  return {pos, row, kurs, wert, einstand, gv, gvPct, r, score, urteil, kl,
+  return {pos, row, kurs, wert, nominal, einstand, gv, gvPct, r, score, urteil, kl,
           live: !!live, w, basis, halt, hebel};
 }
 
@@ -5498,7 +5518,9 @@ function glGewicht(b, stand){
   if (wertEU == null) return null;
   const h = b.hebel;
   if (h && h.art === 'margin' && h.hebel > 1){
-    return {markt: wertEU, kapital: wertEU / h.hebel, hebel: h.hebel, art: 'margin'};
+    // ``b.wert`` ist seit 07.10. schon das eigene Geld; der Nominalwert steht in ``b.nominal``.
+    const nomEU = b.nominal != null ? stand.inEuro(b, b.nominal) : wertEU * h.hebel;
+    return {markt: nomEU, kapital: wertEU, hebel: h.hebel, art: 'margin'};
   }
   if (h && !h.ausgeknockt && h.hebel > 1){
     return {markt: wertEU * h.hebel, kapital: wertEU, hebel: h.hebel, art: 'schein'};
@@ -5898,6 +5920,75 @@ function kursQuelleMarke(b){
   }
   return `<span class="nu" style="font-size:10.5px">Kurs von Hand</span>`;
 }
+/* ============================================================ MINI-CHART JE POSITION
+   Ozan, 07.10.: „Ich will die Analysen auch grafisch sehen." Jede Krypto-Position bekommt
+   unter den Zahlen einen Verlauf der letzten 90 Tage mit ihren Marken: Einstieg, Stop,
+   Ziele, Liquidation (Margin) und aktueller Kurs. Die Tageskerzen kommen direkt von Kraken
+   (öffentlich, ohne Schlüssel); für Aktien und Scheine gibt es hier keine Kerzen — dort
+   bleibt der Knopf „Chart ansehen". Die Karten zeichnen sich alle paar Sekunden neu, darum
+   steht die Kerzenreihe in einem Zwischenspeicher und wird höchstens alle 10 Minuten geholt. */
+const MC_CACHE = new Map();     // Paar -> {zeit, c:[Schlusskurse], fehler}
+const MC_LADEN = new Set();
+function mcLaden(paar){
+  const alt = MC_CACHE.get(paar);
+  if (MC_LADEN.has(paar)) return;
+  if (alt && Date.now() - alt.zeit < (alt.fehler ? 300000 : 600000)) return;
+  MC_LADEN.add(paar);
+  fetch('https://api.kraken.com/0/public/OHLC?pair=' + encodeURIComponent(paar) + '&interval=1440')
+    .then(r => r.json()).then(j => {
+      const k = j && j.result ? j.result[Object.keys(j.result).find(x => x !== 'last')] : null;
+      if (!Array.isArray(k) || k.length < 10) throw new Error('leer');
+      MC_CACHE.set(paar, {zeit: Date.now(),
+        c: k.slice(-90).map(x => ({t: x[0], h: +x[2], l: +x[3], c: +x[4]}))});
+    }).catch(() => MC_CACHE.set(paar, {zeit: Date.now(), fehler: true}))
+    .finally(() => { MC_LADEN.delete(paar); try { if (typeof zeichnePortfolio === 'function') zeichnePortfolio(); } catch(e){} });
+}
+function miniChart(b){
+  if (!b || istBar(b.pos) || istSchein(b.pos)) return '';
+  const pr = krakenPaar(b.pos.sym);
+  if (!pr) return '';
+  const paar = pr.replace('/', '');
+  mcLaden(paar);
+  const e = MC_CACHE.get(paar);
+  if (!e) return `<div class="mc"><span class="nu" style="font-size:12px">Verlauf wird geladen …</span></div>`;
+  if (e.fehler) return '';
+  const pl = b.pos.plan || {};
+  const lang = !istKurzDirekt(b.pos);
+  const marken = [];
+  const add = (lab, v, art) => { if (v != null && isFinite(v) && v > 0) marken.push({lab, v: +v, art}); };
+  add('Einstieg', b.pos.einstieg, 'ein');
+  add(pl.schutz != null ? 'Schutz' : 'Stop', pl.stop, 'stop');
+  add('Ziel 1', pl.tp1, 'tp'); add('Ziel 2', pl.tp2, 'tp'); add('Ziel 3', pl.tp3, 'tp');
+  if (b.hebel && b.hebel.art === 'margin') add('Liquidation', b.hebel.liquidation, 'stop');
+  const cs = e.c, kurs = b.kurs != null ? b.kurs : cs[cs.length-1].c;
+  let lo = Math.min(...cs.map(x => x.l), kurs), hi = Math.max(...cs.map(x => x.h), kurs);
+  // Marken weit ausserhalb quetschen sonst den Verlauf zusammen: nur bis +/- 35 % Abstand.
+  const nah = marken.filter(m => m.v >= lo * 0.65 && m.v <= hi * 1.35);
+  for (const m of nah){ lo = Math.min(lo, m.v); hi = Math.max(hi, m.v); }
+  const W = 340, H = 128, pad = 6, rechts = 112;
+  const X = i => pad + i / (cs.length - 1) * (W - pad - rechts);
+  const Y = v => H - pad - (v - lo) / (hi - lo || 1) * (H - 2 * pad);
+  const d = digits(kurs);
+  const linie = cs.map((x, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x.c).toFixed(1)).join('');
+  const flaeche = linie + `L${X(cs.length-1).toFixed(1)} ${H-pad}L${X(0).toFixed(1)} ${H-pad}Z`;
+  const jy = Y(kurs);
+  // Beschriftungen von oben nach unten, mit Mindestabstand — der Kurs ist eine davon.
+  const texte = nah.map(m => ({y: Y(m.v), art: m.art, t: `${m.lab} ${num(m.v, d)}`, linie: true}))
+    .concat([{y: jy, art: 'kurs', t: `Kurs ${num(kurs, d)}`, linie: false}]).sort((a, c2) => a.y - c2.y);
+  for (let i = 1; i < texte.length; i++) texte[i].ly = Math.max(texte[i].y, (texte[i-1].ly ?? texte[i-1].y) + 10);
+  if (texte.length) texte[0].ly = texte[0].y;
+  const mk = texte.map(m => (m.linie ? `<line class="mc-l ${m.art}" x1="${pad}" x2="${W-rechts}" y1="${m.y.toFixed(1)}" y2="${m.y.toFixed(1)}"/>` : '')
+    + `<text class="mc-t ${m.art}" x="${W-rechts+4}" y="${(m.ly + 3).toFixed(1)}">${esc(m.t)}</text>`).join('');
+  const plus = b.gv == null ? true : b.gv >= 0;
+  const aus = marken.length - nah.length;
+  return `<div class="mc"><svg viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="Verlauf 90 Tage mit Einstieg, Stop und Zielen">
+    <path class="mc-f ${plus ? 'plus' : 'minus'}" d="${flaeche}"/>
+    <path class="mc-p" d="${linie}"/>${mk}
+    <circle class="mc-k" cx="${X(cs.length-1).toFixed(1)}" cy="${jy.toFixed(1)}" r="3"/>
+  </svg><div class="nu" style="font-size:11px">90 Tage${aus ? ` · ${aus} Marke${aus>1?'n':''} weit ausserhalb, nicht eingezeichnet` : ''}${lang ? '' : ' · Short'}</div></div>`;
+}
+
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -6065,6 +6156,7 @@ function zeichnePortfolio(){
           ${(posWertEUR!=null && b.kurs!=null)?`<span>Wert <b>${num(posWertEUR, posWertEUR<100?2:0)} €</b>${
             posWertEigen!=null?` <span style="color:var(--ink-3)">≈ ${num(posWertEigen, posWertEigen<100?2:0)} $</span>`:''}${
             (gesamt && posWertEUR!=null)?` <span style="color:var(--ink-3)">· ${(posWertEUR/gesamt*100).toFixed(1).replace('.',',')} % vom Depot</span>`:''}</span>`:''}
+          ${b.nominal!=null?`<span title="Marktwert der Position; dein eigenes Geld ist ein ${esc(String(b.pos.hebel))}tel davon plus Gewinn/Verlust">Hebel <b>${esc(String(b.pos.hebel))}×</b> · Nominal <b>${num(inEuro(b,b.nominal),0)} €</b></span>`:''}
           ${b.pos.einstieg?`<span>Einstieg <b>${num(b.pos.einstieg,d)}${z}</b></span>`:''}
           ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}${z}</b>${b.live?' <span class="up">live</span>':''}</span>`
             :`<span>Wert <b>${num(b.wert,2)} €</b> <span style="color:var(--ink-3)">von dir eingetragen</span></span>`}
@@ -6074,6 +6166,7 @@ function zeichnePortfolio(){
         ${zahlenHinweis(b)}
         ${r ? '' : basisKasten(b)}
         ${hebelKasten(b)}
+        ${miniChart(b)}
         ${entscheidungsKasten(b, stand)}
         ${ratKasten(b, ku)}
         ${mehrKasten(b)}
