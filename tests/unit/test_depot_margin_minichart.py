@@ -50,3 +50,11 @@ def test_stresstest_kappt_verlust_bei_schein_und_margin() -> None:
 
 def test_karte_zeigt_btc_beta() -> None:
     assert "BTC-Beta <b>" in _s()
+
+
+def test_kapital_ranking_ohne_erfundene_punktzahl() -> None:
+    s = _s()
+    assert "function kapitalRanking(stand)" in s
+    assert "try { h += kapitalRanking(stand); } catch(e){}\n    h += glKasten(stand);" in s
+    assert "alarm.ja === true" in s  # neue Chancen nur mit bestandenem Alarm-Tor
+    assert "Reihenfolge nach Dringlichkeit, nicht nach einer Punktzahl" in s

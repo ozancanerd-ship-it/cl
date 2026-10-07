@@ -6142,6 +6142,62 @@ function stresstest(stand){
       unbekannt ? ` ${unbekannt} Position${unbekannt > 1 ? 'en' : ''} ohne Messreihe zählen nicht mit.` : ''}</p></div>`;
 }
 
+/* ============================================================ KAPITAL-RANKING (seit 07.10.)
+   „Wo ist mein Kapital am besten eingesetzt?" — Positionen UND neue Chancen in EINER Liste.
+   Bewusst KEINE erfundene Punktzahl: die Reihenfolge folgt der Dringlichkeit und dem, was
+   sich messen liess — feste Marken (Stop, Knock-out, Ziel) vor Einschätzungen, belegte
+   Neukäufe (Alarm-Tor bestanden) vor Halten. Eine Punktzahl über Hold/Add/Reduce wäre
+   unbelegt (Studien 27./30.09.: Schlusslicht-, Gegenrichtungs- und Klumpen-Verkauf haben
+   keinen Vorteil gebracht). Jede Zeile nennt, WOHER die Einstufung kommt. */
+function kapitalRanking(stand){
+  const {bew, inEuro, gesamt} = stand;
+  if (!bew.length || !(gesamt > 0) || !S) return '';
+  const zeilen = [];
+  let bar = 0;
+  const imDepot = new Set();
+  for (const b of bew){
+    const eu = inEuro(b, b.wert) || 0;
+    if (istBar(b.pos)){ bar += eu; continue; }
+    const nm = b.row ? muenzeVon(b.row.instrument) : null;
+    if (nm) imDepot.add(nm);
+    let a = null; try { a = positionsAktion(b, stand); } catch(e){}
+    const n = posName(b);
+    const anteil = gesamt ? eu / gesamt * 100 : 0;
+    if (a && a.art === 'raus') zeilen.push({p: 0, tag: 'SCHLIESSEN', kl: 'bad', n, t: a.titel, q: 'feste Marke (Stop / Knock-out / Liquidation)', eu});
+    else if (a && a.art === 'teilverkauf') zeilen.push({p: 1, tag: 'TEIL RAUS', kl: 'warn', n, t: a.titel + (a.euro ? ` · ≈ ${num(a.euro, 0)} €` : ''), q: 'Ziel erreicht bzw. Puffer eng', eu});
+    else if (a && a.art === 'nachlegen') zeilen.push({p: 2, tag: 'NACHLEGEN', kl: 'gut', n, t: `≈ ${num(a.euro, 0)} € zusätzlich`, q: 'Stärke + Setup durch das Alarm-Tor + Stop vorhanden', eu});
+    else {
+      const rs = b.halt && b.halt.rs;
+      const verl = b.gvPct != null && b.gvPct < -10;
+      zeilen.push({p: 4 + (verl && rs != null && rs < RS_SCHWACH ? 0.5 : 0), tag: verl && rs != null && rs < RS_SCHWACH ? 'BEOBACHTEN' : 'HALTEN',
+        kl: verl && rs != null && rs < RS_SCHWACH ? 'warn' : '', n,
+        t: rs != null ? `Relative Stärke ${rs.toFixed(0)} von 100` + (b.gvPct != null ? ` · ${b.gvPct >= 0 ? '+' : '−'}${Math.abs(b.gvPct).toFixed(0)} %` : '') : 'ohne Messung',
+        q: verl && rs != null && rs < RS_SCHWACH ? 'schwach und im Minus — nicht nachkaufen; verkauft wird über den Stop' : 'kein Anlass zu handeln', eu, rs: rs == null ? 50 : rs});
+    }
+  }
+  // Neue Chancen: nur solche, die das Alarm-Tor bestehen (eigene Bilanz) und noch nicht im Depot sind.
+  const neu = (S.gesamt || []).filter(o => o.alarm && o.alarm.ja === true && o.handelbar && !imDepot.has(muenzeVon(o.instrument)))
+    .sort((x, y) => (y.score || 0) - (x.score || 0)).slice(0, 3);
+  for (const o of neu){
+    zeilen.push({p: 3, tag: 'NEU KAUFEN', kl: 'gut', n: o.name || name(o.instrument),
+      t: `${o.richtung === 'short' ? 'Short' : 'Long'} · Note ${o.note} · Einstieg ${num(o.einstieg, digits(o.einstieg))}`,
+      q: 'Alarm-Tor bestanden (benanntes Setup mit positiver eigener Bilanz)', eu: 0});
+  }
+  zeilen.sort((x, y) => x.p - y.p || ((y.rs ?? 50) - (x.rs ?? 50)) || y.eu - x.eu);
+  const top = zeilen.filter(z => z.tag !== 'HALTEN').concat(zeilen.filter(z => z.tag === 'HALTEN'));
+  const gehalten = zeilen.filter(z => z.tag === 'HALTEN').length;
+  const sicht = zeilen.filter(z => z.tag !== 'HALTEN');
+  return `<h2>Wo steht dein Kapital am besten?</h2><div class="karte">
+    <ol class="steps" style="margin:0">${sicht.map(z => `<li><span class="note ${z.kl}" style="margin-right:6px">${esc(z.tag)}</span>
+      <b>${esc(z.n)}</b> — ${esc(z.t)}<br><span class="nu" style="font-size:11.5px">Grund: ${esc(z.q)}</span></li>`).join('')
+      || '<li>Nichts verlangt gerade eine Handlung.</li>'}
+      <li><span class="note" style="margin-right:6px">HALTEN</span><b>${gehalten} Positionen</b> — kein Anlass zu handeln.</li>
+      ${bar > 0.5 ? `<li><span class="note" style="margin-right:6px">BARGELD</span><b>${num(bar, 0)} €</b> — ${(bar / gesamt * 100).toFixed(0)} % des Depots, bereit für ${neu.length ? 'die Chancen oben' : 'die nächste belegte Chance'}.</li>` : ''}
+    </ol>
+    <p class="nu" style="font-size:11.5px;margin:8px 0 0">Reihenfolge nach Dringlichkeit, nicht nach einer Punktzahl: feste Marken vor Einschätzungen, belegte Neukäufe vor Halten. Nichts wird automatisch ausgeführt.</p>
+  </div>`;
+}
+
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -6259,6 +6315,7 @@ function zeichnePortfolio(){
        wo sich Nachlegen rechnen würde. Die Stops stehen und werden nachgezogen; Nichtstun
        ist hier das Ergebnis, nicht die Lücke.</p></div>`; })();
 
+    try { h += kapitalRanking(stand); } catch(e){}
     h += glKasten(stand);
 
     /* Auf einen Blick: wie viel Geld wo steckt. Ozan, 28.09.: „es steht ja immer noch
