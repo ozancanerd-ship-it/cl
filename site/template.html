@@ -6293,6 +6293,8 @@ function zeichnePortfolio(){
           ${b.kurs!=null?`<span>Kurs <b>${num(b.kurs,d)}${z}</b>${b.live?' <span class="up">live</span>':''}</span>`
             :`<span>Wert <b>${num(b.wert,2)} €</b> <span style="color:var(--ink-3)">von dir eingetragen</span></span>`}
           ${b.gvPct!=null?`<span>G/V <b class="${b.gvPct>=0?'up':'dn'}">${pct(b.gvPct,1)}</b></span>`:''}
+          ${(()=>{ try { if (istBar(b.pos)) return ''; const nm = glNameFuer(b); const be = nm ? stBeta(nm, 'BTCUSD') : null;
+              return be == null ? '' : `<span title="Wie stark der Wert Bitcoin folgt (90 Tage): 1,0 = gleich viel, 2,0 = doppelt so stark, unter 0,5 = kaum">BTC-Beta <b>${be.toFixed(2).replace('.', ',')}</b></span>`; } catch(e){ return ''; } })()}
           ${b.r!=null?`<span title="gemessen am Abstand Einstieg → dein Stop">Stand <b class="${b.r>=0?'up':'dn'}">${b.r>=0?'+':'−'}${Math.abs(b.r).toFixed(2).replace('.',',')} R</b></span>`:''}
         </div>
         ${zahlenHinweis(b)}

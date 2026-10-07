@@ -44,3 +44,7 @@ def test_stresstest_kappt_verlust_bei_schein_und_margin() -> None:
     assert "eff = -t.gw.kapital" in s  # Knock-out / Liquidation: hoechstens das eigene Geld
     assert "eff = Math.max(eff, -t.gw.kapital)" in s
     assert "try { h += stresstest(stand); } catch(e){}" in s
+
+
+def test_karte_zeigt_btc_beta() -> None:
+    assert "BTC-Beta <b>" in _s()
