@@ -28,7 +28,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from depot_wache import depot_lesen, sync_lesen
 
-from trading_agent.ops.zweitmeinung import baue_prompt, hole_zweitmeinung, verfuegbar
+from trading_agent.ops.zweitmeinung import (
+    baue_prompt,
+    hole_zweitmeinung,
+    letzter_fehler,
+    verfuegbar,
+)
 from trading_agent.portfolio_intel.depot_stops import ScanIndex, ist_bar, lage_fuer
 
 SYNC = "data/repository_real/live/depot_sync.siegel"
@@ -148,8 +153,10 @@ def main() -> int:
     prompt = baue_prompt(positionen=pos_k, chancen=chancen_k)
     antwort = hole_zweitmeinung(prompt)
     if antwort is None:
-        print("::warning::OpenAI-Anfrage fehlgeschlagen oder leer — kein Fake-Text geschrieben.")
-        schreibe(args.out, {"aktiv": False, "geprueft": jetzt, "grund": "Anfrage fehlgeschlagen"})
+        fehler = letzter_fehler()
+        grund = fehler.grund if fehler is not None else "Anfrage fehlgeschlagen oder leer"
+        print(f"::warning::OpenAI-Anfrage fehlgeschlagen — kein Fake-Text geschrieben. Grund: {grund}")
+        schreibe(args.out, {"aktiv": False, "geprueft": jetzt, "grund": grund})
         return 0
 
     schreibe(

@@ -47,6 +47,13 @@ class Zweitmeinung:
     erzeugt: str  # ISO-Zeitstempel
 
 
+@dataclass(frozen=True, slots=True)
+class ZweitmeinungFehler:
+    """Diagnose eines gescheiterten Aufrufs — niemals den Schluessel enthaltend."""
+
+    grund: str
+
+
 def baue_prompt(*, positionen: list[dict[str, Any]], chancen: list[dict[str, Any]]) -> str:
     """Kompakter Text aus Depot-Positionen und Top-Chancen — dieselben Zahlen, die auch
     in der App stehen, nichts Zusaetzliches erfunden."""
@@ -81,9 +88,14 @@ def hole_zweitmeinung(
     transport: _Transport | None = None,
 ) -> Zweitmeinung | None:
     """Fragt die OpenAI-API. ``None`` bei fehlendem Key oder Fehler — kein Fake-Text,
-    kein Crash (der aufrufende CI-Schritt laeuft mit ``continue-on-error``)."""
+    kein Crash (der aufrufende CI-Schritt laeuft mit ``continue-on-error``).
+
+    Die Fehlerdiagnose (ohne Schluessel) steht danach in ``letzter_fehler()``."""
+    global _LETZTER_FEHLER
+    _LETZTER_FEHLER = None
     key = get_secret("OPENAI_API_KEY", allow_keychain=False)
     if not key.present:
+        _LETZTER_FEHLER = ZweitmeinungFehler(grund="kein OPENAI_API_KEY hinterlegt")
         return None
     sender = transport
     if sender is None:
@@ -109,12 +121,56 @@ def hole_zweitmeinung(
             headers={"Authorization": f"Bearer {key.reveal()}", "Content-Type": "application/json"},
             timeout=30.0,
         )
-    except Exception:
+    except Exception as exc:
+        _LETZTER_FEHLER = ZweitmeinungFehler(grund=_diagnose(exc))
         return None
     try:
         text = antwort["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError):
+        _LETZTER_FEHLER = ZweitmeinungFehler(
+            grund=f"Antwort ohne verwertbaren Text: {_ohne_schluessel(antwort)!r}"
+        )
         return None
     if not text:
+        _LETZTER_FEHLER = ZweitmeinungFehler(grund="Antwort war leer")
         return None
     return Zweitmeinung(text=text, modell=modell, erzeugt=datetime.now(UTC).isoformat())
+
+
+_LETZTER_FEHLER: ZweitmeinungFehler | None = None
+
+
+def letzter_fehler() -> ZweitmeinungFehler | None:
+    """Diagnose des letzten gescheiterten ``hole_zweitmeinung``-Aufrufs, oder ``None``."""
+    return _LETZTER_FEHLER
+
+
+def _ohne_schluessel(wert: Any) -> Any:
+    """Kuerzt eine Antwort fuer die Diagnose — nie den Schluessel, nie zu lang."""
+    text = str(wert)
+    return text[:300]
+
+
+def _diagnose(exc: Exception) -> str:
+    """Fehlerursache ohne jeden sensiblen Wert — nur Statuscode/Fehlertyp."""
+    try:
+        import httpx
+
+        if isinstance(exc, httpx.HTTPStatusError):
+            code = exc.response.status_code
+            body = _ohne_schluessel(exc.response.text)
+            deutung = {
+                401: "Schluessel ungueltig oder abgelaufen (401)",
+                403: "Zugriff verweigert (403) — Projekt/Organisation ohne Freigabe?",
+                429: "Rate-Limit oder kein Zahlungsmittel hinterlegt (429)",
+                500: "OpenAI-Serverfehler (500)",
+                503: "OpenAI ueberlastet (503)",
+            }.get(code, f"HTTP {code}")
+            return f"{deutung} — Antwort: {body}"
+        if isinstance(exc, httpx.TimeoutException):
+            return "Zeitueberschreitung (30s) beim Aufruf von OpenAI"
+        if isinstance(exc, httpx.RequestError):
+            return f"Netzwerkfehler: {type(exc).__name__}: {exc}"
+    except ImportError:
+        pass
+    return f"{type(exc).__name__}: {exc}"

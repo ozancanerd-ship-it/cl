@@ -72,6 +72,60 @@ def test_transport_fehler_gibt_none_kein_crash(monkeypatch):
     assert zm.hole_zweitmeinung("x", transport=kaputt) is None
 
 
+def test_fehler_wird_diagnostiziert_ohne_schluessel_zu_zeigen(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-geheim-abc123")
+
+    def kaputt(*a, **k):
+        raise ConnectionError("kein Netz")
+
+    assert zm.hole_zweitmeinung("x", transport=kaputt) is None
+    fehler = zm.letzter_fehler()
+    assert fehler is not None
+    assert "sk-geheim-abc123" not in fehler.grund
+    assert "ConnectionError" in fehler.grund
+
+
+def test_http_fehler_wird_mit_statuscode_diagnostiziert(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    import httpx
+
+    def unauthorized(*a, **k):
+        req = httpx.Request("POST", zm._ENDPUNKT)
+        resp = httpx.Response(401, text='{"error": "invalid_api_key"}', request=req)
+        raise httpx.HTTPStatusError("401", request=req, response=resp)
+
+    assert zm.hole_zweitmeinung("x", transport=unauthorized) is None
+    fehler = zm.letzter_fehler()
+    assert fehler is not None
+    assert "401" in fehler.grund
+    assert "sk-test-123" not in fehler.grund
+
+
+def test_fehlender_key_setzt_auch_eine_diagnose():
+    monkeypatch_los = zm.hole_zweitmeinung("x")
+    assert monkeypatch_los is None
+    fehler = zm.letzter_fehler()
+    assert fehler is not None
+    assert "OPENAI_API_KEY" in fehler.grund
+
+
+def test_erfolgreicher_aufruf_loescht_vorherige_diagnose(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+
+    def kaputt(*a, **k):
+        raise ConnectionError("kein Netz")
+
+    assert zm.hole_zweitmeinung("x", transport=kaputt) is None
+    assert zm.letzter_fehler() is not None
+
+    def ok(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": "Alles gut."}}]}
+
+    r = zm.hole_zweitmeinung("x", transport=ok)
+    assert r is not None
+    assert zm.letzter_fehler() is None
+
+
 def test_kaputte_antwort_gibt_none(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
     assert zm.hole_zweitmeinung("x", transport=lambda *a, **k: {}) is None
