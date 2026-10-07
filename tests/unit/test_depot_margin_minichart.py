@@ -34,7 +34,7 @@ def test_minichart_steht_auf_der_karte_und_holt_kerzen_gepuffert() -> None:
 
 def test_depot_grafik_steht_ueber_der_tabelle() -> None:
     s = _s()
-    assert "h += depotGrafik(stand);\n    h += `<h2>Auf einen Blick</h2>" in s
+    assert "h += depotGrafik(stand);" in s and s.index("h += depotGrafik(stand);") < s.index("h += `<h2>Auf einen Blick</h2>")
     assert "Wo dein Geld liegt" in s and "Was jede Position seit Kauf gebracht hat" in s
 
 
