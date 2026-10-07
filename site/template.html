@@ -2681,6 +2681,10 @@ function zweitmeinungKasten(){
       <p style="margin-top:6px;font-size:13px">Noch nicht eingerichtet — braucht einen OpenAI-API-Key als Geheimnis
       <span class="mono">OPENAI_API_KEY</span> unter Settings → Secrets → Actions. Ohne Key bleibt dieses Feld leer,
       es wird nichts erfunden.</p></div>`;
+    if (ZM.grund && ZM.grund !== 'kein Scan' && ZM.grund !== 'nichts zu bewerten') return `<div class="note-box warn">
+      <span class="nt">Zweitmeinung (ChatGPT) · zuletzt fehlgeschlagen</span>
+      <p style="margin-top:6px;font-size:13px">Grund: <span class="mono">${esc(ZM.grund)}</span>. Kein erfundener
+      Text — beim nächsten 24/7-Lauf wird es erneut versucht.</p></div>`;
     return '';
   }
   const alt = ZM.erzeugt ? Math.round((Date.now() - Date.parse(ZM.erzeugt)) / 3600000) : null;

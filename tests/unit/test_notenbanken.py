@@ -64,3 +64,11 @@ def test_app_hat_die_zweitmeinung():
     assert "function zweitmeinungKasten" in t
     assert "chatgpt_meinung.json" in t
     assert "zweitmeinungKasten()" in t
+
+
+def test_zweitmeinung_zeigt_den_fehlgrund_statt_zu_schweigen():
+    """Scheitert der OpenAI-Aufruf (z.B. 401), sieht Ozan den Grund in der App —
+    nicht nur im CI-Log, das er nachts nicht offen hat."""
+    t = Path("site/template.html").read_text(encoding="utf-8")
+    assert "zuletzt fehlgeschlagen" in t
+    assert "ZM.grund" in t
