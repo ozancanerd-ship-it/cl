@@ -30,3 +30,9 @@ def test_minichart_steht_auf_der_karte_und_holt_kerzen_gepuffert() -> None:
     assert "api.kraken.com/0/public/OHLC" in s
     assert "600000" in s  # hoechstens alle 10 Minuten
     assert "if (!b || istBar(b.pos) || istSchein(b.pos)) return '';" in s
+
+
+def test_depot_grafik_steht_ueber_der_tabelle() -> None:
+    s = _s()
+    assert "h += depotGrafik(stand);\n    h += `<h2>Auf einen Blick</h2>" in s
+    assert "Wo dein Geld liegt" in s and "Was jede Position seit Kauf gebracht hat" in s

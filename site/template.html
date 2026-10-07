@@ -334,6 +334,16 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .mc-t{font:9px "JetBrains Mono",monospace;fill:var(--ink-3)}
 .mc-t.ein{fill:var(--accent-2)}.mc-t.stop{fill:var(--bad)}.mc-t.tp{fill:var(--long)}.mc-t.kurs{fill:var(--ink)}
 .mc-k{fill:var(--ink);stroke:var(--bg,#000);stroke-width:1.5}
+.dg-bar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--sunk)}
+.dg-s{display:block;height:100%}
+.dg-leg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.dg-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.dg-r{display:grid;grid-template-columns:34% 1fr 24%;gap:6px;align-items:center;padding:3px 0;font-size:12.5px}
+.dg-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dg-b{position:relative;height:10px;background:linear-gradient(var(--line,rgba(128,128,128,.25)),var(--line,rgba(128,128,128,.25))) center/1px 100% no-repeat}
+.dg-b i{position:absolute;top:1px;bottom:1px;border-radius:3px}
+.dg-b i.plus{background:var(--long)}.dg-b i.minus{background:var(--bad)}
+.dg-v{text-align:right;font-family:"JetBrains Mono",monospace}
 .fl{margin:16px 2px 4px; position:relative}
 .fl-bahn{position:relative; height:8px; border-radius:6px; background:var(--sunk);
   box-shadow:inset 0 0 0 1px var(--rule)}
@@ -5989,6 +5999,52 @@ function miniChart(b){
   </svg><div class="nu" style="font-size:11px">90 Tage${aus ? ` · ${aus} Marke${aus>1?'n':''} weit ausserhalb, nicht eingezeichnet` : ''}${lang ? '' : ' · Short'}</div></div>`;
 }
 
+/* ============================================================ DEPOT-GRAFIK
+   Ozan, 07.10.: Analysen „auch grafisch". Zwei Balkenbilder ueber der Tabelle:
+   1. wo das Geld liegt (je Konto, Bargeld abgesetzt) und
+   2. was jede Position seit Kauf gebracht hat, in Euro, als Balken nach links/rechts.
+   Reine Anzeige derselben Zahlen wie die Tabelle — keine neue Rechnung. Margin zaehlt mit
+   dem eigenen Geld, Gewinn/Verlust in Euro umgerechnet. */
+const KONTO_NAME = {traderepublic:'Trade Republic', bybit:'Bybit', kraken:'Kraken', binance:'Binance'};
+function depotGrafik(stand){
+  const {bew, inEuro, gesamt} = stand;
+  if (!bew.length || !(gesamt > 0)) return '';
+  const je = new Map(); let bar = 0;
+  for (const b of bew){
+    const eu = inEuro(b, b.wert) || 0; if (eu <= 0) continue;
+    const k = KONTO_NAME[kontoNorm(b.pos.konto)] || String(b.pos.konto || 'ohne Konto');
+    const e = je.get(k) || {anlage: 0, bar: 0};
+    if (istBar(b.pos)){ e.bar += eu; bar += eu; } else e.anlage += eu;
+    je.set(k, e);
+  }
+  const farben = ['var(--accent-2)', 'var(--long)', 'var(--warn)', 'var(--accent)'];
+  const konten = [...je.entries()].sort((a, b2) => (b2[1].anlage + b2[1].bar) - (a[1].anlage + a[1].bar));
+  const pc = v => (v / gesamt * 100);
+  const segs = konten.map(([k, e], i) => `<i class="dg-s" style="width:${pc(e.anlage + e.bar).toFixed(2)}%;background:${farben[i % farben.length]}"
+      title="${esc(k)}: ${num(e.anlage + e.bar, 0)} €"></i>`).join('');
+  const leg = konten.map(([k, e], i) => `<span><i style="background:${farben[i % farben.length]}"></i>${esc(k)}
+      <b>${num(e.anlage + e.bar, 0)} €</b> · ${pc(e.anlage + e.bar).toFixed(0)} %${e.bar > 0.5 ? ` <span class="nu">(davon ${num(e.bar, 0)} € Bargeld)</span>` : ''}</span>`).join('');
+  const zeilen = bew.filter(b => !istBar(b.pos) && b.gv != null)
+    .map(b => ({n: posName(b), k: KONTO_NAME[kontoNorm(b.pos.konto)] || '', eu: inEuro(b, b.gv) || 0}))
+    .sort((a, b2) => b2.eu - a.eu);
+  // Derselbe Wert auf zwei Konten (Fetch.ai bei Trade Republic und Kraken): Konto dazuschreiben.
+  const anz = new Map(); for (const z of zeilen) anz.set(z.n, (anz.get(z.n) || 0) + 1);
+  for (const z of zeilen) if (anz.get(z.n) > 1 && z.k) z.n += ' · ' + z.k;
+  const mx = Math.max(1, ...zeilen.map(z => Math.abs(z.eu)));
+  const balken = zeilen.map(z => `<div class="dg-r"><span class="dg-n">${esc(z.n)}</span>
+      <span class="dg-b"><i class="${z.eu >= 0 ? 'plus' : 'minus'}" style="${z.eu >= 0 ? 'left:50%' : `right:50%`};width:${(Math.abs(z.eu) / mx * 50).toFixed(1)}%"></i></span>
+      <span class="dg-v ${z.eu >= 0 ? 'up' : 'dn'}">${z.eu >= 0 ? '+' : '−'}${num(Math.abs(z.eu), Math.abs(z.eu) < 100 ? 1 : 0)} €</span></div>`).join('');
+  return `<h2>Grafik</h2>
+    <div class="karte"><h3 style="margin-bottom:8px">Wo dein Geld liegt</h3>
+      <div class="dg-bar">${segs}</div><div class="dg-leg">${leg}</div>
+      ${bar > 0 ? `<p class="nu" style="font-size:12px;margin:6px 0 0">Bargeld insgesamt ${num(bar, 0)} € (${pc(bar).toFixed(0)} % des Depots) — Pulver für neue Chancen, aber ohne Rendite.</p>` : ''}
+    </div>
+    <div class="karte"><h3 style="margin-bottom:8px">Was jede Position seit Kauf gebracht hat</h3>
+      <div class="dg">${balken}</div>
+      <p class="nu" style="font-size:11.5px;margin:6px 0 0">Euro, nicht Prozent — so siehst du, was wirklich Geld bewegt hat. Turbos mit geschätzter Stückzahl und eingetragene Werte sind Näherungen.</p>
+    </div>`;
+}
+
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -6118,6 +6174,7 @@ function zeichnePortfolio(){
       const st = b.pos.plan && b.pos.plan.stop != null && pk ? Math.abs(pk - b.pos.plan.stop) / pk * 100 : null;
       return {b, eu, st};
     }).sort((x, y) => (y.eu || 0) - (x.eu || 0));
+    h += depotGrafik(stand);
     h += `<h2>Auf einen Blick</h2>
       <div class="tw"><table class="mtf" style="font-size:13px">
       <thead><tr><th>Position</th><th style="text-align:right">Wert</th><th style="text-align:right">Anteil</th>
