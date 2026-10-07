@@ -51,3 +51,9 @@ def test_app_hat_den_kasten():
 def test_app_hat_strategie_status():
     t = Path("site/template.html").read_text(encoding="utf-8")
     assert "function strategieKasten" in t and "GESPERRT" in t and "sicherText(strategieKasten)" in t
+
+
+def test_app_hat_nachtplan_und_tiefe_analyse():
+    t = Path("site/template.html").read_text(encoding="utf-8")
+    assert "function nachtPlan" in t and "nachtPlan(stand)" in t
+    assert "function tiefeAnalyse" in t and "tiefeAnalyse(b, stand)" in t

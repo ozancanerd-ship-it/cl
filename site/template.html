@@ -707,6 +707,8 @@ a{color:var(--accent); text-underline-offset:3px}
 .mc-plan{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--accent-2); margin-top:3px; letter-spacing:.02em}
 
 .nb-l{margin:4px 0 0;padding-left:18px;font-size:13.5px;line-height:1.45}.nb-l li{margin:3px 0}
+
+.ta-in h4{margin:12px 0 4px;font-size:14px}.ta-in p{font-size:13.5px;line-height:1.5;margin:4px 0}
 </style>
 </head>
 <body>
@@ -6196,6 +6198,264 @@ function miniChart(b){
    Reine Anzeige derselben Zahlen wie die Tabelle — keine neue Rechnung. Margin zaehlt mit
    dem eigenen Geld, Gewinn/Verlust in Euro umgerechnet. */
 const KONTO_NAME = {traderepublic:'Trade Republic', bybit:'Bybit', kraken:'Kraken', binance:'Binance'};
+/* ============================ NACHT-PLAN
+
+   Ozan, 07.10. 22:14: „Wenn ich schlafen gehe, kann ich nicht mehr auf dem Markt reagieren …
+   so dass ich in Ruhe schlafen gehen kann und nichts verpasse mit dem Teilverkauf oder
+   kompletten Verkauf." Die ehrliche Antwort: nachts verkauft nur eine Order, die BEIM BROKER
+   liegt. Die App fuehrt nichts aus, und eine Meldung um 3 Uhr weckt niemanden. Also sagt
+   dieser Plan vor dem Schlafen je Position genau, welche Orders du eintraegst (Art, Preis,
+   Stueckzahl, Broker-Eigenheit), wie weit sich der Wert ueber Nacht typischerweise bewegt
+   und was im schlechten Fall passiert. Der Waechter auf GitHub prueft weiter alle 10 Minuten
+   und meldet sich — fuer den Morgen. */
+function nachtSd(b){
+  // Tagesschwankung in % (90 Tage, aus der Gleichlauf-Messung). Coins handeln nachts weiter
+  // (8 Std. = Wurzel aus 1/3 eines Tages); Aktien sind zu, aber der Kurs springt zur Eroeffnung
+  // — dafuer gilt eine ganze Tagesschwankung.
+  const nm = glNameFuer(b); const sd = nm ? glVola(nm) : null;
+  if (sd == null) return null;
+  const rr = b.row || (b.hebel && b.hebel.basisSym ? scanRow(b.hebel.basisSym) : null);
+  const krypto = rr && (rr.klasse === 'krypto' || rr.klasse === 'gold');
+  return {sd: krypto ? sd * Math.sqrt(8/24) : sd, krypto, art: krypto ? '8 Std. Handel' : 'bis zur Eröffnung'};
+}
+function scheinBei(b, basisPreis){
+  // Turbo-Preis bei einem bestimmten Kurs des Basiswerts — dieselbe Rechnung wie hebelLage.
+  const h = b.hebel; if (!h || h.ko == null || basisPreis == null) return null;
+  const ab = h.lang ? basisPreis - h.ko : h.ko - basisPreis;
+  if (ab <= 0) return 0;
+  const proBasis = ab / (h.ratio || 1);
+  return (h.schein && h.basisKurs) ? proBasis * (h.schein / ((h.lang ? h.basisKurs - h.ko : h.ko - h.basisKurs) / (h.ratio || 1))) : proBasis;
+}
+const NACHT_BROKER = {
+  traderepublic: {stop: 'Stop-Loss-Order (Stop-Market, „Stop") — Verkauf, sobald der Kurs die Marke berührt',
+    ziel: 'Limit-Verkauf (Take-Profit)',
+    hinweis: 'Trade Republic: ein Stück kann nur in EINER offenen Order stecken. Wenn Stop und Limit nicht zusammen gehen, hat der Stop Vorrang — er schützt, das Limit verdient nur. Aktien und Scheine handeln dort ca. 7:30–23:00; nachts ruht die Order, sie greift beim ersten Kurs am Morgen.'},
+  kraken: {stop: 'Stop-Loss-Order (Order-Typ „Stop Loss")', ziel: 'Take-Profit-Order (Order-Typ „Take Profit") oder Limit-Verkauf',
+    hinweis: 'Kraken handelt rund um die Uhr — die Order greift auch um 3 Uhr. Stop und Take-Profit dürfen zusammen die Menge nicht übersteigen.'},
+  bybit: {stop: 'Stop-Loss direkt an der Position (TP/SL)', ziel: 'Take-Profit an der Position — „Teil-TP/SL" erlaubt eine Teilmenge',
+    hinweis: 'Bybit setzt TP und SL direkt an der Position, auch zusammen und als Teilmenge. Bei Hebel: der Stop muss VOR dem Liquidationspreis liegen.'},
+  binance: {stop: 'Stop-Limit- oder OCO-Order', ziel: 'OCO (Ziel und Stop in einer Order)',
+    hinweis: 'Binance-OCO verbindet Ziel und Stop: wird eins ausgeführt, verfällt das andere — genau richtig für die Nacht.'},
+};
+function nachtZeile(b, stand){
+  const pos = b.pos, pl = pos.plan || {};
+  const name = posName(b), konto = kontoNorm(pos.konto), br = NACHT_BROKER[konto] || NACHT_BROKER.kraken;
+  const eu = stand.inEuro(b, b.wert) || 0;
+  const ns = nachtSd(b);
+  const schein = pos.ko != null && b.hebel && !b.hebel.ausgeknockt;
+  const basis = pl.ebene === 'basis';
+  const z = waehrungsZeichen(b.w), d = digits(b.kurs || 1);
+  const lang = (pl.richtung || pos.hebel_richtung || 'long') === 'long';
+  const stueck = m => (b.row && b.row.klasse === 'krypto') ? num(m, m < 1 ? 6 : 4) : String(Math.max(1, Math.floor(m)));
+  const zeilen = [], warn = [];
+  let stufe = 'gut';
+  // 1 — Stop als Order
+  let stopOrder = null, verlustStop = null;
+  if (pl.stop != null){
+    let preis = pl.stop;
+    if (schein && basis){ preis = scheinBei(b, pl.stop); }
+    if (preis != null && b.kurs){
+      verlustStop = (lang || schein ? (b.kurs - preis) : (preis - b.kurs)) / b.kurs * eu;
+      stopOrder = preis;
+      zeilen.push(`<li><b>Stop: ${br.stop}</b> bei <b>${num(preis, digits(preis))}${z}</b> für <b>alle ${stueck(pos.menge)} Stück</b>${
+        schein && basis ? ` <span class="nu">(entspricht ${esc(b.hebel.basisName || 'Basiswert')} bei ${num(pl.stop, digits(pl.stop))} — der Schein-Preis ist umgerechnet, prüf ihn in der Order-Maske)</span>` : ''}.
+        Wird er ausgelöst: etwa <b>−${num(Math.abs(verlustStop), 0)} €</b>.</li>`);
+    }
+  } else {
+    stufe = 'bad';
+    const rrS = b.row || (b.hebel && b.hebel.basisSym ? scanRow(b.hebel.basisSym) : null);
+    const hs = rrS && rrS.halte ? (lang ? rrS.halte.stop_long : rrS.halte.stop_short) : null;
+    let vp = hs;
+    if (vp != null && schein) vp = scheinBei(b, hs);
+    else if (vp != null && b.row && b.row.kurs && b.kurs) vp = vp * (b.kurs / b.row.kurs);   // in die Waehrung der Position
+    if (vp != null && vp > 0 && b.kurs && (lang ? vp < b.kurs : vp > b.kurs)){
+      verlustStop = Math.abs(b.kurs - vp) / b.kurs * eu;
+      warn.push('Kein Stop eingetragen — über Nacht ungeschützt. Vorschlag aus der Analyse (Halte-Stop) steht darunter.');
+      zeilen.push(`<li><b>Stop (Vorschlag): ${br.stop}</b> bei <b>${num(vp, digits(vp))}${z}</b> für <b>alle ${stueck(pos.menge)} Stück</b>${
+        schein ? ` <span class="nu">(${esc(b.hebel.basisName || 'Basiswert')} bei ${num(hs, digits(hs))})</span>` : ''} — ≈ −${num(verlustStop, 0)} €, falls ausgelöst.</li>`);
+    } else {
+      warn.push('Kein Stop eingetragen und kein Vorschlag aus der Analyse — über Nacht ungeschützt. Mindestens eine Marke unter dem letzten Tief setzen oder verkleinern.');
+    }
+  }
+  // 2 — naechstes Ziel als Limit
+  const erl = new Set(pos.erledigt || []);
+  const naechst = ['tp1','tp2','tp3'].find(k => pl[k] != null && !erl.has(k.toUpperCase()));
+  if (naechst && zieleGelten(pl)){
+    let preis = pl[naechst];
+    if (schein && basis) preis = scheinBei(b, pl[naechst]);
+    const offen = 3 - ['TP1','TP2','TP3'].filter(m => erl.has(m)).length;
+    const m = pos.menge / Math.max(1, offen);
+    if (preis != null) zeilen.push(`<li><b>Ziel: ${br.ziel}</b> bei <b>${num(preis, digits(preis))}${z}</b> für <b>${stueck(m)} Stück</b> (${naechst.toUpperCase()}, ${offen === 1 ? 'der Rest' : 'ein Drittel'}).</li>`);
+  }
+  // 3 — Nachtbewegung
+  if (ns){
+    const fak = schein ? b.hebel.hebel : (Number(pos.hebel) > 1 ? Number(pos.hebel) : 1);
+    const typ = ns.sd * fak, schlecht = 1.65 * ns.sd * fak;
+    zeilen.push(`<li>Über Nacht (${ns.art}) bewegt sich das typischerweise um <b>±${typ.toFixed(1).replace('.',',')} %</b>
+      (≈ ${num(eu * typ / 100, 0)} €); in einer von zwanzig Nächten <b>−${schlecht.toFixed(1).replace('.',',')} %</b> oder mehr
+      (≈ −${num(eu * schlecht / 100, 0)} €)${fak > 1 ? `, Hebel ${fak.toFixed(1).replace('.',',')}× schon eingerechnet` : ''}.</li>`);
+    if (b.hebel && b.hebel.puffer_pct != null){
+      const n = b.hebel.puffer_pct / (ns.sd * 1.65);
+      if (n < 1){ stufe = 'bad'; warn.push(`${b.hebel.art === 'margin' ? 'Liquidation' : 'Knock-out'} liegt nur ${b.hebel.puffer_pct.toFixed(1).replace('.',',')} % entfernt — weniger als eine schlechte Nacht. Vor dem Schlafen verkleinern oder schließen.`); }
+      else if (n < 2){ if (stufe === 'gut') stufe = 'warn'; warn.push(`${b.hebel.art === 'margin' ? 'Liquidation' : 'Knock-out'} ${b.hebel.puffer_pct.toFixed(1).replace('.',',')} % entfernt — das sind nur ${n.toFixed(1).replace('.',',')} schlechte Nächte. Ein Stop VOR der Schwelle ist Pflicht.`); }
+    }
+  }
+  // 4 — Termine in der Nacht
+  const rr = b.row || (b.hebel && b.hebel.basisSym ? scanRow(b.hebel.basisSym) : null);
+  const zt = rr && rr.info && rr.info.zahlen;
+  if (zt && zt.tage != null && zt.tage <= 1){
+    if (stufe === 'gut') stufe = 'warn';
+    warn.push(`Quartalszahlen ${zt.tage === 0 ? 'heute' : 'morgen'} — typische Bewegung ±${num((zt.bewegung||{}).median || 0, 1)} %, im Extrem ${num((zt.bewegung||{}).max || 0, 1)} %. Ein Stop schützt vor einer Kurslücke NICHT: er wird zum ersten Kurs danach ausgeführt.`);
+  }
+  if (!ns && pl.stop != null && stufe === 'gut') stufe = 'warn';
+  return {b, name, eu, stufe, zeilen, warn, verlustStop, br, konto};
+}
+function nachtPlan(stand){
+  const liste = stand.bew.filter(b => !istBar(b.pos) && b.kurs != null && b.pos.menge);
+  if (!liste.length) return '';
+  const z = liste.map(b => { try { return nachtZeile(b, stand); } catch(e){ return null; } }).filter(Boolean)
+    .sort((a, b2) => ({bad:0, warn:1, gut:2}[a.stufe] - {bad:0, warn:1, gut:2}[b2.stufe]) || b2.eu - a.eu);
+  const summeStop = z.reduce((s, x) => s + (x.verlustStop != null ? Math.abs(x.verlustStop) : 0), 0);
+  const ohne = z.filter(x => x.verlustStop == null).length;
+  const rot = z.filter(x => x.stufe === 'bad').length, gelb = z.filter(x => x.stufe === 'warn').length;
+  const std = new Date().getHours();
+  const offen = std >= 19 || std < 3;
+  const kopf = rot ? `${rot} Position${rot > 1 ? 'en' : ''} vor dem Schlafen anfassen` : gelb ? `${gelb} mit Hinweis — sonst ruhig` : 'Alles abgesichert — gute Nacht';
+  const kl = rot ? 'bad' : gelb ? 'warn' : 'gut';
+  const broker = [...new Set(z.map(x => x.konto))].map(k => NACHT_BROKER[k] ? `<li><b>${esc(KONTO_NAME[k] || k)}:</b> ${esc(NACHT_BROKER[k].hinweis)}</li>` : '').join('');
+  return `<details class="karte ${kl}" ${offen ? 'open' : ''} style="margin-top:12px"><summary style="cursor:pointer"><h3 style="display:inline">🌙 Nacht-Plan — ${esc(kopf)}</h3></summary>
+    <p style="font-size:13.5px;margin:8px 0">Nachts verkauft <strong>nur eine Order, die beim Broker liegt</strong>. Die App führt nichts aus,
+      und eine Meldung um 3 Uhr weckt dich nicht. Trag deshalb vor dem Schlafen diese Orders ein — dann passiert ein Stop
+      oder ein Teilverkauf auch, während du schläfst. Der Wächter prüft weiter alle 10 Minuten; was passiert ist, steht morgens hier und in der Mail.</p>
+    <div class="kpi"><span>Wenn alle Stops fallen <b class="dn">−${num(summeStop, 0)} €</b> (${stand.gesamt ? (summeStop / stand.gesamt * 100).toFixed(1).replace('.',',') : '—'} %)</span>
+      ${ohne ? `<span>ohne Stop <b class="dn">${ohne}</b></span>` : ''}<span>rot <b>${rot}</b> · gelb <b>${gelb}</b></span></div>
+    ${z.map(x => `<div style="border-top:1px solid var(--line,#2a3140);margin-top:10px;padding-top:8px">
+      <b>${x.stufe === 'bad' ? '🔴' : x.stufe === 'warn' ? '🟡' : '🟢'} ${esc(x.name)}</b> <span class="nu">${esc(KONTO_NAME[x.konto] || x.b.pos.konto || '')} · ${num(x.eu, x.eu < 100 ? 2 : 0)} €</span>
+      ${x.warn.length ? `<ul class="nb-l" style="color:var(--warn,#e0a040)">${x.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+      <ul class="nb-l">${x.zeilen.join('')}</ul></div>`).join('')}
+    <p style="margin-top:10px"><strong>Je Broker</strong></p><ul class="nb-l">${broker}</ul>
+    <p style="font-size:12px;color:var(--ink-3);margin-top:8px">„Typisch" = eine Standardabweichung der letzten 90 Tage, auf die Nacht umgerechnet;
+      „eine von zwanzig" = 1,65-fach. Echte Paniknächte können mehr. Ein Stop wird zum ersten verfügbaren Kurs ausgeführt —
+      springt der Kurs über Nacht darüber hinweg (Kurslücke), wird es schlechter als die Marke.</p>
+  </details>`;
+}
+
+/* ============================ TIEFE ANALYSE
+
+   Ozan, 07.10.: „Die Analysen sind viel zu kurz und knapp … ich möchte alles verstehen und
+   daraus lernen … wirklich tiefe Analyse." Je Position ein aufklappbarer Teil: Lage, Trend
+   über mehrere Zeiträume, Spanne und Schwankung, warum der Stop dort liegt, Ziele, drei
+   Szenarien in Euro, Fundamentaldaten, Makro, was die Einschätzung ändert — und jeder
+   Fachbegriff erklärt. Alles aus Zahlen, die die App schon hat; nichts erfunden. */
+function tiefeAnalyse(b, stand){
+  if (istBar(b.pos)) return '';
+  const rr = b.row || (b.hebel && b.hebel.basisSym ? scanRow(b.hebel.basisSym) : null);
+  if (!rr) return '';
+  const pos = b.pos, pl = pos.plan || {};
+  const nm = rr.name || rr.instrument;
+  const k = rr.kurs, dd = digits(k || 1), zz = rr.waehrung === 'EUR' ? ' €' : ' $';
+  const f = v => v == null ? '—' : num(v, digits(v)) + zz;
+  const pc = v => v == null ? '—' : pct(v, 1);
+  const eu = stand.inEuro(b, b.wert) || 0;
+  const fak = (b.hebel && b.hebel.hebel) ? b.hebel.hebel : (Number(pos.hebel) > 1 ? Number(pos.hebel) : 1);
+  const euBei = preis => (k && preis != null) ? (preis / k - 1) * 100 * fak / 100 * eu * ((pl.richtung || pos.hebel_richtung || 'long') === 'short' ? -1 : 1) : null;
+  const t = [];
+  const lern = new Set();
+  // 1 Lage
+  t.push(`<h4>1 · Die Lage in einem Satz</h4><p>${esc(nm)} steht bei <b>${f(k)}</b>. Die Analyse sagt: <b>${esc(rr.headline || '—')}</b>
+    (Urteil ${esc(rr.urteil || '—')}${rr.note && rr.note !== '—' ? ', Note ' + esc(rr.note) : ''}). ${rr.begruendung ? 'Begründung: ' + esc(rr.begruendung) + '.' : ''}</p>`);
+  // 2 Trend
+  const ren = (rr.zusatz && rr.zusatz.renditen) || {};
+  if (ren.r21 != null || rr.rs != null){
+    lern.add('rs');
+    t.push(`<h4>2 · Trend über mehrere Zeiträume</h4><ul class="nb-l">
+      ${ren.r21 != null ? `<li>Letzter Monat: <b>${pc(ren.r21)}</b>${ren.r63 != null ? ` · letzte drei Monate: <b>${pc(ren.r63)}</b>` : ''}.
+        ${ren.r21 != null && ren.r63 != null ? (ren.r21 > 0 && ren.r63 > 0 ? 'Beide Zeiträume steigen — der Trend trägt.' : ren.r21 < 0 && ren.r63 > 0 ? 'Mittelfristig aufwärts, zuletzt Rücksetzer — die Frage ist, ob der Rücksetzer hält.' : ren.r21 > 0 && ren.r63 < 0 ? 'Erholung in einem fallenden Trend — vorsichtig, oft nur Gegenbewegung.' : 'Beide Zeiträume fallen — gegen den Trend zu halten ist Hoffnung, kein Plan.') : ''}</li>` : ''}
+      ${rr.rs != null ? `<li>Relative Stärke <b>${num(rr.rs, 0)}</b>/100 — ${rr.rs >= 70 ? 'gehört zu den stärksten seiner Klasse' : rr.rs >= 40 ? 'Mittelfeld' : 'gehört zu den schwächeren seiner Klasse'}.</li>` : ''}
+      ${(rr.muster || []).map(m => `<li>Muster <b>${esc(m.name)}</b> (${esc(m.zeitebene || '')}, Güte ${num((m.guete || 0) * 100, 0)} %): ${esc(m.beschreibung || '')}
+        ${m.hinfaellig != null ? ` Hinfällig unter ${f(m.hinfaellig)}.` : ''}</li>`).join('')}
+    </ul>`);
+    if ((rr.muster || []).length) lern.add('muster');
+  }
+  // 3 Spanne und Schwankung
+  const h = rr.halte;
+  if (h){
+    lern.add('atr');
+    const lage = (h.hoch22 && h.tief22 && h.hoch22 > h.tief22 && k) ? (k - h.tief22) / (h.hoch22 - h.tief22) * 100 : null;
+    t.push(`<h4>3 · Spanne und Schwankung</h4><ul class="nb-l">
+      <li>Durchschnittliche Tagesspanne (ATR): <b>${f(h.atr)}</b> = <b>${num(h.atr_pct, 1)} %</b> vom Kurs${fak > 1 ? ` — mit Hebel ${fak.toFixed(1).replace('.',',')}× sind das für dich ≈ ${num(h.atr_pct * fak, 1)} % je Tag` : ''}.</li>
+      <li>Spanne der letzten ~22 Handelstage: <b>${f(h.tief22)}</b> bis <b>${f(h.hoch22)}</b>${lage != null ? `; der Kurs steht bei <b>${num(lage, 0)} %</b> dieser Spanne (${lage > 80 ? 'nahe am Hoch — Ausbruch oder Abpraller' : lage < 20 ? 'nahe am Tief — hier entscheidet sich, ob die Unterstützung hält' : 'mittendrin'})` : ''}.</li>
+    </ul>`);
+  }
+  // 4 Stop
+  if (pl.stop != null || (h && h.stop_long)){
+    lern.add('stop');
+    const st = pl.stop != null ? pl.stop : h.stop_long;
+    const ab = (k && st) ? Math.abs(k - st) / k * 100 : null;
+    t.push(`<h4>4 · Warum der Stop dort liegt</h4><p>${pl.stop != null ? 'Dein Stop' : 'Vorschlag (Halte-Stop)'}: <b>${f(st)}</b>${ab != null ? ` — ${num(ab, 1)} % entfernt${h && h.atr_pct ? `, das sind ${num(ab / h.atr_pct, 1)} Tagesspannen` : ''}` : ''}.
+      ${h && h.stop_long ? `Der Halte-Stop rechnet „höchster Kurs der letzten 22 Tage (${f(h.hoch22)}) minus ${num(h.k, 0)} Tagesspannen" = ${f(h.stop_long)}. Die Idee: Normales Rauschen soll dich nicht aus dem Trade werfen, ein echter Trendbruch schon.` : ''}
+      ${euBei(st) != null ? ` Fällt er, kostet das etwa <b>${num(euBei(st), 0)} €</b>.` : ''}
+      ${ab != null && h && h.atr_pct && ab / h.atr_pct < 1 ? ' <b>Achtung:</b> weniger als eine Tagesspanne Abstand — schon ein normaler Tag kann ihn auslösen.' : ''}</p>`);
+  }
+  // 5 Ziele
+  const ziele = ['tp1','tp2','tp3'].filter(x => pl[x] != null);
+  if (ziele.length && zieleGelten(pl)){
+    lern.add('crv');
+    const risiko = pl.stop != null && pos.einstieg ? Math.abs(pos.einstieg - pl.stop) : null;
+    t.push(`<h4>5 · Ziele und Chance-Risiko</h4><ul class="nb-l">${ziele.map(x => {
+      const ab = k ? (pl[x] / k - 1) * 100 : null;
+      const crv = risiko ? Math.abs(pl[x] - pos.einstieg) / risiko : null;
+      return `<li>${x.toUpperCase()}: <b>${f(pl[x])}</b>${ab != null ? ` (${pc(ab)} vom Kurs)` : ''}${crv != null ? ` · CRV ${num(crv, 1)} : 1` : ''}${euBei(pl[x]) != null ? ` · ≈ ${euBei(pl[x]) >= 0 ? '+' : ''}${num(euBei(pl[x]), 0)} € auf die ganze Position` : ''}</li>`; }).join('')}</ul>`);
+  }
+  // 6 Szenarien
+  if (h && h.hoch22 && h.tief22){
+    const stS = pl.stop != null ? pl.stop : h.stop_long;
+    t.push(`<h4>6 · Drei Szenarien</h4><ul class="nb-l">
+      <li>🟢 <b>Gut:</b> Schluss über ${f(h.hoch22)} (22-Tage-Hoch) — Ausbruch, der Trend setzt sich fort. ${euBei(h.hoch22) != null ? `Bis dorthin ≈ ${euBei(h.hoch22) >= 0 ? '+' : ''}${num(euBei(h.hoch22), 0)} €.` : ''} Dann: Stop nachziehen, nicht verkaufen.</li>
+      <li>🟡 <b>Seitwärts:</b> Kurs pendelt zwischen ${f(h.tief22)} und ${f(h.hoch22)}. Dann: nichts tun, die Stops arbeiten lassen.</li>
+      <li>🔴 <b>Schlecht:</b> Schluss unter ${f(stS)} — die These ist widerlegt. ${euBei(stS) != null ? `≈ ${num(euBei(stS), 0)} €.` : ''} Dann: raus, nicht nachkaufen.</li></ul>`);
+  }
+  // 7 Fundamental
+  const inf = rr.info;
+  if (inf){
+    lern.add('analysten');
+    const an = inf.analysten || {};
+    const sum = (an.kaufen || 0) + (an.halten || 0) + (an.verkaufen || 0);
+    t.push(`<h4>7 · Unternehmen und Erwartungen</h4><ul class="nb-l">
+      ${inf.sektor ? `<li>${esc(inf.sektor)}${inf.branche ? ' · ' + esc(inf.branche) : ''}${inf.sektor_rang ? ` — Sektor auf Rang ${inf.sektor_rang} von ${inf.sektor_von}` : ''}.</li>` : ''}
+      ${inf.kursziel ? `<li>Kursziel der Analysten im Schnitt <b>${f(inf.kursziel)}</b> (Spanne ${f(inf.kursziel_tief)} – ${f(inf.kursziel_hoch)})${k ? `, ${pc((inf.kursziel / k - 1) * 100)} vom Kurs` : ''}${sum ? `; ${an.kaufen || 0} von ${sum} raten zum Kauf` : ''}. Kursziele laufen dem Kurs oft hinterher — Stimmung, kein Beleg.</li>` : ''}
+      ${inf.hoch52 ? `<li>52-Wochen-Spanne ${f(inf.tief52)} – ${f(inf.hoch52)}${k ? ` — ${num((k - inf.tief52) / (inf.hoch52 - inf.tief52) * 100, 0)} % davon` : ''}.</li>` : ''}
+      ${inf.zahlen && inf.zahlen.datum ? `<li>Nächste Quartalszahlen: <b>${esc(inf.zahlen.datum)}</b> (in ${inf.zahlen.tage} Tagen); typisch ±${num((inf.zahlen.bewegung || {}).median || 0, 1)} %, im Extrem ${num((inf.zahlen.bewegung || {}).max || 0, 1)} % am Tag danach.</li>` : ''}
+    </ul>`);
+  }
+  // 8 Makro
+  if (NB && NB.einordnung){
+    const kl = rr.klasse === 'aktien' ? 'aktien' : rr.klasse === 'gold' ? 'gold' : 'krypto';
+    const nmG = glNameFuer(b); const be = nmG ? stBeta(nmG, 'BTCUSD') : null;
+    t.push(`<h4>8 · Makro und Umfeld</h4><ul class="nb-l"><li>Fed-Ton <b>${esc(NB.fed && NB.fed.ton || '—')}</b>: ${esc((NB.einordnung.wirkung || {})[kl] || '')}.</li>
+      ${be != null ? `<li>BTC-Beta ${num(be, 2)}: ${be > 1.2 ? 'bewegt sich stärker als Bitcoin — fällt BTC 5 %, fällt das hier eher ' + num(5 * be, 0) + ' %' : be > 0.5 ? 'folgt Bitcoin deutlich' : 'läuft weitgehend unabhängig von Bitcoin'}.</li>` : ''}
+      ${(rr.warnungen || []).map(w => `<li>${esc(w)}</li>`).join('')}</ul>`);
+  }
+  // 9 Was aendert die Einschaetzung
+  t.push(`<h4>9 · Was die Einschätzung ändern würde</h4><ul class="nb-l">
+    ${h && h.hoch22 ? `<li>Besser: Tagesschluss über ${f(h.hoch22)} mit steigendem Umsatz.</li>` : ''}
+    ${pl.stop != null || (h && h.stop_long) ? `<li>Schlechter: Tagesschluss unter ${f(pl.stop != null ? pl.stop : h.stop_long)} → raus.</li>` : ''}
+    ${inf && inf.zahlen && inf.zahlen.tage != null && inf.zahlen.tage < 14 ? `<li>Quartalszahlen in ${inf.zahlen.tage} Tagen — danach neu bewerten.</li>` : ''}
+    <li>Ein neues Setup in derselben Richtung mit Alarm-Tor — dann wäre Nachlegen ein Thema.</li></ul>`);
+  // Lernbox
+  const LERN = {
+    rs: '<b>Relative Stärke (RS)</b>: wie gut sich der Wert gegen alle anderen seiner Klasse geschlagen hat (0–100). Starke Werte bleiben statistisch eher stark (Momentum).',
+    muster: '<b>Ausbruch / Kante</b>: der Kurs schliesst über dem Rand einer Spanne, in der er vorher pendelte. „Hinfällig" ist der Kurs, unter dem das Muster nicht mehr gilt.',
+    atr: '<b>ATR (Average True Range)</b>: die durchschnittliche Spanne eines Tages. Sie sagt, was „normale" Bewegung ist — Stops und Ziele werden daran gemessen.',
+    stop: '<b>Halte-Stop (Chandelier)</b>: hängt am höchsten Kurs und folgt ihm nach oben, nie nach unten. So bleibt Gewinn geschützt, ohne dass jeder kleine Rücksetzer dich rauswirft.',
+    crv: '<b>CRV (Chance-Risiko-Verhältnis)</b>: möglicher Gewinn geteilt durch möglichen Verlust bis zum Stop. 2 : 1 heißt: auf 1 € Risiko kommen 2 € Chance.',
+    analysten: '<b>Kursziel</b>: Durchschnitt der Bankanalysten für 12 Monate. Nützlich als Stimmungsbild, als Vorhersage historisch schwach.',
+  };
+  t.push(`<h4>Zum Lernen</h4><ul class="nb-l">${[...lern].map(x => `<li>${LERN[x]}</li>`).join('')}</ul>`);
+  return `<details class="ta" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">Ausführliche Analyse öffnen</summary>
+    <div class="ta-in">${t.join('')}</div></details>`;
+}
+
 function depotGrafik(stand){
   const {bew, inEuro, gesamt} = stand;
   if (!bew.length || !(gesamt > 0)) return '';
@@ -6482,6 +6742,7 @@ function zeichnePortfolio(){
        wo sich Nachlegen rechnen würde. Die Stops stehen und werden nachgezogen; Nichtstun
        ist hier das Ergebnis, nicht die Lücke.</p></div>`; })();
 
+    try { h += nachtPlan(stand); } catch(e){ console.error(e); }
     try { h += kapitalRanking(stand); } catch(e){}
     h += glKasten(stand);
 
@@ -6551,6 +6812,7 @@ function zeichnePortfolio(){
         ${entscheidungsKasten(b, stand)}
         ${ratKasten(b, ku)}
         ${mehrKasten(b)}
+        ${sicherText(() => tiefeAnalyse(b, stand))}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
           ${r?` · <button class="link" data-zeig="${esc(r.instrument)}">Chart ansehen</button>`:''}
           ${(!r && b.basis && b.basis.sym)?` · <button class="link" data-zeig="${esc(b.basis.sym)}">Basiswert im Chart</button>`:''}</p>
