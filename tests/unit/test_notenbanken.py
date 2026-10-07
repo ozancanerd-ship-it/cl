@@ -57,3 +57,10 @@ def test_app_hat_nachtplan_und_tiefe_analyse():
     t = Path("site/template.html").read_text(encoding="utf-8")
     assert "function nachtPlan" in t and "nachtPlan(stand)" in t
     assert "function tiefeAnalyse" in t and "tiefeAnalyse(b, stand)" in t
+
+
+def test_app_hat_die_zweitmeinung():
+    t = Path("site/template.html").read_text(encoding="utf-8")
+    assert "function zweitmeinungKasten" in t
+    assert "chatgpt_meinung.json" in t
+    assert "zweitmeinungKasten()" in t

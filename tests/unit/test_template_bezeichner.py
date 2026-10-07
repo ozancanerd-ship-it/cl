@@ -43,6 +43,7 @@ AUS_TEXTEN = frozenset(
         "NO_TRADE",
         "DEPOT_CODE",
         "DEPOT_SCHLUESSEL",
+        "OPENAI_API_KEY",
         "PUSH_ABOS",
         "VAPID_PRIVATE_KEY",
         # Browser-eigen (DOM), nicht in der Vorlage deklariert: NodeFilter.SHOW_TEXT,

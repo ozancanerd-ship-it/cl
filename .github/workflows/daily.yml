@@ -343,6 +343,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/depot_wache.py --scan web/scan.json --live --send
 
+      # Zweite Meinung von ChatGPT (Ozan, 07.10.: "ich frag dich immer, du sollst mit
+      # ihm zusammenarbeiten"). Nur mit OPENAI_API_KEY aktiv; fehlt das Secret, schreibt
+      # das Skript eine Datei mit aktiv:false und der Lauf geht normal weiter. Nur beim
+      # vollen Lauf — braucht den kompletten Scan, nicht den 10-Minuten-Waechter.
+      - name: ChatGPT-Zweitmeinung
+        id: zweitmeinung
+        if: env.LAUF == 'voll'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: src
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEPOT_CODE: ${{ secrets.DEPOT_CODE }}
+          DEPOT_SCHLUESSEL: ${{ secrets.DEPOT_SCHLUESSEL }}
+        run: python scripts/chatgpt_zweitmeinung.py --scan web/scan.json --out web/chatgpt_meinung.json
+
       # Die eigene Bilanz. Laeuft nach der Wachliste und schreibt sie in die App —
       # ein Scanner, der nie nachrechnet, ob die alten Chancen aufgegangen sind,
       # erzeugt Zuversicht statt Wissen.

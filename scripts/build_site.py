@@ -101,7 +101,10 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
     import shutil
 
     quelle = repo / "web"
-    stat = {"scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0, "waechter": 0, "aktien_info": 0, "notenbanken": 0}
+    stat = {
+        "scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0, "waechter": 0,
+        "aktien_info": 0, "notenbanken": 0, "chatgpt_meinung": 0,
+    }
     # performance.json wurde hier vergessen — die App holte sie, bekam 404 und zeigte
     # deshalb "noch kein abgeschlossener Trade ausgewertet", obwohl 60 in der Datei
     # standen. Genau die Zahl, die man sehen muss, bevor man dem naechsten Signal glaubt.
@@ -117,6 +120,9 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
         ("aktien_info.json", "aktien_info"),
         # Beschluesse von Fed, EZB, BoE — die App ordnet sie fuer Markt und Depot ein.
         ("notenbanken.json", "notenbanken"),
+        # Zweite Meinung von ChatGPT (Ozan, 07.10.) — nur vorhanden, wenn OPENAI_API_KEY
+        # im Lauf hinterlegt ist; sonst schreibt der Zweitmeinung-Schritt gar nichts.
+        ("chatgpt_meinung.json", "chatgpt_meinung"),
     ):
         f = quelle / name
         if f.exists():

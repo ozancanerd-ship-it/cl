@@ -948,6 +948,7 @@ function kuerzel(sym){ return String(sym||'').replace(/-YFD$/,'').replace(/USDT$
 let PF = null;
 let NB = null;                // notenbanken.json — Fed/EZB/BoE-Beschluesse
 let WA = null;                // waechter.json — laeuft der Depot-Waechter auf GitHub?
+let ZM = null;                 // chatgpt_meinung.json — Zweitmeinung von ChatGPT (falls eingerichtet)
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
 
 /* ---- Euro, Broker, Gebuehr -------------------------------------------------
@@ -1082,6 +1083,10 @@ async function ladeScan(){
     const rnb = await fetch('notenbanken.json?v=' + Date.now(), {cache:'no-store'});
     NB = rnb.ok ? await rnb.json() : null;
   } catch(e){ NB = null; }
+  try {
+    const rzm = await fetch('chatgpt_meinung.json?v=' + Date.now(), {cache:'no-store'});
+    ZM = rzm.ok ? await rzm.json() : null;
+  } catch(e){ ZM = null; }
   sicher('Namen', ()=>merkeNamen(S && S.gesamt));
   /* Jeder Teil fuer sich. Vorher standen die Aufrufe in einer Zeile hintereinander —
      ein Fehler im ersten hat alle folgenden mitgenommen, und die App blieb bei
@@ -2659,6 +2664,31 @@ function notenbankKasten(){
       <em>schwanken</em> an solchen Tagen stärker.</p>
     <p style="margin-top:8px;color:var(--ink-3)">Die <em>Richtung</em> (straff = Gegenwind) ist die übliche Lehrbuch-Einordnung —
       <strong>Hinweis, kein Signal</strong>; für 14 Ereignisse nicht belegbar.</p>
+  </div>`;
+}
+
+/* ============================ ZWEITMEINUNG (ChatGPT)
+   Ozan, 07.10. 23:04: „Ich will, dass er mit dir zusammenarbeitet, ohne dass ich ihn
+   jedes Mal fragen muss." Ein zweites Sprachmodell liest dieselben Zahlen (Positionen +
+   Top-Chancen) und kommentiert — automatisch bei jedem vollen 24/7-Lauf, nicht auf
+   Zuruf. Kein zweiter Algorithmus, kein unabhaengiger Beleg: eine zusaetzliche Meinung,
+   klar als solche gekennzeichnet. Ohne eingerichteten Schluessel (OPENAI_API_KEY) zeigt
+   die Karte nur den Hinweis, wie man ihn einrichtet — nie einen erfundenen Text. */
+function zweitmeinungKasten(){
+  if (!ZM) return '';
+  if (!ZM.aktiv){
+    if (ZM.grund === 'kein OPENAI_API_KEY') return `<div class="note-box"><span class="nt">Zweitmeinung (ChatGPT)</span>
+      <p style="margin-top:6px;font-size:13px">Noch nicht eingerichtet — braucht einen OpenAI-API-Key als Geheimnis
+      <span class="mono">OPENAI_API_KEY</span> unter Settings → Secrets → Actions. Ohne Key bleibt dieses Feld leer,
+      es wird nichts erfunden.</p></div>`;
+    return '';
+  }
+  const alt = ZM.erzeugt ? Math.round((Date.now() - Date.parse(ZM.erzeugt)) / 3600000) : null;
+  return `<div class="note-box"><span class="nt">Zweitmeinung (ChatGPT${ZM.modell ? ', ' + esc(ZM.modell) : ''})${
+    alt != null ? ` · vor ${alt < 1 ? 'weniger als einer Stunde' : alt + ' Std.'}` : ''}</span>
+    <p style="margin-top:6px;font-size:13.5px;white-space:pre-wrap">${esc(ZM.text || '')}</p>
+    <p style="margin-top:8px;color:var(--ink-3);font-size:12px">Ein zweites Sprachmodell, keine zweite Datenbasis —
+      liest denselben Stand wie diese App und kommentiert ihn. Kein Signal, keine Kaufempfehlung.</p>
   </div>`;
 }
 
@@ -6744,6 +6774,7 @@ function zeichnePortfolio(){
 
     try { h += nachtPlan(stand); } catch(e){ console.error(e); }
     try { h += kapitalRanking(stand); } catch(e){}
+    try { h += zweitmeinungKasten(); } catch(e){ console.error(e); }
     h += glKasten(stand);
 
     /* Auf einen Blick: wie viel Geld wo steckt. Ozan, 28.09.: „es steht ja immer noch

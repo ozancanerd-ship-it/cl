@@ -55,6 +55,7 @@ def test_karte_zeigt_btc_beta() -> None:
 def test_kapital_ranking_ohne_erfundene_punktzahl() -> None:
     s = _s()
     assert "function kapitalRanking(stand)" in s
-    assert "try { h += kapitalRanking(stand); } catch(e){}\n    h += glKasten(stand);" in s
+    assert "try { h += kapitalRanking(stand); } catch(e){}" in s
+    assert "try { h += zweitmeinungKasten(); } catch(e){ console.error(e); }\n    h += glKasten(stand);" in s
     assert "alarm.ja === true" in s  # neue Chancen nur mit bestandenem Alarm-Tor
     assert "Reihenfolge nach Dringlichkeit, nicht nach einer Punktzahl" in s
