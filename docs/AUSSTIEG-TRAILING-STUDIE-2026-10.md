@@ -79,4 +79,32 @@ unten unter „nur zur Einordnung" und entscheidet nichts.
 
 ## Ergebnis
 
-(folgt nach dem Lauf)
+Gerechnet am 07.10.2026 (Replay 01.03.2025–03.10.2026, 1020 Wachen, 3277 Ereignisse; IS 358 /
+OOS 331 Fälle). Mittlere R je Fall nach Kosten, Unterschied zu X0 in Klammern:
+
+| Teilmenge | X0 Plan | X2 Trail 1 R | X3 Trail 1,5 R | X4 Halb + Trail |
+|---|---:|---:|---:|---:|
+| alle · IS | −0,111 | −0,102 (+0,009) | −0,076 (+0,035) | −0,108 (+0,003) |
+| alle · OOS | −0,112 | −0,123 (−0,011) | −0,081 (+0,031) | −0,123 (−0,011) |
+| Long mit Setup · IS (n 158) | −0,106 | −0,058 (+0,048) | −0,032 (+0,074) | −0,066 (+0,040) |
+| Long mit Setup · OOS (n 100) | +0,044 | +0,002 (−0,042) | +0,010 (−0,034) | +0,010 (−0,034) |
+
+Monats-Bootstrap OOS, 5-%/95-%-Quantil des Unterschieds: X2 [−0,067; +0,042], X3 [−0,049; +0,125],
+X4 [−0,061; +0,039].
+
+**Urteil nach der vorab festgelegten Regel: keine Variante erfüllt sie.**
+* X2 und X4: OOS-Unterschied negativ (Bedingung 1 verfehlt).
+* X3: IS und OOS leicht positiv, aber das Bootstrap-Quantil liegt unter null (Bedingung 3)
+  und auf „Long mit Setup" ist sie OOS schlechter als der Plan (Bedingung 4).
+
+**Entscheidung: Der Plan (⅓–⅓–⅓ mit Stop auf Einstand/Ziel 1) bleibt unverändert.**
+Es wurde nichts an `watchlist.py`, den Alarmtexten oder der App geändert.
+
+### Nur zur Einordnung (entscheidet nichts)
+* Der Plan selbst liegt über alle Fälle bei ≈ −0,11 R, bei „Long mit Setup" im OOS bei +0,04 R:
+  Der Verlust steckt im Einstieg, nicht im Ausstieg — passend zur Bilanz (schnelle
+  Stop-Outs, MFE ≥ 1 R bringt im Schnitt +0,9 R).
+* X3 (weiter Trailing-Abstand) ist die einzige Variante, die in beiden Zeiträumen vorn liegt.
+  Das ist ein Hinweis für eine neue, neu vorab festgelegte Studie, kein Beleg.
+* Konsequenz für die Arbeit: weiter bei der Frage, **warum Einstiege scheitern** (Faktoranalyse
+  der Einstiegs-Fehlschläge), nicht beim Ausstieg.
