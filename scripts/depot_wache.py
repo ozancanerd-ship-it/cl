@@ -75,6 +75,9 @@ from trading_agent.security.siegel import oeffnen, schluessel_aus, versiegeln
 STAND = "data/repository_real/live/depot_stand.siegel"
 OEFFENTLICH = "web/waechter.json"
 ZWECK = "depot-waechter-stand-v1"
+#: Von der App versiegelt hochgeladenes Depot (Auto-Abgleich, Schluessel DEPOT_SCHLUESSEL).
+SYNC = "data/repository_real/live/depot_sync.siegel"
+SYNC_ZWECK = "depot-sync-v1"
 
 ART_TITEL = {
     "stop": "Stop gerissen — verkaufen",
@@ -143,6 +146,21 @@ def depot_lesen(roh: str) -> list[dict[str, Any]]:
     if not isinstance(liste, list):
         return []
     return [p for p in liste if isinstance(p, dict) and p.get("sym")]
+
+
+def sync_lesen(pfad: str | Path, geheim: str) -> str:
+    """Das von der App versiegelte Depot oeffnen. Leer, wenn nichts da ist oder der Schluessel nicht passt."""
+    p = Path(pfad)
+    if not geheim or not p.exists():
+        return ""
+    try:
+        klar = oeffnen(p.read_text(encoding="utf-8"), schluessel_aus(geheim, SYNC_ZWECK))
+    except OSError:
+        return ""
+    if klar is None:
+        print("::warning::depot_sync.siegel passt nicht zu DEPOT_SCHLUESSEL — es gilt DEPOT_CODE.")
+        return ""
+    return klar.decode("utf-8", "replace")
 
 
 # --------------------------------------------------------------------------- Stand
@@ -346,6 +364,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--scan", default="web/scan.json")
     ap.add_argument("--stand", default=STAND)
+    ap.add_argument("--sync", default=SYNC)
     ap.add_argument("--oeffentlich", default=OEFFENTLICH)
     ap.add_argument("--send", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="Stand NICHT fortschreiben")
@@ -363,6 +382,11 @@ def main() -> int:
     jetzt = datetime.now(UTC)
 
     roh = os.environ.get("DEPOT_CODE", "").strip()
+    sync_geheim = os.environ.get("DEPOT_SCHLUESSEL", "").strip()
+    sync_roh = sync_lesen(args.sync, sync_geheim)
+    if sync_roh:
+        # Der automatische Abgleich aus der App ist neuer als jedes von Hand gesetzte DEPOT_CODE.
+        roh = sync_roh
     push = WebPushSink(min_severity=Severity.INFO)
     tg = TelegramSink(min_severity=Severity.INFO)
     mail = EmailSink(min_severity=Severity.INFO)
@@ -422,7 +446,9 @@ def main() -> int:
             }
         print(f"  Livekurse: {len(live)} Wert(e)")
 
-    schluessel = schluessel_aus(roh, ZWECK)
+    # Mit Auto-Abgleich aendert sich der Depot-Text bei jedem Kauf — der Stand-Schluessel muss
+    # aus etwas Festem kommen, sonst finge der Waechter nach jeder Aenderung bei null an.
+    schluessel = schluessel_aus(sync_geheim if sync_roh else roh, ZWECK)
     stand = stand_laden(args.stand, schluessel)
     neuer_stand, ereignisse, uebersicht = pruefe_depot(positionen, scan, stand)
 

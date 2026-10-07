@@ -3459,9 +3459,97 @@ function ladePositionen(){
 }
 function speicherePositionen(a){
   try { localStorage.setItem(SPEICHER, JSON.stringify(a)); } catch(e){}
+  // Automatischer Abgleich mit dem 24/7-Waechter, wenn eingerichtet (Sync-Reiter).
+  try { planeAutoSync(); } catch(e){}
   // Neue Position → sofort Livekurs, nicht erst nach dem naechsten Neustart der App.
   try { abonniereDepot(); } catch(e){}
 }
+/* ============================ AUTOMATISCHER DEPOT-ABGLEICH
+
+   Ozan: „Die Teilverkäufe wurden bis jetzt nicht live aktualisiert … es soll die ganze Zeit
+   analysiert werden." Der Waechter auf GitHub kannte das Depot nur ueber das Geheimnis
+   DEPOT_CODE — nach jedem Kauf haette man es von Hand ersetzen muessen. Auf Ozans Wunsch
+   (07.10.) legt die App das Depot nach jeder Aenderung VERSIEGELT ins Repository (dasselbe
+   Verfahren wie security/siegel.py). Den Schluessel kennen nur dieses Geraet und das
+   GitHub-Geheimnis DEPOT_SCHLUESSEL; im oeffentlichen Repository steht nur Zeichensalat. */
+const AUTO_SYNC = 'desk.autosync.v1';
+const SYNC_REPO = 'ozancanerd-ship-it/cl';
+const SYNC_PFAD = 'data/repository_real/live/depot_sync.siegel';
+function syncCfg(){ try { return JSON.parse(localStorage.getItem(AUTO_SYNC) || 'null'); } catch(e){ return null; } }
+function syncCfgSetzen(c){ try { localStorage.setItem(AUTO_SYNC, JSON.stringify(c)); } catch(e){} }
+const _te = new TextEncoder();
+async function _hmac(key, daten){
+  const k = await crypto.subtle.importKey('raw', key, {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', k, daten));
+}
+function _cat(...a){ const n = a.reduce((s,x)=>s+x.length,0); const o = new Uint8Array(n); let i=0; for (const x of a){ o.set(x,i); i+=x.length; } return o; }
+async function siegelJS(text, geheimnis, nonceFest){
+  const key = new Uint8Array(await crypto.subtle.digest('SHA-256', _te.encode('depot-sync-v1|' + geheimnis)));
+  const kEnc = await _hmac(key, _te.encode('enc')), kMac = await _hmac(key, _te.encode('mac'));
+  const daten = _te.encode(text), nonce = nonceFest || crypto.getRandomValues(new Uint8Array(16));
+  const strom = [];
+  for (let z = 0; z < Math.ceil(daten.length / 32); z++){
+    const ctr = new Uint8Array(8); new DataView(ctr.buffer).setBigUint64(0, BigInt(z));
+    strom.push(await _hmac(kEnc, _cat(nonce, ctr)));
+  }
+  const st = _cat(...strom), geheim = daten.map((b, i) => b ^ st[i]);
+  const kenn = _te.encode('v1');
+  const tag = await _hmac(kMac, _cat(kenn, nonce, geheim));
+  let bin = ''; for (const b of _cat(kenn, nonce, tag, geheim)) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+let _syncTimer = null;
+function planeAutoSync(){
+  const c = syncCfg(); if (!c || !c.token || !c.schluessel) return;
+  clearTimeout(_syncTimer); _syncTimer = setTimeout(() => depotHochladen().catch(()=>{}), 4000);
+}
+async function depotHochladen(){
+  const c = syncCfg(); if (!c || !c.token || !c.schluessel) return {ok:false, grund:'nicht eingerichtet'};
+  const roh = JSON.stringify({v: DEPOT_CODE_VERSION, t: Date.now(), p: ladePositionen()});
+  const inhalt = await siegelJS(roh, c.schluessel) + '\n';
+  const url = `https://api.github.com/repos/${SYNC_REPO}/contents/${SYNC_PFAD}`;
+  const kopf = {Authorization: 'Bearer ' + c.token, Accept: 'application/vnd.github+json'};
+  let sha;
+  try { const r = await fetch(url + '?ref=main', {headers: kopf, cache:'no-store'}); if (r.ok) sha = (await r.json()).sha; } catch(e){}
+  const r = await fetch(url, {method:'PUT', headers: kopf, body: JSON.stringify({
+    message: 'depot: automatischer Abgleich (versiegelt)', content: btoa(inhalt), branch: 'main', ...(sha ? {sha} : {})})});
+  const ok = r.ok;
+  syncCfgSetzen({...c, zuletzt: new Date().toISOString(), ok, fehler: ok ? '' : `GitHub ${r.status}`});
+  return {ok, grund: ok ? '' : `GitHub antwortet ${r.status}`};
+}
+function autoSyncKasten(){
+  const c = syncCfg() || {};
+  const an = !!(c.token && c.schluessel);
+  return `<h2>Automatisch abgleichen (Wächter 24/7)</h2><div class="karte">
+    <p style="margin:0 0 8px;font-size:13.5px">${an
+      ? `<strong>Eingerichtet.</strong> Jede Änderung am Depot geht nach 4 Sekunden versiegelt an den Wächter.
+         ${c.zuletzt ? `Zuletzt: ${esc(new Date(c.zuletzt).toLocaleString('de-DE'))} — ${c.ok ? 'ok' : esc(c.fehler || 'Fehler')}` : 'Noch nichts gesendet.'}`
+      : `Dann musst du DEPOT_CODE nie wieder von Hand ersetzen: Käufe, Verkäufe und Teilverkäufe kommen von selbst beim Wächter an.`}</p>
+    <p style="font-size:12.5px;margin:6px 0">1. GitHub → Settings → Developer settings → <em>Fine-grained token</em>: nur Repository
+      <span class="mono">cl</span>, Berechtigung <em>Contents: Read and write</em>. Token hier einsetzen.</p>
+    <input id="as_tok" type="password" placeholder="github_pat_…" value="${esc(c.token||'')}" style="width:100%;margin:4px 0">
+    <p style="font-size:12.5px;margin:6px 0">2. Schlüssel erzeugen (oder eigenen eintragen) — denselben Text als GitHub-Geheimnis
+      <span class="mono">DEPOT_SCHLUESSEL</span> anlegen.</p>
+    <input id="as_key" placeholder="Schlüssel" value="${esc(c.schluessel||'')}" style="width:100%;margin:4px 0">
+    <p style="margin:8px 0 0"><button class="btn" id="as_gen">Schlüssel erzeugen</button>
+      <button class="btn" id="as_save">Speichern &amp; senden</button></p>
+    <div id="as_hint" style="font-size:12.5px;margin-top:6px"></div>
+    <p style="font-size:12px;color:var(--ink-3);margin-top:8px">Token und Schlüssel bleiben auf diesem Gerät. Im
+      öffentlichen Repository steht nur der versiegelte Text. Der Token darf nur dieses eine Repository schreiben.</p></div>`;
+}
+function verdrahteAutoSync(){
+  const g = $('as_gen'), sv = $('as_save'); if (!g || !sv) return;
+  g.onclick = () => { const b = crypto.getRandomValues(new Uint8Array(18)); $('as_key').value = btoa(String.fromCharCode(...b)).replace(/[+/=]/g,''); };
+  sv.onclick = async () => {
+    const token = $('as_tok').value.trim(), schluessel = $('as_key').value.trim();
+    if (!token || !schluessel){ $('as_hint').textContent = 'Token und Schlüssel ausfüllen.'; return; }
+    syncCfgSetzen({...(syncCfg()||{}), token, schluessel});
+    $('as_hint').textContent = 'Sende …';
+    try { const r = await depotHochladen(); $('as_hint').textContent = r.ok ? 'Gesendet. Der Wächter nimmt es beim nächsten Lauf (≤ 10 Min.).' : 'Fehler: ' + r.grund; }
+    catch(e){ $('as_hint').textContent = 'Fehler: ' + e.message; }
+  };
+}
+
 function abonniereDepot(){
   if (!WS || !WS_OK || WS.readyState !== 1) return;
   const neu = [];
@@ -5038,6 +5126,7 @@ function zeichneSync(){
     dann — die App sieht es nie. Über die Zwischenablage bleibt alles in der App.</p>
   </div>
   <div id="sy_waechter"></div>
+  ${autoSyncKasten()}
 
   <h2>1 · Auf dem Gerät mit dem aktuellen Stand</h2>
   <div class="karte">
@@ -5073,6 +5162,7 @@ function zeichneSync(){
     die Analyse — die holt sich jedes Gerät selbst und hat damit dieselben.</p></div>`;
   $('sync').innerHTML = h;
   fuelleWaechter($('sy_waechter'));
+  try { verdrahteAutoSync(); } catch(e){}
 
   const melde = (el, text, gut) => { el.innerHTML = `<p style="margin:8px 0 0;font-size:13px;
     color:${gut?'var(--up)':'var(--warn)'}">${esc(text)}</p>`; };

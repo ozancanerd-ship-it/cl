@@ -332,6 +332,7 @@ jobs:
         env:
           PYTHONPATH: src
           DEPOT_CODE: ${{ secrets.DEPOT_CODE }}
+          DEPOT_SCHLUESSEL: ${{ secrets.DEPOT_SCHLUESSEL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
@@ -378,6 +379,7 @@ jobs:
         env:
           PYTHONPATH: src
           DEPOT_CODE: ${{ secrets.DEPOT_CODE }}
+          DEPOT_SCHLUESSEL: ${{ secrets.DEPOT_SCHLUESSEL }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
