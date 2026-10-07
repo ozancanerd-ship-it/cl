@@ -90,6 +90,7 @@ ART_TITEL = {
     "zahlen": "Quartalszahlen stehen an",
     "zahlen_ko": "Quartalszahlen — Knock-out-Risiko",
     "entwarnung": "früherer Stop-Alarm hinfällig — nicht deswegen verkaufen",
+    "ueberdehnt": "deutlich im Plus und überdehnt — Rückschlags-Alarm statt Verkauf",
 }
 #: Diese Arten verlangen JETZT eine Entscheidung und bekommen die Klingel auch oeffentlich.
 DRINGEND = {"stop", "ziel", "ko", "puffer_kritisch", "puffer_eng", "zahlen_ko", "entwarnung"}
@@ -331,11 +332,13 @@ def texte(neu: list[Ereignis]) -> tuple[str, str, str]:
         titel = f"{ART_TITEL.get(e.art, e.art)} · {e.name}"
         if len(dringend) > 1:
             titel += f" (+{len(dringend) - 1})"
+    elif len(ruhig) > 1 and all(e.art in {"stop_neu", "stop_nach"} for e in ruhig):
+        titel = f"{len(ruhig)} Stop(s) gesetzt oder nachgezogen"
     else:
         titel = (
-            f"{len(ruhig)} Stop(s) gesetzt oder nachgezogen"
+            f"{len(ruhig)} Meldungen"
             if len(ruhig) > 1
-            else f"{ART_TITEL.get(ruhig[0].art)} · {ruhig[0].name}"
+            else f"{ART_TITEL.get(ruhig[0].art, ruhig[0].art)} · {ruhig[0].name}"
         )
     zeilen = []
     for e in dringend + ruhig:

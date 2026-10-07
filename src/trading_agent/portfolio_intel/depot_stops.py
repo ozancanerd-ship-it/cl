@@ -477,6 +477,34 @@ def pflegen(
             Ereignis("zahlen_ko" if knapp else "zahlen", lg.key, wer, text, knapp, marke=wann)
         )
 
+    # 0b — ueberdehnt und deutlich im Plus: kein Grund zu verkaufen, aber ein Hinweis, dass
+    # der naechste Rueckschlag jederzeit kommen kann (07.10., aus einem echten Fall: MET
+    # +30 % nach starkem Lauf, H4-RSI ueberdehnt — selbe Lage, die die App im Nacht-Plan
+    # zeigt, hier zusaetzlich per Mail, auch wenn Ozan die App nicht offen hat).
+    einstieg_ud = _zahl(pos.get("einstieg"))
+    gv_pct = (
+        ((kurs / einstieg_ud - 1) if lang else (einstieg_ud / kurs - 1)) * 100
+        if einstieg_ud and einstieg_ud > 0 and kurs > 0
+        else None
+    )
+    ueberdehnt = next(
+        (w for w in ((lg.row or {}).get("warnungen") or []) if "ueberdehnt" in str(w).lower()),
+        None,
+    )
+    if ueberdehnt and gv_pct is not None and gv_pct > 15:
+        ev.append(
+            Ereignis(
+                "ueberdehnt",
+                lg.key,
+                wer,
+                f"{lg.name} steht mit {_pct(gv_pct)} im Plus, und die Analyse markiert die "
+                f"Bewegung als überdehnt ({ueberdehnt}). Kein Grund zu verkaufen, aber ein "
+                "guter Moment für einen Rückschlags-Alarm, statt in die Stärke zu verkaufen.",
+                False,
+                marke=f"{int(gv_pct // 5) * 5}",
+            )
+        )
+
     plan = pos.get("plan") or {}
     # Einmalige Korrektur (01.10.): Stops aus einer Setup-Marke auf Positionen, die nicht
     # ueber ein Signal gekauft wurden, waren zu eng und teils aus der falschen Richtung

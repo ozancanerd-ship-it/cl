@@ -53,6 +53,7 @@ def _zeile(
     richtung: str | None = None,
     ziel: float | None = None,
     name: str | None = None,
+    warnungen: list[str] | None = None,
 ) -> dict:
     return {
         "instrument": inst,
@@ -66,6 +67,7 @@ def _zeile(
         "tp2": None,
         "tp3": None,
         "halte": ({"k": 5.0, "stop_long": halte, "stop_short": None} if halte else None),
+        "warnungen": warnungen or [],
     }
 
 
@@ -237,6 +239,48 @@ def test_ziel_1_zieht_den_stop_auf_den_einstieg() -> None:
     # Dasselbe Ziel meldet sich nicht noch einmal.
     stand, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 112.0)), stand)
     assert [e.art for e in ev if e.art == "ziel"] == []
+
+
+def test_ueberdehnt_und_deutlich_im_plus_warnt_per_mail() -> None:
+    pos = [{"sym": "SOLUSD", "menge": 1, "einstieg": 100.0}]
+    scan = _scan(
+        _zeile(
+            "SOLUSD", 120.0, halte=100.0,
+            warnungen=["H4-RSI 83 — die Bewegung ist bereits ueberdehnt"],
+        )
+    )
+    stand, ev, _ = pruefe_depot(pos, scan, {})
+    arten = [e.art for e in ev]
+    assert "ueberdehnt" in arten
+    e = next(x for x in ev if x.art == "ueberdehnt")
+    assert "20,0 %" in e.text
+    assert "überdehnt" in e.text
+    # Dieselbe Spanne (20-25 %) meldet sich nicht noch einmal (Dedup wie bei jedem Alarm).
+    jetzt = datetime.now(UTC)
+    neu, gemeldet = neue_meldungen(ev, {}, jetzt)
+    assert any(x.art == "ueberdehnt" for x in neu)
+    stand, ev2, _ = pruefe_depot(pos, scan, stand)
+    neu2, _ = neue_meldungen(ev2, gemeldet, jetzt)
+    assert not any(x.art == "ueberdehnt" for x in neu2)
+
+
+def test_ueberdehnt_ohne_deutlichen_gewinn_bleibt_still() -> None:
+    pos = [{"sym": "SOLUSD", "menge": 1, "einstieg": 100.0}]
+    scan = _scan(
+        _zeile(
+            "SOLUSD", 105.0, halte=95.0,
+            warnungen=["H4-RSI 83 — die Bewegung ist bereits ueberdehnt"],
+        )
+    )
+    _, ev, _ = pruefe_depot(pos, scan, {})
+    assert "ueberdehnt" not in [e.art for e in ev]
+
+
+def test_im_plus_ohne_ueberdehnt_warnung_bleibt_still() -> None:
+    pos = [{"sym": "SOLUSD", "menge": 1, "einstieg": 100.0}]
+    scan = _scan(_zeile("SOLUSD", 120.0, halte=100.0))
+    _, ev, _ = pruefe_depot(pos, scan, {})
+    assert "ueberdehnt" not in [e.art for e in ev]
 
 
 def test_der_stop_aus_der_app_wird_nie_unterboten() -> None:
