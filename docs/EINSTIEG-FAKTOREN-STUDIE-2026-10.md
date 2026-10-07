@@ -42,3 +42,15 @@ Gesamt: Plan Ø −0,04 R je Fall im Replay (live schlechter: −0,36 R — Ausf
 
 Grenzen: ein Replay über 19 Monate in einer überwiegend steigenden Altcoin-Phase; elf Merkmale
 = Mehrfachtest, deshalb zählt nur, was die strenge Regel besteht.
+
+## Nachtrag: warum live −0,36 R, im Replay −0,04 R?
+* In der eigenen Bilanz (345 Signale) stammen **150 aus einer einzigen Woche (KW37)** mit
+  −0,58 R je Signal und einer Verlustserie von 23 — ein marktweiter Rückschlag, in dem fast alles
+  gleichzeitig ausgestoppt wurde. Ohne KW37: ≈ −0,20 R (195 Signale); KW38/39 liegen bei ≈ 0.
+  Signale sind also **nicht unabhängig**: 345 Fälle sind effektiv deutlich weniger unabhängige Wetten.
+* Das Replay schwankt von Monat zu Monat zwischen −0,52 und +0,37 R (Ø −0,04). Ein einzelner
+  schlechter Monat ist damit im Rahmen des Normalen, ein Beleg für „kaputt" ist er nicht.
+* Geprüft: Cluster-Größe am Aufnahmetag (neue Wachen je Tag, Terzile aus IS) trennt nicht
+  (IS große Tage schlechter −0,17, OOS große Tage besser +0,13) — keine Cluster-Bremse.
+* Folge: Aussagen aus der Bilanz brauchen die Spalte „unabhängig gezählt" (Wochen/Cluster),
+  nicht nur n. Das ist die Grundlage für das Strategie-Status-Board in der App.
