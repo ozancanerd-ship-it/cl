@@ -217,6 +217,16 @@ jobs:
           PYTHONPATH: src
         run: python scripts/fetch_macro.py --out web/macro.json
 
+      # Notenbank-Sitzungen (Fed-Beschlusstext, EZB, BoE). Laeuft bei jedem vollen Lauf; faellt
+      # eine Quelle aus, bleibt der Rest.
+      - name: Notenbanken holen
+        if: env.LAUF == 'voll'
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PYTHONPATH: src
+        run: python scripts/fetch_notenbanken.py --out web/notenbanken.json
+
       # Aktien-Hintergrund: Quartalszahlen-Termine, Sektor, Analystenkonsens (Nasdaq).
       # Holt nur, wenn die veroeffentlichte Datei aelter als 20 Stunden ist — sonst wird
       # sie uebernommen. Faellt Nasdaq aus, laeuft der Scan ohne Termine weiter.

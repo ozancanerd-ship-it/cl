@@ -705,6 +705,8 @@ a{color:var(--accent); text-underline-offset:3px}
 .mc-s{font-size:12.5px; color:var(--ink-2); line-height:1.45; margin-top:2px}
 .mc-s.up{color:var(--long); font-weight:600} .mc-s.warn{color:var(--warn)}
 .mc-plan{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--accent-2); margin-top:3px; letter-spacing:.02em}
+
+.nb-l{margin:4px 0 0;padding-left:18px;font-size:13.5px;line-height:1.45}.nb-l li{margin:3px 0}
 </style>
 </head>
 <body>
@@ -942,6 +944,7 @@ function name(sym){ return NAMEN[sym] || (D.names && D.names[sym]) || sym; }
 function kuerzel(sym){ return String(sym||'').replace(/-YFD$/,'').replace(/USDT$/,''); }
 
 let PF = null;
+let NB = null;                // notenbanken.json — Fed/EZB/BoE-Beschluesse
 let WA = null;                // waechter.json — laeuft der Depot-Waechter auf GitHub?
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
 
@@ -1073,6 +1076,10 @@ async function ladeScan(){
     const rwa = await fetch('waechter.json?v=' + Date.now(), {cache:'no-store'});
     WA = rwa.ok ? await rwa.json() : null;
   } catch(e){ WA = null; }
+  try {
+    const rnb = await fetch('notenbanken.json?v=' + Date.now(), {cache:'no-store'});
+    NB = rnb.ok ? await rnb.json() : null;
+  } catch(e){ NB = null; }
   sicher('Namen', ()=>merkeNamen(S && S.gesamt));
   /* Jeder Teil fuer sich. Vorher standen die Aufrufe in einer Zeile hintereinander —
      ein Fehler im ersten hat alle folgenden mitgenommen, und die App blieb bei
@@ -2038,6 +2045,7 @@ function zeichneStatus(){
     ${sicherText(meineCoinsKasten)}
     ${topSignal()}
     ${makroKasten()}
+    ${sicherText(notenbankKasten)}
     ${stimmungKasten()}
     ${sektorKasten()}
     ${fehler ? `<div class="note-box bad"><span class="nt">Eine Anlageklasse fehlt</span>
@@ -2581,6 +2589,72 @@ function hintergrundKasten(row, kurs){
     <p style="margin:8px 0 0;font-size:12px;color:var(--ink-3)">Kontext zum Wert — nicht im Score.
     Termine von Zacks über Nasdaq, teils geschätzt, bis das Unternehmen sie bestätigt.
     Der Halte-Stop ist die Marke, die die App für eine GEHALTENE Position setzt.</p></div>`;
+}
+
+/* ============================ NOTENBANKEN
+
+   Ozan: „Es soll mir auch sagen, was in den Meetings passiert ist und was es für
+   Auswirkungen auf unseren Markt, Portfolio und Taktik hat." Die Beschlusstexte kommen von
+   Fed, EZB und Bank of England (scripts/fetch_notenbanken.py). Die Einordnung ist die
+   uebliche Lehrbuch-Richtung (straff = Gegenwind fuer Risikoanlagen) — ein Hinweis, kein
+   Signal: gemessen ist diese Wirkung in unseren Daten noch nicht. */
+const NB_KLASSE = {krypto:'Krypto', aktien:'Aktien', gold:'Gold'};
+function notenbankKasten(){
+  if (!NB || !NB.fed) return '';
+  const fed = NB.fed, ent = fed.entscheide || [];
+  const ton = fed.ton || 'neutral';
+  const kl = ton === 'straff' ? 'warn' : ton === 'locker' ? 'gut' : '';
+  const tonText = {straff:'straff', locker:'locker', neutral:'neutral'}[ton];
+  const dat = z => new Date(z).toLocaleDateString('de-DE', {day:'numeric', month:'long', year:'numeric'});
+  const dkurz = z => new Date(z).toLocaleDateString('de-DE', {day:'numeric', month:'short'});
+  const alt = ent[0] ? Math.round((Date.now() - Date.parse(ent[0].zeit)) / 86400000) : null;
+  const pfad = ent.slice().reverse().map(e => {
+    const w = e.aktion === 'anheben' ? '▲' : e.aktion === 'senken' ? '▼' : '■';
+    const sp = e.spanne ? String(e.spanne).replace(' to ', '–').replace(/-/g, ' ') : '';
+    return `${w} ${dkurz(e.zeit)} ${esc(sp)}`;
+  }).join(' → ');
+  const bank = (n, arr) => (arr || []).slice(0, 2).map(m =>
+    `<li><span class="mono">${esc(n)} ${dkurz(m.zeit)}</span> <a href="${esc(m.link)}" target="_blank" rel="noopener">${esc(m.titel.slice(0, 110))}</a></li>`).join('');
+  const kommend = ((S && S.makro && S.makro.termine) || [])
+    .filter(t => /FOMC|ECB|BOE|BoE|Fed |Powell|Lagarde|Bailey|Rate Decision|Minutes|Press Conference/i.test(t.titel)
+                 && Date.parse(t.zeitpunkt) > Date.now() - 3600000 && Date.parse(t.zeitpunkt) < Date.now() + 10*86400000)
+    .slice(0, 5);
+  // Depot: wie viel Gewicht liegt in den Klassen, die der Ton trifft?
+  let depot = '';
+  try {
+    const st = depotStand();
+    if (st && st.bew.length && st.gesamt > 0){
+      const je = {}; let heb = 0, hebN = 0;
+      for (const b of st.bew){
+        const k = (b.row && b.row.klasse) || 'aktien';
+        const eu = st.inEuro(b, b.wert) || 0;
+        je[k] = (je[k] || 0) + eu;
+        if (b.pos.ko != null || Number(b.pos.hebel) > 1){ heb += eu; hebN++; }
+      }
+      const w = (NB.einordnung && NB.einordnung.wirkung) || {};
+      const zeilen = Object.entries(je).filter(([k, v]) => NB_KLASSE[k] && v / st.gesamt >= 0.05)
+        .sort((a, b2) => b2[1] - a[1])
+        .map(([k, v]) => `<li><b>${NB_KLASSE[k]} · ${(v / st.gesamt * 100).toFixed(0)} % deines Depots</b> — ${esc(w[k] || '')}</li>`).join('');
+      depot = `<p style="margin-top:8px"><strong>Dein Depot</strong></p><ul class="nb-l">${zeilen}
+        ${hebN ? `<li><b>${hebN} gehebelte Position${hebN > 1 ? 'en' : ''} · ${(heb / st.gesamt * 100).toFixed(0)} %</b> — ${ton === 'straff' ? 'Zinsüberraschungen bewegen schnell: Knock-out-Puffer prüfen.' : 'Puffer wie gewohnt im Blick behalten.'}</li>` : ''}</ul>`;
+    }
+  } catch(e){ console.error('NB depot', e && e.message); depot = ''; }
+  const taktik = ((NB.einordnung && NB.einordnung.taktik) || []).map(t => `<li>${esc(t)}</li>`).join('');
+  return `<div class="note-box ${kl}">
+    <span class="nt">Notenbanken · Fed ${esc(tonText)}${alt != null ? ` · letzter Beschluss vor ${alt} Tagen` : ''}</span>
+    ${ent[0] ? `<p><strong>${dat(ent[0].zeit)}:</strong> ${esc(ent[0].satz)}
+      ${ent[0].inflation_hoch ? 'Inflation weiter erhöht.' : ''} ${ent[0].unsicherheit ? 'Unsicherheit bleibt hoch.' : ''}</p>` : ''}
+    ${pfad ? `<p class="mono" style="font-size:12.5px">Zinspfad: ${pfad}</p>` : ''}
+    <ul class="nb-l">${bank('EZB', (NB.ezb||{}).mitteilungen)}${bank('BoE', (NB.boe||{}).mitteilungen)}</ul>
+    ${kommend.length ? `<p style="margin-top:8px"><strong>Als Nächstes:</strong> ${kommend.map(t =>
+      `${esc(t.titel)} (${esc(t.land)}, ${zeit(t.zeitpunkt)})`).join(' · ')}</p>` : ''}
+    <p style="margin-top:8px"><strong>Für die Märkte</strong></p>
+    <ul class="nb-l">${Object.entries(NB_KLASSE).map(([k, n]) => `<li><b>${n}</b> — ${esc(((NB.einordnung||{}).wirkung||{})[k] || '')}</li>`).join('')}</ul>
+    ${depot}
+    ${taktik ? `<p style="margin-top:8px"><strong>Taktik</strong></p><ul class="nb-l">${taktik}</ul>` : ''}
+    <p style="margin-top:8px;color:var(--ink-3)">Einordnung nach der üblichen Lehrbuch-Richtung —
+      <strong>Hinweis, kein Signal</strong>. Ob sie in unseren Daten wirklich trägt, ist nicht gemessen.</p>
+  </div>`;
 }
 
 function makroKasten(){

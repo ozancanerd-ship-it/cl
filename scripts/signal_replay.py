@@ -159,8 +159,21 @@ def _bewerte_coin(args: tuple[str, str, str, str, str, int]) -> str:
     ziel = Path(out_dir) / f"{coin}.jsonl"
     name = f"{coin}USD"
     n = 0
-    with ziel.open("w", encoding="utf-8") as fh:
+    # Wiederaufnahme: schon geschriebene Zeitpunkte bleiben (der Lauf wird oft abgebrochen).
+    fertig: set[str] = set()
+    if ziel.exists():
+        for zeile in ziel.read_text(encoding="utf-8").splitlines():
+            try:
+                fertig.add(json.loads(zeile)["t"])
+            except (ValueError, KeyError):
+                continue  # halb geschriebene letzte Zeile
+        keep = [z for z in ziel.read_text(encoding="utf-8").splitlines() if z.endswith("}")]
+        ziel.write_text("\n".join(keep) + ("\n" if keep else ""), encoding="utf-8")
+    n = len(fertig)
+    with ziel.open("a", encoding="utf-8") as fh:
         for t in _takte(datetime.fromisoformat(start), datetime.fromisoformat(ende), takt):
+            if t.isoformat() in fertig:
+                continue
             m5 = reihen[Timeframe.M5].bis(t, FENSTER[Timeframe.M5], MAX_KERZEN)
             if len(m5) < 200:
                 continue
