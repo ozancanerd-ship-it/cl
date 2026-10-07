@@ -46,3 +46,8 @@ def test_einordnung_hat_wirkung_je_klasse():
 def test_app_hat_den_kasten():
     t = Path("site/template.html").read_text(encoding="utf-8")
     assert "function notenbankKasten" in t and "notenbanken.json" in t
+
+
+def test_app_hat_strategie_status():
+    t = Path("site/template.html").read_text(encoding="utf-8")
+    assert "function strategieKasten" in t and "GESPERRT" in t and "sicherText(strategieKasten)" in t

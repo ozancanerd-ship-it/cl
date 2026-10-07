@@ -8630,11 +8630,43 @@ function dauerKasten(){
   </div>`;
 }
 
+/* ============================ STRATEGIE-STATUS
+
+   Jede Strategie traegt einen Zustand, und der kommt aus einer Studie — nicht aus Hoffnung.
+   EXPERIMENTAL = idee ohne Beleg · SCHATTEN = laeuft nur mit, ohne Alarm · AKTIV = belegt,
+   darf klingeln · GESPERRT = Studie negativ. Die Liste steht hier fest; Aenderungen kommen nur
+   zusammen mit einer neuen, vorab festgelegten Studie (docs/*-STUDIE-*.md). */
+const STRATEGIEN = [
+  ['Ausbruch aus der Basis (Coins)', 'SCHATTEN', 'Bilanz ≈ 0 R, n=29 — zu wenig fuer ein Urteil; darf nur ueber das Alarm-Tor klingeln', 'Alarm-Tor / Bilanz'],
+  ['Rueckeroberung nach Liquiditaetsgriff (Coins)', 'SCHATTEN', 'Bilanz ≈ 0 R, n=33; Aktien −1 R (n=6)', 'Alarm-Tor / Bilanz'],
+  ['Plan ⅓–⅓–⅓ mit Stop auf Einstand', 'AKTIV', 'Trailing-Varianten bestehen die Vorab-Regel nicht — Plan bleibt', 'AUSSTIEG-TRAILING-STUDIE-2026-10'],
+  ['Trailing-Stop 1 R / 1,5 R / halb', 'GESPERRT', 'IS/OOS nicht besser, Bootstrap negativ (weit 1,5 R: nur Hinweis)', 'AUSSTIEG-TRAILING-STUDIE-2026-10'],
+  ['Score / Note als Qualitaetsfilter', 'GESPERRT', 'trennt nicht; hoher Score im OOS schlechter', 'EINSTIEG-FAKTOREN-STUDIE-2026-10'],
+  ['BTC-Trend als Filter fuer Alt-Trades', 'EXPERIMENTAL', 'Richtung stimmt, Abstand nicht abgesichert — nur Anzeige', 'EINSTIEG-FAKTOREN-STUDIE-2026-10'],
+  ['Gold-Tageshandel (Asien-Range, Sweep)', 'GESPERRT', 'OOS −0,06 / −0,57 R, Bootstrap negativ', 'GOLD-DAYTRADING-STUDIE-2026-10'],
+  ['Mean Reversion (Bollinger + RSI, 1 h)', 'GESPERRT', 'alle Varianten negativ, OOS −0,13 bis −0,29 R', 'MEAN-REVERSION-STUDIE-2026-10'],
+  ['Notenbank-Einordnung (Fed/EZB/BoE)', 'EXPERIMENTAL', 'Lehrbuch-Richtung, Wirkung in unseren Daten nicht gemessen — nur Hinweis', 'Notenbanken-Karte'],
+  ['Nachlegen / Teilverkauf nach Nachzuegler-Regeln', 'GESPERRT', 'frueher Studien: kein messbarer Nutzen — nur Hinweise, keine Regel', 'AUSSTIEG-STUDIE-2026-10'],
+];
+function strategieKasten(){
+  const farbe = {AKTIV:'gut', SCHATTEN:'', EXPERIMENTAL:'warn', GESPERRT:'bad'};
+  const zeilen = STRATEGIEN.map(([n, z, g, q]) => `<div class="rowx" style="display:block;border-bottom:1px solid var(--line,#2a3140);padding:8px 0">
+    <div><b>${esc(n)}</b> <span class="mono" style="float:right;font-size:11.5px">${esc(z)}</span></div>
+    <div style="font-size:13px;color:var(--ink-3)">${esc(g)} · <span class="mono">${esc(q)}</span></div></div>`).join('');
+  return `<h2>Strategie-Status</h2><div class="karte">${zeilen}</div>
+    <div class="note-box"><span class="nt">So wird entschieden</span>
+      <p>Jede Strategie braucht eine vorab festgelegte Studie (Daten getrennt in Entwicklung und
+      Prüfung, Bootstrap über ganze Monate). Gesperrt heißt: gemessen und nicht besser — nicht
+      „für immer". Signale sind nicht unabhängig: in einer Woche (KW37) kamen 150 von 345
+      Signalen, alle gleichzeitig ausgestoppt — die Zahl der unabhängigen Wetten ist kleiner als n.</p></div>`;
+}
+
 function zeichneBilanz(){
   let h = bilanzKasten();
   h += dauerKasten();
   h += quotenKasten();
   h += historieKasten();
+  h += sicherText(strategieKasten);
   if (!PF) h += `<div class="note-box"><span class="nt">Noch keine Auswertung</span>
     <p>Die Bilanz entsteht im Tageslauf aus der Wachliste. Solange kein Signal
     abgeschlossen ist, gibt es hier nichts zu zeigen — und dann steht hier nichts,
