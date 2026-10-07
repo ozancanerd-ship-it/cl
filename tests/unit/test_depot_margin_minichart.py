@@ -36,3 +36,11 @@ def test_depot_grafik_steht_ueber_der_tabelle() -> None:
     s = _s()
     assert "h += depotGrafik(stand);\n    h += `<h2>Auf einen Blick</h2>" in s
     assert "Wo dein Geld liegt" in s and "Was jede Position seit Kauf gebracht hat" in s
+
+
+def test_stresstest_kappt_verlust_bei_schein_und_margin() -> None:
+    s = _s()
+    assert "function stresstest(stand)" in s
+    assert "eff = -t.gw.kapital" in s  # Knock-out / Liquidation: hoechstens das eigene Geld
+    assert "eff = Math.max(eff, -t.gw.kapital)" in s
+    assert "try { h += stresstest(stand); } catch(e){}" in s

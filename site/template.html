@@ -6045,6 +6045,80 @@ function depotGrafik(stand){
     </div>`;
 }
 
+/* ============================================================ STRESSTEST (seit 07.10.)
+   Master-Prompt-Frage: „Was passiert mit meinem Depot, wenn BTC −10 % macht?" Gerechnet
+   aus der vorhandenen 90-Tage-Messung (Tagesrenditen je Wert, ``S.gleichlauf``), nicht
+   geschätzt: Beta = Korrelation × Schwankung(Wert) ÷ Schwankung(Faktor). Faktoren: Bitcoin
+   und ein Aktienkorb (Apple, Microsoft, Alphabet, Amazon, Meta, NVIDIA, gleich gewichtet).
+   Hebel: ein Schein verliert höchstens seinen Einsatz (Knock-out), Margin höchstens das
+   eigene Geld (Liquidation). Beta ist eine Durchschnittszahl der letzten 90 Tage — in
+   einem echten Absturz laufen Werte meist gleichlaufender als gemessen. Die Zahlen sind
+   deshalb eher zu mild als zu hart. */
+const ST_KORB = ['AAPL','MSFT','GOOGL','AMZN','META','NVDA'];
+function stBeta(nm, faktor){
+  const sd = glVola(nm); if (sd == null) return null;
+  if (faktor === 'BTCUSD'){
+    const sf = glVola('BTCUSD'), k = glKorr(nm, 'BTCUSD');
+    return (sf && k != null) ? k * sd / sf : null;
+  }
+  const namen = ST_KORB.filter(x => glVola(x) != null && glVektoren() && glVektoren().has(x));
+  if (namen.length < 3) return null;
+  let cov = 0, varK = 0;
+  for (const a of namen){
+    const ka = glKorr(nm, a); if (ka == null) return null;
+    cov += ka * sd * glVola(a);
+    for (const b2 of namen){ const kb = glKorr(a, b2); if (kb == null) return null; varK += kb * glVola(a) * glVola(b2); }
+  }
+  cov /= namen.length; varK /= namen.length * namen.length;
+  return varK > 0 ? cov / varK : null;
+}
+function stresstest(stand){
+  const schocks = [['BTCUSD', -5], ['BTCUSD', -10], ['KORB', -3], ['KORB', -5]];
+  const zeilen = [];
+  const teile = [];
+  let unbekannt = 0;
+  for (const b of stand.bew){
+    if (istBar(b.pos)) continue;
+    const gw = glGewicht(b, stand); if (!gw) continue;
+    const nm = glNameFuer(b);
+    const bt = nm ? stBeta(nm, 'BTCUSD') : null, ba = nm ? stBeta(nm, 'KORB') : null;
+    if (bt == null && ba == null){ unbekannt++; continue; }
+    const kurz = (b.hebel && b.hebel.lang === false) || b.pos.hebel_richtung === 'short' || istKurzDirekt(b.pos);
+    teile.push({b, gw, kurz, bt, ba});
+  }
+  if (!teile.length) return '';
+  const gesamt = stand.gesamt;
+  for (const [f, sch] of schocks){
+    let sum = 0; const treffer = []; const beitrag = [];
+    for (const t of teile){
+      const beta = f === 'BTCUSD' ? t.bt : t.ba; if (beta == null) continue;
+      let move = beta * sch / 100; if (t.kurz) move = -move;
+      let eff = t.gw.markt * move;
+      const puffer = t.b.hebel && t.b.hebel.puffer_pct != null ? t.b.hebel.puffer_pct / 100 : null;
+      const lang = !t.kurz;
+      if (t.gw.art !== 'direkt'){
+        const schaden = lang ? -move : move;           // Anteil, um den der Basiswert gegen uns laeuft
+        if (puffer != null && schaden >= puffer){ eff = -t.gw.kapital; treffer.push(posName(t.b)); }
+        else eff = Math.max(eff, -t.gw.kapital);
+      }
+      sum += eff; beitrag.push({n: posName(t.b), eff});
+    }
+    zeilen.push({f, sch, sum, treffer, top: beitrag.sort((a, c) => a.eff - c.eff).slice(0, 3)});
+  }
+  const fn = f => f === 'BTCUSD' ? 'Bitcoin' : 'Aktienmarkt';
+  return `<h2>Stresstest</h2><div class="karte">
+    <div class="tw"><table class="mtf" style="font-size:13px"><thead><tr><th>Szenario</th>
+      <th style="text-align:right">Depot</th><th style="text-align:right">in %</th></tr></thead><tbody>
+    ${zeilen.map(z => `<tr><td>${fn(z.f)} ${z.sch} %<br><span class="nu" style="font-size:11px">am meisten: ${
+        z.top.filter(x => x.eff < -0.5).map(x => esc(x.n) + ' ' + num(x.eff, 0) + ' €').join(', ') || '—'}</span>${
+        z.treffer.length ? `<br><span class="dn" style="font-size:11.5px"><b>Knock-out / Liquidation:</b> ${z.treffer.map(esc).join(', ')}</span>` : ''}</td>
+      <td style="text-align:right;white-space:nowrap" class="${z.sum < 0 ? 'dn' : 'up'}"><b>${z.sum < 0 ? '−' : '+'}${num(Math.abs(z.sum), 0)} €</b></td>
+      <td style="text-align:right;white-space:nowrap">${gesamt ? (z.sum / gesamt * 100).toFixed(1).replace('.', ',') : '—'} %</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="nu" style="font-size:11.5px;margin:6px 0 0">Rechnung aus den Tagesrenditen der letzten 90 Tage (Beta = Korrelation × Schwankung). Im echten Absturz laufen Werte meist gleichlaufender als gemessen — die Zahlen sind eher zu mild.${
+      unbekannt ? ` ${unbekannt} Position${unbekannt > 1 ? 'en' : ''} ohne Messreihe zählen nicht mit.` : ''}</p></div>`;
+}
+
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -6175,6 +6249,7 @@ function zeichnePortfolio(){
       return {b, eu, st};
     }).sort((x, y) => (y.eu || 0) - (x.eu || 0));
     h += depotGrafik(stand);
+    try { h += stresstest(stand); } catch(e){}
     h += `<h2>Auf einen Blick</h2>
       <div class="tw"><table class="mtf" style="font-size:13px">
       <thead><tr><th>Position</th><th style="text-align:right">Wert</th><th style="text-align:right">Anteil</th>
