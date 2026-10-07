@@ -6229,7 +6229,7 @@ function scheinBei(b, basisPreis){
 const NACHT_BROKER = {
   traderepublic: {stop: 'Stop-Loss-Order (Stop-Market, „Stop") — Verkauf, sobald der Kurs die Marke berührt',
     ziel: 'Limit-Verkauf (Take-Profit)',
-    hinweis: 'Trade Republic: ein Stück kann nur in EINER offenen Order stecken. Wenn Stop und Limit nicht zusammen gehen, hat der Stop Vorrang — er schützt, das Limit verdient nur. Aktien und Scheine handeln dort ca. 7:30–23:00; nachts ruht die Order, sie greift beim ersten Kurs am Morgen.'},
+    hinweis: 'Trade Republic: ob Stop und Limit auf dieselben Stücke gleichzeitig offen sein dürfen, ist hier nicht sicher geprüft — im Zweifel in der App nachsehen. Geht nur eine Order, hat der Stop Vorrang: er schützt, das Limit verdient nur. Aktien und Scheine handeln dort ca. 7:30–23:00; nachts ruht die Order, sie greift beim ersten Kurs am Morgen.'},
   kraken: {stop: 'Stop-Loss-Order (Order-Typ „Stop Loss")', ziel: 'Take-Profit-Order (Order-Typ „Take Profit") oder Limit-Verkauf',
     hinweis: 'Kraken handelt rund um die Uhr — die Order greift auch um 3 Uhr. Stop und Take-Profit dürfen zusammen die Menge nicht übersteigen.'},
   bybit: {stop: 'Stop-Loss direkt an der Position (TP/SL)', ziel: 'Take-Profit an der Position — „Teil-TP/SL" erlaubt eine Teilmenge',
