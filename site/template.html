@@ -8902,9 +8902,31 @@ function kaufDialog(sym, mengeVorschlag, kursVorschlag){
    nach beiden Ausstiegsregeln — damit sichtbar bleibt, was der Teilverkauf ausmacht.
    Keine Auswahl, keine Bestenliste: es stehen ALLE da, auch die schlechten. Eine
    Historie, aus der man die Verlierer herausnimmt, ist Werbung. */
+/* 08.10., Ozan am Telefon: „MET steht hier auf Stop/-1 R, aber meine Position ist im
+   Plus." Kein Rechenfehler — diese Tabelle ist das Ergebnis des SYSTEM-EIGENEN Signals
+   (eigener Einstieg/Stop aus dem Scanner), nicht Ozans echte Depot-Position. Beide
+   koennen beim selben Coin in verschiedene Richtungen laufen, weil Einstieg und Zeitpunkt
+   verschieden sind. Jetzt steht das explizit da, und wo eine Zeile zufaellig ein Coin
+   betrifft, das gerade im Depot liegt, steht direkt daneben, wie die ECHTE Position
+   steht — damit niemand mehr beides fuer dasselbe haelt. */
+function echtePositionJeMuenze(){
+  const karte = {};
+  try {
+    const stand = depotStand();
+    if (!stand) return karte;
+    for (const b of stand.bew){
+      if (istBar(b.pos) || b.gvPct == null) continue;
+      const m = muenzeVon(b.pos.sym);
+      if (!karte[m]) karte[m] = b.gvPct;
+    }
+  } catch(e){ console.error('echtePositionJeMuenze', e && e.message); }
+  return karte;
+}
+
 function historieKasten(){
   const t = (PF && PF.trades) || [];
   if (!t.length) return '';
+  const echte = echtePositionJeMuenze();
   const zeilen = t.slice(0, 60).map(x=>{
     const gut = x.r_ganz > 0, schlecht = x.r_ganz < 0;
     const farbe = gut ? 'var(--long)' : schlecht ? 'var(--bad)' : 'var(--ink-3)';
@@ -8914,8 +8936,14 @@ function historieKasten(){
     else if (x.gezaehlt === false) ausgang = 'Kursausfall';
     const blass = x.gezaehlt === false ? ' style="opacity:.5"' : '';
     const handy = x.gemeldet ? ' <span class="mini-tag" title="ging aufs Handy">ALARM</span>' : '';
+    const gvEcht = echte[muenzeVon(x.instrument)];
+    const echtFarbe = gvEcht >= 0 ? 'var(--long)' : 'var(--bad)';
+    const echtTag = gvEcht != null
+      ? ` <span class="mini-tag" style="background:color-mix(in srgb,${echtFarbe} 16%,transparent);color:${echtFarbe}"
+          title="Deine echte Depot-Position in diesem Coin steht gerade ${gvEcht>=0?'+':'−'}${Math.abs(gvEcht).toFixed(0)} % — unabhaengig vom Signal-Ergebnis links">deine Position ${gvEcht>=0?'+':'−'}${Math.abs(gvEcht).toFixed(0)} %</span>`
+      : '';
     return `<tr${blass}>
-      <td class="tf">${esc(name(x.instrument))}${handy}</td>
+      <td class="tf">${esc(name(x.instrument))}${handy}${echtTag}</td>
       <td>${esc(x.note)}</td>
       <td>${esc(ausgang)}${(x.erreicht||[]).length?` <span style="color:var(--ink-3)">${x.erreicht.join(',')}</span>`:''}</td>
       <td style="color:${farbe};font-weight:600">${x.r_ganz>0?'+':''}${x.r_ganz.toFixed(2)} R</td>
@@ -8924,6 +8952,12 @@ function historieKasten(){
     </tr>`;
   }).join('');
   return `<h2>Wie die Signale ausgegangen sind</h2>
+  <p class="lead">Das Ergebnis des <strong>SYSTEM-EIGENEN Signals</strong> je Zeile — eigener
+  Einstieg, eigener Stop, eigene Ziele aus dem Scanner. <strong>Das ist nicht deine echte
+  Depot-Position</strong>, auch wenn der Name gleich ist: Du kannst zu einem anderen Kurs
+  eingestiegen sein oder zu einem anderen Zeitpunkt. Steht „deine Position …%" daneben, hast
+  du diesen Coin gerade im Depot — dieser Wert ist dein echter Gewinn/Verlust, unabhängig vom
+  Signal links davon.</p>
   <p class="lead">Jedes abgeschlossene Signal einzeln, das jüngste zuerst — auch die
   schlechten. <strong>Ganz</strong> ist alles-oder-nichts, <strong>Drittel</strong> mit
   Teilverkauf am ersten Ziel und Stop auf Einstand. <span class="mini-tag">ALARM</span> = ging aufs Handy. Blasse Zeilen
