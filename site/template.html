@@ -3036,7 +3036,7 @@ function zeichneRadar(){
   const jetzt = jetztListe.length;
   const knappe = amEinstieg.length - jetzt;
   const jetztAktien = jetztListe.filter(x => (x.o && x.o.klasse) === 'aktien').length;
-  const kopf = `<div class="note-box"><span class="nt">Zwei verschiedene Fragen</span>
+  const kopf = marktLageKasten() + `<div class="note-box"><span class="nt">Zwei verschiedene Fragen</span>
     <p style="font-size:13.5px"><strong>Ein grünes <em>JETZT</em> heisst: dieser Wert steht
     drüben unter Alarme in „Jetzt einsteigen".</strong> Nichts anderes. Der Filter
     <em>Jetzt einsteigen</em> oben zeigt genau diese Werte.</p>
@@ -6121,6 +6121,65 @@ function depotGesundheit(stand){
   return {wert, pk, schutz, eff, groesste, hebelOk, ohneTermin, gehebelt: gehebelt.length,
           ohneStop: teile.filter(b => !hatSchutz(b))};
 }
+/* ============================================= MARKTLAGE — RISK-ON/RISK-OFF
+
+   Ozan, 08.10. 20:49, nach dem Krypto-Abverkauf: „falls der komplette Markt wieder
+   sinkt, dass wir jetzt keine Scheiße bauen" und „wo man reingehen kann, wo man nicht
+   reingehen kann."
+
+   Der serverseitige Makro-Regime-Wert (``S.makro.regime``) kommt aus Aktienmärkten (VIX,
+   S&P 500, Dollar, Zinsen) und wird nur EINMAL am Tag aktualisiert — ein Krypto-Flashcrash
+   wie der vom 7./8.10. (Liquidationen, ETF-Abflüsse) zeigt sich darin erst mit Verzögerung,
+   manchmal erst am nächsten Tag. Deshalb hier zusätzlich eine zweite, krypto-eigene und
+   LIVE berechnete Lage — direkt aus dem aktuellen Scan, nicht aus einem Tages-Snapshot:
+   wie viele der gescannten Coins sind gerade in den letzten 24 Stunden wie stark gefallen.
+
+   Das ist bewusst nur eine BESCHREIBUNG der Lage, keine neue, ungeprüfte Handelsregel —
+   die bestehenden No-Trade-/Alarm-Tor-Regeln entscheiden weiterhin, wann ein Kaufalarm
+   kommt. Was diese Karte ändert: Ozan sieht die Lage auf einen Blick, statt sie aus
+   einzelnen Positionen zusammenraten zu müssen. */
+function marktLage(){
+  const rows = (S?.gesamt||[]).filter(o => o.klasse === 'krypto'
+    && o.zusatz && isFinite(o.zusatz.bewegung_24h_pct));
+  if (rows.length < 10) return null;
+  const werte = rows.map(o => o.zusatz.bewegung_24h_pct).sort((a,b)=>a-b);
+  const mitte = werte.length >> 1;
+  const median = werte.length % 2 ? werte[mitte] : (werte[mitte-1]+werte[mitte])/2;
+  const starkRot = rows.filter(o => o.zusatz.bewegung_24h_pct <= -5).length;
+  const anteilStarkRot = starkRot / rows.length * 100;
+  const btc = rows.find(o => /^BTC/.test(o.instrument));
+  const btc24h = btc ? btc.zusatz.bewegung_24h_pct : null;
+  let stufe = 'ruhig';
+  if (anteilStarkRot >= 50 || (btc24h != null && btc24h <= -4)) stufe = 'risk_off';
+  else if (anteilStarkRot >= 25 || (btc24h != null && btc24h <= -2)) stufe = 'angespannt';
+  return {median, anteilStarkRot: Math.round(anteilStarkRot), n: rows.length, btc24h, stufe,
+          angstGier: S?.stimmung?.angst_gier || null, makroRegime: S?.makro?.regime || null};
+}
+function marktLageKasten(){
+  const m = marktLage();
+  if (!m) return '';
+  const kl = m.stufe === 'risk_off' ? 'bad' : m.stufe === 'angespannt' ? 'warn' : 'gut';
+  const titel = m.stufe === 'risk_off' ? 'Risk-Off — Markt fällt breit'
+    : m.stufe === 'angespannt' ? 'Angespannt — vorsichtig bleiben' : 'Ruhig';
+  const ag = m.angstGier;
+  return `<div class="note-box ${kl}" style="margin:10px 0 0">
+    <span class="nt">Marktlage (Krypto, live) · ${titel}</span>
+    <p style="margin:4px 0 0;font-size:13px">${m.anteilStarkRot} % der ${m.n} gescannten Coins
+      sind in 24 Std. um mehr als 5 % gefallen (Median ${pct(m.median,1)})${
+      m.btc24h != null ? `, Bitcoin ${pct(m.btc24h,1)}` : ''}.${
+      ag ? ` Angst &amp; Gier: ${ag.wert} (${esc(ag.text)}, vor einer Woche ${ag.vorwoche}).` : ''}</p>
+    <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-3)">${
+      m.stufe === 'risk_off'
+        ? 'Das ist eine Beschreibung der Lage, keine neue Regel: neue Käufe besonders '
+        + 'kritisch prüfen, bei Positionen mit Gewinn die Hinweise unten ernst nehmen — '
+        + 'gegen einen erzwungenen, marktweiten Abverkauf zu kaufen ist kein Signal, '
+        + 'sondern eine Wette gegen Liquidationen.'
+        : m.stufe === 'angespannt'
+        ? 'Noch kein breiter Ausverkauf, aber mehr rote Coins als sonst — Stops und '
+        + 'Gewinnsicherung im Blick behalten.'
+        : 'Kein Anlass, hier etwas anders zu machen als sonst.'}</p></div>`;
+}
+
 function gesundheitKasten(stand){
   const g = depotGesundheit(stand);
   if (!g) return '';
@@ -6764,7 +6823,7 @@ function zeichnePortfolio(){
       ? 'Für den Wächter rund um die Uhr liegt eine Kopie als <strong>Geheimnis</strong> bei '
         + 'GitHub (DEPOT_CODE) — dort ist sie für niemanden lesbar, auch nicht in den Protokollen.'
       : 'Auf einem anderen Gerät bringst du sie über den Reiter Sync hin.'}</p></div>`;
-  let h = `<div id="pf_waechter"></div>`;
+  let h = `<div id="pf_waechter"></div>` + marktLageKasten();
 
   if (bew.length){
     h += `<div class="status">
