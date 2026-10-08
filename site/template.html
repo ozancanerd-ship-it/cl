@@ -5569,6 +5569,21 @@ function kartenUrteil(b, a){
   if (a && a.art === 'nachlegen') return {wort:'NACHLEGEN', kl:'gut', aktion:a};
   return {wort:b.urteil, kl:b.kl, aktion:null};
 }
+/* 08.10., Ozan: „so ne Skala wie viel Prozent die Wahrscheinlichkeit ist, dass es steigt
+   oder sinkt." Das kann ehrlich niemand aus dem Kursverlauf berechnen — keine der
+   Einstiegs-Studien fand einen Filter, der die naechste Richtung vorhersagt (siehe
+   EINSTIEG-FAKTOREN-STUDIE-2026-10). Was es WIRKLICH gibt: eine gemessene Trefferquote,
+   wie oft eine VERGLEICHBARE Setup-Art in der Vergangenheit ihr erstes Ziel erreicht hat,
+   statt im Stop zu enden (dieselbe Zahl, die bei neuen Chancen im Scan schon steht — hier
+   zusaetzlich bei bereits gehaltenen Positionen). Bewusst „Trefferquote (Vergangenheit)",
+   nicht „Wahrscheinlichkeit" — das eine ist eine Zaehlung, das andere eine Vorhersage. */
+function trefferquoteSpan(r){
+  const q = r && r.erwartung && r.erwartung.quote;
+  if (!q || q.n < 5) return '';
+  return `<span title="Von ${q.n} vergangenen Signalen dieser Setup-Art erreichten ${Math.round(q.tp1*100)} % Ziel 1, ${Math.round(q.stop*100)} % liefen in den Stop. Das ist eine Zaehlung aus der Vergangenheit, keine Vorhersage fuer diesen Trade.">Trefferquote <b class="${q.tp1>=0.5?'up':''}">${Math.round(q.tp1*100)} % Ziel1</b>
+    <span style="color:var(--ink-3)">/ ${Math.round(q.stop*100)} % Stop · n=${q.n}${q.belastbar?'':' · wenig Faelle'}</span></span>`;
+}
+
 function ratKasten(b, ku){
   const rat = positionsRat(b);
   const a = ku && ku.aktion;
@@ -6849,6 +6864,7 @@ function zeichnePortfolio(){
           ${(()=>{ try { if (istBar(b.pos)) return ''; const nm = glNameFuer(b); const be = nm ? stBeta(nm, 'BTCUSD') : null;
               return be == null ? '' : `<span title="Wie stark der Wert Bitcoin folgt (90 Tage): 1,0 = gleich viel, 2,0 = doppelt so stark, unter 0,5 = kaum">BTC-Beta <b>${be.toFixed(2).replace('.', ',')}</b></span>`; } catch(e){ return ''; } })()}
           ${b.r!=null?`<span title="gemessen am Abstand Einstieg → dein Stop">Stand <b class="${b.r>=0?'up':'dn'}">${b.r>=0?'+':'−'}${Math.abs(b.r).toFixed(2).replace('.',',')} R</b></span>`:''}
+          ${trefferquoteSpan(r)}
         </div>
         ${zahlenHinweis(b)}
         ${r ? '' : basisKasten(b)}
