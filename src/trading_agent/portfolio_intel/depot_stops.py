@@ -505,6 +505,38 @@ def pflegen(
             )
         )
 
+    # 0c — Gewinn-Rueckgang vom Hoch: Ozan, 08.10. 17:40 — „wir haben noch nie richtig
+    # was mitgenommen". Konkreter Anlass: MET lief weit ins Plus und faellt seitdem
+    # zurueck, ohne dass je verkauft wurde — Ozan wartet live auf „eine Zahl, die er mag",
+    # statt vorher zu entscheiden. ``hoch_gv_pct`` merkt sich ueber alle Laeufe den
+    # bisher hoechsten Gewinn dieser Position (nicht nur den heutigen); faellt der
+    # aktuelle Gewinn deutlich davon zurueck, ist das ein eigenstaendiger, dringender
+    # Grund zu handeln — unabhaengig vom gesetzten Stop, der ja noch nicht gerissen sein
+    # muss. Siehe docs/AUSSTIEG-TRAILING-STUDIE-2026-10.md: ein generelles engeres
+    # Trailing hat im Test nicht mehr gebracht als der Plan — hier geht es nicht um eine
+    # neue Ausstiegsregel, sondern nur darum, einen bereits eingetretenen Rueckgang
+    # ueberhaupt zu melden, statt ihn schweigend zu dulden.
+    if gv_pct is not None:
+        hoch_vorher = _zahl(st.get("hoch_gv_pct"))
+        hoch = max(hoch_vorher, gv_pct) if hoch_vorher is not None else gv_pct
+        st["hoch_gv_pct"] = hoch
+        rueckgang = hoch - gv_pct
+        if hoch >= 10 and rueckgang >= max(8.0, hoch * 0.35):
+            ev.append(
+                Ereignis(
+                    "gewinn_rueckgang",
+                    lg.key,
+                    wer,
+                    f"{lg.name} stand zwischenzeitlich bei {_pct(hoch)} im Plus, jetzt nur "
+                    f"noch {_pct(gv_pct)} — {_pct(rueckgang)} vom Spitzenwert schon wieder "
+                    "weg, ohne dass etwas verkauft wurde. Teilverkauf jetzt sichert, was "
+                    "da ist; Warten auf eine bestimmte Zahl hat beim letzten Mal mehr "
+                    "gekostet als gebracht.",
+                    True,
+                    marke=f"{int(rueckgang // 10) * 10}",
+                )
+            )
+
     plan = pos.get("plan") or {}
     # Einmalige Korrektur (01.10.): Stops aus einer Setup-Marke auf Positionen, die nicht
     # ueber ein Signal gekauft wurden, waren zu eng und teils aus der falschen Richtung

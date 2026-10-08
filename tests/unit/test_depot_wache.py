@@ -23,6 +23,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from scripts.depot_wache import depot_lesen, neue_meldungen, stand_laden, stand_sichern
 
 from trading_agent.portfolio_intel.depot_stops import (
@@ -281,6 +282,39 @@ def test_im_plus_ohne_ueberdehnt_warnung_bleibt_still() -> None:
     scan = _scan(_zeile("SOLUSD", 120.0, halte=100.0))
     _, ev, _ = pruefe_depot(pos, scan, {})
     assert "ueberdehnt" not in [e.art for e in ev]
+
+
+def test_gewinn_faellt_vom_hoch_zurueck_und_meldet_sich_dringend() -> None:
+    """Ozan, 08.10. 17:40: „wir haben noch nie richtig was mitgenommen" — MET lief weit
+    ins Plus und faellt seitdem zurueck, ohne dass je verkauft wurde. Die Position merkt
+    sich ueber zwei Laeufe den Spitzengewinn (hier +60 % bei 160) und meldet sich
+    dringend, sobald davon deutlich etwas wieder weg ist (hier nur noch +20 % bei 120:
+    40 Punkte vom Hoch weg, mehr als 35 % von 60)."""
+    pos = [{"sym": "METUSD", "menge": 10, "einstieg": 100.0}]
+    stand, ev1, _ = pruefe_depot(pos, _scan(_zeile("METUSD", 160.0, halte=90.0)), {})
+    assert "gewinn_rueckgang" not in [e.art for e in ev1]  # noch am Hoch, nichts zu melden
+    assert stand["positionen"]["METUSD|"]["hoch_gv_pct"] == pytest.approx(60.0)
+
+    stand2, ev2, _ = pruefe_depot(pos, _scan(_zeile("METUSD", 120.0, halte=90.0)), stand)
+    e = next(x for x in ev2 if x.art == "gewinn_rueckgang")
+    assert e.dringend is True
+    assert "60,0 %" in e.text and "20,0 %" in e.text
+    assert stand2["positionen"]["METUSD|"]["hoch_gv_pct"] == pytest.approx(60.0)
+
+    # Dedup: derselbe Rueckgangs-Bereich (30-39,9) meldet sich nicht noch einmal.
+    jetzt = datetime.now(UTC)
+    neu, gemeldet = neue_meldungen(ev2, {}, jetzt)
+    assert any(x.art == "gewinn_rueckgang" for x in neu)
+    _, ev3, _ = pruefe_depot(pos, _scan(_zeile("METUSD", 119.0, halte=90.0)), stand2)
+    neu2, _ = neue_meldungen(ev3, gemeldet, jetzt)
+    assert not any(x.art == "gewinn_rueckgang" for x in neu2)
+
+
+def test_kleiner_gewinn_ohne_grossen_rueckgang_bleibt_still() -> None:
+    pos = [{"sym": "METUSD", "menge": 10, "einstieg": 100.0}]
+    stand, _, _ = pruefe_depot(pos, _scan(_zeile("METUSD", 112.0, halte=90.0)), {})
+    _, ev2, _ = pruefe_depot(pos, _scan(_zeile("METUSD", 108.0, halte=90.0)), stand)
+    assert "gewinn_rueckgang" not in [e.art for e in ev2]
 
 
 def test_der_stop_aus_der_app_wird_nie_unterboten() -> None:

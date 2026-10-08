@@ -91,9 +91,19 @@ ART_TITEL = {
     "zahlen_ko": "Quartalszahlen — Knock-out-Risiko",
     "entwarnung": "früherer Stop-Alarm hinfällig — nicht deswegen verkaufen",
     "ueberdehnt": "deutlich im Plus und überdehnt — Rückschlags-Alarm statt Verkauf",
+    "gewinn_rueckgang": "Gewinn fällt vom Hoch zurück — jetzt Teil verkaufen",
 }
 #: Diese Arten verlangen JETZT eine Entscheidung und bekommen die Klingel auch oeffentlich.
-DRINGEND = {"stop", "ziel", "ko", "puffer_kritisch", "puffer_eng", "zahlen_ko", "entwarnung"}
+DRINGEND = {
+    "stop",
+    "ziel",
+    "ko",
+    "puffer_kritisch",
+    "puffer_eng",
+    "zahlen_ko",
+    "entwarnung",
+    "gewinn_rueckgang",
+}
 #: Was die oeffentliche Klingel im Betreff sagt — die Handlung, nie der Wert.
 HANDLUNG = {
     "stop": "VERKAUFEN",
@@ -103,6 +113,7 @@ HANDLUNG = {
     "puffer_eng": "TEIL VERKAUFEN",
     "zahlen_ko": "PRÜFEN",
     "entwarnung": "ENTWARNUNG",
+    "gewinn_rueckgang": "TEIL VERKAUFEN",
 }
 
 
