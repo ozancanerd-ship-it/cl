@@ -167,6 +167,11 @@ def main() -> int:
             "erzeugt": antwort.erzeugt,
             "modell": antwort.modell,
             "text": antwort.text,
+            # Ozan, 09.10. 10:33: seine Meinung soll direkt auf der Buy-/Sell-Karte
+            # stehen — je_position/je_chance sind nach genau demselben Schluessel
+            # (sym/instrument) sortiert, den auch die App fuer die jeweilige Karte nutzt.
+            "je_position": antwort.je_position,
+            "je_chance": antwort.je_chance,
             "bezieht_sich_auf": {"positionen": len(pos_k), "chancen": len(chancen_k)},
         },
     )

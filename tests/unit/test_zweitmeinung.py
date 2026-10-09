@@ -21,6 +21,8 @@ Festgehalten wird:
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from trading_agent.ops import zweitmeinung as zm
@@ -151,3 +153,86 @@ def test_prompt_nennt_position_und_begruendung():
 def test_prompt_ohne_alles_bleibt_ehrlich():
     p = zm.baue_prompt(positionen=[], chancen=[])
     assert "Keine Positionen" in p
+
+
+def test_prompt_nennt_den_maschinenlesbaren_schluessel():
+    """Ozan, 09.10. 10:33: ChatGPTs Meinung soll direkt auf die Buy-/Sell-Karte der App
+    passen — das klappt nur, wenn der Prompt denselben Schluessel (sym/instrument)
+    nennt, den auch die App fuer die Karte benutzt."""
+    p = zm.baue_prompt(
+        positionen=[{"sym": "METUSD", "name": "Metaplex"}],
+        chancen=[{"instrument": "NVDA", "name": "Nvidia"}],
+    )
+    assert "(sym=METUSD)" in p
+    assert "(instrument=NVDA)" in p
+
+
+def test_strukturierte_json_antwort_wird_pro_position_zugeordnet(monkeypatch):
+    """Haelt sich ChatGPT an das verlangte JSON-Format, landet seine Meinung je Position/
+    Chance unter genau dem Schluessel, den die App fuer die jeweilige Karte benutzt."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    inhalt = json.dumps(
+        {
+            "gesamt": "Grundsaetzlich stimme ich der Einschaetzung zu.",
+            "je_position": {"METUSD": "Stop zu weit weg, Rueckgang ernst nehmen."},
+            "je_chance": {"NVDA": "Score plausibel, aber Volumen schwach."},
+        }
+    )
+
+    def transport(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": inhalt}}]}
+
+    r = zm.hole_zweitmeinung("Prompt-Text", transport=transport)
+    assert r is not None
+    assert r.text == "Grundsaetzlich stimme ich der Einschaetzung zu."
+    assert r.je_position == {"METUSD": "Stop zu weit weg, Rueckgang ernst nehmen."}
+    assert r.je_chance == {"NVDA": "Score plausibel, aber Volumen schwach."}
+
+
+def test_antwort_ohne_gueltiges_json_faellt_auf_rohen_text_zurueck_ohne_erfindung(monkeypatch):
+    """Haelt sich das Modell NICHT an das JSON-Format, wird nichts pro Position erfunden —
+    nur der rohe Text bleibt als Gesamtmeinung stehen (besser eine ehrliche Meinung als
+    leere, erfundene Pro-Kaertchen)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+
+    def transport(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": "Kein JSON, einfach Fliesstext."}}]}
+
+    r = zm.hole_zweitmeinung("x", transport=transport)
+    assert r is not None
+    assert r.text == "Kein JSON, einfach Fliesstext."
+    assert r.je_position == {}
+    assert r.je_chance == {}
+
+
+def test_json_mit_nicht_string_werten_wird_still_ausgelassen(monkeypatch):
+    """Ein kaputtes Feld (Zahl statt Text, leerer String) wird ausgelassen statt zu
+    crashen oder einen falschen Wert zu uebernehmen."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    inhalt = json.dumps(
+        {
+            "gesamt": "Passt so weit.",
+            "je_position": {"METUSD": "Ok.", "XRPUSD": 42, "SOLUSD": "  "},
+        }
+    )
+
+    def transport(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": inhalt}}]}
+
+    r = zm.hole_zweitmeinung("x", transport=transport)
+    assert r is not None
+    assert r.je_position == {"METUSD": "Ok."}
+
+
+def test_json_antwort_setzt_response_format_im_request(monkeypatch):
+    """Die Anfrage verlangt explizit ein JSON-Objekt zurueck — das Modell soll sich nicht
+    erst per Prompt-Bitte, sondern auch per API-Parameter ans Format halten."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    gesehen = {}
+
+    def transport(url, *, json, headers, timeout):
+        gesehen["json"] = json
+        return {"choices": [{"message": {"content": "{}"}}]}
+
+    zm.hole_zweitmeinung("x", transport=transport)
+    assert gesehen["json"]["response_format"] == {"type": "json_object"}

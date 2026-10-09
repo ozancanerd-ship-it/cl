@@ -11,7 +11,8 @@ das Feld einfach leer, kein Fake-Text.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -20,14 +21,31 @@ from trading_agent.security.secrets import get_secret
 MODELL_STANDARD = "gpt-4o-mini"
 _ENDPUNKT = "https://api.openai.com/v1/chat/completions"
 
+# Ozan, 09.10. 10:33: „integrier chatgpt mehr in der app, sehe auch seine meinungen bei
+# den buy und sell alarms ... deine und seine will ich sehen und arbeitest mit ihm zsm."
+# Deshalb antwortet ChatGPT jetzt nicht mehr nur mit EINEM Fliesstext, sondern mit einer
+# Gesamteinschaetzung PLUS je einer kurzen Zeile pro Position/Chance, erkennbar an genau
+# dem Schluessel (``sym``/``instrument``), den die App selbst schon fuer jede Karte
+# benutzt — so laesst sich seine Meinung direkt neben Claudes Urteil auf dieselbe Karte
+# setzen, statt irgendwo separat zu stehen. Haelt sich das Modell nicht an das JSON-Format,
+# gibt es KEINEN erfundenen Pro-Position-Text — nur den Gesamttext faellt dann zurueck auf
+# die rohe Antwort (besser eine einzige ehrliche Meinung als lauter leere Pro-Kaertchen).
 _SYSTEM = (
     "Du bist eine zweite, unabhaengige Meinung neben einem bereits bestehenden "
     "Trading-Analyse-System (Claude). Du bekommst dessen aktuelle Einschaetzung zu "
-    "Depot-Positionen und/oder Markt-Chancen. Antworte auf Deutsch, knapp (max. 200 "
-    "Woerter), konkret. Sag explizit, wo du zustimmst, wo du widersprichst und warum, "
-    "und was dir an der Analyse fehlt oder zu schwach belegt scheint. Keine Finanzberatung, "
-    "keine Kaufempfehlung — nur eine fachliche Einschaetzung der vorgelegten Analyse. "
-    "Wenn du nichts Substanzielles beizutragen hast, sag das auch so."
+    "Depot-Positionen und/oder Markt-Chancen, jede mit einem Schluessel in Klammern, "
+    "z. B. (sym=METUSD) oder (instrument=NVDA). Antworte NUR mit einem einzigen gueltigen "
+    "JSON-Objekt, kein Text davor oder danach, exakt mit diesen Feldern:\n"
+    '{"gesamt": "<Gesamteinschaetzung auf Deutsch, max. 60 Woerter>", '
+    '"je_position": {"<sym>": "<max. 30 Woerter je Position>", ...}, '
+    '"je_chance": {"<instrument>": "<max. 30 Woerter je Chance>", ...}}\n'
+    "In 'gesamt' sag knapp, wo du grundsaetzlich zustimmst oder widersprichst und was dir "
+    "an der Analyse insgesamt fehlt oder zu schwach belegt scheint. In 'je_position' und "
+    "'je_chance' gib fuer JEDEN dir vorgelegten Schluessel eine eigene kurze Zeile — "
+    "zustimmend, widersprechend oder abwartend, konkret auf diese eine Position/Chance "
+    "bezogen. Lass ein Feld nur weg, wenn dir dazu wirklich nichts einfaellt. Keine "
+    "Finanzberatung, keine Kaufempfehlung — nur eine fachliche Einschaetzung der "
+    "vorgelegten Analyse."
 )
 
 
@@ -45,6 +63,8 @@ class Zweitmeinung:
     text: str
     modell: str
     erzeugt: str  # ISO-Zeitstempel
+    je_position: dict[str, str] = field(default_factory=dict)
+    je_chance: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,8 +82,8 @@ def baue_prompt(*, positionen: list[dict[str, Any]], chancen: list[dict[str, Any
         teile.append("GEHALTENE POSITIONEN:")
         for p in positionen:
             teile.append(
-                f"- {p.get('name', p.get('sym', '?'))}: Einstieg {p.get('einstieg')}, "
-                f"jetzt {p.get('kurs')} ({p.get('gv_pct', '—')} %), "
+                f"- (sym={p.get('sym', '?')}) {p.get('name', p.get('sym', '?'))}: "
+                f"Einstieg {p.get('einstieg')}, jetzt {p.get('kurs')} ({p.get('gv_pct', '—')} %), "
                 f"Note {p.get('note', '—')} (Score {p.get('score', '—')}), "
                 f"Stop {p.get('stop', 'keiner')}, Ziel {p.get('tp1', 'keins')}, "
                 f"Begruendung: {p.get('begruendung', '—')}"
@@ -72,9 +92,9 @@ def baue_prompt(*, positionen: list[dict[str, Any]], chancen: list[dict[str, Any
         teile.append("\nTOP-CHANCEN IM SCAN (noch nicht im Depot):")
         for c in chancen:
             teile.append(
-                f"- {c.get('name', c.get('instrument', '?'))}: Score {c.get('score', '—')}, "
-                f"Note {c.get('note', '—')}, Richtung {c.get('richtung', '—')}, "
-                f"Begruendung: {c.get('begruendung', '—')}"
+                f"- (instrument={c.get('instrument', '?')}) {c.get('name', c.get('instrument', '?'))}: "
+                f"Score {c.get('score', '—')}, Note {c.get('note', '—')}, "
+                f"Richtung {c.get('richtung', '—')}, Begruendung: {c.get('begruendung', '—')}"
             )
     if not teile:
         teile.append("Keine Positionen und keine Top-Chancen aktuell vorhanden.")
@@ -115,8 +135,9 @@ def hole_zweitmeinung(
                     {"role": "system", "content": _SYSTEM},
                     {"role": "user", "content": prompt},
                 ],
-                "max_tokens": 500,
+                "max_tokens": 900,
                 "temperature": 0.3,
+                "response_format": {"type": "json_object"},
             },
             headers={"Authorization": f"Bearer {key.reveal()}", "Content-Type": "application/json"},
             timeout=30.0,
@@ -134,7 +155,49 @@ def hole_zweitmeinung(
     if not text:
         _LETZTER_FEHLER = ZweitmeinungFehler(grund="Antwort war leer")
         return None
-    return Zweitmeinung(text=text, modell=modell, erzeugt=datetime.now(UTC).isoformat())
+    gesamt, je_position, je_chance = _parse_antwort(text)
+    return Zweitmeinung(
+        text=gesamt,
+        modell=modell,
+        erzeugt=datetime.now(UTC).isoformat(),
+        je_position=je_position,
+        je_chance=je_chance,
+    )
+
+
+def _parse_antwort(text: str) -> tuple[str, dict[str, str], dict[str, str]]:
+    """Versucht, die Antwort als das verlangte JSON zu lesen. Gelingt das nicht — Modell
+    haelt sich nicht ans Format, oder liefert kein Objekt — faellt NUR der Gesamttext auf
+    die rohe Antwort zurueck; es werden NIE Pro-Position-Meinungen erfunden, die das
+    Modell nicht tatsaechlich so geliefert hat."""
+    try:
+        daten = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return text, {}, {}
+    if not isinstance(daten, dict):
+        return text, {}, {}
+    gesamt = daten.get("gesamt")
+    if not isinstance(gesamt, str) or not gesamt.strip():
+        gesamt = text
+    je_position = daten.get("je_position")
+    je_chance = daten.get("je_chance")
+    return (
+        gesamt.strip(),
+        _nur_text_werte(je_position),
+        _nur_text_werte(je_chance),
+    )
+
+
+def _nur_text_werte(wert: Any) -> dict[str, str]:
+    """Nur echte, nicht-leere String-Werte uebernehmen — alles andere (fehlendes Feld,
+    falscher Typ, leere Zeile) wird stillschweigend ausgelassen statt zu crashen."""
+    if not isinstance(wert, dict):
+        return {}
+    return {
+        str(k): v.strip()
+        for k, v in wert.items()
+        if isinstance(v, str) and v.strip()
+    }
 
 
 _LETZTER_FEHLER: ZweitmeinungFehler | None = None
