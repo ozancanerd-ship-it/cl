@@ -112,13 +112,60 @@ def schreibe(pfad: str | Path, inhalt: dict[str, Any]) -> None:
     p.write_text(json.dumps(inhalt, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def vorlauf_lesen(url: str) -> dict[str, Any] | None:
+    """Holt die zuletzt VEROEFFENTLICHTE Zweitmeinung von der Live-Seite.
+
+    Ozan, 09.10. 12:22/12:24: „nirgendwo auf meinem handy steht was mit chat" — der Grund:
+    web/chatgpt_meinung.json wird nur beim VOLLEN Lauf neu geschrieben (OpenAI-Kosten,
+    braucht den kompletten Scan), ist aber in keinem Workflow-Lauf gecacht. Jeder
+    10-Minuten-"krypto"-Lauf dazwischen baut die Seite aus einem FRISCHEN Checkout ohne
+    diese Datei neu — und loescht sie damit von der Live-Seite, bis der naechste volle
+    Lauf (oft erst Stunden spaeter) sie wieder schreibt. In der Zwischenzeit sah die App
+    fuer Ozan so aus, als gaebe es gar keine ChatGPT-Anbindung.
+    """
+    if not url:
+        return None
+    try:
+        import httpx
+
+        r = httpx.get(url.rstrip("/") + "/chatgpt_meinung.json", timeout=15.0)
+        if r.status_code == 200:
+            d = r.json()
+            return d if isinstance(d, dict) else None
+    except Exception:
+        return None
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--scan", default="web/scan.json")
     ap.add_argument("--out", default="web/chatgpt_meinung.json")
     ap.add_argument("--sync", default=SYNC)
+    ap.add_argument(
+        "--vorlauf-url",
+        default="",
+        help="Nur uebernehmen statt neu fragen — holt die zuletzt veroeffentlichte "
+        "Zweitmeinung von dieser Seite und schreibt sie unveraendert fort, damit sie "
+        "zwischen den vollen Laeufen nicht von der Seite verschwindet (kein neuer "
+        "OpenAI-Aufruf, keine Kosten).",
+    )
     args = ap.parse_args()
     jetzt = datetime.now(UTC).isoformat()
+
+    if args.vorlauf_url:
+        alt = vorlauf_lesen(args.vorlauf_url)
+        if alt is not None:
+            # geprueft wird aktualisiert (die App zeigt damit, dass dieser Lauf lief),
+            # erzeugt/text/je_position/je_chance bleiben die ECHTEN Werte vom letzten
+            # vollen Lauf — nichts wird hier neu erfunden oder umdatiert.
+            alt["geprueft"] = jetzt
+            schreibe(args.out, alt)
+            print("Zweitmeinung vom letzten vollen Lauf uebernommen (kein neuer OpenAI-Aufruf).")
+            return 0
+        print("keine vorherige Zweitmeinung zum Uebernehmen gefunden — Feld bleibt leer.")
+        schreibe(args.out, {"aktiv": False, "geprueft": jetzt, "grund": "noch kein voller Lauf"})
+        return 0
 
     if not verfuegbar():
         print("kein OPENAI_API_KEY hinterlegt — keine Zweitmeinung diesen Lauf.")

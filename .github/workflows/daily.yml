@@ -345,11 +345,20 @@ jobs:
 
       # Zweite Meinung von ChatGPT (Ozan, 07.10.: "ich frag dich immer, du sollst mit
       # ihm zusammenarbeiten"). Nur mit OPENAI_API_KEY aktiv; fehlt das Secret, schreibt
-      # das Skript eine Datei mit aktiv:false und der Lauf geht normal weiter. Nur beim
-      # vollen Lauf — braucht den kompletten Scan, nicht den 10-Minuten-Waechter.
+      # das Skript eine Datei mit aktiv:false und der Lauf geht normal weiter. Den echten
+      # OpenAI-Aufruf gibt's nur beim vollen Lauf (braucht den kompletten Scan, kostet
+      # Geld) — ABER: Ozan, 09.10. 12:24: "nirgendwo auf meinem handy steht was mit
+      # chat". Grund war, dass web/chatgpt_meinung.json in keinem Lauf gecacht ist —
+      # jeder 10-Minuten-"krypto"-Lauf baute die Seite aus einem frischen Checkout ohne
+      # diese Datei neu und loeschte sie damit von der Live-Seite, bis Stunden spaeter
+      # der naechste volle Lauf kam. Jetzt laeuft dieser Schritt bei JEDEM Lauf, der auch
+      # die Seite baut: beim vollen Lauf fragt er OpenAI frisch, sonst uebernimmt er nur
+      # die zuletzt veroeffentlichte Antwort unveraendert (--vorlauf-url, kein neuer
+      # Aufruf, keine Kosten) — damit steht ChatGPTs Meinung durchgehend in der App statt
+      # alle paar Minuten zu verschwinden.
       - name: ChatGPT-Zweitmeinung
         id: zweitmeinung
-        if: env.LAUF == 'voll'
+        if: env.LAUF != 'waechter'
         continue-on-error: true
         timeout-minutes: 2
         env:
@@ -357,7 +366,13 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DEPOT_CODE: ${{ secrets.DEPOT_CODE }}
           DEPOT_SCHLUESSEL: ${{ secrets.DEPOT_SCHLUESSEL }}
-        run: python scripts/chatgpt_zweitmeinung.py --scan web/scan.json --out web/chatgpt_meinung.json
+        run: |
+          if [ "$LAUF" = "voll" ]; then
+            python scripts/chatgpt_zweitmeinung.py --scan web/scan.json --out web/chatgpt_meinung.json
+          else
+            python scripts/chatgpt_zweitmeinung.py --out web/chatgpt_meinung.json \
+              --vorlauf-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          fi
 
       # Die eigene Bilanz. Laeuft nach der Wachliste und schreibt sie in die App —
       # ein Scanner, der nie nachrechnet, ob die alten Chancen aufgegangen sind,
