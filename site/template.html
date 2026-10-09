@@ -6998,6 +6998,7 @@ function zeichnePortfolio(){
         ${miniChart(b)}
         ${entscheidungsKasten(b, stand)}
         ${ratKasten(b, ku)}
+        ${chatgptZeile(chatgptMeinungFuer(b.pos.sym))}
         ${mehrKasten(b)}
         ${sicherText(() => tiefeAnalyse(b, stand))}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
