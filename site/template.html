@@ -6531,6 +6531,15 @@ function nachtPlan(stand){
    über mehrere Zeiträume, Spanne und Schwankung, warum der Stop dort liegt, Ziele, drei
    Szenarien in Euro, Fundamentaldaten, Makro, was die Einschätzung ändert — und jeder
    Fachbegriff erklärt. Alles aus Zahlen, die die App schon hat; nichts erfunden. */
+/* Ozan, 09.10. 22:30: „wenn ich auf weitere drücke, ist das Fenster 2 Sekunden offen
+   und danach schließt es sich automatisch — ich kann mir gar nicht alles in Ruhe
+   anschauen." Grund: Portfolio wird bei jedem Live-Kurs-Tick komplett neu gezeichnet
+   (``aktualisierePortfolioKurse`` -> ``zeichnePortfolio``, hoechstens alle 5 s) — genau
+   dieses ``<details>` hatte, anders als ``mehrKasten`` (``MEHR_OFFEN``), KEIN Gedaechtnis
+   fuer den offenen Zustand und klappte bei jeder Neuzeichnung wieder zu. Jetzt genau
+   dasselbe Muster: der Schluessel der Position merkt sich, ob „Ausführliche Analyse"
+   gerade offen war. */
+const TA_OFFEN = new Set();
 function tiefeAnalyse(b, stand){
   if (istBar(b.pos)) return '';
   const rr = b.row || (b.hebel && b.hebel.basisSym ? scanRow(b.hebel.basisSym) : null);
@@ -6636,7 +6645,9 @@ function tiefeAnalyse(b, stand){
     analysten: '<b>Kursziel</b>: Durchschnitt der Bankanalysten für 12 Monate. Nützlich als Stimmungsbild, als Vorhersage historisch schwach.',
   };
   t.push(`<h4>Zum Lernen</h4><ul class="nb-l">${[...lern].map(x => `<li>${LERN[x]}</li>`).join('')}</ul>`);
-  return `<details class="ta" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">Ausführliche Analyse öffnen</summary>
+  const taKey = posSchluessel(b.pos);
+  return `<details class="ta" data-ta="${esc(taKey)}"${TA_OFFEN.has(taKey)?' open':''} style="margin-top:8px">
+    <summary style="cursor:pointer;font-weight:600">Ausführliche Analyse öffnen</summary>
     <div class="ta-in">${t.join('')}</div></details>`;
 }
 
@@ -7091,6 +7102,9 @@ function zeichnePortfolio(){
   fuelleWaechter($('pf_waechter'));
   $('portfolio').querySelectorAll('details[data-mehr]').forEach(d=>d.addEventListener('toggle',()=>{
     if (d.open) MEHR_OFFEN.add(d.dataset.mehr); else MEHR_OFFEN.delete(d.dataset.mehr);
+  }));
+  $('portfolio').querySelectorAll('details[data-ta]').forEach(d=>d.addEventListener('toggle',()=>{
+    if (d.open) TA_OFFEN.add(d.dataset.ta); else TA_OFFEN.delete(d.dataset.ta);
   }));
   $('portfolio').querySelectorAll('[data-weg]').forEach(b=>b.addEventListener('click',()=>{
     speicherePositionen(ladePositionen().filter(p=>p.sym!==b.dataset.weg)); zeichnePortfolio();

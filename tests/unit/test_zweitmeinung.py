@@ -224,6 +224,32 @@ def test_json_mit_nicht_string_werten_wird_still_ausgelassen(monkeypatch):
     assert r.je_position == {"METUSD": "Ok."}
 
 
+def test_system_prompt_verlangt_begruendung_statt_nur_stempel():
+    """Ozan, 09.10. 22:30: "ChatGPT soll wirklich mehr auch dazu sagen, nicht nur ja/
+    Widerspruch ... wirklich zusammenarbeiten ... und alles erklaeren." Ein Urteil ohne
+    Begruendung ist kein zweiter Blick, nur ein Etikett — die Anweisung muss das
+    explizit verlangen, nicht nur hoffen, dass das Modell von sich aus ausfuehrlich
+    wird."""
+    assert "WORAN" in zm._SYSTEM or "woran" in zm._SYSTEM
+    assert "Begruendung" in zm._SYSTEM
+    assert "60-100" in zm._SYSTEM  # deutlich mehr als die alten 30 Woerter je Position
+
+
+def test_max_tokens_reicht_fuer_die_laengeren_antworten(monkeypatch):
+    """Mit 60-100 statt 30 Woertern je Position braeuchte das alte Tokenbudget (900)
+    nicht mehr — eine Antwort mit vielen Positionen wuerde mitten im JSON abgeschnitten
+    und faellt dann unnoetig auf den rohen Text zurueck."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    gesehen = {}
+
+    def transport(url, *, json, headers, timeout):
+        gesehen["json"] = json
+        return {"choices": [{"message": {"content": "{}"}}]}
+
+    zm.hole_zweitmeinung("x", transport=transport)
+    assert gesehen["json"]["max_tokens"] >= 2500
+
+
 def test_json_antwort_setzt_response_format_im_request(monkeypatch):
     """Die Anfrage verlangt explizit ein JSON-Objekt zurueck — das Modell soll sich nicht
     erst per Prompt-Bitte, sondern auch per API-Parameter ans Format halten."""

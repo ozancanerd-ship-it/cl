@@ -23,29 +23,51 @@ _ENDPUNKT = "https://api.openai.com/v1/chat/completions"
 
 # Ozan, 09.10. 10:33: „integrier chatgpt mehr in der app, sehe auch seine meinungen bei
 # den buy und sell alarms ... deine und seine will ich sehen und arbeitest mit ihm zsm."
-# Deshalb antwortet ChatGPT jetzt nicht mehr nur mit EINEM Fliesstext, sondern mit einer
-# Gesamteinschaetzung PLUS je einer kurzen Zeile pro Position/Chance, erkennbar an genau
-# dem Schluessel (``sym``/``instrument``), den die App selbst schon fuer jede Karte
-# benutzt — so laesst sich seine Meinung direkt neben Claudes Urteil auf dieselbe Karte
-# setzen, statt irgendwo separat zu stehen. Haelt sich das Modell nicht an das JSON-Format,
-# gibt es KEINEN erfundenen Pro-Position-Text — nur den Gesamttext faellt dann zurueck auf
-# die rohe Antwort (besser eine einzige ehrliche Meinung als lauter leere Pro-Kaertchen).
+# Deshalb antwortet ChatGPT nicht mehr nur mit EINEM Fliesstext, sondern mit einer
+# Gesamteinschaetzung PLUS je einer Zeile pro Position/Chance, erkennbar an genau dem
+# Schluessel (``sym``/``instrument``), den die App selbst schon fuer jede Karte benutzt.
+#
+# Ozan, 09.10. 22:30 (Folgewunsch): „ChatGPT soll wirklich mehr auch dazu sagen, nicht
+# nur ja/Widerspruch ... wirklich zusammenarbeiten, miteinander kommunizieren wie das
+# analysiert wird ... und alles erklaeren." Ein Wort wie „zustimmend" ohne Begruendung
+# ist keine zweite Meinung, nur ein Stempel. Deshalb jetzt deutlich mehr Platz UND eine
+# explizite Pflicht zu begruenden: nicht nur OB ChatGPT zustimmt, sondern WORAN es das
+# festmacht, was es an der vorgelegten Begruendung fuer stark oder fuer duenn haelt, und
+# was dir (bzw. „Claude") konkret noch fehlt oder was es anders pruefen wuerde — das ist
+# der Unterschied zwischen einem Urteil und einer Zusammenarbeit.
+#
+# Haelt sich das Modell nicht an das JSON-Format, gibt es KEINEN erfundenen Pro-Position-
+# Text — nur der Gesamttext faellt dann zurueck auf die rohe Antwort (besser eine einzige
+# ehrliche Meinung als lauter leere Pro-Kaertchen).
 _SYSTEM = (
-    "Du bist eine zweite, unabhaengige Meinung neben einem bereits bestehenden "
-    "Trading-Analyse-System (Claude). Du bekommst dessen aktuelle Einschaetzung zu "
-    "Depot-Positionen und/oder Markt-Chancen, jede mit einem Schluessel in Klammern, "
-    "z. B. (sym=METUSD) oder (instrument=NVDA). Antworte NUR mit einem einzigen gueltigen "
-    "JSON-Objekt, kein Text davor oder danach, exakt mit diesen Feldern:\n"
-    '{"gesamt": "<Gesamteinschaetzung auf Deutsch, max. 60 Woerter>", '
-    '"je_position": {"<sym>": "<max. 30 Woerter je Position>", ...}, '
-    '"je_chance": {"<instrument>": "<max. 30 Woerter je Chance>", ...}}\n'
-    "In 'gesamt' sag knapp, wo du grundsaetzlich zustimmst oder widersprichst und was dir "
-    "an der Analyse insgesamt fehlt oder zu schwach belegt scheint. In 'je_position' und "
-    "'je_chance' gib fuer JEDEN dir vorgelegten Schluessel eine eigene kurze Zeile — "
-    "zustimmend, widersprechend oder abwartend, konkret auf diese eine Position/Chance "
-    "bezogen. Lass ein Feld nur weg, wenn dir dazu wirklich nichts einfaellt. Keine "
-    "Finanzberatung, keine Kaufempfehlung — nur eine fachliche Einschaetzung der "
-    "vorgelegten Analyse."
+    "Du bist eine zweite, unabhaengige Analyse neben einem bereits bestehenden "
+    "Trading-Analyse-System (genannt 'Claude'). Du bekommst Claudes aktuelle "
+    "Einschaetzung zu Depot-Positionen und/oder Markt-Chancen, jede mit einem Schluessel "
+    "in Klammern, z. B. (sym=METUSD) oder (instrument=NVDA), dazu die Zahlen, auf denen "
+    "Claude seine Einschaetzung aufbaut (Score, Note, Trend/RS, Stop, Ziel, Begruendung). "
+    "Deine Aufgabe ist ECHTE Zusammenarbeit, kein Stempel: nicht nur 'zustimmend' oder "
+    "'widersprechend', sondern WORAN du das konkret festmachst, welche der genannten "
+    "Zahlen das traegt oder in Frage stellt, was an Claudes Begruendung aus deiner Sicht "
+    "stark oder duenn belegt ist, und was DU zusaetzlich pruefen oder anders gewichten "
+    "wuerdest. Wo du selbst unsicher bist, sag das auch so, statt eine Sicherheit "
+    "vorzutaeuschen, die du nicht hast.\n\n"
+    "Antworte NUR mit einem einzigen gueltigen JSON-Objekt, kein Text davor oder danach, "
+    "exakt mit diesen Feldern:\n"
+    '{"gesamt": "<Gesamteinschaetzung auf Deutsch, 100-180 Woerter>", '
+    '"je_position": {"<sym>": "<60-100 Woerter je Position>", ...}, '
+    '"je_chance": {"<instrument>": "<50-80 Woerter je Chance>", ...}}\n\n'
+    "In 'gesamt': ordne ein, wo du Claudes Analyse insgesamt fuer robust haeltst und wo "
+    "nicht, was systematisch fehlt (z. B. welche Datenquelle, welcher Blickwinkel), und "
+    "wie du selbst gerade auf die Gesamtlage schaust (Marktumfeld, Risiko, was dich an "
+    "der Kombination der Positionen stutzig macht oder beruhigt).\n"
+    "In 'je_position' und 'je_chance': fuer JEDEN vorgelegten Schluessel eine eigene, "
+    "ausformulierte Einschaetzung mit Begruendung — zustimmend, widersprechend oder "
+    "abwartend, aber immer mit dem WARUM, bezogen auf die konkreten Zahlen dieser "
+    "Position/Chance (nicht allgemein gehalten). Nenne, wenn sinnvoll, was die "
+    "Einschaetzung aendern wuerde. Lass ein Feld nur weg, wenn dir dazu wirklich nichts "
+    "einfaellt. Keine Finanzberatung, keine Kaufempfehlung — eine fachliche, "
+    "nachvollziehbare Einschaetzung der vorgelegten Analyse, die Claude (oder Ozan) "
+    "etwas bringt, das er aus der eigenen Analyse allein nicht haette."
 )
 
 
@@ -135,7 +157,11 @@ def hole_zweitmeinung(
                     {"role": "system", "content": _SYSTEM},
                     {"role": "user", "content": prompt},
                 ],
-                "max_tokens": 900,
+                # Ozan, 09.10. 22:30: deutlich ausfuehrlichere, begruendete Antworten pro
+                # Position (60-100 statt vorher 30 Woerter) — braucht entsprechend mehr
+                # Platz, sonst bricht die Antwort mitten im JSON ab und _parse_antwort
+                # faellt auf den rohen (abgeschnittenen) Text zurueck.
+                "max_tokens": 4000,
                 "temperature": 0.3,
                 "response_format": {"type": "json_object"},
             },
