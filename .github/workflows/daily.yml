@@ -107,7 +107,15 @@ jobs:
       group: scan
       cancel-in-progress: false   # ein laufender Schreibvorgang wird nicht abgebrochen
     steps:
+      # ref: main statt des Standard-SHA. actions/checkout holt sonst den Commit, der beim
+      # AUSLOESEN des Laufs aktuell war — wartet der Lauf in der Warteschlange (Sperre
+      # "scan"), hat der Lauf davor inzwischen neuen Stand (Wachliste, Alarm-Stand)
+      # gepusht. Der wartende Lauf rechnete dann auf dem alten Stand weiter, und sein
+      # Commit kollidierte beim Rebase: in 6 von 30 Laeufen (11.10.) ging der komplette
+      # Stand dieses Laufs verloren — Wachlisten-Uebergaenge, Alarm-Gedaechtnis, Gold-S9.
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
@@ -484,16 +492,21 @@ jobs:
             exit 0
           fi
           git commit -m "lauf: Stand $(date -u +%Y-%m-%dT%H:%MZ)"
-          # Zwei Laeufe koennen sich ueberschneiden (Zeitplan trifft auf einen Push).
-          # Dann ist der lokale Stand hinterher und ein blosses push scheitert. Rebase
-          # holt den fremden Commit davor; scheitert auch das, ist die Seite trotzdem
-          # gebaut und der Plan verschickt — die Zeile kommt beim naechsten Lauf mit.
+          # Zwei Laeufe koennen sich trotzdem ueberschneiden (ein Code-Push mitten im
+          # Lauf). Dann holt Rebase den fremden Commit davor. Kollidiert eine Stand-Datei,
+          # gewinnt die Fassung DIESES Laufs (-X theirs = der Commit, der gerade
+          # aufgespielt wird) — er ist der neuere Stand. Vorher brach der Rebase ab und
+          # der ganze Stand des Laufs war weg; "kommt beim naechsten Lauf mit" stimmte
+          # nicht, der naechste Lauf startet ja vom Stand auf main.
           for i in 1 2 3; do
             if git push; then exit 0; fi
             echo "Push abgelehnt (Versuch $i) — hole den aktuellen Stand"
-            git pull --rebase --autostash || break
+            if ! git pull --rebase -X theirs --autostash; then
+              git rebase --abort 2>/dev/null || true
+              break
+            fi
           done
-          echo "::warning::Journalzeile konnte nicht gesichert werden — kommt beim naechsten Lauf mit"
+          echo "::warning::Stand dieses Laufs konnte NICHT gesichert werden — er geht verloren"
 
       - uses: actions/upload-pages-artifact@v3
         if: env.LAUF != 'waechter'
