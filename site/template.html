@@ -7294,7 +7294,20 @@ function aktualisierePortfolioKurse(){
   // Nicht neu zeichnen, waehrend jemand tippt — sonst springt der Fokus aus dem Feld.
   const a = document.activeElement;
   if (a && a.tagName === 'INPUT') return;
-  if (Date.now() - _pfZuletzt < 5000) return;
+  // Ozan, 11.10.: „ich glaube die App hängt ... das darf nie wieder passieren". Seit
+  // „Ausführliche Analyse" und „Mehr zur Analyse" offen bleiben (09.10., TA_OFFEN/
+  // MEHR_OFFEN), reisst jeder Live-Kurs-Tick das KOMPLETTE Portfolio-HTML neu auf —
+  // bei 16 Positionen mit geoeffneten, langen Analyse-Kaesten ist das auf dem Handy
+  // spuerbar: der Bildschirm springt/haengt alle paar Sekunden mitten im Lesen, weil
+  // das ganze #portfolio ersetzt wird (Scrollposition und Layout fliegen mit). Zwei
+  // Sicherungen dagegen: (1) ist gerade irgendwo ein Kasten aufgeklappt, wird NICHT neu
+  // gezeichnet — niemand soll mitten im Lesen unterbrochen werden; das Schliessen des
+  // Kastens reicht, danach zeichnet der naechste Tick wieder frisch. (2) der Takt selbst
+  // ist jetzt deutlich ruhiger (20 statt 5 Sekunden) — fuer Swing-Trades ohne spuerbaren
+  // Verlust an Aktualitaet (siehe docs/BETRIEB.md: „Der Takt ist 15 Minuten, nicht
+  // Echtzeit; fuer Scalping waere es einer").
+  if ($('portfolio').querySelector('details[open]')) return;
+  if (Date.now() - _pfZuletzt < 20000) return;
   _pfZuletzt = Date.now();
   zeichnePortfolio();
 }
