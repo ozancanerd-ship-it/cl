@@ -384,6 +384,22 @@ jobs:
           PYTHONPATH: src
         run: python scripts/build_performance.py --out web/performance.json
 
+      # Gold-Tageshandel-Seite (Ozan, 11.10. 17:18/17:41: "extra seite mit gold day
+      # trade"). KEIN Alarmkanal: zeigt nur den JETZT-Zustand von S9
+      # (SETUP-BREAKOUT-RETEST-01, IN_VALIDATION — nicht bewiesen) und die ehrliche
+      # Zusammenfassung der zwei Studien, die fuer Intraday-Gold/Krypto-Mean-Reversion
+      # KEINEN Edge fanden (docs/GOLD-DAYTRADING-STUDIE-2026-10.md,
+      # docs/MEAN-REVERSION-STUDIE-2026-10.md). Faellt Yahoo aus, schreibt das Skript
+      # ehrlich aktiv:false statt etwas zu erfinden — der Rest des Laufs ist davon
+      # unberuehrt.
+      - name: Gold-Tageshandel-Stand
+        if: env.LAUF != 'waechter'
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          PYTHONPATH: src
+        run: python scripts/gold_daytrading_status.py --out web/day_trading.json
+
       # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan, keine
       # Veroeffentlichung. Dauert Sekunden und darf deshalb alle fuenf Minuten laufen.
       - name: Marken pruefen

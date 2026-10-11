@@ -733,6 +733,7 @@ a{color:var(--accent); text-underline-offset:3px}
       <button class="tab" role="tab" aria-selected="false" aria-controls="p8" id="t8">Bilanz</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p9" id="t9">Chat</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p10" id="t10">System</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p11" id="t11">Gold Day</button>
     </div>
   </div>
 </header>
@@ -791,6 +792,10 @@ a{color:var(--accent); text-underline-offset:3px}
 
   <section class="panel" id="p10" role="tabpanel" aria-labelledby="t10" hidden>
     <div id="system"></div>
+  </section>
+
+  <section class="panel" id="p11" role="tabpanel" aria-labelledby="t11" hidden>
+    <div id="daytrading"></div>
   </section>
 </main>
 
@@ -949,6 +954,7 @@ let PF = null;
 let NB = null;                // notenbanken.json — Fed/EZB/BoE-Beschluesse
 let WA = null;                // waechter.json — laeuft der Depot-Waechter auf GitHub?
 let ZM = null;                 // chatgpt_meinung.json — Zweitmeinung von ChatGPT (falls eingerichtet)
+let GD = null;                 // day_trading.json — Gold-Tageshandel-Stand (S9, experimentell, kein Alarm)
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
 
 /* ---- Euro, Broker, Gebuehr -------------------------------------------------
@@ -1006,7 +1012,7 @@ function gebuehrSatz(o, positionswert){
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
-const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System'];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System','Gold Day'];
 function zeigeTab(i){
   TABS.forEach((t,k)=>{
     t.setAttribute('aria-selected', k===i ? 'true':'false');
@@ -1045,7 +1051,7 @@ function sicher(name, fn){
   catch(e){
     AUSFALL.push(name + ': ' + (e && e.message ? e.message : e));
     console.error('[Aufbau] ' + name, e);
-    const ziel = {Rangliste:'radar', Bilanz:'bilanz', Alarme:'alarme', System:'system'}[name];
+    const ziel = {Rangliste:'radar', Bilanz:'bilanz', Alarme:'alarme', System:'system', 'Gold-Tageshandel':'daytrading'}[name];
     const el = ziel && document.getElementById(ziel);
     if (el) el.innerHTML = `<div class="note-box bad"><span class="nt">${esc(name)} nicht aufgebaut</span>
       <p>${esc(String(e && e.message || e))}</p><p>Das ist ein Fehler in der App, nicht im Markt.
@@ -1087,6 +1093,10 @@ async function ladeScan(){
     const rzm = await fetch('chatgpt_meinung.json?v=' + Date.now(), {cache:'no-store'});
     ZM = rzm.ok ? await rzm.json() : null;
   } catch(e){ ZM = null; }
+  try {
+    const rgd = await fetch('day_trading.json?v=' + Date.now(), {cache:'no-store'});
+    GD = rgd.ok ? await rgd.json() : null;
+  } catch(e){ GD = null; }
   sicher('Namen', ()=>merkeNamen(S && S.gesamt));
   /* Jeder Teil fuer sich. Vorher standen die Aufrufe in einer Zeile hintereinander —
      ein Fehler im ersten hat alle folgenden mitgenommen, und die App blieb bei
@@ -1099,6 +1109,7 @@ async function ladeScan(){
   sicher('News', zeichneNews);
   sicher('Bilanz', zeichneBilanz);
   sicher('Alarme', zeichneAlarme);
+  sicher('Gold-Tageshandel', zeichneDaytrading);
   /* Das Depot MUSS hier nochmal gezeichnet werden. Beim Start laeuft zeichnePortfolio()
      bevor der Scan da ist — dann steht bei jeder Position „keine Bewertung" und, viel
      schlimmer, ueber der Handlungsliste „Nichts zu tun". Eine Entwarnung, die nur
@@ -9452,6 +9463,72 @@ function zeichneSystem(){
   $('system').innerHTML = h;
 }
 
+/* Ozan, 11.10. 17:18/17:41: "extra seite mit gold day trade auf kraken oder crypto".
+   KEIN neuer Alarmkanal — zwei vorherige Studien (siehe GD.studien) fanden fuer
+   Gold-Intraday und Krypto-Mean-Reversion keinen Edge, und eine Strategie nur fuer
+   diese Seite zu erfinden waere genau der erfundene Edge, den das Projekt nicht will.
+   Die Seite zeigt deshalb nur den JETZT-Zustand von S9 (Gold-SWING, IN_VALIDATION,
+   aus scripts/gold_daytrading_status.py) plus die ehrliche Studienzusammenfassung —
+   ausdruecklich ohne Telegram-Meldung und ohne Handelsaufforderung. */
+const DT_ZUSTAND_TEXT = {
+  scanning: 'Kein Muster erkennbar', consolidation: 'Konsolidierung', await_retest: 'Wartet auf Retest',
+  armed: 'Bereit (ARMED)', invalidated: 'Entwertet', unbekannt: 'Zu wenig Historie',
+};
+const DT_ZUSTAND_KLASSE = {armed: 'warn', await_retest: 'mittel', consolidation: 'mittel'};
+
+function zeichneDaytrading(){
+  let h = `<h2>🧪 Gold-Tageshandel — experimentell</h2>
+  <div class="note-box warn"><span class="nt">Kein Alarmkanal</span>
+    <p>Diese Seite zeigt nur einen Beobachtungsstand. Es gibt dafür <strong>keine
+    Telegram-Meldung, keinen Alarm und keine Handelsaufforderung</strong>. Was hier
+    steht, ist Forschung, kein Rat — zwei abgeschlossene Studien weiter unten fanden
+    für Intraday-Gold und Krypto-Mean-Reversion keinen belastbaren Vorteil.</p></div>`;
+
+  if (!GD || !GD.aktiv){
+    h += `<div class="note-box bad"><span class="nt">Kein aktueller Stand</span>
+      <p>${esc(GD && GD.fehler ? GD.fehler : 'Noch kein Lauf vorhanden.')}</p></div>`;
+  } else {
+    const g = GD.gold || {};
+    const txt = DT_ZUSTAND_TEXT[g.zustand] || g.zustand || '—';
+    const kl = DT_ZUSTAND_KLASSE[g.zustand] || '';
+    h += `<h3>SETUP-BREAKOUT-RETEST-01 (S9) — Gold-Swing</h3><div class="karte">
+      <div class="rowx"><span class="lab">Zustand</span><span class="val">${esc(txt)} <span class="note ${esc(kl)}">${esc(g.zustand||'')}</span></span></div>
+      <div class="rowx"><span class="lab">D1-Trend</span><span class="val">${esc(g.d1_trend||'—')}</span></div>
+      ${g.richtung ? `<div class="rowx"><span class="lab">Richtung</span><span class="val">${esc(g.richtung)}</span></div>` : ''}
+    </div>`;
+    if (g.zustand === 'armed'){
+      h += `<div class="karte">
+        <div class="rowx"><span class="lab">Entry</span><span class="val">${num(g.entry,2)} $</span></div>
+        <div class="rowx"><span class="lab">SL</span><span class="val">${num(g.sl,2)} $</span></div>
+        <div class="rowx"><span class="lab">TP1</span><span class="val">${num(g.tp1,2)} $</span></div>
+        <div class="rowx"><span class="lab">TP2</span><span class="val">${num(g.tp2,2)} $</span></div>
+        <div class="rowx"><span class="lab">R:R bis TP2</span><span class="val">1:${num(g.rr_bis_tp2,1)}</span></div>
+        <div class="rowx"><span class="lab">Confidence</span><span class="val">${Math.round((g.confidence||0)*100)} %</span></div>
+      </div>
+      <div class="note-box bad"><span class="nt">${esc(g.warnung || 'Nur Beobachtung — kein Trade wird ausgelöst')}</span></div>`;
+    }
+    if (g.text) h += `<p style="font-size:12.5px;color:var(--ink-2);margin-top:6px">${esc(g.text)}</p>`;
+    if (g.hinweis) h += `<div class="note-box"><span class="nt">Warum nicht alarmfähig</span><p>${esc(g.hinweis)}</p></div>`;
+  }
+
+  h += `<h3>Was dafür schon geprüft wurde</h3>`;
+  const studien = (GD && GD.studien) || [];
+  if (!studien.length){
+    h += `<p class="leer">Noch keine Studien hinterlegt.</p>`;
+  } else {
+    for (const s of studien){
+      h += `<div class="karte">
+        <div class="rowx"><span class="lab">Studie</span><span class="val">${esc(s.titel)}</span></div>
+        <div class="rowx"><span class="lab">Zeitraum</span><span class="val">${esc(s.zeitraum)}</span></div>
+        <div class="rowx"><span class="lab">Ergebnis</span><span class="val">${esc(s.ergebnis)}</span></div>
+        <div class="rowx"><span class="lab">Beleg</span><span class="val" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(s.doc)}</span></div>
+      </div>`;
+    }
+  }
+  h += `<p style="font-size:11px;color:var(--ink-3);margin-top:10px">Geprüft: ${zeit(GD && GD.geprueft)}</p>`;
+  $('daytrading').innerHTML = h;
+}
+
 /* ============================================================ START */
 function start(){
   $('built').textContent = 'Gebaut: ' + (D.built_at || '—') +
@@ -9460,6 +9537,7 @@ function start(){
   zeichneNews();
   $('chartansicht').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
   $('analyse').innerHTML = `<p class="leer">Scan wird geladen …</p>`;
+  $('daytrading').innerHTML = `<p class="leer">Stand wird geladen …</p>`;
   depotAusLink();
   const t = parseInt((location.hash||'').replace('#',''), 10);
   zeigeTab(isFinite(t) && t>=0 && t<TABS.length ? t : 0);

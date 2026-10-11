@@ -64,3 +64,32 @@ def test_generated_page_carries_the_numbers() -> None:
     # Der Payload darf das umschliessende <script> nicht vorzeitig schliessen.
     body = html.split('<script id="payload" type="application/json">')[1].split("</script>")[0]
     assert json.loads(body.replace("<\\/", "</")) == payload
+
+
+def test_day_trading_json_wird_mitkopiert(tmp_path: Path) -> None:
+    """Ozan, 11.10.: die neue Gold-Tageshandel-Seite braucht ``day_trading.json`` auf der
+    veroeffentlichten Seite — sonst zeigt die App dort fuer immer "kein Stand vorhanden",
+    obwohl das Skript laengst etwas geschrieben hat."""
+    repo = tmp_path / "repo"
+    out = tmp_path / "out"
+    (repo / "web").mkdir(parents=True)
+    out.mkdir()
+    inhalt = {"aktiv": True, "gold": {"zustand": "scanning"}, "studien": []}
+    (repo / "web" / "day_trading.json").write_text(json.dumps(inhalt), encoding="utf-8")
+
+    stat = bs._kopiere_scan(repo, out)
+
+    assert stat["day_trading"] == 1
+    assert json.loads((out / "day_trading.json").read_text(encoding="utf-8")) == inhalt
+
+
+def test_fehlende_day_trading_json_wird_nicht_erfunden(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    out = tmp_path / "out"
+    (repo / "web").mkdir(parents=True)
+    out.mkdir()
+
+    stat = bs._kopiere_scan(repo, out)
+
+    assert stat["day_trading"] == 0
+    assert not (out / "day_trading.json").exists()

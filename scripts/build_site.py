@@ -103,7 +103,7 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
     quelle = repo / "web"
     stat = {
         "scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0, "waechter": 0,
-        "aktien_info": 0, "notenbanken": 0, "chatgpt_meinung": 0,
+        "aktien_info": 0, "notenbanken": 0, "chatgpt_meinung": 0, "day_trading": 0,
     }
     # performance.json wurde hier vergessen — die App holte sie, bekam 404 und zeigte
     # deshalb "noch kein abgeschlossener Trade ausgewertet", obwohl 60 in der Datei
@@ -123,6 +123,10 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
         # Zweite Meinung von ChatGPT (Ozan, 07.10.) — nur vorhanden, wenn OPENAI_API_KEY
         # im Lauf hinterlegt ist; sonst schreibt der Zweitmeinung-Schritt gar nichts.
         ("chatgpt_meinung.json", "chatgpt_meinung"),
+        # Gold-Tageshandel-Stand (Ozan, 11.10.) — S9 IN_VALIDATION + die beiden
+        # Studien ohne Edge. Fehlt die Datei (Yahoo-Ausfall im allerersten Lauf),
+        # zeigt die App ehrlich "kein Stand vorhanden" statt nichts zu sagen.
+        ("day_trading.json", "day_trading"),
     ):
         f = quelle / name
         if f.exists():
