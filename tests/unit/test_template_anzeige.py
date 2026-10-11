@@ -137,6 +137,11 @@ def test_dezimalpunkte_werden_zu_kommas() -> None:
         # bleibt: deutsche Tausender, Daten, Versionen, schon deutsche Zahlen
         "Depotwert 10.020 € am 28.09. (v1.2)": "Depotwert 10.020 € am 28.09. (v1.2)",
         "Stop 76.151,92 $ · 28.09.2026 · 1.234.567": "Stop 76.151,92 $ · 28.09.2026 · 1.234.567",
+        # Monat.Jahr (Studienzeitraeume auf der Gold-Day-Seite) — war "01,2023"
+        "PAXG 01.2023–09.2026, OOS ab 07.2025": "PAXG 01.2023–09.2026, OOS ab 07.2025",
+        "seit 12.1999": "seit 12.1999",
+        # aber echte Dezimalzahlen mit vier Stellen bleiben Dezimalzahlen
+        "Kurs 1.2345 und 0.2026 und 13.2024": "Kurs 1,2345 und 0,2026 und 13,2024",
     }
     skript = (
         _zahlen_block()

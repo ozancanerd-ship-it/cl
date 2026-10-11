@@ -70,6 +70,8 @@ def _lauf(gd: dict | None) -> str:
         + "const $ = id => id === 'daytrading' ? _el : null;\n"
         + _konst(roh, "DT_ZUSTAND_TEXT")
         + _konst(roh, "DT_ZUSTAND_KLASSE")
+        + _konst(roh, "DT_TREND_TEXT")
+        + _konst(roh, "DT_RICHTUNG_TEXT")
         + _funktion(roh, "zeichneDaytrading")
         + "zeichneDaytrading();\n"
         + "console.log(JSON.stringify({html: _el.innerHTML}));\n"
@@ -125,7 +127,8 @@ def test_nicht_armed_zustand_ohne_geometrie():
     }
     html = _lauf(gd)
     assert "Kein Muster erkennbar" in html
-    assert "trend_down" in html
+    assert "Abwärts" in html
+    assert "trend_down" not in html  # kein Rohschluessel auf der Seite
     assert "Entry" not in html
     assert "IN_VALIDATION" in html
 
@@ -153,7 +156,8 @@ def test_armed_zeigt_geometrie_und_warnung():
     html = _lauf(gd)
     assert "102,60" in html or "102.6" in html
     assert "Nur Beobachtung" in html
-    assert "long" in html
+    assert "Long (steigend)" in html
+    assert "Gold-Future" in html  # Hinweis, dass die Marken nicht 1:1 Kraken-Kurse sind
 
 
 def test_studien_stehen_immer_da():

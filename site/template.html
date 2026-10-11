@@ -884,11 +884,16 @@ function mitUmlauten(t){
    „1 R = 10.61" — mitten in einer deutschen Seite, deren eigene Zahlen „529,40" heißen.
    Umgeschrieben wird nur, was eindeutig ein Dezimalpunkt ist: ein bis zwei oder vier und
    mehr Nachkommastellen. Genau drei („10.020") kann ein deutscher Tausenderpunkt sein und
-   bleibt stehen; Daten („28.09.") und Versionen („v1.2") ebenso. */
+   bleibt stehen; Daten („28.09.") und Versionen („v1.2") ebenso.
+   Monat.Jahr („01.2023", „07.2025") ist ebenfalls kein Dezimalpunkt — vorher wurde daraus
+   „01,2023" (sichtbar auf der Gold-Day-Seite, 11.10.). Erkannt an: zweistelliger Monat
+   01–12 und genau vierstelliges Jahr 19xx/20xx. */
 const DEZIMAL_RE = /(^|[^\d.,\w])(\d+)\.(\d{1,2}|\d{4,})(?![\d.A-Za-z])/g;
+const MONAT_JAHR_RE = /^(0[1-9]|1[0-2])$/;
 function deZahlen(t){
   if (!t || t.indexOf('.') < 0) return t;
-  return t.replace(DEZIMAL_RE, '$1$2,$3');
+  return t.replace(DEZIMAL_RE, (m, vor, ganz, bruch) =>
+    (MONAT_JAHR_RE.test(ganz) && /^(19|20)\d\d$/.test(bruch)) ? m : vor + ganz + ',' + bruch);
 }
 function anzeigeText(t){ return deZahlen(mitUmlauten(t)); }
 const UMLAUT_NICHT = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'CODE', 'PRE', 'SELECT']);
@@ -9475,6 +9480,8 @@ const DT_ZUSTAND_TEXT = {
   armed: 'Bereit (ARMED)', invalidated: 'Entwertet', unbekannt: 'Zu wenig Historie',
 };
 const DT_ZUSTAND_KLASSE = {armed: 'warn', await_retest: 'mittel', consolidation: 'mittel'};
+const DT_TREND_TEXT = {trend_up: 'Aufwärts', trend_down: 'Abwärts', range: 'Seitwärts', unclear: 'Unklar'};
+const DT_RICHTUNG_TEXT = {long: 'Long (steigend)', short: 'Short (fallend)'};
 
 function zeichneDaytrading(){
   let h = `<h2>🧪 Gold-Tageshandel — experimentell</h2>
@@ -9492,9 +9499,10 @@ function zeichneDaytrading(){
     const txt = DT_ZUSTAND_TEXT[g.zustand] || g.zustand || '—';
     const kl = DT_ZUSTAND_KLASSE[g.zustand] || '';
     h += `<h3>SETUP-BREAKOUT-RETEST-01 (S9) — Gold-Swing</h3><div class="karte">
-      <div class="rowx"><span class="lab">Zustand</span><span class="val">${esc(txt)} <span class="note ${esc(kl)}">${esc(g.zustand||'')}</span></span></div>
-      <div class="rowx"><span class="lab">D1-Trend</span><span class="val">${esc(g.d1_trend||'—')}</span></div>
-      ${g.richtung ? `<div class="rowx"><span class="lab">Richtung</span><span class="val">${esc(g.richtung)}</span></div>` : ''}
+      <div class="rowx"><span class="lab">Zustand</span><span class="val">${kl ? `<span class="note ${esc(kl)}">${esc(txt)}</span>` : esc(txt)}</span></div>
+      <div class="rowx"><span class="lab">Trend Tageschart</span><span class="val">${esc(DT_TREND_TEXT[g.d1_trend] || g.d1_trend || '—')}</span></div>
+      ${g.richtung ? `<div class="rowx"><span class="lab">Richtung</span><span class="val">${esc(DT_RICHTUNG_TEXT[g.richtung] || g.richtung)}</span></div>` : ''}
+      <div class="rowx"><span class="lab">Datenquelle</span><span class="val">Gold-Future (Yahoo GC=F), 4-Std./Tag</span></div>
     </div>`;
     if (g.zustand === 'armed'){
       h += `<div class="karte">
@@ -9505,7 +9513,9 @@ function zeichneDaytrading(){
         <div class="rowx"><span class="lab">R:R bis TP2</span><span class="val">1:${num(g.rr_bis_tp2,1)}</span></div>
         <div class="rowx"><span class="lab">Confidence</span><span class="val">${Math.round((g.confidence||0)*100)} %</span></div>
       </div>
-      <div class="note-box bad"><span class="nt">${esc(g.warnung || 'Nur Beobachtung — kein Trade wird ausgelöst')}</span></div>`;
+      <div class="note-box bad"><span class="nt">${esc(g.warnung || 'Nur Beobachtung — kein Trade wird ausgelöst')}</span>
+        <p>Die Marken stammen vom Gold-Future. PAXG/XAUT auf Kraken notieren einige Dollar
+        daneben — die Zahlen sind nicht 1:1 als Order auf Kraken übertragbar.</p></div>`;
     }
     if (g.text) h += `<p style="font-size:12.5px;color:var(--ink-2);margin-top:6px">${esc(g.text)}</p>`;
     if (g.hinweis) h += `<div class="note-box"><span class="nt">Warum nicht alarmfähig</span><p>${esc(g.hinweis)}</p></div>`;
