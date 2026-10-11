@@ -153,7 +153,7 @@ def test_bauen_schreibt_studien_auch_bei_quellenausfall() -> None:
     assert ergebnis["aktiv"] is False
     assert "fehler" in ergebnis
     assert stand is None and alarme == []  # Ausfall: Stand bleibt unangetastet
-    assert len(ergebnis["studien"]) == 2
+    assert len(ergebnis["studien"]) == len(skript.STUDIEN)
     titel = {s["titel"] for s in ergebnis["studien"]}
     assert any("Asien-Range" in t for t in titel)
     assert any("Mean-Reversion" in t for t in titel)
@@ -189,7 +189,7 @@ def test_bauen_bei_zu_wenig_h1_bars_bleibt_ehrlich() -> None:
     assert ergebnis["aktiv"] is False
     assert stand is None
     assert "H1-Bars" in ergebnis["fehler"]
-    assert len(ergebnis["studien"]) == 2
+    assert len(ergebnis["studien"]) == len(skript.STUDIEN)
 
 
 def test_main_schreibt_seite_und_stand(monkeypatch, tmp_path) -> None:

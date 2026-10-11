@@ -57,7 +57,7 @@ def _konst(roh: str, name: str) -> str:
     return roh[m.start() : ende + 1] + "\n"
 
 
-def _lauf(gd: dict | None) -> str:
+def _lauf(gd: dict | None, dtw: dict | None = None) -> str:
     node = shutil.which("node")
     if not node:
         pytest.skip("node nicht vorhanden")
@@ -69,6 +69,7 @@ def _lauf(gd: dict | None) -> str:
         + _funktion(roh, "num")
         + _funktion(roh, "zeit")
         + f"let GD = {json.dumps(gd)};\n"
+        + f"let DTW = {json.dumps(dtw)};\n"
         + "const _el = {_html: '', set innerHTML(v){this._html=v;}, get innerHTML(){return this._html;}};\n"
         + "const $ = id => id === 'daytrading' ? _el : null;\n"
         + _konst(roh, "DT_ZUSTAND_TEXT")
@@ -79,6 +80,8 @@ def _lauf(gd: dict | None) -> str:
         + _funktion(roh, "dtR")
         + _funktion(roh, "dtOffenerTrade")
         + _funktion(roh, "dtForward")
+        + _konst(roh, "DTW_GRUND")
+        + _funktion(roh, "dtKrypto")
         + _funktion(roh, "zeichneDaytrading")
         + "zeichneDaytrading();\n"
         + "console.log(JSON.stringify({html: _el.innerHTML}));\n"
@@ -242,3 +245,41 @@ def test_kraken_marken_im_laufenden_trade():
     assert "PAXG/USD" in html
     assert "4.158,00" in html  # 4200 * 0,99
     assert "4.189,60" in html  # aktueller PAXG-Kurs im Zustand
+
+
+# ------------------------------------------------------------------ Krypto-Ausbruchswelle
+# Ozan, 11.10. 22:33: "ich brauche dafuer Alarme ... fuer Krypto und fuer Gold".
+
+_DTW = {
+    "aktiv": True, "welle": 14, "min_welle": 12, "btc_ueber_ema200": True,
+    "letzte_kerze": "2026-10-11T20:00:00+00:00",
+    "offen": [{"sym": "SOL", "klasse": "coin", "signal_ts": "2026-10-11T18:00:00+00:00",
+               "einstieg": 150.0, "stop": 146.0, "ausstieg_marke": 147.5, "r_offen": 0.4}],
+    "bilanz_krypto": {"anzahl": 3, "ziel": 100, "summe_r": 2.5, "schnitt_r": 0.833,
+                      "trefferquote": 0.333, "letzte": [{"sym": "ETH", "signal_ts": "2026-10-10T10:00:00+00:00",
+                                                          "r": 3.4, "grund": "AUSSTIEG"}]},
+    "bilanz_gold": {"anzahl": 0, "ziel": 100, "summe_r": 0, "letzte": []},
+    "studie": {"krypto": {"regel": "Welle-Regel", "status": "KANDIDAT", "geld": "OOS +9,7 %",
+                          "kosten": "Bybit-Spot"}, "gold": {"status": "EXPERIMENTELL"}},
+}
+
+
+def test_krypto_welle_mit_offenem_trade_und_bilanz():
+    html = _lauf({"aktiv": False, "studien": []}, _DTW)
+    assert "Krypto-Ausbruchswelle" in html
+    assert "14 von 24" in html and "Welle läuft" in html
+    assert "SOL" in html and "+0,40 R" in html and "raus unter" in html
+    assert "3 von 100" in html and "+3,40 R" in html
+    assert "KANDIDAT" in html and "Bybit-Spot" in html and "OOS +9,7 %" in html
+
+
+def test_krypto_ohne_welle_sagt_ab_wann():
+    dtw = dict(_DTW, welle=5, offen=[])
+    html = _lauf({"aktiv": False, "studien": []}, dtw)
+    assert "ab 12 Alarm" in html
+    assert "Gerade kein offener Tageshandel" in html
+
+
+def test_krypto_ohne_daten_ehrlich():
+    html = _lauf({"aktiv": False, "studien": []}, {"aktiv": False, "fehler": ["Kraken weg"]})
+    assert "Kraken weg" in html

@@ -733,7 +733,7 @@ a{color:var(--accent); text-underline-offset:3px}
       <button class="tab" role="tab" aria-selected="false" aria-controls="p8" id="t8">Bilanz</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p9" id="t9">Chat</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p10" id="t10">System</button>
-      <button class="tab" role="tab" aria-selected="false" aria-controls="p11" id="t11">Gold Day</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p11" id="t11">Day-Trading</button>
     </div>
   </div>
 </header>
@@ -959,7 +959,8 @@ let PF = null;
 let NB = null;                // notenbanken.json — Fed/EZB/BoE-Beschluesse
 let WA = null;                // waechter.json — laeuft der Depot-Waechter auf GitHub?
 let ZM = null;                 // chatgpt_meinung.json — Zweitmeinung von ChatGPT (falls eingerichtet)
-let GD = null;                 // day_trading.json — Gold-Tageshandel-Stand (S9, experimentell, kein Alarm)
+let GD = null;                 // day_trading.json — Gold-Swing S9 (experimentell, Alarme mit 🧪)
+let DTW = null;                // daytrade.json — Tageshandel: Krypto-Ausbruchswelle + Gold-Ausbruch
 const NOTE_KLASSE = {'A+':'gut','A':'gut','A−':'mittel','B+':'mittel','B':'','WATCH':'','—':''};
 
 /* ---- Euro, Broker, Gebuehr -------------------------------------------------
@@ -1017,7 +1018,7 @@ function gebuehrSatz(o, positionswert){
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
-const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System','Gold Day'];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System','Day-Trading'];
 function zeigeTab(i){
   TABS.forEach((t,k)=>{
     t.setAttribute('aria-selected', k===i ? 'true':'false');
@@ -1102,6 +1103,10 @@ async function ladeScan(){
     const rgd = await fetch('day_trading.json?v=' + Date.now(), {cache:'no-store'});
     GD = rgd.ok ? await rgd.json() : null;
   } catch(e){ GD = null; }
+  try {
+    const rdt = await fetch('daytrade.json?v=' + Date.now(), {cache:'no-store'});
+    DTW = rdt.ok ? await rdt.json() : null;
+  } catch(e){ DTW = null; }
   sicher('Namen', ()=>merkeNamen(S && S.gesamt));
   /* Jeder Teil fuer sich. Vorher standen die Aufrufe in einer Zeile hintereinander —
      ein Fehler im ersten hat alle folgenden mitgenommen, und die App blieb bei
@@ -9642,14 +9647,71 @@ function dtForward(f){
   return h;
 }
 
+/* Ozan, 11.10. 22:33: "ich brauche dafuer Alarme ... fuer Krypto und fuer Gold".
+   Tageshandel aus scripts/daytrade_alarme.py (Studie docs/DAYTRADE-STUDIE-2026-10.md):
+   Krypto-Ausbruchswelle als KANDIDAT, Gold-Ausbruch als EXPERIMENTELL. Hier stehen die
+   Welle jetzt, die offenen Paper-Trades, die Forward-Bilanz und was die Studie gezeigt hat. */
+const DTW_GRUND = {STOP: 'Stop', AUSSTIEG: 'Ausstieg', ZEIT: 'Zeit'};
+function dtKrypto(w){
+  let h = `<h2>⚡ Tageshandel — Krypto-Ausbruchswelle</h2>`;
+  if (!w || !w.aktiv){
+    return h + `<div class="note-box bad"><span class="nt">Kein aktueller Stand</span>
+      <p>${esc(w && w.fehler && w.fehler.length ? w.fehler.join(' · ') : 'Noch kein Lauf vorhanden.')}</p></div>`;
+  }
+  const welle = w.welle || 0, min = w.min_welle || 12;
+  const anteil = Math.max(0, Math.min(100, Math.round(100 * welle / 24)));
+  const st = w.studie && w.studie.krypto || {};
+  h += `<div class="karte">
+    <div class="rowx"><span class="lab">Welle jetzt</span><span class="val">${welle} von 24 Coins ausgebrochen (24 Std.)
+      ${welle >= min ? '<span class="note gut">Welle läuft</span>' : `<span class="note">ab ${min} Alarm</span>`}</span></div>
+    <div style="height:6px;border-radius:3px;background:var(--sunk);margin:4px 0 8px;overflow:hidden;position:relative" aria-label="${welle} von 24">
+      <div style="height:100%;width:${anteil}%;background:${welle >= min ? 'var(--long)' : 'var(--accent)'}"></div>
+      <div style="position:absolute;top:0;bottom:0;left:${Math.round(100*min/24)}%;width:2px;background:var(--ink-3)"></div></div>
+    <div class="rowx"><span class="lab">Bitcoin über EMA 200 (1 Std.)</span><span class="val">${w.btc_ueber_ema200 ? 'ja — Filter offen' : 'nein — keine Einstiege'}</span></div>
+    <div class="rowx"><span class="lab">Letzte Stundenkerze</span><span class="val">${zeit(w.letzte_kerze)}</span></div>
+  </div>`;
+  const offen = w.offen || [];
+  if (offen.length){
+    h += `<h3>Offene Paper-Trades (${offen.length})</h3><div class="karte">`;
+    for (const t of offen){
+      const gold = t.klasse === 'gold';
+      h += `<div class="rowx"><span class="lab">${gold ? '🧪 ' : ''}${esc(t.sym)} · seit ${zeit(t.signal_ts)}</span>
+        <span class="val">${t.einstieg != null ? `Kauf ${num(t.einstieg)} $ · ` : 'Einstieg zur nächsten Stunde · '}Stop ${num(t.stop)} $
+        ${t.ausstieg_marke != null ? ` · raus unter ${num(t.ausstieg_marke)} $` : ''}${t.r_offen != null ? ` · <b class="${t.r_offen>=0?'up':'dn'}">${dtR(t.r_offen)}</b>` : ''}</span></div>`;
+    }
+    h += `</div>`;
+  } else {
+    h += `<p class="leer" style="padding:4px 0">Gerade kein offener Tageshandel. Der Alarm kommt, sobald eine Welle läuft.</p>`;
+  }
+  for (const [titel, b] of [['Forward-Bilanz Krypto (Paper)', w.bilanz_krypto], ['Forward-Bilanz Gold 🧪 (Paper)', w.bilanz_gold]]){
+    if (!b) continue;
+    h += `<h3>${titel}</h3><div class="karte">
+      <div class="rowx"><span class="lab">Abgeschlossen</span><span class="val">${b.anzahl} von ${b.ziel}</span></div>
+      <div class="rowx"><span class="lab">Summe / Schnitt</span><span class="val">${dtR(b.anzahl ? b.summe_r : null)} / ${dtR(b.schnitt_r)}</span></div>
+      <div class="rowx"><span class="lab">Trefferquote</span><span class="val">${b.trefferquote == null ? '—' : Math.round(b.trefferquote*100) + ' % (erwartet ≈ 25 %)'}</span></div>
+      ${(b.letzte||[]).map(t => `<div class="rowx"><span class="lab">${esc(t.sym)} · ${zeit(t.signal_ts)}</span><span class="val">${dtR(t.r)} · ${esc(DTW_GRUND[t.grund] || t.grund || '')}</span></div>`).join('')}
+    </div>`;
+  }
+  h += `<details class="note-box klapp erkl"><summary><span class="nt">Was die Studie zeigt — ehrlich</span>
+      <span class="klapp-hint">antippen</span></summary>
+      <p><strong>Regel:</strong> ${esc(st.regel || '')}.</p>
+      <p><strong>Ergebnis:</strong> ${esc(st.is || '')}; ${esc(st.oos || '')}. ${esc(st.ohne_welle || '')}.</p>
+      <p><strong>In Geld:</strong> ${esc(st.geld || '')}.</p>
+      <p><strong>Größe:</strong> ${esc(st.groesse || '')}. <strong>Trefferquote:</strong> ${esc(st.trefferquote || '')}.</p>
+      <p><strong>Kosten:</strong> ${esc(st.kosten || '')}.</p>
+      <p><strong>Status:</strong> ${esc(st.status || '')}. Gold: ${esc((w.studie && w.studie.gold && w.studie.gold.status) || '')}.</p>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(st.doc || '')}</p></details>`;
+  return h;
+}
+
 function zeichneDaytrading(){
-  let h = `<h2>🧪 Gold-Tageshandel — experimentell</h2>
+  let h = dtKrypto(DTW) + `<h2>🧪 Gold-Swing S9 — experimentell</h2>
   <div class="note-box warn"><span class="nt">Experimentelle Alarme</span>
     <p>Bei einem neuen Gold-Setup, bei TP1, TP2, Stop oder Zeitausstieg kommt ein Alarm —
     <strong>immer mit 🧪 als experimentell markiert</strong>. Die Strategie ist noch nicht
     bewiesen; jeder Alarm ist ein Paper-Trade, keine Kaufempfehlung, kein Echtgeld. Erst
-    rund 100 echte Forward-Trades zeigen, ob sie trägt. Zwei Studien weiter unten fanden
-    für Intraday-Gold und Krypto-Mean-Reversion keinen Vorteil.</p></div>`;
+    rund 100 echte Forward-Trades zeigen, ob sie trägt. Was für den Tageshandel schon
+    geprüft wurde, steht ganz unten.</p></div>`;
   h += dtOffenerTrade(GD && GD.offen, GD && GD.kurs);
   h += dtForward(GD && GD.forward);
 

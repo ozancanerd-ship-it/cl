@@ -411,6 +411,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/gold_daytrading_status.py --out web/day_trading.json --send
 
+      # Tageshandel-Alarme (Ozan, 11.10. 22:33: "ich brauche dafuer Alarme ... Krypto und
+      # Gold"). Grundlage docs/DAYTRADE-STUDIE-2026-10.md: Krypto-Ausbruchswelle (Kandidat,
+      # >= 12 von 24 Coins brechen gleichzeitig aus) und Gold-Ausbruch (experimentell).
+      # Kraken-1-Std.-Kerzen, ein gebuendelter Alarm je Welle, Paper-Trades vorwaerts in
+      # daytrade_stand.json. Faellt Kraken aus: Stand bleibt unveraendert.
+      - name: Tageshandel-Alarme
+        if: env.LAUF != 'waechter'
+        continue-on-error: true
+        timeout-minutes: 4
+        env:
+          PYTHONPATH: src
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/daytrade_alarme.py --out web/daytrade.json --send
+
       # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan, keine
       # Veroeffentlichung. Dauert Sekunden und darf deshalb alle fuenf Minuten laufen.
       - name: Marken pruefen
@@ -484,7 +502,8 @@ jobs:
                    data/repository_real/live/depot_stand.siegel \
                    data/repository_real/live/alerts.jsonl \
                    data/repository_real/live/trend_swing_forward.json \
-                   data/repository_real/live/gold_s9_stand.json; do
+                   data/repository_real/live/gold_s9_stand.json \
+                   data/repository_real/live/daytrade_stand.json; do
             if [ -f "$f" ]; then git add -f "$f"; else echo "  (noch nicht vorhanden: $f)"; fi
           done
           if git diff --cached --quiet; then

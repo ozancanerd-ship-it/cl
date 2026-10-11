@@ -103,7 +103,7 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
     quelle = repo / "web"
     stat = {
         "scan": 0, "wachliste": 0, "assets": 0, "bilanz": 0, "waechter": 0,
-        "aktien_info": 0, "notenbanken": 0, "chatgpt_meinung": 0, "day_trading": 0,
+        "aktien_info": 0, "notenbanken": 0, "chatgpt_meinung": 0, "day_trading": 0, "daytrade": 0,
     }
     # performance.json wurde hier vergessen — die App holte sie, bekam 404 und zeigte
     # deshalb "noch kein abgeschlossener Trade ausgewertet", obwohl 60 in der Datei
@@ -127,6 +127,8 @@ def _kopiere_scan(repo: Path, out: Path) -> dict[str, int]:
         # Studien ohne Edge. Fehlt die Datei (Yahoo-Ausfall im allerersten Lauf),
         # zeigt die App ehrlich "kein Stand vorhanden" statt nichts zu sagen.
         ("day_trading.json", "day_trading"),
+        # Tageshandel-Alarme Krypto-Welle + Gold (Ozan, 11.10. 22:33).
+        ("daytrade.json", "daytrade"),
     ):
         f = quelle / name
         if f.exists():

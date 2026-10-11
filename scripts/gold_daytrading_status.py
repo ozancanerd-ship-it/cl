@@ -77,6 +77,16 @@ STUDIEN: tuple[dict[str, object], ...] = (
         ),
         "doc": "docs/MEAN-REVERSION-STUDIE-2026-10.md",
     },
+    {
+        "titel": "Tageshandel 2. Studie: Ausbruch, Ausreißer-Tag, Squeeze, Intraday-Momentum",
+        "zeitraum": "24 Coins + PAXG, 1 Std., 01.2022–09.2026, OOS ab 01.2025",
+        "ergebnis": (
+            "Krypto-Ausbruchswelle (≥ 12 Coins): Kandidat mit schmalem Edge, OOS +0,14 R — "
+            "dafür kommen jetzt Alarme. Gold-Ausbruch nur in der Hausse 2025/26 positiv "
+            "(experimentell). Alle anderen Varianten ohne Edge."
+        ),
+        "doc": "docs/DAYTRADE-STUDIE-2026-10.md",
+    },
 )
 
 #: Chain-Progress-Texte fuer die Zustaende ohne Geometrie (SCANNING/AWAIT_RETEST/

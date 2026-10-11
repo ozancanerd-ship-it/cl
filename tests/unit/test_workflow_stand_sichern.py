@@ -47,6 +47,13 @@ def test_gold_s9_stand_wird_gesichert() -> None:
     assert "data/repository_real/live/gold_s9_stand.json" in sichern["run"]
 
 
+def test_daytrade_stand_wird_gesichert_und_alarme_senden() -> None:
+    sichern = next(s for s in _schritte() if s.get("name") == "Journal sichern")
+    assert "data/repository_real/live/daytrade_stand.json" in sichern["run"]
+    dt = next(s for s in _schritte() if s.get("name") == "Tageshandel-Alarme")
+    assert "--send" in dt["run"] and "VAPID_PRIVATE_KEY" in (dt.get("env") or {})
+
+
 def test_gold_schritt_sendet_und_hat_die_kanaele() -> None:
     gold = next(s for s in _schritte() if s.get("name") == "Gold-Tageshandel-Stand")
     assert "--send" in gold["run"]
