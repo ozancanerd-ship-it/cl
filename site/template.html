@@ -1139,13 +1139,38 @@ async function waehle(sym, wechseln = true){
 /* ------------------------------------------------------------ Live */
 /* Die Börse liefert die Kurse direkt an den Browser. Kein eigener Server, keine
    Zwischenspeicherung, kein Schlüssel — es ist der öffentliche Marktdaten-Stream.
-   Aktien haben kein frei zugängliches Live-Feed mit CORS; sie bleiben auf dem Stand
-   des Scans und werden auch so beschriftet. */
+   Aktien haben GRUNDSÄTZLICH kein frei zugängliches Live-Feed mit CORS und bleiben auf
+   dem Stand des Scans — AUSSER Kraken fuehrt fuer genau diese Aktie einen tokenisierten
+   Markt mit Status "online" (siehe ``kraken_live`` weiter unten, 11.10.): dann kommt der
+   Kurs genauso live wie bei Krypto, nur eben ueber den tokenisierten statt den echten
+   Aktienmarkt. */
+/* Ozan, 11.10. 17:18: "Kraken hat jetzt auch die Option ... mit Aktien zu handeln ...
+   du muesstest die eigentlich auch dort alle sehen." Der Scan markiert eine Aktienzeile
+   mit ``kraken_live`` (dem Kraken-WebSocket-Paarnamen, z.B. "AAPLx/USD"), aber NUR wenn
+   Kraken dafuer wirklich einen laufenden, beidseitig liquiden Markt fuehrt ("online" —
+   siehe ``_kraken_xstocks_anhaengen`` im Scan-Lauf; die meisten Aktien sind bei Kraken
+   nur "post_only" oder fehlen ganz und bleiben bewusst beim Yahoo-Scanstand). Diese
+   zwei Tabellen uebersetzen zwischen dem Instrumentnamen, den die App ueberall benutzt
+   ("AAPL"), und dem Kraken-Paarnamen ("AAPLx/USD") — in beide Richtungen, weil
+   ``krakenPaar`` beim Abonnieren die eine Richtung braucht und ``ausKrakenPaar`` beim
+   Einsortieren eines eingehenden Live-Ticks die andere. */
+let XSTOCK_PAAR = new Map();       // "AAPL" -> "AAPLx/USD"
+let XSTOCK_PAAR_RUECK = new Map(); // "AAPLXUSD" (Paar, Grossbuchstaben, ohne "/") -> "AAPL"
+
 function kryptoSymbole(){
   if (!S) return [];
   const aus = [];
   const gesehen = new Set();
   const dazu = x => { const k = String(x||'').toUpperCase(); if (k && !gesehen.has(k)){ gesehen.add(k); aus.push(k); } };
+  XSTOCK_PAAR = new Map();
+  XSTOCK_PAAR_RUECK = new Map();
+  const merkeXstock = o => {
+    if (!o || !o.kraken_live) return;
+    const sym = String(o.instrument||'').toUpperCase();
+    if (!sym) return;
+    XSTOCK_PAAR.set(sym, o.kraken_live);
+    XSTOCK_PAAR_RUECK.set(String(o.kraken_live).toUpperCase().replace('/',''), sym);
+  };
   /* Das eigene Depot ZUERST. Bis 30.09. wurden nur die ersten 90 Werte des Scans
      abonniert — in der Reihenfolge des Scans. Eine Position, die dort weiter hinten
      stand (oder gar nicht, weil der Coin gerade durch den Liquiditaetsfilter fiel), bekam
@@ -1154,7 +1179,10 @@ function kryptoSymbole(){
   for (const d of depotKryptoSymbole()) dazu(d);
   // GROSS, nicht klein: Kraken meldet die Symbole gross zurueck, und der Livespeicher
   // wird an anderer Stelle mit dem Instrumentnamen aus dem Scan abgefragt.
-  for (const o of (S.gesamt||[])) if (o.klasse === 'krypto' || o.klasse === 'gold') dazu(o.instrument);
+  for (const o of (S.gesamt||[])){
+    if (o.klasse === 'krypto' || o.klasse === 'gold') dazu(o.instrument);
+    else if (o.klasse === 'aktien' && o.kraken_live){ merkeXstock(o); dazu(o.instrument); }
+  }
   return aus.slice(0, 180);
 }
 function depotKryptoSymbole(){
@@ -1167,6 +1195,9 @@ function depotKryptoSymbole(){
     const row = scanRow(p.sym);
     if (row){
       if (row.klasse === 'krypto' || row.klasse === 'gold') aus.push(row.instrument);
+      // Aktien im Depot mit Kraken-Live-Kurs werden ueber die obere Schleife in
+      // kryptoSymbole() erfasst (S.gesamt) — hier reicht normales Krypto/Gold, denn
+      // XSTOCK_PAAR wird erst dort befuellt, bevor kryptoSymbole() zurueckgibt.
     } else if (/(USDT|USDC|USD|EUR)$/i.test(String(p.sym))){
       // Nicht im Scan (zu duenn, ausgelistet) — Kraken versuchen wir trotzdem.
       aus.push(p.sym);
@@ -1256,6 +1287,11 @@ function beiSichtbarkeitRueckkehr(){
    sonst liefe der Livestream leer, waehrend die Karten Dollarpreise zeigen. */
 function krakenPaar(sym){
   const s = String(sym||'').toUpperCase();
+  // Kraken-xStocks ZUERST: "AAPL" hat keine der Krypto-Endungen unten, die generische
+  // Erkennung wuerde also ohnehin null liefern — aber auch wenn ein kuenftiges
+  // Aktienkuerzel zufaellig auf "USD" o.ae. endet, soll ein bekannter xStock-Eintrag
+  // immer gewinnen statt falsch als Krypto-Paar geraten zu werden.
+  if (XSTOCK_PAAR.has(s)) return XSTOCK_PAAR.get(s);
   for (const q of ['USDT','USDC','USD','EUR']){
     if (s.endsWith(q) && s.length > q.length){
       // Kraken kennt kein USDT-Paar fuer die meisten Coins — dort dann USD.
@@ -1269,6 +1305,10 @@ function ausKrakenPaar(paar){
   const s = String(paar||'').toUpperCase();
   if (!s.includes('/')) return null;
   const flach = s.replace('/','');
+  // Kraken-xStocks ZUERST, aus demselben Grund wie in krakenPaar(): "AAPLXUSD" (aus
+  // "AAPLx/USD") ist kein Krypto-Paar und darf nicht ueber die Krypto-Endungen
+  // zusammengebastelt werden.
+  if (XSTOCK_PAAR_RUECK.has(flach)) return XSTOCK_PAAR_RUECK.get(flach);
   // Zurueck auf den Namen, den der Scan benutzt: ein USDT-Paar aus dem Scan wird als
   // USD-Paar abonniert und muss hier wieder seinen Scan-Namen bekommen.
   if (KRYPTO_NAMEN_LIVE.has(flach)) return flach;
@@ -9356,14 +9396,29 @@ function zeichneSystem(){
     <div class="rowx"><span class="lab">Quelle</span><span class="val">Börsen-Websocket</span></div>
     <div class="rowx"><span class="lab">Werte mit Livekurs</span><span class="val">${L.size}</span></div>
   </div>
-  <div class="note-box"><span class="nt">Was hier live ist und was nicht</span>
+  ${(() => {
+    // Ozan, 11.10. 17:18: "Kraken hat jetzt auch die Option ... mit Aktien zu handeln".
+    // Nur Aktien mit einem tatsaechlich "online" gefuehrten Kraken-Markt bekommen einen
+    // Live-Kurs (siehe _kraken_xstocks_anhaengen im Scan) — das muss hier auch so stehen,
+    // sonst behauptet die Erklaerung entweder zu viel ("alle Aktien live") oder zu wenig
+    // ("keine Aktie live"), je nachdem, wie lange der Text schon alt ist.
+    const xAktien = (S && S.gesamt || []).filter(o => o.klasse === 'aktien' && o.kraken_live)
+      .map(o => o.instrument);
+    return `<div class="note-box"><span class="nt">Was hier live ist und was nicht</span>
     <p><strong>Live:</strong> die Kurse für Krypto und Gold — direkt von der Börse an
-    deinen Browser, ohne Umweg.</p>
+    deinen Browser, ohne Umweg.${xAktien.length
+      ? ` Dazu ${xAktien.length === 1 ? 'die Aktie' : 'die Aktien'} <b>${xAktien.map(esc).join(', ')}</b> —
+        Kraken führt dafür einen eigenen, laufend gehandelten Markt aus tokenisierten
+        Aktien (keine echten Aktien, sondern ein an den Kurs gekoppeltes Kraken-Produkt).`
+      : ''}</p>
     <p><strong>Nicht live:</strong> die eingezeichnete Analyse. Sie stammt aus dem
-    stündlichen Scan und trägt dessen Zeitstempel. Für Aktien gibt es kein frei
-    zugängliches Live-Feed; dort ist auch der Kurs der Stand des Scans.</p>
+    stündlichen Scan und trägt dessen Zeitstempel. Für die übrigen Aktien gibt es kein
+    frei zugängliches Live-Feed; dort ist auch der Kurs der Stand des Scans — Kraken
+    führt die meisten davon nur einseitig oder gar nicht, und ein Kurs ohne verlässliche
+    Gegenseite wäre kein echter Live-Kurs, nur ein zufälliger letzter Abschluss.</p>
     <p>Diese Trennung ist Absicht. Eine Seite, die alles gleich aussehen lässt, verleitet
     dazu, einen Stand von vor einer Stunde für den aktuellen Kurs zu halten.</p></div>`;
+  })()}`;
   h += `<h2>Was noch fehlt</h2><div class="karte">
     <div class="rowx"><span class="lab">Nachführung laufender Trades in Echtzeit</span><span class="val">offen</span></div>
     <div class="rowx"><span class="lab">Fundamentaldaten bei Aktien</span><span class="val">offen</span></div>

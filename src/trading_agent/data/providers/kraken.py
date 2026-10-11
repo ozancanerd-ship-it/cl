@@ -249,6 +249,55 @@ class KrakenDataProvider(AsyncOHLCVSource, AsyncTradeSource, AsyncQuoteSource):
         self._health.record_success(latency_ms=1.0)
         return aus
 
+    # ---- xStocks: tokenisierte Einzelaktien --------------------------
+    #
+    # Ozan, 11.10. 17:18: "Kraken hat jetzt auch die Option sozusagen mit Aktien zu
+    # handeln. Das heisst, du muesstest die eigentlich auch dort alle sehen." Kraken
+    # listet seit 2026 ueber Backed Finance tokenisierte Aktien (xStocks, z.B.
+    # "AAPLxUSD") im oeffentlichen Spotmarkt mit einer eigenen Asset-Klasse
+    # ("tokenized_asset") — oeffentlich abrufbar, ohne Schluessel, ueber denselben
+    # /0/public/-Endpunkt und denselben WebSocket (wss://ws.kraken.com/v2), den dieses
+    # Projekt fuer Krypto bereits benutzt. Das sind KEINE echten Aktien (kein Anspruch
+    # auf das Unternehmen, kein Stimmrecht) und Kraken fuehrt die meisten davon noch als
+    # "post_only" (nur einseitig im Buch, keine verlaessliche Gegenseite) — ein solcher
+    # Kurs waere kein echter Live-Kurs, nur ein letzter zufaelliger Druck. Nur "online"
+    # gefuehrte Paare liefern tatsaechlich einen handelbaren, laufend aktualisierten
+    # Kurs; die Unterscheidung bleibt deshalb Teil des Ergebnisses statt verschwiegen zu
+    # werden.
+    async def list_xstock_pairs(self) -> dict[str, dict[str, Any]]:
+        """Tokenisierte Aktien: Basiswert (z.B. "AAPL") -> WebSocket-Paarname und Status.
+
+        Liefert je Basiswert ``{"ws_pair": "AAPLx/USD", "status": "online"|"post_only"|...}``.
+        Kraken fuehrt manche Basiswerte unter mehreren Kraken-internen Schluesseln
+        (z.B. "AAPLSPVUSD" und "AAPLxUSD") — bei einem Widerspruch gewinnt "online"
+        gegen jeden anderen Status, weil das der einzige ist, der fuer einen Live-Kurs
+        taugt.
+        """
+        try:
+            result = self._unwrap(
+                await self._client.get_json(
+                    "/0/public/AssetPairs", {"aclass_base": "tokenized_asset"}
+                )
+            )
+        except Exception as exc:
+            self._health.record_failure(str(exc))
+            raise
+        aus: dict[str, dict[str, Any]] = {}
+        for _, row in result.items():
+            if not isinstance(row, dict):
+                continue
+            altname = str(row.get("altname") or "")
+            wsname = str(row.get("wsname") or "")
+            status = str(row.get("status") or "")
+            if not altname.endswith("xUSD") or not wsname:
+                continue
+            basis = altname[: -len("xUSD")]
+            bisher = aus.get(basis)
+            if bisher is None or (bisher.get("status") != "online" and status == "online"):
+                aus[basis] = {"ws_pair": wsname, "status": status}
+        self._health.record_success(latency_ms=1.0)
+        return aus
+
     async def fetch_ticker_24h_all(self) -> list[dict[str, Any]]:
         """Alle Ticker in einem Aufruf, auf dieselben Felder gebracht wie anderswo.
 

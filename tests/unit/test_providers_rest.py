@@ -130,6 +130,78 @@ async def test_kraken_fetch_quote_bid_ask() -> None:
 
 
 @respx.mock
+async def test_kraken_xstock_pairs_only_tokenized_asset_class_requested() -> None:
+    """Ozan, 11.10. 17:18: Kraken-Aktien sollen erfasst werden. Die Abfrage MUSS
+    ``aclass_base=tokenized_asset`` mitschicken — ohne das liefert Kraken den normalen
+    Forex-Markt zurueck (die eigene Doku nennt ``forex`` als Default), und das Ergebnis
+    waere eine stille Fehlabfrage statt der tokenisierten Aktien."""
+    route = respx.get("https://api.kraken.com/0/public/AssetPairs").mock(
+        return_value=httpx.Response(200, json={"error": [], "result": {}})
+    )
+    p = KrakenDataProvider()
+    await p.list_xstock_pairs()
+    await p.aclose()
+    assert route.calls.last.request.url.params["aclass_base"] == "tokenized_asset"
+
+
+@respx.mock
+async def test_kraken_xstock_pairs_online_gewinnt_gegen_post_only() -> None:
+    """Live-reale Kraken-Antwort (11.10.): manche Basiswerte stehen unter zwei
+    Kraken-Schluesseln (z.B. "AAPLSPVUSD" und "AAPLxUSD") — fast immer mit demselben
+    Status, aber die Zuordnung darf sich nicht auf die Reihenfolge der JSON-Schluessel
+    verlassen. Taucht "online" irgendwo fuer einen Basiswert auf, muss es gewinnen,
+    sonst zeigt die App fuer einen tatsaechlich live handelbaren Wert "nicht live"."""
+    respx.get("https://api.kraken.com/0/public/AssetPairs").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "error": [],
+                "result": {
+                    "AAPLSPVUSD": {
+                        "altname": "AAPLxUSD",
+                        "wsname": "AAPLx/USD",
+                        "status": "post_only",
+                    },
+                    "AAPLxUSD": {
+                        "altname": "AAPLxUSD",
+                        "wsname": "AAPLx/USD",
+                        "status": "online",
+                    },
+                    "METASPVUSD": {
+                        "altname": "METAxUSD",
+                        "wsname": "METAx/USD",
+                        "status": "post_only",
+                    },
+                },
+            },
+        )
+    )
+    p = KrakenDataProvider()
+    paare = await p.list_xstock_pairs()
+    await p.aclose()
+    assert paare["AAPL"] == {"ws_pair": "AAPLx/USD", "status": "online"}
+    assert paare["META"] == {"ws_pair": "METAx/USD", "status": "post_only"}
+    assert p.status().health is ProviderHealth.HEALTHY
+
+
+@respx.mock
+async def test_kraken_xstock_pairs_fehler_wird_nicht_verschluckt() -> None:
+    """Wie jeder andere Kraken-Aufruf: ein Fehler fliegt als Exception nach oben und
+    markiert den Anbieter als nicht gesund — kein stilles leeres Ergebnis, das wie
+    "keine Aktien bei Kraken" aussieht, obwohl die Abfrage selbst gescheitert ist."""
+    respx.get("https://api.kraken.com/0/public/AssetPairs").mock(
+        return_value=httpx.Response(
+            200, json={"error": ["EGeneral:Invalid arguments"], "result": {}}
+        )
+    )
+    p = KrakenDataProvider()
+    with contextlib.suppress(Exception):
+        await p.list_xstock_pairs()
+    await p.aclose()
+    assert p.status().health is not ProviderHealth.HEALTHY
+
+
+@respx.mock
 async def test_bybit_fetch_quote_bid_ask() -> None:
     respx.get("https://api.bybit.com/v5/market/tickers").mock(
         return_value=httpx.Response(

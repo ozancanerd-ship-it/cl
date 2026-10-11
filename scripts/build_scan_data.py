@@ -729,6 +729,56 @@ def _aktien_info(pfad: str) -> dict[str, Any]:
     return d if isinstance(d, dict) else {}
 
 
+async def _kraken_xstocks_anhaengen(zeilen: list[dict[str, Any]]) -> dict[str, int]:
+    """Live-Kurs ueber Kraken fuer Einzelaktien, wo Kraken das tatsaechlich liefert.
+
+    Ozan, 11.10. 17:18: "Kraken hat jetzt auch die Option sozusagen mit Aktien zu
+    handeln ... du muesstest die eigentlich auch dort alle sehen." Kraken fuehrt seit
+    2026 tokenisierte Aktien (xStocks) im oeffentlichen Spotmarkt — oeffentlich, ohne
+    Schluessel, ueber denselben Kraken-WebSocket, den dieses Projekt fuer Krypto schon
+    benutzt (siehe ``KrakenDataProvider.list_xstock_pairs``).
+
+    Stichprobe vom 11.10.: von den 104 gefuehrten Aktien stehen nur 5 als "online" bei
+    Kraken (beidseitig liquide, ein echter laufender Kurs) — NVDA, AAPL, GOOGL, TSLA,
+    MSTR. Fast 50 weitere sind "post_only" (nur einseitig im Buch, kein verlaesslicher
+    Kurs), der Rest fehlt bei Kraken ganz. Deshalb bekommt NUR "online" ein Feld
+    ``kraken_live`` in der Zeile (den WebSocket-Paarnamen, z.B. "AAPLx/USD") — alles
+    andere bleibt unverändert beim bisherigen Yahoo-Scanstand, genau wie vorher. Eine
+    Kennzeichnung "live", die in Wahrheit auf einem Markt ohne Gegenseite steht, waere
+    schlimmer als gar keine: sie saehe aus wie ein Kurs, auf den man eine Order legen
+    kann.
+
+    Scheitert der Abruf (Netzwerk, Kraken down), bleibt einfach alles beim Yahoo-Stand —
+    kein Absturz, keine Zeile verliert ihre bisherige Bewertung.
+    """
+    from trading_agent.data.providers.kraken import KrakenDataProvider
+
+    prov = KrakenDataProvider()
+    try:
+        paare = await prov.list_xstock_pairs()
+    except Exception as exc:
+        print(f"  ::warning::Kraken-xStocks nicht ladbar: {type(exc).__name__}: {exc}")
+        return {"gesetzt": 0}
+    finally:
+        await prov.aclose()
+
+    gesetzt = 0
+    fuer_online = {basis for basis, v in paare.items() if v.get("status") == "online"}
+    for r in zeilen:
+        if r.get("klasse") != "aktien":
+            continue
+        basis = str(r.get("instrument") or "").upper()
+        info = paare.get(basis)
+        if info is not None and info.get("status") == "online":
+            r["kraken_live"] = info["ws_pair"]
+            gesetzt += 1
+        else:
+            r.pop("kraken_live", None)
+    if fuer_online:
+        print(f"  Kraken-xStocks live: {', '.join(sorted(fuer_online))}")
+    return {"gesetzt": gesetzt}
+
+
 def _datum_de(iso: str) -> str:
     try:
         d = datetime.fromisoformat(iso).date()
@@ -1167,6 +1217,17 @@ async def main() -> int:
     sektoren = sektoren_rechnen(kompakt_neu + kompakt_alt)
     if sektoren:
         print("  Sektoren: " + " · ".join(f"{s['sektor']} {s['rs']:.0f}" for s in sektoren[:5]))
+
+    # Kraken-xStocks: ueber ALLE Aktienzeilen, nicht nur die frisch gescannten — sonst
+    # bliebe eine uebernommene Zeile bis zum naechsten vollen Lauf ohne das Feld, obwohl
+    # der Live-Status sich seit Tagen nicht geaendert hat. Der Abruf ist oeffentlich,
+    # ohne Schluessel und billig (ein Aufruf, keine Rate-Limit-Sorge) — es lohnt sich,
+    # ihn bei jedem Lauf zu machen, der ueberhaupt Aktienzeilen hat.
+    if any(r.get("klasse") == "aktien" for r in kompakt_neu + kompakt_alt):
+        try:
+            await _kraken_xstocks_anhaengen(kompakt_neu + kompakt_alt)
+        except Exception as exc:
+            print(f"  ::warning::Kraken-xStocks uebersprungen: {type(exc).__name__}: {exc}")
 
     # Krypto: Terminmarkt und Stimmung — nur, wenn Krypto in diesem Lauf gescannt wurde.
     stimmung = None
