@@ -6928,6 +6928,126 @@ function kapitalRanking(stand){
   </div>`;
 }
 
+/* ============================================================ LERNEN AM DEPOT
+   Ozan: "bau mir einen lern extra ding ... das ich nebenbei noch lernen kann" und
+   07.10.: Analysen sollen erklaeren, "aus denen er lernen kann, Begriffe erklaert".
+   Statt einer zweiten App (er will nur EINE) lernt er hier an seinen EIGENEN Positionen:
+   jede Lektion nimmt ein echtes Beispiel aus dem Depot und rechnet es vor. Gezeigt wird
+   nur, was gerade passt — kein Turbo, keine Knock-out-Lektion. Dazu ein Begriff des
+   Tages, der jeden Tag wechselt. */
+const BEGRIFFE = [
+  ['CRV (Chance-Risiko-Verhältnis)', 'Wie viel du am Ziel gewinnst im Verhältnis zu dem, was du am Stop verlierst. CRV 1:3 heißt: 1 € Risiko für 3 € Chance. Damit reicht schon jeder dritte Treffer, um nicht zu verlieren (vor Gebühren).'],
+  ['R (Risiko-Einheit)', 'Der Abstand vom Einstieg zum Stop ist 1 R. +2 R heißt: du hast doppelt so viel gewonnen, wie du riskiert hast. Mit R lassen sich Trades vergleichen, egal ob Bitcoin oder Apple.'],
+  ['ATR (durchschnittliche Tagesschwankung)', 'Wie weit sich ein Kurs an einem normalen Tag bewegt. Ein Stop enger als etwa eine ATR wird oft schon vom normalen Rauschen ausgelöst — ohne dass die Idee falsch war.'],
+  ['Drawdown', 'Der Rückgang vom höchsten Depotstand bis zum tiefsten danach. Er zeigt, was du aushalten musst. 30 % Drawdown fühlen sich viel schlimmer an, als sie auf dem Papier aussehen.'],
+  ['Trefferquote vs. CRV', 'Eine Strategie mit 35 % Treffern kann gut sein (wenn die Gewinner dreimal so groß sind wie die Verlierer), eine mit 70 % Treffern schlecht (wenn ein Verlust fünf Gewinne auffrisst). Nur beides zusammen sagt etwas.'],
+  ['Spread', 'Der Abstand zwischen Kauf- und Verkaufskurs. Du zahlst ihn bei jedem Trade. Bei kleinen Coins und Scheinen außerhalb der Börsenzeit kann er mehr kosten als die Gebühr.'],
+  ['Slippage', 'Wenn deine Order zu einem schlechteren Kurs ausgeführt wird als gedacht — typisch bei schnellen Bewegungen und Stop-Orders. Ein Stop bei 100 kann bei 98 ausgeführt werden.'],
+  ['Momentum (TSMOM)', 'Was in den letzten Monaten gestiegen ist, steigt im Schnitt eher weiter — eine der am besten belegten Regeln an den Märkten. Sie gilt für den Durchschnitt, nicht für jeden einzelnen Fall.'],
+  ['Relative Stärke (RS)', 'Wie gut sich ein Wert im Vergleich zu seiner Klasse schlägt. RS 90 heißt: besser als 90 % der anderen Coins bzw. Aktien. Stärke hält oft an — Schwäche aber nicht zwingend.'],
+  ['Beta', 'Wie stark ein Wert dem Gesamtmarkt folgt. Ein Coin mit Bitcoin-Beta 2 fällt ungefähr doppelt so stark wie Bitcoin. Viele Werte mit hohem Beta sind im Absturz wie eine einzige Position.'],
+  ['Marktregime', 'Ob der Markt gerade im Trend, seitwärts oder unruhig ist. Dieselbe Strategie funktioniert in einem Regime und scheitert im anderen — deshalb prüft die App das Regime vor jedem Setup.'],
+  ['Overfitting', 'Eine Strategie so lange an alte Daten anpassen, bis sie perfekt aussieht — und dann versagt sie live. Deshalb wird hier immer auf Daten geprüft, die beim Entwickeln nicht benutzt wurden (Out-of-Sample).'],
+  ['Teilverkauf', 'Einen Teil der Position am ersten Ziel verkaufen und den Stop für den Rest auf Einstand ziehen. Dann kann der Trade kaum noch Verlust machen, und der Rest hat trotzdem Luft nach oben.'],
+  ['Knock-out-Schwelle', 'Bei einem Turbo der Kurs des Basiswerts, an dem der Schein sofort (fast) wertlos wird. Anders als ein Stop wartet er nicht auf den Schlusskurs — ein kurzer Ausschlag reicht.'],
+];
+
+function lernKasten(stand){
+  const {bew, gesamt, inEuro} = stand || {};
+  if (!bew || !bew.length) return '';
+  const karten = [];
+  const nm = b => esc(posName(b));
+  const karte = (titel, text, merke) => `<details class="note-box klapp erkl"><summary><span class="nt">${titel}</span>
+      <span class="klapp-hint">antippen</span></summary>${text}
+      ${merke ? `<p style="margin-top:6px"><strong>Merke:</strong> ${merke}</p>` : ''}</details>`;
+
+  // 1. Knock-out am engsten Turbo
+  const turbos = bew.filter(b => b.pos.ko != null && b.hebel && !b.hebel.ausgeknockt && isFinite(b.hebel.puffer_pct))
+                    .sort((a, c) => a.hebel.puffer_pct - c.hebel.puffer_pct);
+  if (turbos.length){
+    const b = turbos[0], hl = b.hebel;
+    const p = hl.puffer_pct, hb = hl.hebel;
+    karten.push(karte(`Knock-out — an deinem Turbo auf ${esc(hl.basisName || posName(b))}`,
+      `<p>${esc(hl.basisName || 'Der Basiswert')} steht bei <b>${num(hl.basisKurs)}</b>, die Schwelle liegt bei
+      <b>${num(hl.ko)}</b>. Abstand: <b>${num(p,1)} %</b>. Daraus ergibt sich ein Hebel von etwa
+      <b>${num(hb,1)}×</b> — bewegt sich der Basiswert um 1 %, bewegt sich dein Schein um rund ${num(hb,1)} %.</p>
+      <p>${hl.lang ? 'Fällt' : 'Steigt'} ${esc(hl.basisName || 'der Basiswert')} um ${num(p,1)} %, ist der Schein
+      <b>sofort wertlos</b> — auch wenn der Kurs danach sofort zurückkommt. Je näher die Schwelle, desto größer
+      der Hebel, aber desto leichter reicht ein normaler Wackler.</p>`,
+      'Ein Puffer unter etwa zwei normalen Tagesschwankungen ist sehr eng. Mehr Hebel heißt nicht mehr Gewinn, sondern weniger Spielraum.'));
+  }
+
+  // 2. Verlust-Mathematik an der schwächsten Position
+  const minus = bew.filter(b => b.gvPct != null && b.gvPct <= -10).sort((a, c) => a.gvPct - c.gvPct);
+  if (minus.length){
+    const b = minus[0], v = b.gvPct;
+    const noetig = (1 / (1 + v / 100) - 1) * 100;
+    karten.push(karte(`Warum Verluste schwerer wiegen — an ${nm(b)}`,
+      `<p>${nm(b)} liegt bei <b>${pct(v,1)}</b>. Um wieder bei null zu sein, muss der Kurs nicht um
+      ${num(Math.abs(v),1)} % steigen, sondern um <b>${pct(noetig,1)}</b> — weil der Anstieg von einer
+      kleineren Basis aus startet.</p>
+      <p>Faustregel: −10 % brauchen +11 %, −25 % brauchen +33 %, −50 % brauchen +100 %.</p>`,
+      'Verluste klein halten ist wichtiger als Gewinne groß machen. Genau dafür ist der Stop da — er entscheidet, BEVOR die Rechnung unangenehm wird.'));
+  }
+
+  // 3. R an einer Position mit Stop — oder: warum ein Stop
+  const mitR = bew.filter(b => b.r != null && b.pos.einstieg && b.pos.plan && b.pos.plan.stop != null)
+                  .sort((a, c) => Math.abs(c.r) - Math.abs(a.r));
+  if (mitR.length){
+    const b = mitR[0], z = waehrungsZeichen(b.w), d = digits(b.kurs || 1);
+    karten.push(karte(`In R denken — an ${nm(b)}`,
+      `<p>Einstieg <b>${num(b.pos.einstieg,d)}${z}</b>, dein Stop <b>${num(b.pos.plan.stop,d)}${z}</b>. Der Abstand
+      dazwischen ist <b>1 R</b> — das, was du bei diesem Trade bereit warst zu verlieren.</p>
+      <p>Jetzt steht der Kurs bei <b>${num(b.kurs,d)}${z}</b>, also bei <b>${b.r>=0?'+':'−'}${num(Math.abs(b.r),2)} R</b>.
+      ${b.r >= 1 ? 'Du hast schon mehr gewonnen, als du riskiert hast — ein guter Moment, den Stop nachzuziehen.'
+        : b.r < 0 ? 'Der Trade läuft gegen dich, aber höchstens bis −1 R — das war der Plan.'
+        : 'Noch weniger als dein Risiko verdient — Geduld, solange der Stop steht.'}</p>`,
+      'R macht Trades vergleichbar: +2 R bei einem Coin und +2 R bei einer Aktie sind gleich gut, egal wie groß die Beträge sind.'));
+  } else {
+    const ohne = bew.filter(b => !(b.pos.plan && b.pos.plan.stop != null) && b.wert != null)
+                    .sort((a, c) => (inEuro(c, c.wert) || 0) - (inEuro(a, a.wert) || 0));
+    if (ohne.length){
+      const b = ohne[0], e = inEuro(b, b.wert) || 0;
+      karten.push(karte(`Warum ein Stop — an ${nm(b)}`,
+        `<p>${nm(b)} ist rund <b>${num(e,0)} €</b> wert und hat keinen Stop. Dein Risiko ist damit nicht
+        „ein paar Prozent", sondern im schlimmsten Fall die ganze Position.</p>
+        <p>Ein Stop legt vorher fest, ab wann die Idee falsch ist. Er nimmt dir die Entscheidung in dem Moment ab,
+        in dem du am schlechtesten entscheidest: wenn es gerade wehtut.</p>`,
+        'Kein Stop heißt nicht kein Risiko — es heißt unbegrenztes Risiko.'));
+    }
+  }
+
+  // 4. Klumpenrisiko
+  const groesste = bew.slice().sort((a, c) => (inEuro(c, c.wert) || 0) - (inEuro(a, a.wert) || 0))[0];
+  const anteil = (groesste && gesamt) ? (inEuro(groesste, groesste.wert) || 0) / gesamt * 100 : 0;
+  if (anteil >= 25){
+    karten.push(karte(`Klumpenrisiko — an ${nm(groesste)}`,
+      `<p>${nm(groesste)} macht <b>${num(anteil,0)} %</b> deines Depots aus. Fällt sie um 20 %, verliert
+      dein <em>ganzes</em> Depot dadurch allein <b>${num(anteil * 0.2,1)} %</b> — egal, wie gut der Rest läuft.</p>`,
+      'Keine einzelne Position sollte über das Depot entscheiden. Viele Profis begrenzen eine Position auf 10–20 %.'));
+  }
+
+  // 5. Teilverkauf an einem Gewinner
+  const plus = bew.filter(b => b.gvPct != null && b.gvPct >= 15).sort((a, c) => c.gvPct - a.gvPct);
+  if (plus.length){
+    const b = plus[0];
+    karten.push(karte(`Gewinne sichern — an ${nm(b)}`,
+      `<p>${nm(b)} liegt <b>${pct(b.gvPct,1)}</b> im Plus. Verkaufst du jetzt die Hälfte, ist rund
+      ${pct(b.gvPct/2,1)} vom Einsatz als Gewinn sicher. Ziehst du den Stop für den Rest auf deinen Einstieg,
+      kann der Trade insgesamt kaum noch Verlust machen — und die andere Hälfte darf weiterlaufen.</p>`,
+      'Ein Gewinn ist erst ein Gewinn, wenn er gesichert ist. Teilverkauf + Stop auf Einstand nimmt den Druck raus.'));
+  }
+
+  // 6. Begriff des Tages — wechselt täglich, für alle gleich
+  const tag = Math.floor(Date.now() / 86400000);
+  const [wort, erkl] = BEGRIFFE[tag % BEGRIFFE.length];
+  karten.push(karte(`Begriff des Tages: ${esc(wort)}`, `<p>${esc(erkl)}</p>`, ''));
+
+  return `<h2>📚 Lernen an deinem Depot</h2>
+    <p class="leer" style="padding:4px 0 8px">Jede Lektion rechnet mit deinen echten Positionen. Antippen zum Aufklappen.</p>
+    ${karten.join('')}`;
+}
+
 function zeichnePortfolio(){
   /* Ein Depot in zwei Waehrungen zusammenzuzaehlen, ohne umzurechnen, ergibt eine Zahl,
      die es nicht gibt. Gerechnet wird alles in Euro — das ist die Waehrung, in der Ozan
@@ -7157,6 +7277,7 @@ function zeichnePortfolio(){
         die Position, deren Verkauf dich am wenigsten Stärke kostet. Ein Wechsel kostet Gebühren
         und Spread und wirft die laufende These weg.</p></div>`;
     }
+    try { h += lernKasten(stand); } catch(e){ console.error('[Lernen]', e); }
   } else {
     h += `<p class="leer">Noch keine Positionen eingetragen.</p>`;
   }
