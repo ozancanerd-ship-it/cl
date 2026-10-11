@@ -384,21 +384,24 @@ jobs:
           PYTHONPATH: src
         run: python scripts/build_performance.py --out web/performance.json
 
-      # Gold-Tageshandel-Seite (Ozan, 11.10. 17:18/17:41: "extra seite mit gold day
-      # trade"). KEIN Alarmkanal: zeigt nur den JETZT-Zustand von S9
-      # (SETUP-BREAKOUT-RETEST-01, IN_VALIDATION — nicht bewiesen) und die ehrliche
-      # Zusammenfassung der zwei Studien, die fuer Intraday-Gold/Krypto-Mean-Reversion
-      # KEINEN Edge fanden (docs/GOLD-DAYTRADING-STUDIE-2026-10.md,
-      # docs/MEAN-REVERSION-STUDIE-2026-10.md). Faellt Yahoo aus, schreibt das Skript
-      # ehrlich aktiv:false statt etwas zu erfinden — der Rest des Laufs ist davon
-      # unberuehrt.
+      # Gold-Tageshandel-Seite (Ozan, 11.10. 17:41: "extra seite mit gold day trade",
+      # 20:49: "will auch dafuer alarme bekommen"). Zeigt den JETZT-Zustand von S9
+      # (SETUP-BREAKOUT-RETEST-01, IN_VALIDATION — nicht bewiesen), die zwei Studien ohne
+      # Edge, und fuehrt einen Paper-Trade je Setup vorwaerts (gold_s9_stand.json). Die
+      # Alarme sind ausdruecklich EXPERIMENTELL markiert — etwa 5 Setups in 10 Monaten,
+      # also kein Spam. Faellt Yahoo aus: aktiv:false, Stand bleibt unveraendert.
       - name: Gold-Tageshandel-Stand
         if: env.LAUF != 'waechter'
         continue-on-error: true
         timeout-minutes: 3
         env:
           PYTHONPATH: src
-        run: python scripts/gold_daytrading_status.py --out web/day_trading.json
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ABOS: ${{ secrets.PUSH_ABOS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/gold_daytrading_status.py --out web/day_trading.json --send
 
       # Der leichte Lauf: nur Kurse der beobachteten Werte, kein Scan, keine
       # Veroeffentlichung. Dauert Sekunden und darf deshalb alle fuenf Minuten laufen.
@@ -472,7 +475,8 @@ jobs:
                    data/repository_real/live/depot_alarme.json \
                    data/repository_real/live/depot_stand.siegel \
                    data/repository_real/live/alerts.jsonl \
-                   data/repository_real/live/trend_swing_forward.json; do
+                   data/repository_real/live/trend_swing_forward.json \
+                   data/repository_real/live/gold_s9_stand.json; do
             if [ -f "$f" ]; then git add -f "$f"; else echo "  (noch nicht vorhanden: $f)"; fi
           done
           if git diff --cached --quiet; then

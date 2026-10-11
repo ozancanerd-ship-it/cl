@@ -16,7 +16,10 @@ Festgehalten wird:
 3. ARMED zeigt die volle Geometrie UND eine deutliche "nur Beobachtung"-Warnung —
    niemals ohne diese Warnung.
 4. Die Studien-Zusammenfassung erscheint immer, unabhaengig vom S9-Zustand.
-5. Der "Kein Alarmkanal"-Hinweis steht IMMER oben, auch wenn alles andere fehlt.
+5. Der Hinweis "Experimentelle Alarme" steht IMMER oben, auch wenn alles andere fehlt
+   (Ozan, 20:49: "will auch dafuer alarme bekommen" — Alarme ja, aber nie ohne 🧪).
+6. Ein laufender Paper-Trade zeigt Einstieg, aktuellen Stop (nach TP1: Einstand) und R.
+7. Die Forward-Bilanz zeigt den Fortschritt Richtung 100 Trades und warnt bei kleiner Zahl.
 """
 
 from __future__ import annotations
@@ -72,6 +75,10 @@ def _lauf(gd: dict | None) -> str:
         + _konst(roh, "DT_ZUSTAND_KLASSE")
         + _konst(roh, "DT_TREND_TEXT")
         + _konst(roh, "DT_RICHTUNG_TEXT")
+        + _konst(roh, "DT_ART_TEXT")
+        + _funktion(roh, "dtR")
+        + _funktion(roh, "dtOffenerTrade")
+        + _funktion(roh, "dtForward")
         + _funktion(roh, "zeichneDaytrading")
         + "zeichneDaytrading();\n"
         + "console.log(JSON.stringify({html: _el.innerHTML}));\n"
@@ -102,7 +109,7 @@ def test_ohne_daten_kein_erfundener_zustand():
     html = _lauf(None)
     assert "Kein aktueller Stand" in html
     assert "armed" not in html.lower()
-    assert "Kein Alarmkanal" in html
+    assert "Experimentelle Alarme" in html
 
 
 def test_ohne_daten_zeigt_fehlertext_wenn_vorhanden():
@@ -171,3 +178,48 @@ def test_studien_stehen_immer_da():
     for s in _STUDIEN:
         assert s["doc"] in html
         assert s["ergebnis"] in html
+
+
+def test_laufender_trade_mit_stop_auf_einstand_nach_tp1():
+    gd = {
+        "aktiv": True,
+        "gold": {"zustand": "scanning", "hinweis": "x"},
+        "offen": {
+            "signal_ts": "2026-10-11T12:00:00+00:00", "richtung": "long",
+            "entry": 4200.0, "sl": 4180.0, "tp1": 4230.0, "tp2": 4260.0,
+            "gemeldet": ["NEU", "TP1"], "r_offen": 1.1, "kurs": 4222.0,
+        },
+        "forward": {"anzahl": 0, "ziel": 100, "summe_r": 0, "letzte": []},
+        "studien": _STUDIEN,
+    }
+    html = _lauf(gd)
+    assert "Laufender Paper-Trade" in html
+    assert "Long (steigend)" in html
+    # Stop aktuell = Einstieg, weil TP1 schon da war
+    stop_zeile = html.split("Stop aktuell")[1].split("</div>")[0]
+    assert "4.200,00" in stop_zeile
+    assert "+1,10 R" in html
+    assert "TP1" in html
+
+
+def test_forward_bilanz_mit_fortschritt_und_warnung():
+    gd = {
+        "aktiv": True,
+        "gold": {"zustand": "scanning", "hinweis": "x"},
+        "offen": None,
+        "forward": {
+            "anzahl": 2, "ziel": 100, "summe_r": 1.25, "schnitt_r": 0.625, "trefferquote": 0.5,
+            "letzte": [
+                {"signal_ts": "2026-10-01T12:00:00+00:00", "richtung": "short", "r": -1.0,
+                 "ausstieg": {"art": "STOP"}},
+            ],
+        },
+        "studien": _STUDIEN,
+    }
+    html = _lauf(gd)
+    assert "2 von 100" in html
+    assert "+1,25 R" in html
+    assert "50 %" in html
+    assert "-1,00 R" in html
+    assert "sagt die Bilanz noch nichts" in html
+    assert "Laufender Paper-Trade" not in html

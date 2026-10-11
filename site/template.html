@@ -9468,13 +9468,12 @@ function zeichneSystem(){
   $('system').innerHTML = h;
 }
 
-/* Ozan, 11.10. 17:18/17:41: "extra seite mit gold day trade auf kraken oder crypto".
-   KEIN neuer Alarmkanal — zwei vorherige Studien (siehe GD.studien) fanden fuer
-   Gold-Intraday und Krypto-Mean-Reversion keinen Edge, und eine Strategie nur fuer
-   diese Seite zu erfinden waere genau der erfundene Edge, den das Projekt nicht will.
-   Die Seite zeigt deshalb nur den JETZT-Zustand von S9 (Gold-SWING, IN_VALIDATION,
-   aus scripts/gold_daytrading_status.py) plus die ehrliche Studienzusammenfassung —
-   ausdruecklich ohne Telegram-Meldung und ohne Handelsaufforderung. */
+/* Ozan, 11.10. 17:18/17:41: "extra seite mit gold day trade auf kraken oder crypto",
+   20:49: "will auch dafuer alarme bekommen". Zwei vorherige Studien (GD.studien) fanden
+   fuer Gold-Intraday und Krypto-Mean-Reversion keinen Edge. Die Seite zeigt deshalb S9
+   (Gold-SWING, IN_VALIDATION, scripts/gold_daytrading_status.py): Jetzt-Zustand, den
+   laufenden Paper-Trade und die Forward-Bilanz Richtung 100 Trades. Alarme kommen —
+   aber IMMER als experimentell markiert, nie als Kaufempfehlung. */
 const DT_ZUSTAND_TEXT = {
   scanning: 'Kein Muster erkennbar', consolidation: 'Konsolidierung', await_retest: 'Wartet auf Retest',
   armed: 'Bereit (ARMED)', invalidated: 'Entwertet', unbekannt: 'Zu wenig Historie',
@@ -9483,13 +9482,54 @@ const DT_ZUSTAND_KLASSE = {armed: 'warn', await_retest: 'mittel', consolidation:
 const DT_TREND_TEXT = {trend_up: 'Aufwärts', trend_down: 'Abwärts', range: 'Seitwärts', unclear: 'Unklar'};
 const DT_RICHTUNG_TEXT = {long: 'Long (steigend)', short: 'Short (fallend)'};
 
+const DT_ART_TEXT = {NEU: 'Einstieg', TP1: 'TP1 — Hälfte raus, Stop auf Einstand', TP2: 'TP2 — beendet',
+  STOP: 'Stop — beendet', EINSTAND: 'Einstand — beendet', ZEIT: 'Zeitausstieg — beendet'};
+function dtR(r){ return (r == null || !isFinite(r)) ? '—' : (r > 0 ? '+' : '') + num(r, 2) + ' R'; }
+function dtOffenerTrade(t, kurs){
+  if (!t) return '';
+  const lang = t.richtung === 'long';
+  const stopNow = (t.gemeldet || []).includes('TP1') ? t.entry : t.sl;
+  return `<h3>🧪 Laufender Paper-Trade</h3><div class="karte">
+    <div class="rowx"><span class="lab">Richtung</span><span class="val"><span class="note ${lang ? 'gut' : 'bad'}">${esc(DT_RICHTUNG_TEXT[t.richtung] || t.richtung)}</span></span></div>
+    <div class="rowx"><span class="lab">Signal</span><span class="val">${zeit(t.signal_ts)}</span></div>
+    <div class="rowx"><span class="lab">Einstieg</span><span class="val">${num(t.entry,2)} $</span></div>
+    <div class="rowx"><span class="lab">Stop aktuell</span><span class="val">${num(stopNow,2)} $</span></div>
+    <div class="rowx"><span class="lab">TP1 / TP2</span><span class="val">${num(t.tp1,2)} / ${num(t.tp2,2)} $</span></div>
+    <div class="rowx"><span class="lab">Kurs (letzte 4-Std.-Kerze)</span><span class="val">${num(t.kurs ?? kurs,2)} $</span></div>
+    <div class="rowx"><span class="lab">Stand</span><span class="val">${dtR(t.r_offen)}</span></div>
+    <div class="rowx"><span class="lab">Bisher</span><span class="val">${(t.gemeldet || []).map(a => esc(DT_ART_TEXT[a] || a)).join(' · ') || '—'}</span></div>
+  </div>`;
+}
+function dtForward(f){
+  if (!f) return '';
+  const n = f.anzahl || 0, ziel = f.ziel || 100;
+  const anteil = Math.max(0, Math.min(100, Math.round(100 * n / ziel)));
+  let h = `<h3>Forward-Bilanz (Paper)</h3><div class="karte">
+    <div class="rowx"><span class="lab">Abgeschlossene Trades</span><span class="val">${n} von ${ziel}</span></div>
+    <div style="height:6px;border-radius:3px;background:var(--sunk);margin:4px 0 8px;overflow:hidden" aria-label="${anteil} % des Ziels">
+      <div style="height:100%;width:${anteil}%;background:var(--accent)"></div></div>
+    <div class="rowx"><span class="lab">Summe</span><span class="val">${dtR(n ? f.summe_r : null)}</span></div>
+    <div class="rowx"><span class="lab">Schnitt je Trade</span><span class="val">${dtR(f.schnitt_r)}</span></div>
+    <div class="rowx"><span class="lab">Trefferquote</span><span class="val">${f.trefferquote == null ? '—' : Math.round(f.trefferquote*100) + ' %'}</span></div>`;
+  for (const t of (f.letzte || [])){
+    h += `<div class="rowx"><span class="lab">${zeit(t.signal_ts)} · ${esc(t.richtung === 'long' ? 'Long' : 'Short')}</span>
+      <span class="val">${dtR(t.r)} · ${esc((DT_ART_TEXT[t.ausstieg && t.ausstieg.art] || '').split(' —')[0])}</span></div>`;
+  }
+  h += `</div>`;
+  if (n < 30) h += `<p style="font-size:12px;color:var(--ink-3);margin-top:4px">Bei ${n} Trades sagt die Bilanz noch nichts — Zufall überwiegt bis weit über 30 Trades.</p>`;
+  return h;
+}
+
 function zeichneDaytrading(){
   let h = `<h2>🧪 Gold-Tageshandel — experimentell</h2>
-  <div class="note-box warn"><span class="nt">Kein Alarmkanal</span>
-    <p>Diese Seite zeigt nur einen Beobachtungsstand. Es gibt dafür <strong>keine
-    Telegram-Meldung, keinen Alarm und keine Handelsaufforderung</strong>. Was hier
-    steht, ist Forschung, kein Rat — zwei abgeschlossene Studien weiter unten fanden
-    für Intraday-Gold und Krypto-Mean-Reversion keinen belastbaren Vorteil.</p></div>`;
+  <div class="note-box warn"><span class="nt">Experimentelle Alarme</span>
+    <p>Bei einem neuen Gold-Setup, bei TP1, TP2, Stop oder Zeitausstieg kommt ein Alarm —
+    <strong>immer mit 🧪 als experimentell markiert</strong>. Die Strategie ist noch nicht
+    bewiesen; jeder Alarm ist ein Paper-Trade, keine Kaufempfehlung, kein Echtgeld. Erst
+    rund 100 echte Forward-Trades zeigen, ob sie trägt. Zwei Studien weiter unten fanden
+    für Intraday-Gold und Krypto-Mean-Reversion keinen Vorteil.</p></div>`;
+  h += dtOffenerTrade(GD && GD.offen, GD && GD.kurs);
+  h += dtForward(GD && GD.forward);
 
   if (!GD || !GD.aktiv){
     h += `<div class="note-box bad"><span class="nt">Kein aktueller Stand</span>
@@ -9518,7 +9558,7 @@ function zeichneDaytrading(){
         daneben — die Zahlen sind nicht 1:1 als Order auf Kraken übertragbar.</p></div>`;
     }
     if (g.text) h += `<p style="font-size:12.5px;color:var(--ink-2);margin-top:6px">${esc(g.text)}</p>`;
-    if (g.hinweis) h += `<div class="note-box"><span class="nt">Warum nicht alarmfähig</span><p>${esc(g.hinweis)}</p></div>`;
+    if (g.hinweis) h += `<div class="note-box"><span class="nt">Status der Strategie</span><p>${esc(g.hinweis)}</p></div>`;
   }
 
   h += `<h3>Was dafür schon geprüft wurde</h3>`;
