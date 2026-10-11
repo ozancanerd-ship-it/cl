@@ -1224,6 +1224,33 @@ function starteLive(){
   };
 }
 
+/* Ozan, 11.10. 17:18: "die gleichen Alarme noch einen Tag lang" — die App zeigte seit
+   Stunden denselben Stand, obwohl der 24/7-Lauf im Hintergrund die ganze Zeit frische
+   Daten gebaut hat (Backend-Luecken > 15 Minuten wurden fuer den fraglichen Tag per
+   CI-Protokoll ausgeschlossen; der Service Worker cached bewusst nichts). Der
+   eigentliche Fehler: nichts in dieser Seite hat je nachgesehen, ob sie noch sichtbar
+   ist. ``setInterval`` und die Kraken-WebSocket-Verbindung werden von mobilen Browsern
+   (vor allem iOS-Safari-PWAs) gedrosselt oder ganz angehalten, solange die Seite im
+   Hintergrund liegt — kommt das Handy zurueck, zeigt die App weiter den letzten Stand
+   von vor der Pause, bis zufaellig der naechste Fuenf-Minuten-Tick faellig ist (der
+   aber selbst gedrosselt gewesen sein kann) oder man von Hand neu laedt. Deshalb jetzt:
+   sobald die Seite wieder sichtbar wird (Tab-Wechsel, App aus dem Hintergrund,
+   Bildschirm an), sofort ``ladeScan()`` — das holt alle Dateien frisch
+   (``cache:'no-store'``) und baut am Ende ohnehin die WebSocket-Verbindung neu auf
+   (``starteLive()``), falls die alte inzwischen stillschweigend gestorben ist. Eine
+   kurze Sperre verhindert nur, dass ein und dasselbe "wieder sichtbar"-Ereignis (mehrere
+   Browser feuern dafuer mehr als ein Event gleichzeitig: ``visibilitychange``,
+   ``pageshow`` UND ``focus``) zwei- oder dreimal hintereinander denselben Ladevorgang
+   ausloest. */
+let _letzteSichtbarkeitsLadung = 0;
+function beiSichtbarkeitRueckkehr(){
+  if (document.visibilityState !== 'visible') return;
+  const jetzt = Date.now();
+  if (jetzt - _letzteSichtbarkeitsLadung < 5000) return;
+  _letzteSichtbarkeitsLadung = jetzt;
+  ladeScan();
+}
+
 /* "BTCUSD" <-> "BTC/USD". Kraken v2 spricht bereits BTC und nicht mehr XBT.
    Seit der Scan den Dollarmarkt bevorzugt, muessen beide Endungen erkannt werden —
    sonst liefe der Livestream leer, waehrend die Karten Dollarpreise zeigen. */
@@ -9367,6 +9394,17 @@ function start(){
   if ('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
+
+  // Ozan, 11.10. 17:18: "die gleichen Alarme noch einen Tag lang". Drei Ereignisse,
+  // weil kein Browser verlaesslich nur eines davon feuert, wenn die Seite aus dem
+  // Hintergrund zurueckkommt: "visibilitychange" ist der Standard (auch bei Tab-
+  // Wechsel am Desktop), "pageshow" greift zusaetzlich beim Zurueck-Navigieren und auf
+  // manchen mobilen Browsern beim Zurueckholen aus dem App-Umschalter, "focus" fuer den
+  // Fall, dass die Seite selbst nie "hidden" war (z.B. ein anderes Fenster hatte den
+  // Fokus) aber trotzdem seit Minuten keinen Tick mehr bekommen hat.
+  document.addEventListener('visibilitychange', beiSichtbarkeitRueckkehr);
+  window.addEventListener('pageshow', beiSichtbarkeitRueckkehr);
+  window.addEventListener('focus', beiSichtbarkeitRueckkehr);
 }
 umlauteBeobachten();
 start();
