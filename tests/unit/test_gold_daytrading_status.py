@@ -392,3 +392,31 @@ def test_d1_kerze_des_laufenden_tages_fliesst_nicht_ein(monkeypatch) -> None:
     d1 = [_d1_bar(_T0 - timedelta(days=45 - k), 100, 101, 99, 100) for k in range(60)]
     skript.gold_status(h4, d1, datetime.now(UTC))
     assert gesehen["d1_ende"] <= gesehen["cutoff"]
+
+
+# ------------------------------------------------------------------ Kraken-Umrechnung
+# Ozan kauft Gold auf Kraken (PAXG/USD), die Marken kommen vom Gold-Future. Am 11.10.
+# lagen beide rund 30 $ auseinander — ohne Umrechnung waere jede Marke falsch.
+
+
+def test_umrechnung_nur_mit_frischem_future_kurs() -> None:
+    assert skript.umrechnungsfaktor(4220.0, 4189.6, 600) == pytest.approx(4189.6 / 4220.0, rel=1e-6)
+    assert skript.umrechnungsfaktor(4220.0, 4189.6, 3 * 3600) is None  # Wochenende/Pause
+    assert skript.umrechnungsfaktor(4220.0, None, 600) is None
+    assert skript.umrechnungsfaktor(4220.0, 3000.0, 600) is None  # unplausibel
+
+
+def test_alarm_nennt_kraken_marken_wenn_faktor_da(monkeypatch) -> None:
+    monkeypatch.setattr(skript, "neue_signale", lambda h4, d1, seit: [_trade()])
+    _, alarme = skript.fortschreiben(None, _folge((101.0, 99.5, 100.5)), [], kraken_faktor=0.99)
+    neu = alarme[0]
+    assert "PAXG/USD" in neu["text"]
+    assert "Einstieg 99,00" in neu["text"]  # 100 * 0,99
+    assert "Stop 97,02" in neu["text"]
+
+
+def test_alarm_ohne_faktor_sagt_ehrlich_dass_es_future_kurse_sind(monkeypatch) -> None:
+    monkeypatch.setattr(skript, "neue_signale", lambda h4, d1, seit: [_trade()])
+    _, alarme = skript.fortschreiben(None, _folge((101.0, 99.5, 100.5)), [])
+    assert "Gold-Future" in alarme[0]["text"]
+    assert "0,5–1 % tiefer" in alarme[0]["text"]

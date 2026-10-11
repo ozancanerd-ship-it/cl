@@ -9495,6 +9495,7 @@ function dtOffenerTrade(t, kurs){
     <div class="rowx"><span class="lab">Einstieg</span><span class="val">${num(t.entry,2)} $</span></div>
     <div class="rowx"><span class="lab">Stop aktuell</span><span class="val">${num(stopNow,2)} $</span></div>
     <div class="rowx"><span class="lab">TP1 / TP2</span><span class="val">${num(t.tp1,2)} / ${num(t.tp2,2)} $</span></div>
+    ${t.kraken_faktor ? `<div class="rowx"><span class="lab">Auf Kraken (Pax Gold, PAXG/USD) ≈</span><span class="val">Einstieg ${num(t.entry*t.kraken_faktor,2)} · Stop ${num(stopNow*t.kraken_faktor,2)} · TP1 ${num(t.tp1*t.kraken_faktor,2)} · TP2 ${num(t.tp2*t.kraken_faktor,2)} $</span></div>` : `<div class="rowx"><span class="lab">Kraken</span><span class="val">Marken vom Gold-Future — PAXG/USD liegt meist 0,5–1 % tiefer</span></div>`}
     <div class="rowx"><span class="lab">Kurs (letzte 4-Std.-Kerze)</span><span class="val">${num(t.kurs ?? kurs,2)} $</span></div>
     <div class="rowx"><span class="lab">Stand</span><span class="val">${dtR(t.r_offen)}</span></div>
     <div class="rowx"><span class="lab">Bisher</span><span class="val">${(t.gemeldet || []).map(a => esc(DT_ART_TEXT[a] || a)).join(' · ') || '—'}</span></div>
@@ -9543,6 +9544,7 @@ function zeichneDaytrading(){
       <div class="rowx"><span class="lab">Trend Tageschart</span><span class="val">${esc(DT_TREND_TEXT[g.d1_trend] || g.d1_trend || '—')}</span></div>
       ${g.richtung ? `<div class="rowx"><span class="lab">Richtung</span><span class="val">${esc(DT_RICHTUNG_TEXT[g.richtung] || g.richtung)}</span></div>` : ''}
       <div class="rowx"><span class="lab">Datenquelle</span><span class="val">Gold-Future (Yahoo GC=F), 4-Std./Tag</span></div>
+      ${GD.paxg_kurs ? `<div class="rowx"><span class="lab">Gold auf Kraken (Pax Gold, PAXG/USD)</span><span class="val">${num(GD.paxg_kurs,2)} $</span></div>` : ''}
     </div>`;
     if (g.zustand === 'armed'){
       h += `<div class="karte">

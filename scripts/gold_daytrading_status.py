@@ -345,14 +345,37 @@ def _fmt(x: float) -> str:
     return f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def umrechnungsfaktor(
+    future_kurs: float | None, paxg_kurs: float | None, alter_s: float | None
+) -> float | None:
+    """Gold-Future -> Kraken PAXG/USD. Der Future notiert wegen Zins/Lagerkosten meist
+    0,5-1 % ueber Spot; PAXG ist Spot-Gold. Nur wenn der Future-Kurs frisch ist (Boerse
+    offen, hoechstens 2 Std. alt) — am Wochenende steht der Future, PAXG laeuft weiter,
+    ein Faktor daraus waere falsch. Unplausible Abstaende (> 5 %) werden verworfen."""
+    if not future_kurs or not paxg_kurs or alter_s is None or alter_s > 2 * 3600:
+        return None
+    f = paxg_kurs / future_kurs
+    return round(f, 6) if 0.95 < f < 1.05 else None
+
+
+def _kraken_zeile(t: dict) -> str:
+    f = t.get("kraken_faktor")
+    if not f:
+        return "Gold-Future-Kurse; auf Kraken (PAXG/USD) liegt Gold meist 0,5–1 % tiefer."
+    return (
+        f"Auf Kraken (Pax Gold, PAXG/USD) ≈ Einstieg {_fmt(t['entry'] * f)} · Stop "
+        f"{_fmt(t['sl'] * f)} · TP1 {_fmt(t['tp1'] * f)} · TP2 {_fmt(t['tp2'] * f)}."
+    )
+
+
 def _alarm_neu(t: dict) -> dict:
-    richtung = "LONG" if t["richtung"] == "long" else "SHORT"
+    richtung = "LONG (steigend)" if t["richtung"] == "long" else "SHORT (fallend)"
     return {
-        "titel": f"🧪 Gold S9 {richtung} (experimentell)",
+        "titel": f"🧪 Gold S9 {richtung} — experimentell",
         "text": (
-            f"Breakout-Retest auf Gold (4 Std.). Einstieg {_fmt(t['entry'])} · Stop "
-            f"{_fmt(t['sl'])} · TP1 {_fmt(t['tp1'])} · TP2 {_fmt(t['tp2'])} (Gold-Future-"
-            f"Kurse, PAXG/XAUT auf Kraken weichen ab).\n{_WARNUNG_ALARM}"
+            f"Breakout-Retest auf Gold (4-Std.-Chart). Gold-Future: Einstieg "
+            f"{_fmt(t['entry'])} · Stop {_fmt(t['sl'])} · TP1 {_fmt(t['tp1'])} · TP2 "
+            f"{_fmt(t['tp2'])} $.\n{_kraken_zeile(t)}\n{_WARNUNG_ALARM}"
         ),
         "dedup_key": f"gold-s9:{t['signal_ts']}:NEU",
     }
@@ -360,15 +383,19 @@ def _alarm_neu(t: dict) -> dict:
 
 def _alarm_ereignis(t: dict, e: dict, r: float | None) -> dict:
     zusatz = f" Ergebnis {r:+.2f} R." if r is not None else ""
+    f = t.get("kraken_faktor")
+    kraken = f" (PAXG ≈ {_fmt(e['preis'] * f)})" if f else ""
     return {
         "titel": f"🧪 Gold S9: {_ART_TEXT.get(e['art'], e['art'])}",
-        "text": f"Bei {_fmt(e['preis'])}.{zusatz} Paper-Trade vom {t['signal_ts'][:16]} UTC.\n"
-        + _WARNUNG_ALARM,
+        "text": f"Bei {_fmt(e['preis'])} ${kraken}.{zusatz} Paper-Trade vom "
+        f"{t['signal_ts'][:16].replace('T', ' ')} UTC.\n" + _WARNUNG_ALARM,
         "dedup_key": f"gold-s9:{t['signal_ts']}:{e['art']}",
     }
 
 
-def fortschreiben(stand: dict | None, h4: list[OHLCV], d1: list[OHLCV]) -> tuple[dict, list[dict]]:
+def fortschreiben(
+    stand: dict | None, h4: list[OHLCV], d1: list[OHLCV], kraken_faktor: float | None = None
+) -> tuple[dict, list[dict]]:
     """Stand + neue Kerzen -> neuer Stand + Liste der zu sendenden Alarme.
 
     Hoechstens EIN offener Trade zur Zeit (wie im Shadow-Lauf). Jedes Ereignis wird je
@@ -409,6 +436,8 @@ def fortschreiben(stand: dict | None, h4: list[OHLCV], d1: list[OHLCV]) -> tuple
                 continue
             if any(a["signal_ts"] == s["signal_ts"] for a in abgeschlossen):
                 continue
+            if kraken_faktor:
+                s["kraken_faktor"] = kraken_faktor
             alarme.append(_alarm_neu(s))
             s["gemeldet"].append("NEU")
             offen = _abarbeiten(s)
@@ -451,6 +480,21 @@ async def _h1_bars(tage: int) -> list[OHLCV]:
         await provider.aclose()
 
 
+async def _kraken_paxg() -> float | None:
+    """Mittelkurs Pax Gold (PAXG/USD) bei Kraken — oder None, wenn nicht erreichbar."""
+    try:
+        from trading_agent.data.providers.kraken import KrakenDataProvider
+
+        prov = KrakenDataProvider()
+        try:
+            q = await prov.fetch_quote("PAXGUSD")
+        finally:
+            await prov.aclose()
+        return round((q.bid + q.ask) / 2, 2)
+    except Exception:
+        return None
+
+
 async def _bauen(
     tage: int, stand: dict | None = None
 ) -> tuple[dict[str, object], dict | None, list[dict]]:
@@ -475,12 +519,18 @@ async def _bauen(
     h4 = list(resample_ohlcv(h1, Timeframe.H1, _H4, require_complete=True, source_name="yahoo_h1"))
     d1 = list(resample_ohlcv(h1, Timeframe.H1, _D1, require_complete=False, source_name="yahoo_h1"))
     gold = gold_status(h4, d1, jetzt)
-    neuer_stand, alarme = fortschreiben(stand, h4, d1)
+    paxg = await _kraken_paxg()
+    faktor = umrechnungsfaktor(
+        h1[-1].close, paxg, (jetzt - h1[-1].close_time).total_seconds() if h1 else None
+    )
+    neuer_stand, alarme = fortschreiben(stand, h4, d1, faktor)
     seite = {
         **basis,
         "aktiv": True,
         "gold": gold,
         "kurs": h4[-1].close if h4 else None,
+        "paxg_kurs": paxg,
+        "kraken_faktor": faktor,
         "forward": forward_bilanz(neuer_stand),
         "offen": neuer_stand.get("offen"),
     }

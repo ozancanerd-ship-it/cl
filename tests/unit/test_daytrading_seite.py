@@ -223,3 +223,22 @@ def test_forward_bilanz_mit_fortschritt_und_warnung():
     assert "-1,00 R" in html
     assert "sagt die Bilanz noch nichts" in html
     assert "Laufender Paper-Trade" not in html
+
+
+def test_kraken_marken_im_laufenden_trade():
+    gd = {
+        "aktiv": True,
+        "paxg_kurs": 4189.6,
+        "gold": {"zustand": "scanning", "hinweis": "x"},
+        "offen": {
+            "signal_ts": "2026-10-11T12:00:00+00:00", "richtung": "long",
+            "entry": 4200.0, "sl": 4180.0, "tp1": 4230.0, "tp2": 4260.0,
+            "gemeldet": ["NEU"], "r_offen": 0.2, "kraken_faktor": 0.99,
+        },
+        "forward": {"anzahl": 0, "ziel": 100, "summe_r": 0, "letzte": []},
+        "studien": _STUDIEN,
+    }
+    html = _lauf(gd)
+    assert "PAXG/USD" in html
+    assert "4.158,00" in html  # 4200 * 0,99
+    assert "4.189,60" in html  # aktueller PAXG-Kurs im Zustand
