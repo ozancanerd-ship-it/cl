@@ -224,6 +224,80 @@ def test_json_mit_nicht_string_werten_wird_still_ausgelassen(monkeypatch):
     assert r.je_position == {"METUSD": "Ok."}
 
 
+def test_strukturiertes_urteil_wird_als_abzeichen_erfasst(monkeypatch):
+    """Ozan, 11.10. 17:18: "du hast deine eigene These und er seine eigene These, ihr
+    solltet aber zusammenarbeiten" — ein Abzeichen (stimmt zu/teilweise/widerspricht)
+    macht auf einen Blick sichtbar, ob beide einig sind, statt den ganzen Text lesen zu
+    muessen. Das neue Format verschachtelt Urteil und Text pro Schluessel."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    inhalt = json.dumps(
+        {
+            "gesamt": "Grundsaetzlich stimme ich zu.",
+            "je_position": {
+                "METUSD": {"urteil": "widerspricht", "text": "Stop zu weit weg."},
+            },
+            "je_chance": {
+                "NVDA": {"urteil": "stimmt_zu", "text": "Score plausibel."},
+            },
+        }
+    )
+
+    def transport(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": inhalt}}]}
+
+    r = zm.hole_zweitmeinung("x", transport=transport)
+    assert r is not None
+    assert r.je_position == {"METUSD": "Stop zu weit weg."}
+    assert r.urteil_position == {"METUSD": "widerspricht"}
+    assert r.je_chance == {"NVDA": "Score plausibel."}
+    assert r.urteil_chance == {"NVDA": "stimmt_zu"}
+
+
+def test_ungueltiges_urteil_verliert_nur_das_abzeichen_nicht_den_text(monkeypatch):
+    """Ein Tippfehler oder ein Fantasiewort beim Urteil ('eher_dafuer' statt eines der
+    drei erlaubten Woerter) soll nicht die ganze Einschaetzung verwerfen — der Text ist
+    immer noch eine echte, brauchbare Meinung, nur das Abzeichen faellt weg."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    inhalt = json.dumps(
+        {
+            "gesamt": "x",
+            "je_position": {
+                "METUSD": {"urteil": "eher_dafuer", "text": "Sieht gut aus."},
+            },
+        }
+    )
+
+    def transport(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": inhalt}}]}
+
+    r = zm.hole_zweitmeinung("x", transport=transport)
+    assert r is not None
+    assert r.je_position == {"METUSD": "Sieht gut aus."}
+    assert r.urteil_position == {}
+
+
+def test_altes_format_ohne_urteil_bleibt_als_text_erhalten(monkeypatch):
+    """Rueckwaertskompatibel: ein blanker String als Wert (das Format vor dem 11.10.,
+    oder falls das Modell sich trotz Anweisung nicht an das Objektformat haelt) bleibt
+    als Text erhalten — nur eben ohne Urteils-Abzeichen."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
+    inhalt = json.dumps({"gesamt": "x", "je_position": {"METUSD": "Alter Freitext."}})
+
+    def transport(url, *, json, headers, timeout):
+        return {"choices": [{"message": {"content": inhalt}}]}
+
+    r = zm.hole_zweitmeinung("x", transport=transport)
+    assert r is not None
+    assert r.je_position == {"METUSD": "Alter Freitext."}
+    assert r.urteil_position == {}
+
+
+def test_system_prompt_verlangt_das_strukturierte_urteil():
+    assert "stimmt_zu" in zm._SYSTEM
+    assert "widerspricht" in zm._SYSTEM
+    assert "teilweise" in zm._SYSTEM
+
+
 def test_system_prompt_verlangt_begruendung_statt_nur_stempel():
     """Ozan, 09.10. 22:30: "ChatGPT soll wirklich mehr auch dazu sagen, nicht nur ja/
     Widerspruch ... wirklich zusammenarbeiten ... und alles erklaeren." Ein Urteil ohne

@@ -2753,10 +2753,35 @@ function chatgptMeinungFuer(schluessel){
   return (ZM.je_position && ZM.je_position[schluessel])
       || (ZM.je_chance && ZM.je_chance[schluessel]) || '';
 }
-function chatgptZeile(text){
+/* Ozan, 11.10. 17:18: "du hast deine eigene These und er seine eigene These, ihr
+   solltet aber zusammenarbeiten ... richtig reingehen in die Materie." Zwei Texte
+   nebeneinander lesen sich wie zwei Monologe — man muss erst ChatGPTs ganzen Satz
+   lesen, um zu merken, ob er ueberhaupt zustimmt. Das Abzeichen (aus urteil_position/
+   urteil_chance, von chatgpt_zweitmeinung.py geschrieben) macht das auf einen Blick
+   sichtbar, BEVOR der Text kommt — und nur dann, wenn ChatGPT tatsaechlich eines der
+   drei erlaubten Woerter geliefert hat (kein erfundenes Abzeichen zu einem alten
+   Freitext ohne Urteil). */
+function chatgptUrteilFuer(schluessel){
+  if (!ZM || !ZM.aktiv || !schluessel) return '';
+  const u = (ZM.urteil_position && ZM.urteil_position[schluessel])
+         || (ZM.urteil_chance && ZM.urteil_chance[schluessel]) || '';
+  return ['stimmt_zu','teilweise','widerspricht'].includes(u) ? u : '';
+}
+const CHATGPT_URTEIL_ANZEIGE = {
+  stimmt_zu:   {wort: 'stimmt zu',     kl: 'gut'},
+  teilweise:   {wort: 'teilweise',     kl: 'warn'},
+  widerspricht:{wort: 'widerspricht',  kl: 'bad'},
+};
+function chatgptZeile(schluessel){
+  const text = chatgptMeinungFuer(schluessel);
   if (!text) return '';
+  const urteil = chatgptUrteilFuer(schluessel);
+  const abzeichen = urteil ? (() => {
+    const a = CHATGPT_URTEIL_ANZEIGE[urteil];
+    return ` <span class="note ${a.kl}" style="margin-left:4px">${esc(a.wort)}</span>`;
+  })() : '';
   return `<p style="margin:6px 0 0;font-size:12px;color:var(--ink-2);border-top:1px dashed var(--line);padding-top:6px">
-    <span style="color:var(--accent)">🤖 ChatGPT:</span> ${esc(text)}</p>`;
+    <span style="color:var(--accent)">🤖 ChatGPT${abzeichen}:</span> ${esc(text)}</p>`;
 }
 function zweitmeinungKasten(){
   if (!ZM) return '';
@@ -6960,7 +6985,7 @@ function zeichnePortfolio(){
           <span>≈ <b>${num(a.euro,2)} €</b></span>
           <span>Anteil <b>${a.anteil!=null?pctK(a.anteil):'—'}</b></span></div>`:''}
         <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(a.text)}</p>
-        ${chatgptZeile(chatgptMeinungFuer(b.pos.sym))}
+        ${chatgptZeile(b.pos.sym)}
         ${(a.menge!=null && b.pos.menge)?`<p style="margin:9px 0 0">
           <button class="btn" data-mengeschl="${esc(posSchluessel(b.pos))}"
                   data-mengeart="${esc(a.art)}" data-mengewert="${a.menge}"
@@ -7076,7 +7101,7 @@ function zeichnePortfolio(){
         ${miniChart(b)}
         ${entscheidungsKasten(b, stand)}
         ${ratKasten(b, ku)}
-        ${chatgptZeile(chatgptMeinungFuer(b.pos.sym))}
+        ${chatgptZeile(b.pos.sym)}
         ${mehrKasten(b)}
         ${sicherText(() => tiefeAnalyse(b, stand))}
         <p style="margin:9px 0 0"><button class="link" data-weg="${esc(b.pos.sym)}">entfernen</button>
@@ -7749,7 +7774,7 @@ function signalKarte(x){
     </div>
     ${euro>0?`<p style="font-size:11.5px;color:var(--ink-3);margin-top:6px">${gebuehrSatz(o, euro)}</p>`:''}
     ${erwartungsKasten(o)}
-    ${chatgptZeile(chatgptMeinungFuer(w.instrument))}
+    ${chatgptZeile(w.instrument)}
     <p style="margin:10px 0 0"><button class="btn" data-kauf="${esc(w.instrument)}"
       data-menge="${stueck}" data-kurs="${w.einstieg}">Gekauft — ins Depot</button></p>
     ${(o.warnungen||[]).length?`<p class="warnz">${o.warnungen.map(esc).join('<br>')}</p>`:''}

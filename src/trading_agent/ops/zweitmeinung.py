@@ -36,9 +36,22 @@ _ENDPUNKT = "https://api.openai.com/v1/chat/completions"
 # was dir (bzw. „Claude") konkret noch fehlt oder was es anders pruefen wuerde — das ist
 # der Unterschied zwischen einem Urteil und einer Zusammenarbeit.
 #
+# Ozan, 11.10. 17:18 (dritter Folgewunsch): „du hast deine eigene These und er seine
+# eigene These, ihr solltet aber zusammenarbeiten ... richtig reingehen in die Materie."
+# Zwei nebeneinanderstehende Fliesstexte lesen sich wie zwei Monologe, auch wenn der
+# zweite Text inhaltlich auf den ersten eingeht — man muss ihn erst lesen, um zu wissen,
+# OB er zustimmt. Deshalb bekommt jede Position/Chance jetzt ZUSAETZLICH ein explizites,
+# maschinenlesbares Urteil ("stimmt_zu" / "teilweise" / "widerspricht"), das die App als
+# Abzeichen direkt neben Claudes eigenem Urteil zeigen kann — man sieht auf einen Blick,
+# ob beide einig sind, bevor man den Begruendungstext liest. Die Begruendung bleibt
+# Pflicht; ein Urteil ohne WARUM waere wieder nur ein Stempel.
+#
 # Haelt sich das Modell nicht an das JSON-Format, gibt es KEINEN erfundenen Pro-Position-
 # Text — nur der Gesamttext faellt dann zurueck auf die rohe Antwort (besser eine einzige
-# ehrliche Meinung als lauter leere Pro-Kaertchen).
+# ehrliche Meinung als lauter leere Pro-Kaertchen). Liefert eine Position einen Text aber
+# kein gueltiges Urteil (altes Format, Tippfehler des Modells), bleibt der Text trotzdem
+# stehen — nur das Abzeichen faellt dann weg, statt die ganze Einschaetzung zu verwerfen.
+_URTEILE = ("stimmt_zu", "teilweise", "widerspricht")
 _SYSTEM = (
     "Du bist eine zweite, unabhaengige Analyse neben einem bereits bestehenden "
     "Trading-Analyse-System (genannt 'Claude'). Du bekommst Claudes aktuelle "
@@ -54,20 +67,25 @@ _SYSTEM = (
     "Antworte NUR mit einem einzigen gueltigen JSON-Objekt, kein Text davor oder danach, "
     "exakt mit diesen Feldern:\n"
     '{"gesamt": "<Gesamteinschaetzung auf Deutsch, 100-180 Woerter>", '
-    '"je_position": {"<sym>": "<60-100 Woerter je Position>", ...}, '
-    '"je_chance": {"<instrument>": "<50-80 Woerter je Chance>", ...}}\n\n'
+    '"je_position": {"<sym>": {"urteil": "stimmt_zu|teilweise|widerspricht", '
+    '"text": "<60-100 Woerter>"}, ...}, '
+    '"je_chance": {"<instrument>": {"urteil": "stimmt_zu|teilweise|widerspricht", '
+    '"text": "<50-80 Woerter>"}, ...}}\n\n'
     "In 'gesamt': ordne ein, wo du Claudes Analyse insgesamt fuer robust haeltst und wo "
     "nicht, was systematisch fehlt (z. B. welche Datenquelle, welcher Blickwinkel), und "
     "wie du selbst gerade auf die Gesamtlage schaust (Marktumfeld, Risiko, was dich an "
     "der Kombination der Positionen stutzig macht oder beruhigt).\n"
-    "In 'je_position' und 'je_chance': fuer JEDEN vorgelegten Schluessel eine eigene, "
-    "ausformulierte Einschaetzung mit Begruendung — zustimmend, widersprechend oder "
-    "abwartend, aber immer mit dem WARUM, bezogen auf die konkreten Zahlen dieser "
-    "Position/Chance (nicht allgemein gehalten). Nenne, wenn sinnvoll, was die "
-    "Einschaetzung aendern wuerde. Lass ein Feld nur weg, wenn dir dazu wirklich nichts "
-    "einfaellt. Keine Finanzberatung, keine Kaufempfehlung — eine fachliche, "
-    "nachvollziehbare Einschaetzung der vorgelegten Analyse, die Claude (oder Ozan) "
-    "etwas bringt, das er aus der eigenen Analyse allein nicht haette."
+    "In 'je_position' und 'je_chance': fuer JEDEN vorgelegten Schluessel ein 'urteil' "
+    "(GENAU eines der drei Woerter 'stimmt_zu', 'teilweise' oder 'widerspricht' — "
+    "'stimmt_zu' nur, wenn du Claudes Einschaetzung UND Richtung teilst; 'widerspricht', "
+    "wenn du zu einer anderen Einschaetzung kaemst; 'teilweise' fuer alles dazwischen, "
+    "z. B. gleiche Richtung aber andere Risikoeinschaetzung) PLUS einen eigenen, "
+    "ausformulierten 'text' mit Begruendung, immer mit dem WARUM, bezogen auf die "
+    "konkreten Zahlen dieser Position/Chance (nicht allgemein gehalten). Nenne, wenn "
+    "sinnvoll, was die Einschaetzung aendern wuerde. Lass einen Schluessel nur weg, wenn "
+    "dir dazu wirklich nichts einfaellt. Keine Finanzberatung, keine Kaufempfehlung — "
+    "eine fachliche, nachvollziehbare Einschaetzung der vorgelegten Analyse, die Claude "
+    "(oder Ozan) etwas bringt, das er aus der eigenen Analyse allein nicht haette."
 )
 
 
@@ -87,6 +105,12 @@ class Zweitmeinung:
     erzeugt: str  # ISO-Zeitstempel
     je_position: dict[str, str] = field(default_factory=dict)
     je_chance: dict[str, str] = field(default_factory=dict)
+    #: Schluessel -> "stimmt_zu"|"teilweise"|"widerspricht". Nur fuer Schluessel gesetzt,
+    #: fuer die das Modell tatsaechlich eines der drei gueltigen Woerter geliefert hat —
+    #: ein Text ohne (oder mit ungueltigem) Urteil bleibt in je_position/je_chance stehen,
+    #: taucht hier aber einfach nicht auf (kein erfundenes Abzeichen).
+    urteil_position: dict[str, str] = field(default_factory=dict)
+    urteil_chance: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,49 +205,70 @@ def hole_zweitmeinung(
     if not text:
         _LETZTER_FEHLER = ZweitmeinungFehler(grund="Antwort war leer")
         return None
-    gesamt, je_position, je_chance = _parse_antwort(text)
+    gesamt, je_position, je_chance, urteil_position, urteil_chance = _parse_antwort(text)
     return Zweitmeinung(
         text=gesamt,
         modell=modell,
         erzeugt=datetime.now(UTC).isoformat(),
         je_position=je_position,
         je_chance=je_chance,
+        urteil_position=urteil_position,
+        urteil_chance=urteil_chance,
     )
 
 
-def _parse_antwort(text: str) -> tuple[str, dict[str, str], dict[str, str]]:
+def _parse_antwort(
+    text: str,
+) -> tuple[str, dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
     """Versucht, die Antwort als das verlangte JSON zu lesen. Gelingt das nicht — Modell
     haelt sich nicht ans Format, oder liefert kein Objekt — faellt NUR der Gesamttext auf
     die rohe Antwort zurueck; es werden NIE Pro-Position-Meinungen erfunden, die das
-    Modell nicht tatsaechlich so geliefert hat."""
+    Modell nicht tatsaechlich so geliefert hat.
+
+    Gibt zurueck: (gesamt, je_position, je_chance, urteil_position, urteil_chance)."""
     try:
         daten = json.loads(text)
     except (json.JSONDecodeError, ValueError):
-        return text, {}, {}
+        return text, {}, {}, {}, {}
     if not isinstance(daten, dict):
-        return text, {}, {}
+        return text, {}, {}, {}, {}
     gesamt = daten.get("gesamt")
     if not isinstance(gesamt, str) or not gesamt.strip():
         gesamt = text
-    je_position = daten.get("je_position")
-    je_chance = daten.get("je_chance")
-    return (
-        gesamt.strip(),
-        _nur_text_werte(je_position),
-        _nur_text_werte(je_chance),
-    )
+    je_position, urteil_position = _je_schluessel_aufgeteilt(daten.get("je_position"))
+    je_chance, urteil_chance = _je_schluessel_aufgeteilt(daten.get("je_chance"))
+    return gesamt.strip(), je_position, je_chance, urteil_position, urteil_chance
 
 
-def _nur_text_werte(wert: Any) -> dict[str, str]:
-    """Nur echte, nicht-leere String-Werte uebernehmen — alles andere (fehlendes Feld,
-    falscher Typ, leere Zeile) wird stillschweigend ausgelassen statt zu crashen."""
+def _je_schluessel_aufgeteilt(wert: Any) -> tuple[dict[str, str], dict[str, str]]:
+    """Ein Feld wie ``je_position`` in (Texte, Urteile) aufteilen.
+
+    Zwei Formate werden akzeptiert, ohne dass eines das andere crasht:
+    - das verlangte neue Format ``{"<key>": {"urteil": "...", "text": "..."}}``
+    - ein blanker String als Wert (altes Format, oder das Modell haelt sich trotz
+      Anweisung nicht ans Objektformat) — dann gibt es den Text, aber kein Urteil.
+    Jeder andere Werttyp, ein leerer Text oder ein nicht in ``_URTEILE`` enthaltenes
+    Urteilswort wird stillschweigend ausgelassen statt zu crashen oder etwas zu raten.
+    """
+    texte: dict[str, str] = {}
+    urteile: dict[str, str] = {}
     if not isinstance(wert, dict):
-        return {}
-    return {
-        str(k): v.strip()
-        for k, v in wert.items()
-        if isinstance(v, str) and v.strip()
-    }
+        return texte, urteile
+    for k, v in wert.items():
+        schluessel = str(k)
+        if isinstance(v, str):
+            if v.strip():
+                texte[schluessel] = v.strip()
+            continue
+        if not isinstance(v, dict):
+            continue
+        t = v.get("text")
+        if isinstance(t, str) and t.strip():
+            texte[schluessel] = t.strip()
+        u = v.get("urteil")
+        if isinstance(u, str) and u.strip().lower() in _URTEILE:
+            urteile[schluessel] = u.strip().lower()
+    return texte, urteile
 
 
 _LETZTER_FEHLER: ZweitmeinungFehler | None = None

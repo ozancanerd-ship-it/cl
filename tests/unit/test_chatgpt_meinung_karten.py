@@ -30,6 +30,7 @@ Geprüft werden die echten Funktionen aus ``site/template.html``, ausgeführt in
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -54,20 +55,32 @@ def _funktion(roh: str, name: str) -> str:
     return roh[start:anfang] + roh[anfang : i + 1]
 
 
+def _konst(roh: str, name: str) -> str:
+    m = re.search(rf"const {name}\s*=", roh)
+    assert m, f"Konstante {name} nicht gefunden"
+    ende = roh.index(";", m.start())
+    return roh[m.start() : ende + 1] + "\n"
+
+
 def _lauf(zm: dict | None, schluessel: str) -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node nicht vorhanden")
     roh = VORLAGE.read_text(encoding="utf-8")
+    # chatgptZeile(schluessel) seit 11.10. 17:18 (Urteils-Abzeichen): sie holt den Text
+    # und das Urteil jetzt selbst ueber den Schluessel, statt einen fertigen Text zu
+    # bekommen — darum braucht dieser Test chatgptUrteilFuer/CHATGPT_URTEIL_ANZEIGE mit.
     skript = (
         "function esc(s){ return String(s == null ? '' : s)"
         ".replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }\n"
+        + f"\nlet ZM = {json.dumps(zm)};\n"
         + _funktion(roh, "chatgptMeinungFuer")
+        + _funktion(roh, "chatgptUrteilFuer")
+        + _konst(roh, "CHATGPT_URTEIL_ANZEIGE")
         + _funktion(roh, "chatgptZeile")
-        + f"\nconst ZM = {json.dumps(zm)};\n"
         + f"const schluessel = {json.dumps(schluessel)};\n"
         + "const text = chatgptMeinungFuer(schluessel);\n"
-        + "console.log(JSON.stringify({text, karte: chatgptZeile(text)}));\n"
+        + "console.log(JSON.stringify({text, karte: chatgptZeile(schluessel)}));\n"
     )
     aus = subprocess.run([node, "-e", skript], capture_output=True, text=True, timeout=20)
     if aus.returncode != 0:

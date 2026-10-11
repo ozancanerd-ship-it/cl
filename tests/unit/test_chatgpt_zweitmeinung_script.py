@@ -37,6 +37,60 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import chatgpt_zweitmeinung as skript
 
+from trading_agent.ops.zweitmeinung import Zweitmeinung
+
+
+def test_voller_lauf_schreibt_die_urteils_abzeichen_mit(monkeypatch, tmp_path):
+    """Ozan, 11.10. 17:18: "ihr solltet zusammenarbeiten" — das Abzeichen je Schluessel
+    muss auch durch DIESES Skript (nicht nur durch zweitmeinung.py selbst) tatsaechlich
+    in die veroeffentlichte Datei kommen, sonst sieht die App nie etwas davon."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(skript, "verfuegbar", lambda: True)
+    monkeypatch.setattr(skript, "depot_lesen", lambda roh: [])
+    monkeypatch.setattr(skript, "sync_lesen", lambda pfad, geheim: "")
+
+    scan = tmp_path / "scan.json"
+    scan.write_text(
+        json.dumps(
+            {
+                "gesamt": [
+                    {
+                        "instrument": "NVDA",
+                        "name": "Nvidia",
+                        "klasse": "aktien",
+                        "score": 88,
+                        "note": "A",
+                        "richtung": "long",
+                        "begruendung": "Score 88, starker Trend",
+                        "handelbar": True,
+                        "alarm": {"ja": True},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    antwort = Zweitmeinung(
+        text="Gesamt.",
+        modell="gpt-4o-mini",
+        erzeugt="2026-10-11T17:00:00+00:00",
+        je_chance={"NVDA": "Score plausibel."},
+        urteil_chance={"NVDA": "stimmt_zu"},
+    )
+    monkeypatch.setattr(skript, "hole_zweitmeinung", lambda *a, **k: antwort)
+
+    out = tmp_path / "chatgpt_meinung.json"
+    monkeypatch.setattr(
+        sys, "argv", ["prog", "--scan", str(scan), "--out", str(out)]
+    )
+    rc = skript.main()
+    assert rc == 0
+
+    geschrieben = json.loads(out.read_text(encoding="utf-8"))
+    assert geschrieben["je_chance"] == {"NVDA": "Score plausibel."}
+    assert geschrieben["urteil_chance"] == {"NVDA": "stimmt_zu"}
+
 
 def test_vorlauf_uebernimmt_die_letzte_veroeffentlichte_antwort_unveraendert(monkeypatch, tmp_path):
     alte_antwort = {
@@ -63,6 +117,35 @@ def test_vorlauf_uebernimmt_die_letzte_veroeffentlichte_antwort_unveraendert(mon
     assert geschrieben["je_position"] == {"METUSD": "Alte Meinung zu MET."}
     assert geschrieben["erzeugt"] == "2026-10-09T09:00:05+00:00"  # unveraendert
     assert geschrieben["geprueft"] != "2026-10-09T09:00:00+00:00"  # aktualisiert
+
+
+def test_vorlauf_mit_altem_format_ohne_urteil_felder_stuerzt_nicht_ab(monkeypatch, tmp_path):
+    """Eine vor dem 11.10. veroeffentlichte Antwort hat keine urteil_position/
+    urteil_chance-Felder — das darf den Carry-Forward-Lauf nicht zum Absturz bringen,
+    es wird einfach unveraendert durchgereicht (die App liefert ``.get(...) || {}``
+    dagegen und zeigt dann schlicht kein Abzeichen)."""
+    alte_antwort_ohne_urteil = {
+        "aktiv": True,
+        "geprueft": "2026-10-09T09:00:00+00:00",
+        "erzeugt": "2026-10-09T09:00:05+00:00",
+        "modell": "gpt-4o-mini",
+        "text": "Alte Gesamteinschaetzung, noch ohne Abzeichen.",
+        "je_position": {"METUSD": "Alte Meinung zu MET."},
+        "je_chance": {},
+        "bezieht_sich_auf": {"positionen": 1, "chancen": 0},
+    }
+    monkeypatch.setattr(skript, "vorlauf_lesen", lambda url: dict(alte_antwort_ohne_urteil))
+
+    out = tmp_path / "chatgpt_meinung.json"
+    monkeypatch.setattr(
+        sys, "argv", ["prog", "--out", str(out), "--vorlauf-url", "https://example.invalid"]
+    )
+    rc = skript.main()
+    assert rc == 0
+
+    geschrieben = json.loads(out.read_text(encoding="utf-8"))
+    assert geschrieben["je_position"] == {"METUSD": "Alte Meinung zu MET."}
+    assert "urteil_position" not in geschrieben
 
 
 def test_vorlauf_ohne_vorherige_antwort_bleibt_ehrlich_leer(monkeypatch, tmp_path):

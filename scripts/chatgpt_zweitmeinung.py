@@ -157,8 +157,11 @@ def main() -> int:
         alt = vorlauf_lesen(args.vorlauf_url)
         if alt is not None:
             # geprueft wird aktualisiert (die App zeigt damit, dass dieser Lauf lief),
-            # erzeugt/text/je_position/je_chance bleiben die ECHTEN Werte vom letzten
-            # vollen Lauf — nichts wird hier neu erfunden oder umdatiert.
+            # erzeugt/text/je_position/je_chance/urteil_position/urteil_chance bleiben
+            # die ECHTEN Werte vom letzten vollen Lauf — nichts wird hier neu erfunden
+            # oder umdatiert (ein aelteres ``alt`` ohne urteil_*-Felder, von vor dem
+            # 11.10., wird unveraendert durchgereicht: ``.get()`` in der App liefert
+            # dann einfach kein Abzeichen statt abzustuerzen).
             alt["geprueft"] = jetzt
             schreibe(args.out, alt)
             print("Zweitmeinung vom letzten vollen Lauf uebernommen (kein neuer OpenAI-Aufruf).")
@@ -219,6 +222,13 @@ def main() -> int:
             # (sym/instrument) sortiert, den auch die App fuer die jeweilige Karte nutzt.
             "je_position": antwort.je_position,
             "je_chance": antwort.je_chance,
+            # Ozan, 11.10. 17:18: "ihr solltet zusammenarbeiten" — ein Abzeichen
+            # (stimmt_zu/teilweise/widerspricht) je Schluessel, damit die App auf einen
+            # Blick zeigen kann, ob Claude und ChatGPT einig sind, statt dass man erst
+            # den Text lesen muss. Nur fuer Schluessel gesetzt, zu denen ein gueltiges
+            # Urteil tatsaechlich geliefert wurde (siehe zweitmeinung._parse_antwort).
+            "urteil_position": antwort.urteil_position,
+            "urteil_chance": antwort.urteil_chance,
             "bezieht_sich_auf": {"positionen": len(pos_k), "chancen": len(chancen_k)},
         },
     )
