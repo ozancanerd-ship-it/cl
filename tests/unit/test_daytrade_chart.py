@@ -438,7 +438,7 @@ def test_playbook_zeigt_die_ehrlichen_zahlen() -> None:
 
 def test_startseite_zeigt_tageshandel_und_gold() -> None:
     roh = VORLAGE.read_text(encoding="utf-8")
-    assert "${depotZeile()}\n    ${sicherText(tageshandelZeile)}" in roh
+    assert "${sicherText(lernKarteStart)}\n    ${sicherText(tageshandelZeile)}" in roh
     z = _funktion(roh, "tageshandelZeile")
     assert "Welle" in z and "Gold" in z and "zeigeTab(11)" in roh
 

@@ -157,6 +157,7 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .tabs{display:flex; gap:4px; margin-top:16px; overflow-x:auto; scrollbar-width:none;
   padding-bottom:2px}
 .tabs::-webkit-scrollbar{display:none}
+#t0{order:-2}#t12{order:-1}
 .tab{appearance:none; background:none; border:0; position:relative;
   font:inherit; font-size:13px; font-weight:500; color:var(--ink-3);
   padding:10px 13px 12px; cursor:pointer; white-space:nowrap; letter-spacing:.01em;
@@ -686,7 +687,7 @@ a{color:var(--accent); text-underline-offset:3px}
     box-shadow:0 14px 40px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.06) inset}
   .dock button{appearance:none; border:0; background:none; font:inherit; color:var(--ink-3);
     display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 8px 5px;
-    min-width:56px; border-radius:14px; cursor:pointer; position:relative;
+    min-width:50px; border-radius:14px; cursor:pointer; position:relative;
     transition:color .16s, background .16s}
   .dock svg{width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.7;
     stroke-linecap:round; stroke-linejoin:round}
@@ -771,6 +772,7 @@ a{color:var(--accent); text-underline-offset:3px}
       <button class="tab" role="tab" aria-selected="false" aria-controls="p9" id="t9">Chat</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p10" id="t10">System</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p11" id="t11">Day-Trading</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="p12" id="t12">🎓 Lernen</button>
     </div>
   </div>
 </header>
@@ -782,6 +784,7 @@ a{color:var(--accent); text-underline-offset:3px}
   <button type="button" data-dock="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/></svg><span>Depot</span></button>
   <button type="button" data-dock="8"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 16l4-5 3 3 5-7"/><circle cx="19" cy="7" r="1.4"/></svg><span>Bilanz</span></button>
   <button type="button" data-dock="1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v4M8 17v4M16 5v3M16 16v4"/><rect x="5.5" y="7" width="5" height="10" rx="1.2"/><rect x="13.5" y="8" width="5" height="8" rx="1.2"/></svg><span>Chart</span></button>
+  <button type="button" data-dock="12"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-5 9 5-9 5-9-5Z"/><path d="M7 11.5V16c2.5 2 7.5 2 10 0v-4.5"/></svg><span>Lernen</span></button>
 </nav>
 
 <main class="wrap">
@@ -834,6 +837,10 @@ a{color:var(--accent); text-underline-offset:3px}
   <section class="panel" id="p11" role="tabpanel" aria-labelledby="t11" hidden>
     <div id="dtchart"></div>
     <div id="daytrading"></div>
+  </section>
+
+  <section class="panel" id="p12" role="tabpanel" aria-labelledby="t12" hidden>
+    <div id="lernen"></div>
   </section>
 </main>
 
@@ -1056,7 +1063,7 @@ function gebuehrSatz(o, positionswert){
 
 /* ---------------------------------------------------------------- Tabs */
 const TABS = [...document.querySelectorAll('.tab')];
-const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System','Day-Trading'];
+const TITEL = ['Markt','Chart','Analyse','Portfolio','Sync','Plan','Alarme','News','Bilanz','Chat','System','Day-Trading','Lernen'];
 function zeigeTab(i){
   TABS.forEach((t,k)=>{
     t.setAttribute('aria-selected', k===i ? 'true':'false');
@@ -1067,6 +1074,7 @@ function zeigeTab(i){
   if (i===1) requestAnimationFrame(()=>chart.groesse());
   try { dtWsPruefen(); } catch(e){}
   if (i===11) requestAnimationFrame(()=>{ try { dtTakt(); dtChartZeichnen(); } catch(e){} });
+  if (i===12) { try { zeichneLernen(); } catch(e){ console.error(e); } }
   if (i===4) zeichneSync();
   if (i===9) zeichneChat();
   try { history.replaceState(null,'','#'+i); } catch(e){}
@@ -2176,6 +2184,7 @@ function zeichneStatus(){
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
     ${depotZeile()}
+    ${sicherText(lernKarteStart)}
     ${sicherText(tageshandelZeile)}
     ${sicherText(kaufAlarmLeiste)}
     ${sicherText(meineCoinsKasten)}
@@ -2193,6 +2202,8 @@ function zeichneStatus(){
     el.addEventListener('click', e => { e.stopPropagation(); waehle(el.dataset.sym); }));
   const dz = $('depotzeile');
   if (dz) dz.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); });
+  const lk = $('lernkarte');
+  if (lk) lk.addEventListener('click', ()=>{ zeigeTab(12); try { window.scrollTo(0, 0); } catch(e){} });
   const tz = $('tageshandelzeile');
   if (tz) tz.addEventListener('click', ()=>{ zeigeTab(11); try { window.scrollTo(0, 0); } catch(e){} });
   document.querySelectorAll('#meinecoins [data-sym]').forEach(el =>
@@ -7996,7 +8007,7 @@ function signalKarte(x){
     ${st&&st.trigger?`<p style="color:var(--ink-2);font-size:12px;margin-top:7px">
       <span style="color:var(--accent)">Auslöser:</span> ${esc(st.trigger)}</p>`:''}
     <div class="kpi" style="margin-top:8px">
-      <span>Kaufen bei <b>${esc(o.broker||'—')}</b></span>
+      <span>${o.richtung==='short'?'Short über':'Kaufen bei'} <b>${esc(o.broker||'—')}</b></span>
       ${eurHinweis(o)?`<span>${eurHinweis(o)}</span>`:''}
     </div>
     ${euro>0?`<p style="font-size:11.5px;color:var(--ink-3);margin-top:6px">${gebuehrSatz(o, euro)}</p>`:''}
@@ -8891,7 +8902,7 @@ function urteilFuer(o){
   if (q) zeilen.push(`Vergleichbare Signale trafen bisher ${Math.round(q.tp1*100)} % — aus ${q.n} Fällen, `
     + `im Schnitt ${q.schnitt_r >= 0 ? '+' : ''}${String(q.schnitt_r).replace('.',',')} R. Das ist Vergangenheit, keine Vorhersage.`);
   if ((o.warnungen||[]).length) zeilen.push('Dagegen spricht: ' + o.warnungen.slice(0,3).join(' · '));
-  if (o.broker) zeilen.push(`Kaufen bei ${o.broker}.`);
+  if (o.broker) zeilen.push(`${o.richtung==='short'?'Short über':'Kaufen bei'} ${o.broker}.`);
 
   const offen = ladePositionen().length;
   if (offen >= 4) zeilen.push(`Achtung: du hast schon ${offen} Positionen offen. Jede weitere `
@@ -11024,6 +11035,117 @@ function zeichneDaytrading(){
   }
   h += `<p style="font-size:11px;color:var(--ink-3);margin-top:10px">Geprüft: ${zeit(GD && GD.geprueft)}</p>`;
   $('daytrading').innerHTML = h;
+}
+
+/* ============================================================ LERNEN (eigener Reiter, 12.10.)
+   Ozan: "ich finde den Lern-Part nicht". Das Lernmaterial lag verstreut (Depot-Reiter nur mit
+   Positionen, Day-Trading-Reiter ganz unten). Jetzt ein Reiter, der in der Dock-Leiste und
+   ganz oben auf dem Markt-Reiter steht: Lernpfad in vier Stufen mit Quizfragen und Haken,
+   Lektionen an deinem Depot, Gold-Playbook, durchsuchbares Glossar, Weg zum Übungs-Journal. */
+const LERN_KEY = 'desk.lernen.v1';
+const LERNPFAD = [
+  {id:'grund', icon:'1', titel:'Grundlagen: Risiko zuerst', min:5,
+   text:`<p><b>Der Stop kommt vor dem Einstieg.</b> Bevor du kaufst, legst du fest, bei welchem Kurs die Idee falsch ist. Der Abstand Einstieg → Stop ist <b>1 R</b>, dein Risiko in diesem Trade.</p>
+     <p><b>Positionsgröße</b> = Risiko in € ÷ Abstand zum Stop. Beispiel: Depot 10.000 €, Risiko 0,5 % = 50 €. Stop 5 % unter dem Einstieg → Position 1.000 €. Ein enger Stop heißt nicht „weniger Risiko“, sondern „mehr Stück bei gleichem Risiko“.</p>
+     <p><b>CRV</b> (Ziel ÷ Risiko): bei 1:3 reicht jeder vierte Treffer, um vor Kosten nicht zu verlieren. <b>Kosten</b> (Gebühr + Spread) kommen bei jedem Trade dazu.</p>`,
+   merke:'Erst Stop, dann Größe, dann Einstieg — nie umgekehrt.',
+   quiz:[
+    {f:'Depot 10.000 €, Risiko 0,5 %. Stop 5 % unter dem Einstieg. Wie groß ist die Position?', o:['500 €','1.000 €','5.000 €'], r:1, e:'50 € Risiko ÷ 0,05 = 1.000 €. Fällt der Kurs 5 %, verlierst du genau 50 €.'},
+    {f:'Ein Trade hat CRV 1:3. Wie oft musst du mindestens treffen, um (vor Kosten) nicht zu verlieren?', o:['jedes 2. Mal','jedes 4. Mal','jedes 10. Mal'], r:1, e:'Bei 1 R Verlust und 3 R Gewinn: 1 Treffer gleicht 3 Verluste aus — ab 25 % Trefferquote bist du bei null.'}]},
+  {id:'swing', icon:'2', titel:'Swing-Trading: unser Hauptfokus', min:6,
+   text:`<p><b>Swing</b> heißt: Trades über Tage bis Wochen, Analyse auf 4 Std. und Tageschart. Die Ziele sind weit (mehrere %), darum fallen Gebühren und Spread kaum ins Gewicht — das ist der große Vorteil gegenüber dem Tageshandel.</p>
+     <p><b>Erst die große Zeiteinheit.</b> Tag und 4 Std. bestimmen die Richtung (Kurs über/unter EMA 200, höhere Hochs/Tiefs). Kleine Zeiteinheiten sind nur für den Einstieg da.</p>
+     <p><b>Ausbruch & Retest:</b> Bricht der Kurs eine Marke und kommt zurück, ohne sie wieder zu verlieren, ist der Einstieg sicherer als beim Ausbruch selbst. Genau das prüft unser Gold-Setup S9 — noch 🧪 experimentell, bis genug Forward-Trades vorliegen.</p>
+     <p><b>Stop nach ATR:</b> mindestens etwa 1–2 ATR vom Einstieg, sonst löst ihn das normale Rauschen aus. <b>Teilverkauf</b> am ersten Ziel und Stop auf Einstand nimmt den Druck raus.</p>`,
+   merke:'Im Swing zählt Geduld: wenige, gute Setups — und „Kein Trade“ ist ein Ergebnis.',
+   quiz:[
+    {f:'Warum ist Swing für Gold realistischer als Day-Trading?', o:['Weil Gold nur langsam läuft','Weil Kosten bei weiten Zielen kaum ins Gewicht fallen','Weil es keine Stops braucht'], r:1, e:'Gold-Spread und Gebühren sind bei einem Ziel von mehreren % klein, bei einem Ziel von 0,2 % fressen sie den Gewinn auf.'},
+    {f:'Dein Stop liegt weniger als 1 ATR vom Einstieg entfernt. Was ist das Problem?', o:['Nichts, enger ist besser','Er wird oft vom normalen Rauschen ausgelöst','Er wird nie ausgelöst'], r:1, e:'Eine ATR ist die normale Schwankung. Engere Stops werden ausgestoppt, obwohl die Idee stimmte.'}]},
+  {id:'day', icon:'3', titel:'Day-Trading: warum es so schwer ist', min:6,
+   text:`<p><b>Rein und raus am selben Tag</b>, Analyse auf 1–15 Min. Die Bewegungen sind klein, die Kosten bleiben gleich: eine Runde kostet bei Marktorders auf Kraken rund 0,5–0,8 % — mehr, als eine 15-Min.-Kerze bei Gold im Schnitt bewegt.</p>
+     <p><b>Zählt zuerst:</b> Kosten · Uhrzeit (Asien ruhig, London lebhafter, New York am stärksten, 14:30 Uhr US-Daten) · erwartete Spanne der nächsten Stunden.</p>
+     <p><b>Unser Ergebnis:</b> Fünf geprüfte Gold-Tageshandelsregeln brachten nach Kosten keinen Vorteil (Details im Playbook unten). Bei Coins gibt es eine Ausbruchswelle-Regel mit schwachem, noch nicht bewiesenem Vorteil — darum nur Paper.</p>`,
+   merke:'Day-Trading nur als Übung: kleine Paper-Trades, Journal führen, Kosten ehrlich mitrechnen.',
+   quiz:[
+    {f:'Eine Runde kostet 0,6 %, dein Ziel sind 0,5 %. Was passiert im Schnitt?', o:['Du gewinnst 0,5 %','Du verlierst auch bei Treffer','Kosten spielen keine Rolle'], r:1, e:'Ziel 0,5 % − Kosten 0,6 % = −0,1 %. Selbst jeder Treffer ist ein Verlust.'},
+    {f:'Wann sollte man laut App keine neuen Gold-Trades eröffnen?', o:['Direkt vor US-Daten (14:30 Uhr)','Nur nachts','Immer montags'], r:0, e:'Um US-Daten springt der Kurs, der Spread wird weit, Stops werden mit Slippage ausgeführt.'}]},
+  {id:'kopf', icon:'4', titel:'Risiko & Kopf: wie man nicht aufgibt', min:5,
+   text:`<p><b>Verlustmathematik:</b> −10 % brauchen +11 %, −25 % brauchen +33 %, −50 % brauchen +100 %. Darum klein halten.</p>
+     <p><b>Overfitting:</b> Eine Regel so lange an alte Daten anpassen, bis sie perfekt aussieht — und live versagt. Nur Daten zählen, die beim Bauen nicht benutzt wurden (<b>Out-of-Sample</b>).</p>
+     <p><b>Stichprobe:</b> Unter 20–30 Trades sagt keine Bilanz etwas — Glück und Pech überwiegen. Darum der Forward-Zähler (0 von 100) und das Übungs-Journal.</p>
+     <p><b>FOMO:</b> Der Drang, nach einem Anstieg noch einzusteigen. Gegenmittel: feste Regeln, ein Alarm nur bei echtem Setup und die Bereitschaft, einen Lauf zu verpassen.</p>`,
+   merke:'Der Plan schützt dich vor dir selbst: Regel aufschreiben, bevor es wehtut.',
+   quiz:[
+    {f:'Dein Coin ist 25 % im Minus. Wie viel Anstieg braucht er bis zum Einstand?', o:['25 %','33 %','50 %'], r:1, e:'Von 75 auf 100 sind +33 %.'},
+    {f:'Eine Regel gewinnt in 12 Trades 9-mal. Was sagt das?', o:['Sie ist bewiesen','Noch fast nichts — zu wenige Trades','Sie ist sicher überangepasst'], r:1, e:'12 Trades sind eine winzige Stichprobe; erst ab etwa 30–100 Forward-Trades wird die Aussage tragfähig.'}]},
+];
+function lernStand(){ try { return JSON.parse(localStorage.getItem(LERN_KEY) || '{}') || {}; } catch(e){ return {}; } }
+function lernSpeichern(s){ try { localStorage.setItem(LERN_KEY, JSON.stringify(s)); } catch(e){} }
+function lernFortschritt(s){
+  const quizN = LERNPFAD.reduce((a, l) => a + l.quiz.length, 0);
+  const richtig = LERNPFAD.reduce((a, l) => a + l.quiz.filter((_, i) => (s.quiz || {})[l.id + i] === 1).length, 0);
+  const gelesen = LERNPFAD.filter(l => (s.gelesen || {})[l.id]).length;
+  return {gelesen, stufen: LERNPFAD.length, richtig, quizN};
+}
+function lernGlossar(){
+  const m = new Map();
+  for (const [t, x] of BEGRIFFE) m.set(t.toLowerCase(), [t, x]);
+  for (const [t, x] of Object.values(DT_BEGRIFFE)) if (![...m.keys()].some(k => k.split(' ')[0] === t.toLowerCase().split(' ')[0])) m.set(t.toLowerCase(), [t, x]);
+  return [...m.values()].sort((a, b) => a[0].localeCompare(b[0], 'de'));
+}
+function lernGlossarHtml(filter){
+  const f = String(filter || '').trim().toLowerCase();
+  const l = lernGlossar().filter(([t, x]) => !f || (t + ' ' + x).toLowerCase().includes(f));
+  return l.length ? l.map(([t, x]) => `<div class="dtbg"><b>${esc(t)}</b><p>${esc(x)}</p></div>`).join('') : '<p class="leer">Nichts gefunden.</p>';
+}
+function zeichneLernen(){
+  const el = $('lernen'); if (!el) return;
+  const s = lernStand(), fp = lernFortschritt(s);
+  const quizTxt = (l, i, q) => {
+    const antw = (s.quiz || {})[l.id + i];
+    return `<div class="lq" data-lq="${l.id}|${i}" style="margin:10px 0"><p style="margin:0 0 6px"><b>Frage ${i + 1}:</b> ${esc(q.f)}</p>
+      ${q.o.map((o, k) => `<button class="btn lqo" data-k="${k}" style="display:block;width:100%;text-align:left;margin:4px 0">${esc(o)}</button>`).join('')}
+      <p class="lqe" style="font-size:12.5px;margin:6px 0 0;${antw == null ? 'display:none' : ''}">${antw == null ? '' : (antw === 1 ? '✅ Richtig. ' : '❌ Nicht ganz. ') + esc(q.e)}</p></div>`;
+  };
+  let h = `<h2>🎓 Lernen</h2>
+    <div class="karte"><p style="margin:0 0 6px">Dein Weg in vier Stufen — von „was ist ein Stop“ bis „warum verlieren die meisten im Tageshandel“. Jede Stufe: kurzer Text, zwei Quizfragen, Haken setzen.</p>
+    <div class="kpi"><span>Stufen gelesen <b>${fp.gelesen}/${fp.stufen}</b></span><span>Quiz richtig <b>${fp.richtig}/${fp.quizN}</b></span></div>
+    <div style="height:6px;background:var(--rule);border-radius:4px;margin-top:8px"><div style="height:6px;width:${Math.round((fp.gelesen + fp.richtig) / (fp.stufen + fp.quizN) * 100)}%;background:var(--accent);border-radius:4px"></div></div></div>
+    <h3>Lernpfad</h3>`;
+  h += LERNPFAD.map(l => {
+    const ok = (s.gelesen || {})[l.id];
+    return `<details class="note-box klapp erkl" id="lp-${l.id}"><summary><span class="nt">${ok ? '✅' : 'Stufe ' + l.icon + ' ·'} ${esc(l.titel)}</span><span class="klapp-hint">${l.min} Min. · antippen</span></summary>
+      ${l.text}<p style="margin-top:6px"><strong>Merke:</strong> ${esc(l.merke)}</p>
+      ${l.quiz.map((q, i) => quizTxt(l, i, q)).join('')}
+      <p style="margin:8px 0 0"><button class="btn" data-gelesen="${l.id}">${ok ? 'Als ungelesen markieren' : 'Stufe abgehakt ✓'}</button></p></details>`;
+  }).join('');
+  h += `<h3>An deinem Depot & am Live-Markt</h3>`;
+  try { const st = depotStand(); const k = st ? lernKasten(st) : ''; h += k || `<p class="leer">Sobald du Positionen eingetragen hast, rechnet die App hier Lektionen an deinen echten Werten vor.</p>`; } catch(e){ h += `<p class="leer">Depot noch nicht lesbar.</p>`; }
+  h += `<p style="margin:8px 0"><button class="btn" id="lern_live">⚡ Live-Lektionen & Übungs-Trade (Day-Trading-Reiter) →</button></p>`;
+  if (DTW && DTW.gold_literatur) { try { h += dtPlaybook(); } catch(e){} }
+  h += `<h3>📖 Glossar</h3><input id="lern_suche" class="val" style="width:100%;margin-bottom:6px" placeholder="Begriff suchen, z. B. ATR, Stop, Spread …"><div id="lern_gl">${lernGlossarHtml('')}</div>`;
+  el.innerHTML = h;
+  const suche = $('lern_suche');
+  if (suche) suche.addEventListener('input', () => { $('lern_gl').innerHTML = lernGlossarHtml(suche.value); });
+  const live = $('lern_live'); if (live) live.addEventListener('click', () => { zeigeTab(11); try { window.scrollTo(0, 0); } catch(e){} });
+  const offenMerken = () => { const o = el.querySelector('details[open]'); return o && o.id; };
+  el.querySelectorAll('[data-gelesen]').forEach(b => b.addEventListener('click', () => {
+    const st = lernStand(); st.gelesen = st.gelesen || {}; const id = b.dataset.gelesen;
+    if (st.gelesen[id]) delete st.gelesen[id]; else st.gelesen[id] = 1;
+    lernSpeichern(st); const oid = offenMerken();
+    zeichneLernen(); const d = oid && $(oid); if (d) d.open = true;
+  }));
+  el.querySelectorAll('.lq').forEach(box => box.querySelectorAll('.lqo').forEach(b => b.addEventListener('click', () => {
+    const [id, i] = box.dataset.lq.split('|'); const l = LERNPFAD.find(x => x.id === id), q = l.quiz[+i];
+    const st = lernStand(); st.quiz = st.quiz || {}; st.quiz[id + i] = (+b.dataset.k === q.r) ? 1 : 0; lernSpeichern(st);
+    zeichneLernen(); const d = $('lp-' + id); if (d) d.open = true;
+  })));
+}
+function lernKarteStart(){
+  const fp = lernFortschritt(lernStand());
+  return `<div class="karte" style="margin:10px 0 0;cursor:pointer" id="lernkarte">
+    <h3>🎓 Lernen <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">öffnen →</span></h3>
+    <p style="margin:0;font-size:12.5px;color:var(--ink-2)">Lernpfad (Stop, Swing, Day-Trading, Risiko), Quiz, Glossar und Übungs-Trades an einem Ort. Fortschritt: ${fp.gelesen}/${fp.stufen} Stufen, ${fp.richtig}/${fp.quizN} Fragen richtig.</p></div>`;
 }
 
 /* ============================================================ START */
