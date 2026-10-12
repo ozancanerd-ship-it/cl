@@ -375,13 +375,20 @@ def _zeichen(w: str) -> str:
 
 
 def pflegen(
-    pos: dict[str, Any], lg: Lage, alt: dict[str, Any] | None
+    pos: dict[str, Any],
+    lg: Lage,
+    alt: dict[str, Any] | None,
+    schluss: dict[str, float] | None = None,
 ) -> tuple[dict[str, Any], list[Ereignis]]:
     """Neuer Stand fuer eine Position plus das, was zu melden ist.
 
     ``alt`` ist der bisherige Stand dieser Position (oder ``None``):
     ``{"stop", "ebene", "quelle", "gemeldet_stop", "ziele": {...}, "erreicht": [...],
-    "ausgestoppt": iso|None}``.
+    "ausgestoppt": iso|None, "vorlaeufig": [...]}``.
+
+    ``schluss``: letzter ABGESCHLOSSENER Stundenschluss je Instrument, nur wenn er frisch und
+    vollstaendig ist (siehe ``scripts/depot_wache.stunden_schluesse``). Fehlt er, gilt ein
+    Ziel wie bisher beim Beruehren — mit dem Vermerk, dass keine Stundenbestaetigung da war.
     """
     st: dict[str, Any] = dict(alt or {})
     st.setdefault("erreicht", [])
@@ -623,6 +630,9 @@ def pflegen(
     erledigt = set(pos.get("erledigt") or []) | set(st.get("erreicht") or [])
     menge = _zahl(pos.get("menge"))
     offen = 3 - len({"TP1", "TP2", "TP3"} & erledigt)
+    vor = set(st.get("vorlaeufig") or [])
+    inst = str((lg.row or {}).get("instrument") or "")
+    close = (schluss or {}).get(inst)
     for marke, teil in (("TP1", "ein Drittel"), ("TP2", "das zweite Drittel"), ("TP3", "den Rest")):
         ziel = _zahl(ziele.get(marke.lower()))
         if ziel is None or marke in erledigt:
@@ -630,7 +640,43 @@ def pflegen(
         if menge and menge > 0 and offen > 0:
             stk = menge / offen
             teil += f" (ca. {stk:.4g} Stück von {menge:.6g})"
-        if kurs >= ziel if lang else kurs <= ziel:
+        beruehrt = kurs >= ziel if lang else kurs <= ziel
+        # Stundenbestaetigung: nur wenn ein frischer, abgeschlossener Schluss vorliegt.
+        # Ohne Daten keine Bestaetigung behaupten — dann gilt das Beruehren wie bisher.
+        schluss_ok = None if close is None else ((close >= ziel) if lang else (close <= ziel))
+        if beruehrt and schluss_ok is False and marke not in vor:
+            st["vorlaeufig"] = sorted(vor | {marke})
+            ev.append(
+                Ereignis(
+                    "ziel",
+                    lg.key,
+                    wer,
+                    f"VORLÄUFIG: {marke} berührt ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}). "
+                    "Noch nicht bestätigt — erst der abgeschlossene Stundenschluss entscheidet. "
+                    "Bis dahin kein Verkauf.",
+                    True,
+                    marke=f"{marke}-vorlaeufig",
+                )
+            )
+            break
+        if not beruehrt and marke in vor:
+            st["vorlaeufig"] = sorted(vor - {marke})
+            ev.append(
+                Ereignis(
+                    "ziel",
+                    lg.key,
+                    wer,
+                    f"{marke}-Hinweis zurückgenommen: Kurs wieder unter Ziel ({_fmt(kurs)}{z}). Kein Verkauf.",
+                    True,
+                    marke=f"{marke}-zurueck",
+                )
+            )
+            break
+        if beruehrt and schluss_ok is False:
+            break  # schon vorläufig gemeldet; der abgeschlossene Schluss bestätigt noch nicht
+        if beruehrt and marke in vor:
+            st["vorlaeufig"] = sorted(vor - {marke})
+        if beruehrt:
             erledigt.add(marke)
             st["erreicht"] = sorted(set(st.get("erreicht") or []) | {marke})
             danach = (
@@ -641,6 +687,10 @@ def pflegen(
                 else " Damit ist der Trade zu."
             )
             rahmen_satz = " (Ziel aus deinem Stop: je 1 R)" if rahmen else ""
+            if schluss_ok:
+                rahmen_satz += " (Stundenschluss bestätigt)"
+            elif close is None:
+                rahmen_satz += " (ohne Stundenbestätigung — keine Stundendaten)"
             # Was der Verkauf bringt und wohin der Stop wandert — als feste Zahlen, nicht
             # als Hinweis auf eine Rechnung, die man selbst machen muss.
             ein_r = _zahl(pos.get("einstieg"))
@@ -746,7 +796,10 @@ def pflegen(
 
 
 def pruefe_depot(
-    positionen: list[dict[str, Any]], scan: dict[str, Any], stand: dict[str, Any]
+    positionen: list[dict[str, Any]],
+    scan: dict[str, Any],
+    stand: dict[str, Any],
+    schluss: dict[str, float] | None = None,
 ) -> tuple[dict[str, Any], list[Ereignis], dict[str, Any]]:
     """Das ganze Depot einmal durch. Gibt (neuer Stand, Ereignisse, Uebersicht) zurueck.
 
@@ -777,7 +830,7 @@ def pruefe_depot(
                 for k, v in alt.items()
                 if k not in ("ausgestoppt", "stop", "gemeldet_stop", "quelle")
             }
-        st, ev = pflegen(pos, lg, alt)
+        st, ev = pflegen(pos, lg, alt, schluss)
         st["menge"] = menge
         neu_pos[key] = st
         alle.extend(ev)

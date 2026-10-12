@@ -282,6 +282,67 @@ async def livekurse(
     return aus
 
 
+def letzter_schluss(kerzen: list[Any], jetzt_ts: float) -> float | None:
+    """Schluss der letzten ABGESCHLOSSENEN Stundenkerze — oder ``None``, wenn die Daten
+    nicht taugen. Kraken liefert als letzte Zeile die laufende Kerze; die vorletzte ist
+    fertig. Verlangt: mindestens drei Kerzen, lueckenlos stuendlich in den letzten Zeilen,
+    die fertige Kerze nicht aelter als zwei Stunden und noch nicht in der Zukunft."""
+    if len(kerzen) < 3:
+        return None
+    try:
+        zeiten = [float(k[0]) for k in kerzen[-3:]]
+        if zeiten[1] - zeiten[0] != 3600 or zeiten[2] - zeiten[1] != 3600:
+            return None  # Luecke oder falscher Takt
+        ende = zeiten[1] + 3600
+        if ende > jetzt_ts or jetzt_ts - ende >= 2 * 3600:
+            return None  # noch nicht abgeschlossen oder veraltet
+        c = float(kerzen[-2][4])
+    except (TypeError, ValueError, IndexError):
+        return None
+    return c if c > 0 else None
+
+
+async def stunden_schluesse(
+    scan: dict[str, Any], positionen: list[dict[str, Any]], jetzt: datetime
+) -> dict[str, float]:
+    """Letzter ABGESCHLOSSENER Stundenschluss je Krypto-/Gold-Instrument (Kraken, 60 Min.).
+
+    Nur verwendbar, wenn die Kerze vollstaendig und frisch ist: Die letzte geschlossene
+    Kerze darf hoechstens zwei Stunden alt sein, und es muessen mindestens zwei Kerzen da
+    sein. Alles andere — Aktien, fehlende oder veraltete Daten, Fehler — fehlt im Ergebnis.
+    Ein fehlender Schluss erzeugt nie eine bestaetigte Meldung (siehe ``pflegen``)."""
+    import httpx
+
+    from trading_agent.portfolio_intel.depot_stops import ScanIndex, lage_fuer
+
+    idx = ScanIndex(scan)
+    brauche: set[str] = set()
+    for pos in positionen:
+        lg = lage_fuer(pos, idx)
+        if lg.row and str(lg.row.get("klasse") or "") in ("krypto", "gold") and lg.row.get("instrument"):
+            brauche.add(str(lg.row["instrument"]))
+    aus: dict[str, float] = {}
+    jetzt_ts = jetzt.timestamp()
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        for inst in brauche:
+            if not inst.endswith("USD"):
+                continue
+            try:
+                r = await c.get("https://api.kraken.com/0/public/OHLC", params={"pair": inst, "interval": 60})
+                d = r.json()
+                if d.get("error"):
+                    continue
+                werte = [v for k, v in (d.get("result") or {}).items() if k != "last" and isinstance(v, list)]
+                if not werte or len(werte[0]) < 3:
+                    continue
+                schluss = letzter_schluss(werte[0], jetzt_ts)
+                if schluss is not None:
+                    aus[inst] = schluss
+            except Exception:
+                continue
+    return aus
+
+
 def scan_holen(pfad: str, url: str) -> dict[str, Any] | None:
     """Die Scan-Datei — lokal, oder (im leichten Lauf) die veroeffentlichte von der Seite."""
     try:
@@ -464,7 +525,8 @@ def main() -> int:
     # aus etwas Festem kommen, sonst finge der Waechter nach jeder Aenderung bei null an.
     schluessel = schluessel_aus(sync_geheim if sync_roh else roh, ZWECK)
     stand = stand_laden(args.stand, schluessel)
-    neuer_stand, ereignisse, uebersicht = pruefe_depot(positionen, scan, stand)
+    schluss = asyncio.run(stunden_schluesse(scan, positionen, datetime.now(UTC)))
+    neuer_stand, ereignisse, uebersicht = pruefe_depot(positionen, scan, stand, schluss)
 
     # Merker von Positionen, die es nicht mehr gibt, fallen weg — sonst meldete ein
     # spaeterer Wiedereinstieg nie wieder etwas.

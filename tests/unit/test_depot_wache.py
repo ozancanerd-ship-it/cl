@@ -24,7 +24,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from scripts.depot_wache import depot_lesen, neue_meldungen, stand_laden, stand_sichern
+from scripts.depot_wache import (
+    depot_lesen,
+    letzter_schluss,
+    neue_meldungen,
+    stand_laden,
+    stand_sichern,
+)
 
 from trading_agent.portfolio_intel.depot_stops import (
     MELDE_SCHRITT_PCT,
@@ -580,3 +586,65 @@ def test_teilverkauf_rahmen_aus_eigenem_stop() -> None:
     pos[0]["plan"]["quelle"] = "app"
     _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {})
     assert [e.art for e in ev] == []
+
+
+def _pos_rahmen() -> list[dict]:
+    return [{"sym": "SOLUSD", "menge": 3, "einstieg": 100.0, "plan": {"stop": 90.0, "quelle": "selbst"}}]
+
+
+def test_ziel_beruehrt_aber_schluss_darunter_ist_nur_vorlaeufig() -> None:
+    """Berühren allein bestätigt nichts: erst ein abgeschlossener Stundenschluss über dem Ziel."""
+    stand, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 108.0})
+    assert [e.art for e in ev] == ["ziel"]
+    assert ev[0].text.startswith("VORLÄUFIG")
+    assert ev[0].marke == "TP1-vorlaeufig"
+    # Zweiter Lauf, gleiche Lage: keine Wiederholung (Merker bleibt gleich, Stand merkt es).
+    _, ev2, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.6)), stand, {"SOLUSD": 108.0})
+    assert [e.art for e in ev2] == []
+
+
+def test_schluss_bestaetigt_danach_der_verkaufshinweis() -> None:
+    stand, _, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 108.0})
+    _, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 111.0)), stand, {"SOLUSD": 110.2})
+    arten = [e.art for e in ev]
+    assert arten[0] == "ziel" and set(arten) <= {"ziel", "stop_nach"}
+    assert "Stundenschluss bestätigt" in ev[0].text
+    assert "Neuer Stop" in ev[0].text
+
+
+def test_fehlt_der_schluss_gibt_es_keine_bestaetigung_vorgetaeuscht() -> None:
+    """Ohne frische Stundendaten (Aktien, Fehler, veraltet) gilt das Berühren wie bisher —
+    aber der Text sagt ausdrücklich, dass keine Bestätigung vorlag."""
+    _, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, None)
+    assert [e.art for e in ev] == ["ziel"]
+    assert "ohne Stundenbestätigung" in ev[0].text
+    assert "bestätigt)" not in ev[0].text.replace("ohne Stundenbestätigung", "")
+
+
+def test_vorlaeufiger_hinweis_wird_zurueckgenommen_wenn_der_kurs_zurueckfaellt() -> None:
+    stand, _, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 108.0})
+    _, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 104.0)), stand, {"SOLUSD": 108.0})
+    assert [e.marke for e in ev] == ["TP1-zurueck"]
+    assert "zurückgenommen" in ev[0].text
+
+
+def test_stop_alarm_bleibt_direkt_auch_mit_stundenlogik() -> None:
+    _, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 89.0)), {}, {"SOLUSD": 95.0})
+    assert [e.art for e in ev] == ["stop"]
+
+
+def _kerzen(t0: float, n: int = 4, c: float = 100.0) -> list[list[float]]:
+    return [[t0 + 3600 * i, c, c, c, c + i, c, 1, 1] for i in range(n)]
+
+
+def test_stundenschluss_nur_aus_frischen_vollstaendigen_kerzen() -> None:
+    """Fehlende, lückenhafte oder veraltete Stundenkerzen dürfen nichts bestätigen."""
+    k = _kerzen(1_000_000)  # Zeiten t0, +1h, +2h, +3h; die letzte läuft noch
+    jetzt = 1_000_000 + 3600 * 3 + 600  # 10 Min. in der letzten Kerze
+    assert letzter_schluss(k, jetzt) == 102.0  # vorletzte (t0+2h) ist fertig
+    assert letzter_schluss(k[:2], jetzt) is None  # zu wenige Kerzen
+    luecke = [k[0], k[1], k[3]]
+    assert letzter_schluss(luecke, jetzt) is None  # Lücke
+    assert letzter_schluss(k, jetzt + 3 * 3600) is None  # veraltet
+    assert letzter_schluss(k, 1_000_000 + 3600 * 3 - 60) is None  # fertige Kerze noch nicht zu
+    assert letzter_schluss([["x"] * 5] * 3, jetzt) is None  # Müll
