@@ -65,4 +65,4 @@ def test_einstiegs_rangliste_sortiert_beste_zuerst() -> None:
     out = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout
     hoch, tief = json.loads(out)
     assert hoch > tief and tief >= 0 and hoch <= 100
-    assert "sicherText(()=>einstiegsRangHtml(amEinstieg))" in s
+    assert "einstiegsRangHtml(amEinstieg.concat(" in s

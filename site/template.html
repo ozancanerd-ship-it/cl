@@ -8310,6 +8310,11 @@ function einstiegsPunkte(x){
   const wn = Math.min((o.warnungen || []).length, 3) * 4;
   if (wn){ p -= wn; teile.push(`Warnungen −${wn}`); }
   if (!x.live){ p -= 3; teile.push('Kurs nur aus Scan −3'); }
+  // Noch nicht am Einstieg („bald“): je weiter weg, desto weniger Punkte — bis 1,5 % = bis −15.
+  if (x.stufe !== 'jetzt' && x.abstand != null){
+    const b = Math.round(Math.min(Math.abs(x.abstand), 1.5) / 1.5 * 15);
+    p -= b; teile.push(`noch ${Math.abs(x.abstand).toFixed(2).replace('.',',')} % weg −${b}`);
+  }
   return {punkte: Math.max(0, Math.min(100, p)), teile};
 }
 function einstiegsRangHtml(liste){
@@ -8323,14 +8328,14 @@ function einstiegsRangHtml(liste){
         <span class="mono">${x.lang ? 'KAUFEN' : 'SHORT'} · ${esc(w.note)}</span>
         <span class="ka-t"><b>${punkte}</b>/100</span></div>
       <div class="ka-s"><span>Einstieg ${num(w.einstieg, d)} · Stop ${num(w.stop, d)}${c != null ? ` · CRV 1:${c.toFixed(1)}` : ''}</span>
-        <span class="${ja ? 'up' : ''}" style="${ja ? '' : 'color:var(--warn)'}">${ja ? 'Alarm ✓' : 'kein Alarm'}</span></div>
+        <span class="${x.stufe === 'jetzt' ? 'up' : ''}" style="${x.stufe === 'jetzt' ? '' : 'color:var(--warn)'}">${x.stufe === 'jetzt' ? (ja ? 'JETZT · Alarm ✓' : 'JETZT · kein Alarm') : `noch ${Math.abs(x.abstand ?? 0).toFixed(2).replace('.',',')} % bis zum Einstieg`}</span></div>
       <div class="ka-s" style="color:var(--ink-3);font-size:11.5px">${esc(teile.join(' · '))}</div>
     </div>`;
   }).join('');
   return `<div class="ka"><div class="ka-h"><span class="nt">🏁 Wo jetzt einsteigen? Rangliste</span>
       <span class="ka-zahl">${r.length} am Einstieg — bester oben</span></div>
     ${zeilen}
-    <p class="ka-frei">Punkte = Note, Alarm-Tor, Chance-Risiko, Score, relative Stärke, minus Warnungen. Das ist eine Reihenfolge der Qualität, keine Gewinn-Prognose. Antippen öffnet den Wert; die vollständigen Karten stehen darunter.</p>
+    <p class="ka-frei">Enthalten sind alle Werte, bei denen der Einstieg jetzt oder gleich möglich ist — mit und ohne Alarm. Punkte = Note, Alarm-Tor, Chance-Risiko, Score, relative Stärke, minus Warnungen und minus Abstand zum Einstieg. Das ist eine Reihenfolge der Qualität, keine Gewinn-Prognose.</p>
   </div>`;
 }
 
@@ -8356,7 +8361,7 @@ function zeichneAlarme(){
   const warten = tot ? [] : signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
 
-  let h = altersBanner() + stoerungsBanner() + sicherText(kaufAlarmLeiste) + sicherText(()=>einstiegsRangHtml(amEinstieg)) + pushBlock();
+  let h = altersBanner() + stoerungsBanner() + sicherText(kaufAlarmLeiste) + sicherText(()=>einstiegsRangHtml(amEinstieg.concat(signale.filter(x=>x.stufe==='bald'&&!tot)))) + pushBlock();
   h += `<details class="mehr" style="margin-bottom:6px"><summary>Wie diese Seite funktioniert — Alarme = handeln, Markt = lesen</summary><div class="note-box" style="border-color:rgba(0,229,255,.28)">
     <span class="nt" style="color:var(--accent)">Hier wird gekauft</span>
     <p style="font-size:13.5px"><strong>Diese Seite ist die Handlungsliste.</strong> Was unter
