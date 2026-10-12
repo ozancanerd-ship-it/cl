@@ -434,3 +434,10 @@ def test_playbook_zeigt_die_ehrlichen_zahlen() -> None:
         assert teil in pb
     # Lernkarten nur aus der Live-Lage, immer mit "Merke"
     assert "<strong>Merke:</strong>" in _funktion(roh, "dtLernen")
+
+
+def test_startseite_zeigt_tageshandel_und_gold() -> None:
+    roh = VORLAGE.read_text(encoding="utf-8")
+    assert "${depotZeile()}\n    ${sicherText(tageshandelZeile)}" in roh
+    z = _funktion(roh, "tageshandelZeile")
+    assert "Welle" in z and "Gold" in z and "zeigeTab(11)" in roh

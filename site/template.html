@@ -2176,6 +2176,7 @@ function zeichneStatus(){
         <div class="n">${zeit(S.erzeugt)} · Profil ${esc(S.profil||'')}</div></div>
     </div>
     ${depotZeile()}
+    ${sicherText(tageshandelZeile)}
     ${sicherText(kaufAlarmLeiste)}
     ${sicherText(meineCoinsKasten)}
     ${topSignal()}
@@ -2192,6 +2193,8 @@ function zeichneStatus(){
     el.addEventListener('click', e => { e.stopPropagation(); waehle(el.dataset.sym); }));
   const dz = $('depotzeile');
   if (dz) dz.addEventListener('click', ()=>{ zeichnePortfolio(); zeigeTab(3); });
+  const tz = $('tageshandelzeile');
+  if (tz) tz.addEventListener('click', ()=>{ zeigeTab(11); try { window.scrollTo(0, 0); } catch(e){} });
   document.querySelectorAll('#meinecoins [data-sym]').forEach(el =>
     el.addEventListener('click', ()=>waehle(el.dataset.sym)));
   // Das Alter steht in der Kopfzeile. Ist es zu hoch, steht es dort auch in Farbe —
@@ -2213,6 +2216,33 @@ function zeichneStatus(){
 
    Eine Zeile, vier Zahlen, ein Klick ins Detail. Kein zweites Depot — dieselbe
    Bewertung, nur frueher sichtbar. */
+/* Tageshandel & Gold auf der Startseite (12.10.): der Markt-Reiter ist das Cockpit — der
+   Tageshandel stand bisher nur im eigenen Reiter, und Gold tauchte vorne gar nicht auf. Eine
+   Zeile: Welle, offene Paper-Trades, Gold-Kurs, S9-Zustand, naechster US-Termin. */
+function tageshandelZeile(){
+  if (!DTW && !GD) return '';
+  const w = DTW || {};
+  const welle = w.welle || 0, min = w.min_welle || 12;
+  const offen = (w.offen || []).filter(t => t.alarm !== false).length;
+  const gk = (w.analyse && w.analyse.PAXG && w.analyse.PAXG.kurs) || (GD && GD.paxg_kurs);
+  const s9 = GD && GD.gold ? (DT_ZUSTAND_TEXT[GD.gold.zustand] || GD.gold.zustand) : null;
+  const term = (typeof dtGoldTermine === 'function') ? dtGoldTermine(S && S.makro && S.makro.termine, Date.now()) : [];
+  const t0 = term.find(t => Date.parse(t.zeitpunkt) > Date.now());
+  const wl = welle >= min;
+  return `<div class="karte ${wl ? 'gut' : ''}" style="margin:10px 0 0;cursor:pointer" id="tageshandelzeile">
+    <h3>⚡ Tageshandel & Gold <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">Chart & Analyse →</span></h3>
+    <div class="kpi">
+      <span>Welle <b class="${wl ? 'up' : ''}">${welle}/24</b></span>
+      <span>Paper offen <b>${offen}</b></span>
+      ${gk ? `<span>Gold <b>${num(gk, 2)} $</b></span>` : ''}
+      ${s9 ? `<span>S9 <b>${esc(s9)}</b></span>` : ''}
+    </div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${wl
+      ? 'Die Ausbruchswelle läuft — Einstiegs-Alarme kommen nur für klare Ausbrüche.'
+      : `Keine Welle (Alarm ab ${min} von 24 Coins). Kein Tageshandel nötig — warten ist hier die Strategie.`}
+      ${t0 ? ` Nächster wichtiger US-Termin für Gold: <b>${esc(t0.titel)}</b>, ${zeit(t0.zeitpunkt)}.` : ''}</p>
+  </div>`;
+}
 function depotZeile(){
   let pos;
   try { pos = ladePositionen(); } catch(e){ return ''; }
