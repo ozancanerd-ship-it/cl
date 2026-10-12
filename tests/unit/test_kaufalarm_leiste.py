@@ -28,7 +28,7 @@ def _quelle() -> str:
 def test_leiste_steht_auf_startseite_und_unter_alarme() -> None:
     s = _quelle()
     assert "${sicherText(kaufAlarmLeiste)}\n    ${sicherText(meineCoinsKasten)}" in s
-    assert "sicherText(kaufAlarmLeiste) + pushBlock()" in s
+    assert "sicherText(kaufAlarmLeiste) + sicherText(()=>einstiegsRangHtml(" in s
 
 
 def test_tagesdeckel_wird_angezeigt() -> None:
