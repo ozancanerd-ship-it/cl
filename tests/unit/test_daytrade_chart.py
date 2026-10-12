@@ -441,3 +441,23 @@ def test_startseite_zeigt_tageshandel_und_gold() -> None:
     assert "${depotZeile()}\n    ${sicherText(tageshandelZeile)}" in roh
     z = _funktion(roh, "tageshandelZeile")
     assert "Welle" in z and "Gold" in z and "zeigeTab(11)" in roh
+
+
+def test_uebungs_journal_rechnet_richtig() -> None:
+    js = (
+        _gold_js("dtjPruefe", "dtjR", "dtZahl")
+        + """
+    const t = {status: 'offen', richtung: 'long', einstieg: 100, stop: 99, ziel: 102, t0: 1000};
+    const k = [[500, 100, 98, 97, 98], [1000, 100, 101, 99.5, 100.5], [2000, 100.5, 102.5, 98.5, 101]];
+    const beides = dtjPruefe(t, k);             // Stop und Ziel in derselben Kerze -> Stop
+    const ziel = dtjPruefe(t, [[1000, 100, 102.2, 99.5, 102]]);
+    const shortT = dtjPruefe({...t, richtung: 'short', stop: 101, ziel: 98}, [[1000, 100, 100.5, 97.9, 98]]);
+    console.log(JSON.stringify([beides.status, ziel.status, shortT.status,
+      dtjR({...ziel}, 0), dtjR({...ziel}, 0.004), dtjR(beides, 0),
+      dtZahl('4.160,12'), dtZahl('4160.12'), dtZahl('0,25')]));"""
+    )
+    st1, st2, st3, r_ziel, r_ziel_geb, r_stop, z1, z2, z3 = _node(js)
+    assert (st1, st2, st3) == ("stop", "ziel", "ziel")  # alte Kerze vor dem Einstieg zaehlt nicht
+    assert r_ziel == pytest.approx(2.0) and r_stop == pytest.approx(-1.0)
+    assert r_ziel_geb == pytest.approx(2.0 - 2 * 0.004 * 100 / 1)
+    assert (z1, z2, z3) == (4160.12, 4160.12, 0.25)

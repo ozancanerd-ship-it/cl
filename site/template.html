@@ -10593,11 +10593,13 @@ function dtChartZeichnen(nurChart){
   if (q) q.textContent = `Kraken · ${new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}${tag ? ' · 24 Std. ' + pct((live / tag - 1) * 100, 1) : ''}`;
   if (nurChart && Date.now() - DTC.analyseZeit < 10000) return;
   if (nurChart && $('dtanalyse').querySelector('details[open]')) return;
-  if (nurChart && document.activeElement && document.activeElement.id === 'dtgeb') return;
+  const fokus = document.activeElement;
+  if (nurChart && fokus && $('dtanalyse').contains(fokus) && /^(INPUT|SELECT|TEXTAREA)$/.test(fokus.tagName)) return;
   DTC.analyseZeit = Date.now();
   // Wer gerade in der Analyse liest, verliert beim Neuaufbau seine Scrollposition nicht:
   // die Hoehe bleibt gleich, nur der Inhalt wechselt.
   $('dtanalyse').innerHTML = dtAnalyseHtml(sym, info, an, live);
+  try { dtjVerdrahten(sym); } catch(e){ console.error(e); }
   const gi = $('dtgeb');
   if (gi) gi.addEventListener('change', () => {
     const v = parseFloat(String(gi.value).replace(',', '.'));
@@ -10718,6 +10720,117 @@ function dtPlaybook(){
     <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Belege: docs/GOLD-INTRADAY-LITERATUR-STUDIE-2026-10.md, GOLD-DAYTRADING-STUDIE-2026-10.md, DAYTRADE-STUDIE-2026-10.md</p></div>`;
   return h;
 }
+/* ---------------------------------------------------------------- Uebungs-Journal (Paper)
+   "dass ich auch daraus lerne" (12.10.): Wissen aus Buechern ersetzt keine eigene Bilanz.
+   Hier traegt man eigene Tageshandels-Ideen als Paper-Trade ein — mit Stop, Ziel und einem
+   Satz "warum". Die App verfolgt sie an den Kraken-Kerzen (Stop zuerst, wenn beides in einer
+   Kerze liegt) und rechnet das Ergebnis in R NACH deiner Gebuehr. Nur in diesem Browser. */
+const DTJ_KEY = 'desk.dt.journal.v1';
+function dtjLaden(){ try { const a = JSON.parse(localStorage.getItem(DTJ_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch(e){ return []; } }
+function dtjSpeichern(a){ try { localStorage.setItem(DTJ_KEY, JSON.stringify(a.slice(-300))); } catch(e){} }
+/* Reines Rechnen: offenen Trade gegen Kerzen [t,o,h,l,c] pruefen (Kerzen NACH dem Einstieg). */
+function dtjPruefe(t, kerzen){
+  if (!t || t.status !== 'offen') return t;
+  const lang = t.richtung === 'long';
+  for (const k of (kerzen || [])){
+    if (k[0] < t.t0) continue;
+    const stopT = lang ? k[3] <= t.stop : k[2] >= t.stop;
+    const zielT = t.ziel != null && (lang ? k[2] >= t.ziel : k[3] <= t.ziel);
+    if (stopT) return {...t, status: 'stop', exit: t.stop, t1: k[0]};
+    if (zielT) return {...t, status: 'ziel', exit: t.ziel, t1: k[0]};
+  }
+  return t;
+}
+function dtjR(t, gebuehr){
+  const risiko = Math.abs(t.einstieg - t.stop);
+  if (!(risiko > 0) || t.exit == null) return null;
+  const brutto = (t.richtung === 'long' ? t.exit - t.einstieg : t.einstieg - t.exit) / risiko;
+  return brutto - (2 * gebuehr * t.einstieg) / risiko;
+}
+function dtjAktualisieren(){
+  const a = dtjLaden(); let geaendert = false;
+  const neu = a.map(t => {
+    if (t.status !== 'offen') return t;
+    const k = dtAlle(t.sym, 1) || dtAlle(t.sym, 5) || dtAlle(t.sym, 15);
+    const u = dtjPruefe(t, k);
+    if (u !== t) geaendert = true;
+    return u;
+  });
+  if (geaendert) dtjSpeichern(neu);
+  return neu;
+}
+function dtJournalHtml(sym, info, prog, live){
+  const a = dtjAktualisieren();
+  const geb = dtGebuehrLesen();
+  const fertig = a.filter(t => t.status !== 'offen');
+  const rs = fertig.map(t => dtjR(t, geb)).filter(x => x != null);
+  const sum = rs.reduce((x, y) => x + y, 0);
+  const e1 = prog && prog.je[1];
+  const stopVorschlag = e1 ? e1.lo95 : live * 0.99;
+  let h = `<h3>🧪 Übungs-Trade (Paper) — lerne an deiner eigenen Bilanz${dtFrage('r')}</h3><div class="karte">
+    <p style="margin:0 0 8px;font-size:12.5px;color:var(--ink-2)">Trag eine eigene Idee ein — mit Stop, Ziel und einem Satz, warum. Die App verfolgt sie an den echten Kraken-Kerzen und rechnet nach deiner Gebühr. Nach 20–30 Übungs-Trades siehst du, ob deine Ideen tragen — bevor echtes Geld drin ist.</p>
+    <div class="rowx"><span class="lab">Richtung</span><span class="val">
+      <select id="dtj_r" class="val"><option value="long">Long (steigt)</option><option value="short">Short (fällt)</option></select></span></div>
+    <div class="rowx"><span class="lab">Einstieg (Live-Kurs)</span><span class="val">${num(live)} $</span></div>
+    <div class="rowx"><span class="lab">Stop${e1 ? ' <span style="font-size:11px;color:var(--ink-3)">Vorschlag: außerhalb der 1-Std.-Spanne</span>' : ''}</span>
+      <span class="val"><input id="dtj_s" class="val" inputmode="decimal" style="width:110px;text-align:right" value="${num(stopVorschlag).replace(/\./g, '')}"></span></div>
+    <div class="rowx"><span class="lab">Ziel <span style="font-size:11px;color:var(--ink-3)">leer = 2 R</span></span>
+      <span class="val"><input id="dtj_z" class="val" inputmode="decimal" style="width:110px;text-align:right" placeholder="2 R"></span></div>
+    <div class="rowx"><span class="lab">Warum? (ein Satz)</span><span class="val"><input id="dtj_n" class="val" style="width:100%" maxlength="140" placeholder="z. B. Asien-Hoch gebrochen, US-Daten vorbei"></span></div>
+    <p style="margin:10px 0 0"><button class="btn" id="dtj_add">Übungs-Trade eintragen</button> <span id="dtj_msg" style="font-size:12px;margin-left:8px"></span></p>`;
+  const offen = a.filter(t => t.status === 'offen');
+  if (offen.length){
+    h += `<p style="margin:12px 0 4px;font-size:13px"><b>Offen</b></p>` + offen.map(t => {
+      const lp = t.sym === sym ? live : null;
+      const r = lp != null ? dtjR({...t, exit: lp}, geb) : null;
+      return `<div class="rowx"><span class="lab">${esc(t.sym)} ${t.richtung === 'long' ? '▲' : '▼'} ${num(t.einstieg)} · Stop ${num(t.stop)}${t.ziel != null ? ' · Ziel ' + num(t.ziel) : ''}<br><span style="font-size:11px;color:var(--ink-3)">${esc(t.notiz || '')}</span></span>
+        <span class="val">${r != null ? `<b class="${r >= 0 ? 'up' : 'dn'}">${(r >= 0 ? '+' : '') + num(r, 2)} R</b> ` : ''}<br><span style="font-size:11px;color:var(--ink-3)">davon Gebühr −${num(2 * geb * t.einstieg / Math.abs(t.einstieg - t.stop), 2)} R</span><br><button class="link" data-dtjzu="${t.id}">jetzt schließen</button></span></div>`;
+    }).join('');
+  }
+  if (fertig.length){
+    h += `<p style="margin:12px 0 4px;font-size:13px"><b>Deine Bilanz</b>: ${fertig.length} Trades · Summe <b class="${sum >= 0 ? 'up' : 'dn'}">${(sum >= 0 ? '+' : '') + num(sum, 2)} R</b> · Ø ${num(rs.length ? sum / rs.length : 0, 2)} R · Treffer ${rs.length ? Math.round(rs.filter(x => x > 0).length / rs.length * 100) : 0} % (nach Gebühr)</p>`
+      + fertig.slice(-8).reverse().map(t => { const r = dtjR(t, geb); return `<div class="rowx"><span class="lab">${esc(t.sym)} ${t.richtung === 'long' ? '▲' : '▼'} · ${zeit(new Date(t.t0).toISOString())} · ${esc({stop: 'Stop', ziel: 'Ziel', manuell: 'von Hand'}[t.status] || t.status)}<br><span style="font-size:11px;color:var(--ink-3)">${esc(t.notiz || '')}</span></span>
+        <span class="val"><b class="${r >= 0 ? 'up' : 'dn'}">${r == null ? '—' : (r >= 0 ? '+' : '') + num(r, 2) + ' R'}</b></span></div>`; }).join('');
+    if (fertig.length < 20) h += `<p style="font-size:11.5px;color:var(--ink-3);margin:6px 0 0">Unter 20 Trades sagt die Bilanz noch wenig — Glück und Pech überwiegen.</p>`;
+  }
+  return h + `</div>`;
+}
+/* "4.160,12" (deutsch) und "4160.12" (Punkt) beide richtig lesen. */
+function dtZahl(v){
+  let x = String(v == null ? '' : v).trim().replace(/\s/g, '');
+  if (x.includes(',')) x = x.replace(/\./g, '').replace(',', '.');
+  return parseFloat(x);
+}
+function dtjVerdrahten(sym){
+  const add = $('dtj_add');
+  if (add) add.addEventListener('click', () => {
+    const lese = id => dtZahl(($(id) || {}).value);
+    const d = DTC.daten.get(sym + '|' + DTC.tf);
+    const tk = DTWS.tick;
+    const live = tk && isFinite(tk.last) && Date.now() - tk.zeit < 60000 ? tk.last : (d && d.alle ? d.alle[d.alle.length - 1][4] : null);
+    const richtung = ($('dtj_r') || {}).value === 'short' ? 'short' : 'long';
+    const stop = lese('dtj_s'); let ziel = lese('dtj_z');
+    const msg = $('dtj_msg');
+    const fehler = !isFinite(live) ? 'Kein Live-Kurs.' : !isFinite(stop) ? 'Stop fehlt.'
+      : (richtung === 'long' ? stop >= live : stop <= live) ? 'Stop liegt auf der falschen Seite.' : '';
+    if (fehler){ if (msg){ msg.textContent = fehler; msg.style.color = 'var(--bad)'; } return; }
+    if (!isFinite(ziel)) ziel = live + (richtung === 'long' ? 2 : -2) * Math.abs(live - stop);
+    const a = dtjLaden();
+    a.push({id: Date.now().toString(36), sym, richtung, einstieg: live, stop, ziel, t0: Date.now(), status: 'offen',
+            notiz: String(($('dtj_n') || {}).value || '').slice(0, 140)});
+    dtjSpeichern(a);
+    if (DTC.tf !== 1) dtLaden(sym, 1);
+    DTC.analyseZeit = 0; dtChartZeichnen();
+  });
+  document.querySelectorAll('[data-dtjzu]').forEach(b => b.addEventListener('click', () => {
+    const d = DTC.daten.get(DTC.sym + '|' + DTC.tf);
+    const tk = DTWS.tick;
+    const live = tk && isFinite(tk.last) && Date.now() - tk.zeit < 60000 ? tk.last : (d && d.alle ? d.alle[d.alle.length - 1][4] : null);
+    const a = dtjLaden().map(t => t.id === b.dataset.dtjzu && t.status === 'offen' && t.sym === DTC.sym && isFinite(live)
+      ? {...t, status: 'manuell', exit: live, t1: Date.now()} : t);
+    dtjSpeichern(a); DTC.analyseZeit = 0; dtChartZeichnen();
+  }));
+}
 function dtZeile(ok, text, wert){
   return `<li><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</span><span>${text}</span><span class="v">${wert || ''}</span></li>`;
 }
@@ -10780,6 +10893,7 @@ function dtAnalyseHtml(sym, info, an, live){
       <div class="rowx"><span class="lab">24-Std.-Tief (Ausstiegsmarke der Regel)</span><span class="val">${num(an.tief24)} $</span></div>
     </div>`;
   }
+  try { h += dtJournalHtml(sym, info, DTC.prog, live); } catch(e){ console.error(e); }
   return h + dtBegriffeHtml();
 }
 /* Takt: Websocket an/aus je nach Reiter, Historie nachladen (der Websocket haelt nur die
@@ -10788,6 +10902,7 @@ function dtTakt(){
   dtWsPruefen();
   if (!$('p11') || $('p11').hidden || !DTC.sym) return;
   dtAllesLaden(DTC.sym);
+  try { for (const t of dtjLaden()) if (t.status === 'offen') dtLaden(t.sym, 5); } catch(e){}
   dtChartZeichnen(true);
 }
 setInterval(dtTakt, 15000);
