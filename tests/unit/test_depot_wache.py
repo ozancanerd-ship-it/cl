@@ -648,3 +648,51 @@ def test_stundenschluss_nur_aus_frischen_vollstaendigen_kerzen() -> None:
     assert letzter_schluss(k, jetzt + 3 * 3600) is None  # veraltet
     assert letzter_schluss(k, 1_000_000 + 3600 * 3 - 60) is None  # fertige Kerze noch nicht zu
     assert letzter_schluss([["x"] * 5] * 3, jetzt) is None  # Müll
+
+
+def test_trend_von_und_rsi() -> None:
+    from trading_agent.portfolio_intel.depot_stops import rsi14, trend_von
+
+    steigend = [100 + i * 0.5 for i in range(260)]
+    fallend = [200 - i * 0.5 for i in range(260)]
+    assert trend_von(steigend) == "auf"
+    assert trend_von(fallend) == "ab"
+    assert trend_von(steigend[:100]) is None  # zu wenig Daten: nichts behaupten
+    assert rsi14(steigend) == 100.0
+    assert rsi14(fallend) < 5
+    assert rsi14(steigend[:10]) is None
+
+
+def test_lage_zeile_zeigt_konflikt_zum_trend_statt_ihn_zu_verschweigen() -> None:
+    from trading_agent.portfolio_intel.depot_stops import lage_zeile
+
+    auf = {"d1": "auf", "h4": "auf", "rsi_h1": 71.0}
+    t = lage_zeile(True, 110.0, 120.0, 100.0, auf, "$")
+    assert "Konflikt" in t and "Teilverkauf kostet Upside" in t
+    assert "RSI (1 Std.) 71" in t and "nächsten Ziel" in t and "Stop" in t
+    dreht = lage_zeile(True, 110.0, None, 100.0, {"d1": "ab", "h4": "auf"}, "$")
+    assert "stützt den Teilverkauf" in dreht
+    keine = lage_zeile(True, 110.0, None, 100.0, None, "$")
+    assert "keine Daten" in keine
+    assert "keine Pflicht" in keine
+
+
+def test_bestaetigter_teilverkauf_enthaelt_die_lage() -> None:
+    kontext = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 66.0}}
+    _, ev, _ = pruefe_depot(
+        _pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 110.2}, kontext
+    )
+    ziel = next(e for e in ev if e.art == "ziel")
+    assert "Lage:" in ziel.text and "Konflikt" in ziel.text
+    assert "Stundenschluss bestätigt" in ziel.text
+
+
+def test_geschlossene_schluesse_alle_intervalle() -> None:
+    from scripts.depot_wache import geschlossene_schluesse
+
+    t0 = 2_000_000.0
+    k4 = [[t0 + 14400 * i, 1, 1, 1, 50 + i, 1, 1, 1] for i in range(5)]
+    jetzt = t0 + 14400 * 4 + 900
+    assert geschlossene_schluesse(k4, 14400, jetzt) == [50.0, 51.0, 52.0, 53.0]
+    assert geschlossene_schluesse(k4, 14400, jetzt + 14400 * 3) is None  # veraltet
+    assert geschlossene_schluesse(k4, 3600, jetzt) is None  # falscher Takt

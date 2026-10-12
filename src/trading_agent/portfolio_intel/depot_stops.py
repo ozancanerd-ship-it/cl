@@ -358,6 +358,85 @@ class Ereignis:
         return f"{self.key}|{self.art}|{self.marke}"
 
 
+def ema_wert(werte: list[float], n: int) -> float | None:
+    """Letzter EMA-Wert (Start mit dem ersten Wert), ``None`` bei zu wenig Daten."""
+    if len(werte) < n:
+        return None
+    a, e = 2 / (n + 1), werte[0]
+    for v in werte[1:]:
+        e = a * v + (1 - a) * e
+    return e
+
+
+def trend_von(closes: list[float]) -> str | None:
+    """Grobe Trendlage einer Zeiteinheit: ``auf`` (Kurs und EMA 50 ueber EMA 200), ``ab``
+    (beides darunter), sonst ``gemischt``. ``None``, wenn weniger als 210 Schluesse da sind."""
+    if len(closes) < 210:
+        return None
+    e50, e200 = ema_wert(closes, 50), ema_wert(closes, 200)
+    if e50 is None or e200 is None:
+        return None
+    c = closes[-1]
+    if c > e200 and e50 > e200:
+        return "auf"
+    if c < e200 and e50 < e200:
+        return "ab"
+    return "gemischt"
+
+
+def rsi14(closes: list[float]) -> float | None:
+    """RSI(14) nach Wilder, ``None`` bei zu wenig Daten."""
+    if len(closes) < 30:
+        return None
+    d = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+    g = sum(max(x, 0) for x in d[:14]) / 14
+    v = sum(max(-x, 0) for x in d[:14]) / 14
+    for x in d[14:]:
+        g = (g * 13 + max(x, 0)) / 14
+        v = (v * 13 + max(-x, 0)) / 14
+    return 100.0 if v == 0 else 100 - 100 / (1 + g / v)
+
+
+_TREND_TXT = {"auf": "aufwärts", "ab": "abwärts", "gemischt": "uneins"}
+
+
+def lage_zeile(
+    lang: bool,
+    kurs: float,
+    ziel_next: float | None,
+    stop: float | None,
+    kontext: dict[str, Any] | None,
+    z: str,
+) -> str:
+    """Die Lage hinter einem Teilverkauf-Hinweis: Trend D1/H4, Momentum, verbleibendes
+    Upside, Abstand zum Stop. Ein bestaetigter Stundenschluss ist ein Anlass zum Pruefen —
+    kein Befehl; Widersprueche zum Trend stehen im Text statt verschwiegen zu werden."""
+    k = kontext or {}
+    d1, h4 = k.get("d1"), k.get("h4")
+    teile: list[str] = []
+    if d1 is None and h4 is None:
+        teile.append("Trend D1/H4: keine Daten")
+    else:
+        t = f"Trend D1 {_TREND_TXT.get(d1, '—')}, H4 {_TREND_TXT.get(h4, '—')}"
+        dafuer = "auf" if lang else "ab"
+        dagegen = "ab" if lang else "auf"
+        if d1 == dafuer and h4 == dafuer:
+            t += " — Konflikt: der Trend läuft weiter in Richtung deiner Position, ein Teilverkauf kostet Upside"
+        elif dagegen in (d1, h4):
+            t += " — Trend dreht gegen die Position, das stützt den Teilverkauf"
+        else:
+            t += " — Trend uneinheitlich"
+        teile.append(t)
+    rsi = k.get("rsi_h1")
+    if rsi is not None:
+        teile.append(f"RSI (1 Std.) {rsi:.0f}")
+    if ziel_next is not None and kurs:
+        teile.append(f"bis zum nächsten Ziel {_fmt(ziel_next)}{z} noch {abs(ziel_next - kurs) / kurs * 100:.1f} %".replace(".", ","))
+    if stop is not None and kurs:
+        teile.append(f"Stop {_fmt(stop)}{z} ({abs(kurs - stop) / kurs * 100:.1f} % entfernt)".replace(".", ","))
+    return " Lage: " + "; ".join(teile) + ". Das ist ein Hinweis zum Prüfen, keine Pflicht."
+
+
 def _fmt(x: float | None) -> str:
     if x is None:
         return "—"
@@ -379,6 +458,7 @@ def pflegen(
     lg: Lage,
     alt: dict[str, Any] | None,
     schluss: dict[str, float] | None = None,
+    kontext: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[Ereignis]]:
     """Neuer Stand fuer eine Position plus das, was zu melden ist.
 
@@ -700,6 +780,15 @@ def pflegen(
                 extra += f" Neuer Stop: {_fmt(neu_stop)}{z}."
             if menge and menge > 0 and offen > 0:
                 extra += f" Erlös ca. {_fmt((menge / offen) * kurs)}{z} brutto."
+            naechstes = {"TP1": "tp2", "TP2": "tp3"}.get(marke)
+            extra += lage_zeile(
+                bool(lang),
+                kurs,
+                _zahl(ziele.get(naechstes)) if naechstes else None,
+                _zahl(st.get("stop")),
+                (kontext or {}).get(inst),
+                z,
+            )
             ev.append(
                 Ereignis(
                     "ziel",
@@ -800,6 +889,7 @@ def pruefe_depot(
     scan: dict[str, Any],
     stand: dict[str, Any],
     schluss: dict[str, float] | None = None,
+    kontext: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[Ereignis], dict[str, Any]]:
     """Das ganze Depot einmal durch. Gibt (neuer Stand, Ereignisse, Uebersicht) zurueck.
 
@@ -830,7 +920,7 @@ def pruefe_depot(
                 for k, v in alt.items()
                 if k not in ("ausgestoppt", "stop", "gemeldet_stop", "quelle")
             }
-        st, ev = pflegen(pos, lg, alt, schluss)
+        st, ev = pflegen(pos, lg, alt, schluss, kontext)
         st["menge"] = menge
         neu_pos[key] = st
         alle.extend(ev)

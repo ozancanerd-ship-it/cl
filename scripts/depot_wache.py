@@ -282,38 +282,46 @@ async def livekurse(
     return aus
 
 
-def letzter_schluss(kerzen: list[Any], jetzt_ts: float) -> float | None:
-    """Schluss der letzten ABGESCHLOSSENEN Stundenkerze — oder ``None``, wenn die Daten
-    nicht taugen. Kraken liefert als letzte Zeile die laufende Kerze; die vorletzte ist
-    fertig. Verlangt: mindestens drei Kerzen, lueckenlos stuendlich in den letzten Zeilen,
-    die fertige Kerze nicht aelter als zwei Stunden und noch nicht in der Zukunft."""
+def geschlossene_schluesse(kerzen: list[Any], intervall_s: int, jetzt_ts: float) -> list[float] | None:
+    """Schluesse der ABGESCHLOSSENEN Kerzen — oder ``None``, wenn die Daten nicht taugen.
+
+    Kraken liefert als letzte Zeile die laufende Kerze; sie wird weggelassen. Verlangt:
+    mindestens drei Kerzen, die letzten drei lueckenlos im Takt, die letzte fertige Kerze
+    nicht in der Zukunft und nicht aelter als zwei Intervalle. Fehlende, lueckenhafte oder
+    veraltete Daten liefern ``None`` und koennen so nie einen bestaetigten Alarm ausloesen."""
     if len(kerzen) < 3:
         return None
     try:
         zeiten = [float(k[0]) for k in kerzen[-3:]]
-        if zeiten[1] - zeiten[0] != 3600 or zeiten[2] - zeiten[1] != 3600:
-            return None  # Luecke oder falscher Takt
-        ende = zeiten[1] + 3600
-        if ende > jetzt_ts or jetzt_ts - ende >= 2 * 3600:
-            return None  # noch nicht abgeschlossen oder veraltet
-        c = float(kerzen[-2][4])
+        if zeiten[1] - zeiten[0] != intervall_s or zeiten[2] - zeiten[1] != intervall_s:
+            return None
+        ende = zeiten[1] + intervall_s
+        if ende > jetzt_ts or jetzt_ts - ende >= 2 * intervall_s:
+            return None
+        closes = [float(k[4]) for k in kerzen[:-1]]
     except (TypeError, ValueError, IndexError):
         return None
-    return c if c > 0 else None
+    return closes if closes and all(c > 0 for c in closes[-3:]) else None
 
 
-async def stunden_schluesse(
+def letzter_schluss(kerzen: list[Any], jetzt_ts: float) -> float | None:
+    """Schluss der letzten abgeschlossenen Stundenkerze (siehe ``geschlossene_schluesse``)."""
+    c = geschlossene_schluesse(kerzen, 3600, jetzt_ts)
+    return c[-1] if c else None
+
+
+async def marktdaten(
     scan: dict[str, Any], positionen: list[dict[str, Any]], jetzt: datetime
-) -> dict[str, float]:
-    """Letzter ABGESCHLOSSENER Stundenschluss je Krypto-/Gold-Instrument (Kraken, 60 Min.).
+) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
+    """Stundenschluss, Trend (D1/H4) und Momentum fuer Krypto-/Gold-Positionen (Kraken).
 
-    Nur verwendbar, wenn die Kerze vollstaendig und frisch ist: Die letzte geschlossene
-    Kerze darf hoechstens zwei Stunden alt sein, und es muessen mindestens zwei Kerzen da
-    sein. Alles andere — Aktien, fehlende oder veraltete Daten, Fehler — fehlt im Ergebnis.
-    Ein fehlender Schluss erzeugt nie eine bestaetigte Meldung (siehe ``pflegen``)."""
+    Rueckgabe: ``(schluss, kontext)``. ``schluss[inst]`` = letzter abgeschlossener
+    Stundenschluss; ``kontext[inst]`` = ``{"d1", "h4", "rsi_h1"}``. Was fehlt oder nicht
+    frisch genug ist, fehlt im Ergebnis — nie geraten. Aktien haben hier keine Stundendaten
+    und bekommen den Hinweis „ohne Stundenbestaetigung"."""
     import httpx
 
-    from trading_agent.portfolio_intel.depot_stops import ScanIndex, lage_fuer
+    from trading_agent.portfolio_intel.depot_stops import ScanIndex, lage_fuer, rsi14, trend_von
 
     idx = ScanIndex(scan)
     brauche: set[str] = set()
@@ -321,26 +329,38 @@ async def stunden_schluesse(
         lg = lage_fuer(pos, idx)
         if lg.row and str(lg.row.get("klasse") or "") in ("krypto", "gold") and lg.row.get("instrument"):
             brauche.add(str(lg.row["instrument"]))
-    aus: dict[str, float] = {}
+    schluss: dict[str, float] = {}
+    kontext: dict[str, dict[str, Any]] = {}
     jetzt_ts = jetzt.timestamp()
+
+    async def holen(c: Any, inst: str, minuten: int) -> list[float] | None:
+        try:
+            r = await c.get("https://api.kraken.com/0/public/OHLC", params={"pair": inst, "interval": minuten})
+            d = r.json()
+            if d.get("error"):
+                return None
+            werte = [v for k, v in (d.get("result") or {}).items() if k != "last" and isinstance(v, list)]
+            return geschlossene_schluesse(werte[0], minuten * 60, jetzt_ts) if werte else None
+        except Exception:
+            return None
+        finally:
+            await asyncio.sleep(0.4)  # oeffentliche Kraken-Schnittstelle: hoechstens etwa eine Anfrage je Sekunde
+
     async with httpx.AsyncClient(timeout=15.0) as c:
-        for inst in brauche:
+        for inst in sorted(brauche):
             if not inst.endswith("USD"):
                 continue
-            try:
-                r = await c.get("https://api.kraken.com/0/public/OHLC", params={"pair": inst, "interval": 60})
-                d = r.json()
-                if d.get("error"):
-                    continue
-                werte = [v for k, v in (d.get("result") or {}).items() if k != "last" and isinstance(v, list)]
-                if not werte or len(werte[0]) < 3:
-                    continue
-                schluss = letzter_schluss(werte[0], jetzt_ts)
-                if schluss is not None:
-                    aus[inst] = schluss
-            except Exception:
-                continue
-    return aus
+            h1 = await holen(c, inst, 60)
+            h4 = await holen(c, inst, 240)
+            d1 = await holen(c, inst, 1440)
+            if h1:
+                schluss[inst] = h1[-1]
+            kontext[inst] = {
+                "d1": trend_von(d1) if d1 else None,
+                "h4": trend_von(h4) if h4 else None,
+                "rsi_h1": rsi14(h1) if h1 else None,
+            }
+    return schluss, kontext
 
 
 def scan_holen(pfad: str, url: str) -> dict[str, Any] | None:
@@ -525,8 +545,8 @@ def main() -> int:
     # aus etwas Festem kommen, sonst finge der Waechter nach jeder Aenderung bei null an.
     schluessel = schluessel_aus(sync_geheim if sync_roh else roh, ZWECK)
     stand = stand_laden(args.stand, schluessel)
-    schluss = asyncio.run(stunden_schluesse(scan, positionen, datetime.now(UTC)))
-    neuer_stand, ereignisse, uebersicht = pruefe_depot(positionen, scan, stand, schluss)
+    schluss, kontext = asyncio.run(marktdaten(scan, positionen, datetime.now(UTC)))
+    neuer_stand, ereignisse, uebersicht = pruefe_depot(positionen, scan, stand, schluss, kontext)
 
     # Merker von Positionen, die es nicht mehr gibt, fallen weg — sonst meldete ein
     # spaeterer Wiedereinstieg nie wieder etwas.
