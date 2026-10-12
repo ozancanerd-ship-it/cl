@@ -310,6 +310,24 @@ def letzter_schluss(kerzen: list[Any], jetzt_ts: float) -> float | None:
     return c[-1] if c else None
 
 
+def schluesse_aus_ohlcv(bars: list[Any], jetzt: datetime, max_alter_s: float) -> list[float] | None:
+    """Schluesse aus abgeschlossenen ``OHLCV``-Kerzen (Yahoo) — nur wenn frisch.
+
+    ``None`` bei weniger als drei Kerzen, einer Kerze, die noch nicht zu ist, oder einer
+    letzten Kerze, die aelter als ``max_alter_s`` ist (Boerse zu, Datenluecke)."""
+    if len(bars) < 3:
+        return None
+    try:
+        bars = sorted(bars, key=lambda b: b.open_time)
+        letzte = bars[-1]
+        if letzte.close_time > jetzt or (jetzt - letzte.close_time).total_seconds() >= max_alter_s:
+            return None
+        closes = [float(b.close) for b in bars]
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return closes if all(c > 0 for c in closes[-3:]) else None
+
+
 async def marktdaten(
     scan: dict[str, Any], positionen: list[dict[str, Any]], jetzt: datetime
 ) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
@@ -360,6 +378,39 @@ async def marktdaten(
                 "h4": trend_von(h4) if h4 else None,
                 "rsi_h1": rsi14(h1) if h1 else None,
             }
+    # Aktien: Yahoo-Stundenkerzen, nur waehrend der Boersenzeit (sonst gibt es keine frische
+    # Kerze). Yahoo liefert keine 4-Stunden-Kerzen — H4 bleibt hier ausdruecklich leer.
+    aktien: set[str] = set()
+    for pos in positionen:
+        lg = lage_fuer(pos, idx)
+        if lg.row and str(lg.row.get("klasse") or "") == "aktien" and lg.row.get("instrument"):
+            aktien.add(str(lg.row["instrument"]))
+    if aktien and _boerse_offen(jetzt):
+        from datetime import timedelta
+
+        from trading_agent.core.enums import Timeframe
+        from trading_agent.data.providers.yahoo_finance import YahooFinanceProvider
+
+        prov = YahooFinanceProvider()
+        try:
+            for inst in sorted(aktien):
+                try:
+                    h1b = await prov.fetch_ohlcv(inst, Timeframe.H1, jetzt - timedelta(days=30), jetzt)
+                    d1b = await prov.fetch_ohlcv(inst, Timeframe.D1, jetzt - timedelta(days=500), jetzt)
+                except Exception:
+                    continue
+                h1 = schluesse_aus_ohlcv(h1b, jetzt, 2 * 3600 + 1800)
+                d1 = schluesse_aus_ohlcv(d1b, jetzt, 4 * 86400)
+                if h1:
+                    schluss[inst] = h1[-1]
+                kontext[inst] = {
+                    "d1": trend_von(d1) if d1 else None,
+                    "h4": None,
+                    "rsi_h1": rsi14(h1) if h1 else None,
+                }
+        finally:
+            with contextlib.suppress(Exception):
+                await prov.aclose()
     return schluss, kontext
 
 

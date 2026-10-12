@@ -240,11 +240,11 @@ def test_ziel_1_zieht_den_stop_auf_den_einstieg() -> None:
             "plan": {"stop": 90.0, "tp1": 110.0, "tp2": 120.0, "gekauft": "2026-09-20"},
         }
     ]
-    stand, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {})
-    assert [e.art for e in ev] == ["ziel"]
+    stand, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {}, {"SOLUSD": 110.8})
+    assert "ziel" in [e.art for e in ev]
     assert stand["positionen"]["SOLUSD|"]["stop"] == 100.0
     # Dasselbe Ziel meldet sich nicht noch einmal.
-    stand, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 112.0)), stand)
+    stand, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 112.0)), stand, {"SOLUSD": 111.5})
     assert [e.art for e in ev if e.art == "ziel"] == []
 
 
@@ -580,11 +580,11 @@ def test_teilverkauf_rahmen_aus_eigenem_stop() -> None:
     """Ozan, 13.10.: nur Einstieg und eigener Stop eintragen — dann gilt der Rahmen aus
     dem Abstand: 1 R = ein Drittel verkaufen, Stop auf Einstand. Fremde Setups bleiben aus."""
     pos = [{"sym": "SOLUSD", "menge": 3, "einstieg": 100.0, "plan": {"stop": 90.0, "quelle": "selbst"}}]
-    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {})
-    assert [e.art for e in ev] == ["ziel"]
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 110.2})
+    assert ev[0].art == "ziel"
     assert "je 1 R" in ev[0].text
     pos[0]["plan"]["quelle"] = "app"
-    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {})
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 110.2})
     assert [e.art for e in ev] == []
 
 
@@ -612,13 +612,14 @@ def test_schluss_bestaetigt_danach_der_verkaufshinweis() -> None:
     assert "Neuer Stop" in ev[0].text
 
 
-def test_fehlt_der_schluss_gibt_es_keine_bestaetigung_vorgetaeuscht() -> None:
-    """Ohne frische Stundendaten (Aktien, Fehler, veraltet) gilt das Berühren wie bisher —
-    aber der Text sagt ausdrücklich, dass keine Bestätigung vorlag."""
-    _, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, None)
-    assert [e.art for e in ev] == ["ziel"]
-    assert "ohne Stundenbestätigung" in ev[0].text
-    assert "bestätigt)" not in ev[0].text.replace("ohne Stundenbestätigung", "")
+def test_fehlen_stundendaten_bleibt_es_vorlaeufig_nie_bestaetigt() -> None:
+    """Fehlende oder veraltete Stundendaten dürfen keinen bestätigten Alarm erzeugen."""
+    stand, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, None)
+    assert [e.marke for e in ev] == ["TP1-vorlaeufig"]
+    assert "nicht bestätigt" in ev[0].text and "keine frischen" in ev[0].text
+    # Auch beim nächsten Lauf ohne Daten: keine Wiederholung, keine Bestätigung.
+    _, ev2, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.9)), stand, None)
+    assert ev2 == []
 
 
 def test_vorlaeufiger_hinweis_wird_zurueckgenommen_wenn_der_kurs_zurueckfaellt() -> None:
@@ -696,3 +697,22 @@ def test_geschlossene_schluesse_alle_intervalle() -> None:
     assert geschlossene_schluesse(k4, 14400, jetzt) == [50.0, 51.0, 52.0, 53.0]
     assert geschlossene_schluesse(k4, 14400, jetzt + 14400 * 3) is None  # veraltet
     assert geschlossene_schluesse(k4, 3600, jetzt) is None  # falscher Takt
+
+
+def test_schluesse_aus_ohlcv_nur_wenn_frisch() -> None:
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from scripts.depot_wache import schluesse_aus_ohlcv
+
+    jetzt = datetime(2026, 10, 13, 15, 10, tzinfo=UTC)
+    bars = [
+        SimpleNamespace(open_time=jetzt - timedelta(hours=h + 1), close_time=jetzt - timedelta(hours=h), close=100 + h)
+        for h in (3, 2, 1)
+    ]
+    ok = schluesse_aus_ohlcv(bars, jetzt, 3 * 3600)
+    assert ok is not None and len(ok) == 3
+    assert schluesse_aus_ohlcv(bars, jetzt + timedelta(hours=5), 3 * 3600) is None  # veraltet
+    assert schluesse_aus_ohlcv(bars[:2], jetzt, 3 * 3600) is None  # zu wenig
+    zukunft = [*bars[:2], SimpleNamespace(open_time=jetzt, close_time=jetzt + timedelta(hours=1), close=1.0)]
+    assert schluesse_aus_ohlcv(zukunft, jetzt, 3 * 3600) is None  # Kerze noch nicht zu

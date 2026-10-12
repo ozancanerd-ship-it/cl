@@ -724,16 +724,21 @@ def pflegen(
         # Stundenbestaetigung: nur wenn ein frischer, abgeschlossener Schluss vorliegt.
         # Ohne Daten keine Bestaetigung behaupten — dann gilt das Beruehren wie bisher.
         schluss_ok = None if close is None else ((close >= ziel) if lang else (close <= ziel))
-        if beruehrt and schluss_ok is False and marke not in vor:
+        if beruehrt and schluss_ok is not True and marke not in vor:
             st["vorlaeufig"] = sorted(vor | {marke})
+            grund = (
+                "Es liegen keine frischen, vollständigen Stundendaten vor — nicht bestätigt."
+                if schluss_ok is None
+                else "Der letzte abgeschlossene Stundenschluss liegt noch nicht über dem Ziel."
+            )
             ev.append(
                 Ereignis(
                     "ziel",
                     lg.key,
                     wer,
                     f"VORLÄUFIG: {marke} berührt ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}). "
-                    "Noch nicht bestätigt — erst der abgeschlossene Stundenschluss entscheidet. "
-                    "Bis dahin kein Verkauf.",
+                    f"{grund} Erst ein bestätigter Stundenschluss macht daraus einen "
+                    "Verkaufshinweis. Bis dahin kein Verkauf.",
                     True,
                     marke=f"{marke}-vorlaeufig",
                 )
@@ -752,8 +757,8 @@ def pflegen(
                 )
             )
             break
-        if beruehrt and schluss_ok is False:
-            break  # schon vorläufig gemeldet; der abgeschlossene Schluss bestätigt noch nicht
+        if beruehrt and schluss_ok is not True:
+            break  # schon vorläufig gemeldet; ohne bestätigten Schluss kein Verkaufshinweis
         if beruehrt and marke in vor:
             st["vorlaeufig"] = sorted(vor - {marke})
         if beruehrt:
@@ -767,10 +772,7 @@ def pflegen(
                 else " Damit ist der Trade zu."
             )
             rahmen_satz = " (Ziel aus deinem Stop: je 1 R)" if rahmen else ""
-            if schluss_ok:
-                rahmen_satz += " (Stundenschluss bestätigt)"
-            elif close is None:
-                rahmen_satz += " (ohne Stundenbestätigung — keine Stundendaten)"
+            rahmen_satz += " (Stundenschluss bestätigt)"
             # Was der Verkauf bringt und wohin der Stop wandert — als feste Zahlen, nicht
             # als Hinweis auf eine Rechnung, die man selbst machen muss.
             ein_r = _zahl(pos.get("einstieg"))
