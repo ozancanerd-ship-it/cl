@@ -11,7 +11,14 @@ Krypto und fuer Gold". Grundlage ist ``scripts/daytrade_studie.py`` (Ergebnis in
   OOS +0,14 R je Trade nach 0,25 % Kosten, 16/24 Coins im Plus, jedes Jahr 2022–2026 >= 0.
   Ohne die Welle (einzelne Ausbrueche) war es negativ — deshalb gibt es fuer die keinen Alarm.
 * **Gold (PAXG) — experimentell.** Dieselbe Ausbruchsregel ohne Welle: OOS +0,45 R, aber
-  2022–24 deutlich negativ. Lief nur in der Gold-Hausse. Alarm kommt mit 🧪.
+  2022–24 deutlich negativ. Lief nur in der Gold-Hausse. Seit 12.10. KEIN Push mehr, nur
+  Paper und Anzeige — Ozan: "Benachrichtigung fuer Entry ... aber nur wenn es sich lohnt".
+  Gold-Alarme kommen weiter aus S9 (``scripts/gold_daytrading_status.py``).
+
+"LOHNT SICH"-TOR (12.10.2026): ein Einstiegs-Push nur, wenn der Coin in der Welle KLAR
+ausbricht — Schluss mindestens 0,25 ATR(24) ueber dem 48-Std.-Hoch
+(``daytrade_ausbruch.MIN_UEBERHANG_ATR``). Knappe Ausbrueche waren IS und OOS die schwaechste
+Gruppe; sie laufen als Paper-Gegenprobe mit, ohne Push.
 
 Ein Alarm je Lauf und Art (Einstiege gebuendelt, Ausstiege gebuendelt) — eine Welle mit
 zehn Coins ist EINE Meldung, nicht zehn. Jeder Trade wird als Paper-Trade vorwaerts
@@ -65,6 +72,9 @@ COINS = {
     "XLM": "XLMUSD",
 }
 GOLD = {"PAXG": "PAXGUSD"}
+#: Nur Anzeige (Chart + Analyse), zaehlt NICHT zur Welle und bekommt keine Alarme —
+#: Ozan haelt TAO (12.10.). Nicht Teil der Studie.
+EXTRA = {"TAO": "TAOUSD"}
 NAMEN = {
     "BTC": "Bitcoin",
     "ETH": "Ethereum",
@@ -91,6 +101,7 @@ NAMEN = {
     "TRX": "Tron",
     "XLM": "Stellar",
     "PAXG": "Gold (Pax Gold)",
+    "TAO": "Bittensor",
 }
 MIN_WELLE = 12
 FENSTER_BARS = 3  # Laeufe kommen alle ~10 Min.; drei Stunden decken Ausfaelle ab
@@ -115,13 +126,18 @@ STUDIE = {
         "mit Kraken-Marktorder (0,4 % je Seite) ist der Vorteil weg",
         "status": "KANDIDAT — OOS bestätigt, aber die Wellen-Schwelle wurde nach Sicht auf "
         "die IS-Daten gewählt; die Forward-Bilanz entscheidet",
+        "tor": "Push nur bei klarem Ausbruch (Schluss ≥ 0,25 ATR über dem 48-Std.-Hoch): "
+        "knappe Ausbrüche IS +0,02 R / OOS −0,30 R, klare IS +0,27 R / OOS +0,28 R, "
+        "OOS-Untergrenze (Bootstrap 5 %) +0,11 R, 18/24 Coins im Plus. Nachtrag mit Sicht "
+        "auf IS und OOS — darum weiter Kandidat",
         "doc": "docs/DAYTRADE-STUDIE-2026-10.md",
     },
     "gold": {
         "regel": "dieselbe Ausbruchsregel auf Pax Gold, ohne Welle",
         "is": "−0,43 R je Trade (2022–2024)",
         "oos": "+0,45 R je Trade (2025–09.2026)",
-        "status": "EXPERIMENTELL — lief nur in der Gold-Hausse, vorher klar negativ",
+        "status": "EXPERIMENTELL — lief nur in der Gold-Hausse, vorher klar negativ. "
+        "Lohnt sich nicht belegt: KEIN Push, nur Paper und Chart",
         "doc": "docs/DAYTRADE-STUDIE-2026-10.md",
     },
 }
@@ -144,9 +160,11 @@ def kraken_kerzen(paar: str) -> list[tuple]:
     return [x for x in kerzen if x[0] + timedelta(hours=1) <= jetzt]
 
 
-def alle_kerzen(pause: float = 0.35) -> tuple[dict[str, list], list[str]]:
+def alle_kerzen(
+    pause: float = 0.35, paare: dict[str, str] | None = None
+) -> tuple[dict[str, list], list[str]]:
     daten, fehler = {}, []
-    for sym, paar in {**COINS, **GOLD}.items():
+    for sym, paar in (paare or {**COINS, **GOLD}).items():
         try:
             daten[sym] = kraken_kerzen(paar)
         except Exception as exc:
@@ -215,6 +233,8 @@ def neue_signale(daten: dict[str, list], seit: datetime | None) -> tuple[list[di
             stop = c - m.STOP_ATR * a[i]
             if (c - stop) / c < m.MIN_RISIKO:
                 continue
+            ue = m.ueberhang(k, i, a)
+            lohnt = (not gold) and ue is not None and ue >= m.MIN_UEBERHANG_ATR
             raus.append(
                 {
                     "sym": sym,
@@ -224,6 +244,10 @@ def neue_signale(daten: dict[str, list], seit: datetime | None) -> tuple[list[di
                     "stop": round(stop, 8),
                     "ausstieg_marke": min(x[3] for x in k[i - m.TRAIL + 1 : i + 1]),
                     "breite": breite,
+                    "ueberhang_atr": round(ue, 3) if ue is not None else None,
+                    "lohnt": lohnt,
+                    # Push nur, wenn es sich lohnt; alles andere laeuft still als Paper mit.
+                    "alarm": lohnt,
                     "gemeldet": [],
                 }
             )
@@ -272,7 +296,8 @@ def fortschreiben(stand: dict | None, daten: dict[str, list]) -> tuple[dict, dic
             )
             fertig.append(t)
             del offen[sym]
-            alarme["aus"].append(t)
+            if t.get("alarm", True):  # alte Trades (vor 12.10.) wurden alle gemeldet
+                alarme["aus"].append(t)
         elif res["status"] == "offen":
             t.update(
                 {
@@ -290,7 +315,8 @@ def fortschreiben(stand: dict | None, daten: dict[str, list]) -> tuple[dict, dic
         if any(f["sym"] == s["sym"] and f["signal_ts"] >= s["signal_ts"] for f in fertig):
             continue
         offen[s["sym"]] = s
-        alarme["neu"].append(s)
+        if s["alarm"]:
+            alarme["neu"].append(s)
         res = verfolge_trade(s, daten[s["sym"]])
         if res["status"] == "geschlossen":  # nach einem Ausfall schon wieder vorbei
             s.update(
@@ -304,7 +330,8 @@ def fortschreiben(stand: dict | None, daten: dict[str, list]) -> tuple[dict, dic
             )
             fertig.append(s)
             del offen[s["sym"]]
-            alarme["aus"].append(s)
+            if s["alarm"]:
+                alarme["aus"].append(s)
 
     letzte = max((k[-1][0] for k in daten.values() if k), default=None)
     neu = {
@@ -338,62 +365,70 @@ def _groesse(t: dict) -> float:
     return min(0.25 / a * 100, 10.0) if a > 0 else 0.0
 
 
+def _zahl(x: float, d: int = 1) -> str:
+    return f"{x:.{d}f}".replace(".", ",")
+
+
 def alarm_texte(alarme: dict[str, list], welle: int) -> list[dict]:
+    """Push-Texte. In ``alarme`` stehen nur noch Trades, die es sich zu melden lohnt
+    (``alarm`` = True) — Gold-Ausbrueche und knappe Coin-Ausbrueche laufen still mit."""
     out = []
-    neu_k = [t for t in alarme["neu"] if t["klasse"] == "coin"]
-    neu_g = [t for t in alarme["neu"] if t["klasse"] == "gold"]
+    neu_k = [t for t in alarme["neu"] if t.get("alarm", True)]
     if neu_k:
-        zeilen = [
-            f"• {NAMEN.get(t['sym'], t['sym'])} ({t['sym']}/USDT): Kauf ≈ {_fmt(t['signal_kurs'])} $ · "
-            f"Stop {_fmt(t['stop'])} $ (−{_abstand(t):.1f} %) · Größe ≈ {_groesse(t):.0f} % vom Depot"
-            for t in neu_k
-        ]
+        zeilen = []
+        for t in neu_k:
+            ue = t.get("ueberhang_atr")
+            zeilen.append(
+                f"• {NAMEN.get(t['sym'], t['sym'])} ({t['sym']}/USDT): Kauf ≈ {_fmt(t['signal_kurs'])} $ · "
+                f"Stop {_fmt(t['stop'])} $ (−{_zahl(_abstand(t))} %) · Größe ≈ {_groesse(t):.0f} % vom Depot"
+                + (f" · Ausbruch {_zahl(ue, 2)} ATR über der Marke" if ue is not None else "")
+            )
         out.append(
             {
-                "titel": f"🚀 Krypto-Ausbruchswelle ({welle}/24 Coins): {len(neu_k)} Einstieg"
-                + ("e" if len(neu_k) > 1 else ""),
+                "titel": f"🚀 Daytrade-Einstieg — lohnt sich: {len(neu_k)} Coin"
+                + ("s" if len(neu_k) > 1 else "")
+                + f" (Welle {welle}/24)",
                 "text": "\n".join(zeilen)
-                + "\nAusstieg: sobald eine Stunde unter dem 24-Std.-Tief schliesst (kommt als "
-                "Alarm), spätestens nach 72 Std.\nGröße: 0,25 % Depot-Risiko je Coin, höchstens "
-                "10 % vom Depot je Coin — ALLE Einstiege der Welle nehmen, der Vorteil steckt im "
-                "Korb (3 von 4 Trades verlieren klein, wenige gewinnen groß).\nHandeln über "
+                + "\nWarum es sich lohnt: Welle (≥ 12 von 24 Coins brechen aus) UND klarer "
+                "Ausbruch (≥ 0,25 ATR über dem 48-Std.-Hoch). Genau diese Fälle lagen in der "
+                "Studie bei +0,27 R (2022–24) und +0,28 R (2025–26) je Trade nach Kosten.\n"
+                "Ausstieg: sobald eine Stunde unter dem 24-Std.-Tief schliesst (kommt als Alarm), "
+                "spätestens nach 72 Std. Kein festes Kursziel — Gewinne laufen lassen.\n"
+                "Größe: 0,25 % Depot-Risiko je Coin, höchstens 10 % vom Depot je Coin. Rund 3 "
+                "von 4 Trades verlieren klein, wenige gewinnen groß — einzelne Verluste sind normal.\n"
                 "Bybit-Spot (USDT) oder Limit-Order — Kraken-Marktorder kostet den Vorteil.\n"
                 "Kandidat, nicht bewiesen — Paper, kein Echtgeld-Rat.",
                 "dedup_key": "daytrade:neu:"
                 + ",".join(f"{t['sym']}@{t['signal_ts']}" for t in neu_k),
             }
         )
-    for t in neu_g:
-        out.append(
-            {
-                "titel": "🧪 Gold-Daytrade (Pax Gold) — experimentell",
-                "text": f"Ausbruch über das 48-Std.-Hoch. Kauf ≈ {_fmt(t['signal_kurs'])} $ · Stop "
-                f"{_fmt(t['stop'])} $. Ausstieg bei Stundenschluss unter dem 24-Std.-Tief, "
-                "spätestens 72 Std.\nEXPERIMENTELL: lief nur 2025/26 positiv, 2022–24 "
-                "negativ. Nur Paper.",
-                "dedup_key": f"daytrade:neu:PAXG@{t['signal_ts']}",
-            }
-        )
-    if alarme["aus"]:
+    aus = [t for t in alarme["aus"] if t.get("alarm", True)]
+    if aus:
         zeilen = [
             f"• {NAMEN.get(t['sym'], t['sym'])}: {_GRUND.get(t['grund'], t['grund'])} bei "
             f"{_fmt(t['preis_aus'])} $ → {t['r']:+.2f} R"
-            for t in alarme["aus"]
+            for t in aus
         ]
         out.append(
             {
-                "titel": f"🔻 Daytrade verkaufen: {len(alarme['aus'])} Ausstieg"
-                + ("e" if len(alarme["aus"]) > 1 else ""),
+                "titel": f"🔻 Daytrade verkaufen: {len(aus)} Ausstieg"
+                + ("e" if len(aus) > 1 else ""),
                 "text": "\n".join(zeilen) + "\nPaper-Trades — Ergebnis nach 0,25 % Kosten.",
-                "dedup_key": "daytrade:aus:"
-                + ",".join(f"{t['sym']}@{t['ts_aus']}" for t in alarme["aus"]),
+                "dedup_key": "daytrade:aus:" + ",".join(f"{t['sym']}@{t['ts_aus']}" for t in aus),
             }
         )
     return out
 
 
-def bilanz(stand: dict, klasse: str) -> dict:
-    f = [t for t in (stand.get("abgeschlossen") or []) if t.get("klasse") == klasse and "r" in t]
+def bilanz(stand: dict, klasse: str, alarm: bool | None = None) -> dict:
+    """Forward-Bilanz. ``alarm`` True = nur gemeldete Trades, False = stille Gegenprobe."""
+    f = [
+        t
+        for t in (stand.get("abgeschlossen") or [])
+        if t.get("klasse") == klasse
+        and "r" in t
+        and (alarm is None or bool(t.get("alarm", True)) == alarm)
+    ]
     n = len(f)
     s = round(sum(t["r"] for t in f), 3)
     return {
@@ -404,6 +439,27 @@ def bilanz(stand: dict, klasse: str) -> dict:
         "trefferquote": round(sum(1 for t in f if t["r"] > 0) / n, 3) if n else None,
         "letzte": f[-6:][::-1],
     }
+
+
+def analysen(daten: dict[str, list], btc_ok: dict) -> dict[str, dict]:
+    """Jetzt-Zustand je Wert fuer Seite und Chart (gleiche Rechnung wie der Alarm)."""
+    out: dict[str, dict] = {}
+    for sym, k in daten.items():
+        if not k:
+            continue
+        markt = None if (sym in GOLD or sym in EXTRA) else btc_ok.get(k[-1][0], False)
+        a = m.analyse(k, markt_ok=markt)
+        if not a:
+            continue
+        a["name"] = NAMEN.get(sym, sym)
+        a["klasse"] = "gold" if sym in GOLD else ("extra" if sym in EXTRA else "coin")
+        a["paar"] = {**COINS, **GOLD, **EXTRA}[sym]
+        ue = a.get("ueberhang_atr")
+        a["lohnt"] = bool(
+            a["klasse"] == "coin" and a["signal"] and ue is not None and ue >= m.MIN_UEBERHANG_ATR
+        )
+        out[sym] = {x: (round(v, 8) if isinstance(v, float) else v) for x, v in a.items()}
+    return out
 
 
 def _senden(texte: list[dict]) -> None:
@@ -461,12 +517,14 @@ def main() -> int:
 
     jetzt = datetime.now(UTC)
     daten, fehler = alle_kerzen()
+    extra, fehler_extra = alle_kerzen(paare=EXTRA)
     seite: dict = {
         "aktiv": False,
         "geprueft": jetzt.isoformat(),
         "studie": STUDIE,
         "min_welle": MIN_WELLE,
-        "fehler": fehler,
+        "min_ueberhang_atr": m.MIN_UEBERHANG_ATR,
+        "fehler": fehler + fehler_extra,
     }
     if "BTC" not in daten or len(daten) < len(COINS) // 2:
         seite["fehler"] = [*fehler, "zu wenige Kursreihen von Kraken — kein Lauf"]
@@ -483,8 +541,10 @@ def main() -> int:
                 "welle": welle,
                 "btc_ueber_ema200": bool(btc_ok.get(letzte_btc)),
                 "offen": list(neuer["offen"].values()),
-                "bilanz_krypto": bilanz(neuer, "coin"),
+                "bilanz_krypto": bilanz(neuer, "coin", alarm=True),
+                "bilanz_krypto_still": bilanz(neuer, "coin", alarm=False),
                 "bilanz_gold": bilanz(neuer, "gold"),
+                "analyse": analysen({**daten, **extra}, btc_ok),
                 "letzte_kerze": letzte_btc.isoformat(),
             }
         )
@@ -503,7 +563,9 @@ def main() -> int:
         _senden(texte)
     print(
         json.dumps(
-            {k: v for k, v in seite.items() if k not in ("studie", "offen")}, indent=2, default=str
+            {k: v for k, v in seite.items() if k not in ("studie", "offen", "analyse")},
+            indent=2,
+            default=str,
         )[:1500]
     )
     return 0

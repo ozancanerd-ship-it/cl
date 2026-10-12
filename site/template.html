@@ -399,6 +399,31 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
    zoomen. Vorher (none) blieb man auf dem Handy im Chart haengen — 400 px, auf denen die
    Seite nicht mehr scrollte. */
 #cv{display:block; width:100%; height:500px; touch-action:pan-y; cursor:crosshair}
+/* Day-Trading-Chart (12.10.): eigener, schlanker Kerzenchart, Kurse direkt von Kraken */
+#dtcv{display:block; width:100%; height:330px; touch-action:pan-y}
+@media (max-width:640px){#dtcv{height:290px}}
+.dtwahl{display:flex; gap:6px; overflow-x:auto; padding:10px 11px; border-bottom:1px solid var(--rule);
+  scrollbar-width:none}
+.dtwahl::-webkit-scrollbar{display:none}
+.dtw{appearance:none; flex:none; border:1px solid var(--rule); background:transparent; font:inherit;
+  font-size:12px; color:var(--ink-2); padding:6px 11px; border-radius:100px; cursor:pointer;
+  white-space:nowrap}
+.dtw[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent); border-color:rgba(61,240,208,.35);
+  font-weight:600}
+.dtw .pu{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px;
+  background:var(--ink-3); vertical-align:1px}
+.dtw .pu.aus{background:var(--long)} .dtw .pu.nah{background:var(--warn)} .dtw .pu.zu{background:var(--bad)}
+.dtcheck{list-style:none; margin:0; padding:0}
+.dtcheck li{display:flex; gap:9px; align-items:baseline; padding:5px 0; font-size:13px;
+  border-bottom:1px solid var(--rule)}
+.dtcheck li:last-child{border-bottom:0}
+.dtcheck .ok{color:var(--long); font-weight:700} .dtcheck .no{color:var(--bad); font-weight:700}
+.dtcheck .v{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--ink-2);
+  text-align:right}
+.dturteil{margin:10px 0 0; padding:10px 12px; border-radius:10px; font-size:13.5px; line-height:1.45}
+.dturteil.gut{background:var(--long-bg); color:var(--long)}
+.dturteil.warte{background:var(--sunk); color:var(--ink-2)}
+.dturteil.warn{background:var(--warn-bg); color:var(--warn)}
 @media (max-width:640px){#cv{height:420px}}
 .chart-q{margin-left:auto; font-size:10.5px; color:var(--ink-3); align-self:center; text-align:right}
 .chart-q b{font-weight:600; color:var(--accent-2)}
@@ -795,6 +820,7 @@ a{color:var(--accent); text-underline-offset:3px}
   </section>
 
   <section class="panel" id="p11" role="tabpanel" aria-labelledby="t11" hidden>
+    <div id="dtchart"></div>
     <div id="daytrading"></div>
   </section>
 </main>
@@ -1027,6 +1053,7 @@ function zeigeTab(i){
   $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
   try { dockMarkieren(i); } catch(e){}
   if (i===1) requestAnimationFrame(()=>chart.groesse());
+  if (i===11) requestAnimationFrame(()=>{ try { dtTakt(); dtChartZeichnen(); } catch(e){} });
   if (i===4) zeichneSync();
   if (i===9) zeichneChat();
   try { history.replaceState(null,'','#'+i); } catch(e){}
@@ -7506,7 +7533,7 @@ function leseDepot(text){
     const norm = zeile.replace(/(\d)[,](\d)/g, '$1.$2').replace(/[€$£]/g, ' ');
     const teile = norm.split(/[\s,;]+/).filter(Boolean);
     if (teile.length < 2){ fehler.push(zeile.slice(0,24)); continue; }
-    const sym = teile[0].toUpperCase().replace(/[^A-Z0-9.\-]/g, '');
+    const sym = depotSymAufloesen(teile[0].toUpperCase().replace(/[^A-Z0-9.\-]/g, ''));
     let i = 1;
     const zahlen = [];
     while (i < teile.length && /^\d+(\.\d+)?$/.test(teile[i])){ zahlen.push(parseFloat(teile[i])); i++; }
@@ -7520,6 +7547,21 @@ function leseDepot(text){
     });
   }
   return {neu, fehler};
+}
+
+/* Ozan, 12.10.: „TAO 2,3 130 Kraken" lieferte keinen Kurs und keinen Verlauf, weil nur
+   das Kürzel TAO ankam — Kraken braucht TAO/USD. Ein reines Coin-Kürzel wird hier auf das
+   Krypto-Paar aus dem Scan aufgelöst (TAO → TAOUSD). Aktien-Kürzel (AAPL, NVDA) bleiben,
+   wie sie sind: die stehen nicht als Krypto im Scan. */
+function depotSymAufloesen(sym){
+  const s = String(sym || '').toUpperCase();
+  if (!s || /(USDT|USDC|USD|EUR)$/.test(s) || /[-.]/.test(s)) return s;
+  const g = (S && S.gesamt) || [];
+  for (const q of ['USD', 'USDT']){
+    const hit = g.find(o => o.instrument === s + q && o.klasse === 'krypto');
+    if (hit) return hit.instrument;
+  }
+  return s;
 }
 
 let _pfZuletzt = 0;
@@ -9669,13 +9711,15 @@ function dtKrypto(w){
       <div style="position:absolute;top:0;bottom:0;left:${Math.round(100*min/24)}%;width:2px;background:var(--ink-3)"></div></div>
     <div class="rowx"><span class="lab">Bitcoin über EMA 200 (1 Std.)</span><span class="val">${w.btc_ueber_ema200 ? 'ja — Filter offen' : 'nein — keine Einstiege'}</span></div>
     <div class="rowx"><span class="lab">Letzte Stundenkerze</span><span class="val">${zeit(w.letzte_kerze)}</span></div>
+    <div class="rowx"><span class="lab">Push nur, wenn es sich lohnt</span><span class="val">Welle + klarer Ausbruch (≥ ${num(w.min_ueberhang_atr ?? 0.25, 2)} ATR über dem 48-Std.-Hoch)</span></div>
   </div>`;
   const offen = w.offen || [];
   if (offen.length){
     h += `<h3>Offene Paper-Trades (${offen.length})</h3><div class="karte">`;
     for (const t of offen){
       const gold = t.klasse === 'gold';
-      h += `<div class="rowx"><span class="lab">${gold ? '🧪 ' : ''}${esc(t.sym)} · seit ${zeit(t.signal_ts)}</span>
+      const still = t.alarm === false;
+      h += `<div class="rowx"><span class="lab">${gold ? '🧪 ' : ''}${esc(t.sym)} · seit ${zeit(t.signal_ts)}${still ? ' <span class="note">still · ohne Push</span>' : ''}</span>
         <span class="val">${t.einstieg != null ? `Kauf ${num(t.einstieg)} $ · ` : 'Einstieg zur nächsten Stunde · '}Stop ${num(t.stop)} $
         ${t.ausstieg_marke != null ? ` · raus unter ${num(t.ausstieg_marke)} $` : ''}${t.r_offen != null ? ` · <b class="${t.r_offen>=0?'up':'dn'}">${dtR(t.r_offen)}</b>` : ''}</span></div>`;
     }
@@ -9683,7 +9727,9 @@ function dtKrypto(w){
   } else {
     h += `<p class="leer" style="padding:4px 0">Gerade kein offener Tageshandel. Der Alarm kommt, sobald eine Welle läuft.</p>`;
   }
-  for (const [titel, b] of [['Forward-Bilanz Krypto (Paper)', w.bilanz_krypto], ['Forward-Bilanz Gold 🧪 (Paper)', w.bilanz_gold]]){
+  for (const [titel, b] of [['Forward-Bilanz Krypto — gemeldete Einstiege (Paper)', w.bilanz_krypto],
+                            ['Gegenprobe: knappe Ausbrüche ohne Push (Paper)', w.bilanz_krypto_still],
+                            ['Forward-Bilanz Gold-Ausbruch 🧪 ohne Push (Paper)', w.bilanz_gold]]){
     if (!b) continue;
     h += `<h3>${titel}</h3><div class="karte">
       <div class="rowx"><span class="lab">Abgeschlossen</span><span class="val">${b.anzahl} von ${b.ziel}</span></div>
@@ -9699,12 +9745,391 @@ function dtKrypto(w){
       <p><strong>In Geld:</strong> ${esc(st.geld || '')}.</p>
       <p><strong>Größe:</strong> ${esc(st.groesse || '')}. <strong>Trefferquote:</strong> ${esc(st.trefferquote || '')}.</p>
       <p><strong>Kosten:</strong> ${esc(st.kosten || '')}.</p>
+      ${st.tor ? `<p><strong>Lohnt-sich-Tor:</strong> ${esc(st.tor)}.</p>` : ''}
       <p><strong>Status:</strong> ${esc(st.status || '')}. Gold: ${esc((w.studie && w.studie.gold && w.studie.gold.status) || '')}.</p>
       <p style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(st.doc || '')}</p></details>`;
   return h;
 }
 
+/* ============================================================ DAY-TRADING: CHART + ANALYSE
+   Ozan, 12.10. 08:26: "ich kann bei den daytrades vor allem gold nicht den chart und die
+   analyse sehen und ich will auch benachrichtigung fuer entry bekommen halt aber nur wenn es
+   sich lohnt". Der Reiter zeigte bisher nur Zahlen. Jetzt:
+
+   * ein Kerzenchart je Wert (Gold = Pax Gold PAXG/USD, die 24 Coins der Welle, TAO), Kurse
+     direkt und live von Kraken (oeffentlich, ohne Schluessel), 1 Std. oder 4 Std.;
+   * eingezeichnet, wogegen die Regel prueft: 48-Std.-Hoch (Ausbruchsmarke), die Schwelle,
+     ab der ein Einstieg sich LOHNT (+0,25 ATR), EMA 200, 24-Std.-Tief (Ausstieg), offene
+     Paper-Trades, beim Gold die S9-Marken (auf PAXG umgerechnet) und deine eigene Position;
+   * darunter die Analyse als Checkliste: was fuer einen Einstiegs-Alarm fehlt — und ab
+     welchem Stundenschluss er kommt.
+
+   Die Rechnung ist dieselbe wie im Alarm (daytrade_ausbruch.analyse in Python) und wird
+   im Test gegen sie geprueft. Nur abgeschlossene Kerzen zaehlen; die laufende ist im Chart
+   blasser gezeichnet und bewegt nur den Kurs. */
+const DT_LOOKBACK = 48, DT_TRAIL = 24, DT_STOP_ATR = 2.0, DT_MIN_UEBERHANG = 0.25;
+const DTC = {sym: null, tf: 60, daten: new Map(), laedt: new Set(), timer: null};
+const DT_FEST = {PAXG: {paar: 'PAXGUSD', name: 'Gold (Pax Gold)', klasse: 'gold'},
+                 TAO: {paar: 'TAOUSD', name: 'Bittensor', klasse: 'extra'}};
+const DT_STATUS = {ausbruch: 'Ausbruch', nah: 'Kurz vor der Marke', unter_ema: 'Unter EMA 200 — kein Long',
+  markt_zu: 'Bitcoin unter EMA 200 — Filter zu', ruhig: 'Ruhig — unter der Marke'};
+
+function dtEma(werte, n){
+  const a = 2 / (n + 1), out = []; let e = null;
+  for (let i = 0; i < werte.length; i++){
+    e = e === null ? werte[i] : a * werte[i] + (1 - a) * e;
+    out.push(i >= n - 1 ? e : null);
+  }
+  return out;
+}
+function dtAtr(k, n){
+  const out = [], tr = [];
+  for (let i = 0; i < k.length; i++){
+    const [, , h, l, c] = k[i];
+    const pc = i ? k[i-1][4] : c;
+    tr.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+    out.push(i >= n ? tr.slice(-n).reduce((x, y) => x + y, 0) / n : null);
+  }
+  return out;
+}
+/* Spiegel von daytrade_ausbruch.analyse(): Kerzen [t, o, h, l, c], nur abgeschlossene. */
+function dtAnalyse(k, marktOk){
+  if (!k || k.length < 201) return null;
+  const i = k.length - 1;
+  const e = dtEma(k.map(x => x[4]), 200), a = dtAtr(k, 24);
+  if (e[i] == null || !a[i]) return null;
+  const c = k[i][4];
+  let marke = -Infinity;
+  for (let j = i - DT_LOOKBACK; j < i; j++) marke = Math.max(marke, k[j][2]);
+  let tief = Infinity;
+  for (let j = i - DT_TRAIL + 1; j <= i; j++) tief = Math.min(tief, k[j][3]);
+  const ueber = (c - marke) / a[i];
+  const sig = i >= 200 && c > marke && c > e[i] && marktOk !== false;
+  let status;
+  if (sig) status = 'ausbruch';
+  else if (c <= e[i]) status = 'unter_ema';
+  else if (marktOk === false) status = 'markt_zu';
+  else if (marke - c <= a[i]) status = 'nah';
+  else status = 'ruhig';
+  return {kurs: c, ema200: e[i], marke48: marke, tief24: tief, atr24: a[i],
+          stop_bei_signal: c - DT_STOP_ATR * a[i], abstand_pct: (marke - c) / c * 100,
+          ueberhang_atr: ueber, signal: sig, status, emaReihe: e};
+}
+function dtInfo(sym){
+  const a = DTW && DTW.analyse && DTW.analyse[sym];
+  const f = DT_FEST[sym];
+  return {paar: (a && a.paar) || (f && f.paar) || (sym + 'USD'),
+          name: (a && a.name) || (f && f.name) || sym,
+          klasse: (a && a.klasse) || (f && f.klasse) || 'coin', server: a || null};
+}
+function dtLaden(sym, tf, zwingen){
+  const key = sym + '|' + tf, alt = DTC.daten.get(key);
+  if (DTC.laedt.has(key)) return;
+  if (!zwingen && alt && Date.now() - alt.zeit < (alt.fehler ? 30000 : 55000)) return;
+  DTC.laedt.add(key);
+  fetch('https://api.kraken.com/0/public/OHLC?pair=' + encodeURIComponent(dtInfo(sym).paar) + '&interval=' + tf)
+    .then(r => r.json()).then(j => {
+      const roh = j && j.result ? j.result[Object.keys(j.result).find(x => x !== 'last')] : null;
+      if (!Array.isArray(roh) || roh.length < 30) throw new Error((j && j.error && j.error[0]) || 'leer');
+      const alle = roh.map(x => [x[0] * 1000, +x[1], +x[2], +x[3], +x[4], +x[6]]);
+      const jetzt = Date.now();
+      const fertig = alle.filter(x => x[0] + tf * 60000 <= jetzt);
+      DTC.daten.set(key, {zeit: jetzt, alle, fertig});
+    }).catch(e => DTC.daten.set(key, {zeit: Date.now(), fehler: String(e && e.message || e)}))
+    .finally(() => { DTC.laedt.delete(key); if (DTC.sym === sym && DTC.tf === tf) dtChartZeichnen(); });
+}
+/* Eigene Position im Depot zum Wert (nur Coin, nur in USD — sonst stimmt die Achse nicht). */
+function dtDeinePosition(sym){
+  try {
+    for (const p of ladePositionen()){
+      if (!p || !p.sym || istSchein(p)) continue;
+      if (muenzeVon(p.sym) !== sym) continue;
+      if (posWaehrung(p) !== 'USD') continue;
+      return p;
+    }
+  } catch(e){}
+  return null;
+}
+/* Linien fuer den Chart: [Beschriftung, Preis, Farbvariable, gestrichelt] */
+function dtLinien(sym, an){
+  const L = [], info = dtInfo(sym);
+  if (an){
+    L.push(['48-Std.-Hoch', an.marke48, '--accent-2', true]);
+    if (info.klasse === 'coin') L.push(['Alarm ab', an.marke48 + DT_MIN_UEBERHANG * an.atr24, '--accent', false]);
+    L.push(['24-Std.-Tief', an.tief24, '--warn', true]);
+  }
+  const t = DTW && (DTW.offen || []).find(x => x.sym === sym);
+  if (t){
+    if (t.einstieg != null) L.push(['Paper-Kauf', t.einstieg, '--accent-2', false]);
+    L.push(['Paper-Stop', t.stop, '--bad', false]);
+    if (t.ausstieg_marke != null) L.push(['raus unter', t.ausstieg_marke, '--warn', false]);
+  }
+  if (sym === 'PAXG' && GD){
+    const f = (GD.offen && GD.offen.kraken_faktor) || GD.kraken_faktor;
+    const o = GD.offen, g = GD.gold || {};
+    if (f && o){
+      const stopNow = (o.gemeldet || []).includes('TP1') ? o.entry : o.sl;
+      L.push(['S9 Einstieg', o.entry * f, '--accent-2', false], ['S9 Stop', stopNow * f, '--bad', false],
+             ['S9 TP1', o.tp1 * f, '--long', false], ['S9 TP2', o.tp2 * f, '--long', false]);
+    } else if (f && g.zustand === 'armed'){
+      L.push(['S9 Einstieg', g.entry * f, '--accent-2', true], ['S9 Stop', g.sl * f, '--bad', true],
+             ['S9 TP1', g.tp1 * f, '--long', true], ['S9 TP2', g.tp2 * f, '--long', true]);
+    }
+  }
+  const p = dtDeinePosition(sym);
+  if (p){
+    if (p.einstieg != null) L.push(['Dein Kauf', +p.einstieg, '--accent-2', false]);
+    if (p.plan && p.plan.stop != null) L.push(['Dein Stop', +p.plan.stop, '--bad', false]);
+  }
+  return L.filter(x => x[1] != null && isFinite(x[1]) && x[1] > 0);
+}
+function dtFarbe(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
+  if (!cv) return;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect();
+  if (!r.width) return;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = r.width, H = r.height, M = {l: 4, r: 86, t: 10, b: 20};
+  ctx.clearRect(0, 0, W, H);
+  const n = Math.min(alle.length, tf >= 240 ? 90 : (W < 500 ? 60 : 96));
+  const a0 = alle.length - n, v = alle.slice(a0);
+  let hi = -Infinity, lo = Infinity;
+  for (const b of v){ hi = Math.max(hi, b[2]); lo = Math.min(lo, b[3]); }
+  const kspanne = (hi - lo) || hi * 0.01;
+  // Linien ziehen die Achse nur so weit auf, dass die Kerzen lesbar bleiben (wie im Haupt-Chart)
+  const rand = [];
+  const khi = hi, klo = lo;
+  for (const l of linien){
+    const pr = l[1];
+    if (pr > khi + kspanne * 0.6 || pr < klo - kspanne * 0.6){ rand.push(l); continue; }
+    hi = Math.max(hi, pr); lo = Math.min(lo, pr);
+  }
+  const luft = (hi - lo) * 0.06; hi += luft; lo -= luft;
+  const y = p => M.t + (hi - p) / (hi - lo) * (H - M.t - M.b);
+  const sw = (W - M.l - M.r) / n, kb = Math.max(1, sw * 0.62);
+  const x = i => M.l + i * sw + sw / 2;
+  const cGrid = dtFarbe('--grid'), cInk3 = dtFarbe('--ink-3'), cUp = dtFarbe('--long'), cDn = dtFarbe('--bad');
+  ctx.font = '10px "JetBrains Mono",monospace'; ctx.textBaseline = 'middle';
+  // Gitter + Preisachse
+  for (let g = 0; g <= 4; g++){
+    const pr = lo + (hi - lo) * g / 4, yy = y(pr);
+    ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(M.l, yy); ctx.lineTo(W - M.r, yy); ctx.stroke();
+    ctx.fillStyle = cInk3; ctx.fillText(num(pr), W - M.r + 4, yy);
+  }
+  // Zeitachse: Tageswechsel
+  ctx.textBaseline = 'alphabetic';
+  let letzterTag = null;
+  for (let i = 0; i < n; i++){
+    const d = new Date(v[i][0]), tag = d.getDate();
+    if (tag !== letzterTag && (tf >= 240 ? d.getHours() < 4 : d.getHours() === 0)){
+      ctx.fillStyle = cInk3; ctx.fillText(d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}), x(i) - 12, H - 5);
+      ctx.strokeStyle = cGrid; ctx.beginPath(); ctx.moveTo(x(i), M.t); ctx.lineTo(x(i), H - M.b); ctx.stroke();
+    }
+    letzterTag = tag;
+  }
+  // EMA 200
+  if (emaReihe){
+    ctx.strokeStyle = dtFarbe('--ink-2'); ctx.globalAlpha = .55; ctx.lineWidth = 1.4; ctx.beginPath();
+    let auf = false;
+    for (let i = 0; i < n; i++){
+      const e = emaReihe[a0 + i];
+      if (e == null){ auf = false; continue; }
+      if (!auf){ ctx.moveTo(x(i), y(e)); auf = true; } else ctx.lineTo(x(i), y(e));
+    }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    const eEnde = emaReihe[a0 + n - 1];
+    if (eEnde != null && eEnde <= hi && eEnde >= lo){
+      ctx.fillStyle = dtFarbe('--ink-3'); ctx.font = '9.5px "JetBrains Mono",monospace'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`EMA 200 (${tf >= 240 ? '4' : '1'} Std.)`, Math.max(M.l + 2, x(n - 1) - 104), y(eEnde) - 3);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+  // Kerzen (die laufende blasser)
+  for (let i = 0; i < n; i++){
+    const [, o, h, l, c] = v[i];
+    const col = c >= o ? cUp : cDn;
+    ctx.globalAlpha = (a0 + i) >= fertigN ? .45 : 1;
+    ctx.strokeStyle = col; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x(i), y(h)); ctx.lineTo(x(i), y(l)); ctx.stroke();
+    ctx.fillStyle = col;
+    const yo = y(Math.max(o, c)), yc = y(Math.min(o, c));
+    ctx.fillRect(x(i) - kb / 2, yo, kb, Math.max(1, yc - yo));
+  }
+  ctx.globalAlpha = 1;
+  // Linien mit Beschriftung rechts (ueberlappende auseinanderschieben)
+  const marken = linien.filter(l => !rand.includes(l)).map(([lab, pr, col, gestr]) => ({lab, pr, col: dtFarbe(col), gestr, yy: y(pr)}));
+  marken.sort((a, b) => a.yy - b.yy);
+  for (let i = 0; i < marken.length; i++)
+    marken[i].ty = i ? Math.max(marken[i].yy, marken[i-1].ty + 12) : marken[i].yy;
+  ctx.textBaseline = 'middle';
+  for (const mk of marken){
+    ctx.strokeStyle = mk.col; ctx.lineWidth = 1.2; ctx.setLineDash(mk.gestr ? [5, 4] : []);
+    ctx.beginPath(); ctx.moveTo(M.l, mk.yy); ctx.lineTo(W - M.r, mk.yy); ctx.stroke();
+    ctx.setLineDash([]);
+    const ty = Math.min(H - M.b, mk.ty ?? mk.yy);
+    ctx.fillStyle = dtFarbe('--bg'); ctx.globalAlpha = .85; ctx.fillRect(W - M.r + 1, ty - 7, M.r - 2, 14); ctx.globalAlpha = 1;
+    ctx.fillStyle = mk.col; ctx.font = '9.5px "JetBrains Mono",monospace';
+    ctx.fillText(mk.lab.slice(0, 13), W - M.r + 4, ty);
+  }
+  // Ausserhalb liegende Marken als Pfeil am Rand
+  ctx.font = '10px "JetBrains Mono",monospace';
+  let oben = M.t + 8, unten = H - M.b - 8;
+  for (const [lab, pr, col] of rand){
+    const auf = pr > hi; ctx.fillStyle = dtFarbe(col);
+    ctx.fillText(`${auf ? '↑' : '↓'} ${lab} ${num(pr)}`, M.l + 4, auf ? oben : unten);
+    if (auf) oben += 13; else unten -= 13;
+  }
+  // aktueller Kurs
+  const last = v[v.length - 1][4], yl = y(last);
+  ctx.fillStyle = dtFarbe('--ink'); ctx.fillRect(W - M.r + 1, yl - 8, M.r - 2, 16);
+  ctx.fillStyle = dtFarbe('--bg'); ctx.font = '600 10px "JetBrains Mono",monospace';
+  ctx.fillText(num(last), W - M.r + 4, yl);
+}
+/* Die Wahl-Leiste: Gold, deine Coins, offene Trades, dann die Coins am naechsten am Ausbruch. */
+function dtWahlListe(){
+  const out = ['PAXG'];
+  try { for (const p of ladePositionen()){ const m = muenzeVon(p.sym); if ((DT_FEST[m] || (DTW && DTW.analyse && DTW.analyse[m])) && !out.includes(m)) out.push(m); } } catch(e){}
+  if (!out.includes('TAO')) out.push('TAO');
+  for (const t of ((DTW && DTW.offen) || [])) if (!out.includes(t.sym)) out.push(t.sym);
+  const an = (DTW && DTW.analyse) || {};
+  const coins = Object.keys(an).filter(s => an[s].klasse === 'coin')
+    .sort((a, b) => (an[b].signal - an[a].signal) || (an[a].abstand_pct - an[b].abstand_pct));
+  for (const s of coins) if (!out.includes(s)) out.push(s);
+  return out;
+}
+function dtPunkt(sym){
+  const a = DTW && DTW.analyse && DTW.analyse[sym];
+  if (!a) return '';
+  return a.status === 'ausbruch' ? 'aus' : a.status === 'nah' ? 'nah' : (a.status === 'unter_ema' || a.status === 'markt_zu') ? 'zu' : '';
+}
+function dtChartAufbau(){
+  const box = $('dtchart'); if (!box) return;
+  if (!DTC.sym) DTC.sym = 'PAXG';
+  const liste = dtWahlListe();
+  box.innerHTML = `<h2>📈 Chart & Analyse</h2>
+    <div class="chartbox">
+      <div class="dtwahl" id="dtwahl">${liste.map(s => `<button class="dtw" data-dts="${esc(s)}" aria-pressed="${s === DTC.sym}">
+        <span class="pu ${dtPunkt(s)}"></span>${esc(s === 'PAXG' ? 'Gold' : s)}</button>`).join('')}</div>
+      <div class="chart-h"><span class="nm" id="dtname"></span><span class="px" id="dtpx">—</span></div>
+      <div class="tfbar">${[[60, '1 Std.'], [240, '4 Std.']].map(([t, l]) =>
+        `<button class="tfb" data-dtf="${t}" aria-pressed="${t === DTC.tf}">${l}</button>`).join('')}
+        <span class="chart-q" id="dtquelle" style="margin-left:auto;font-size:11px;color:var(--ink-3)"></span></div>
+      <canvas id="dtcv" role="img" aria-label="Kerzenchart"></canvas>
+    </div>
+    <div id="dtanalyse"></div>`;
+  box.querySelectorAll('[data-dts]').forEach(b => b.addEventListener('click', () => dtWaehle(b.dataset.dts)));
+  box.querySelectorAll('[data-dtf]').forEach(b => b.addEventListener('click', () => {
+    DTC.tf = Number(b.dataset.dtf);
+    box.querySelectorAll('[data-dtf]').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.dtf) === DTC.tf)));
+    dtLaden(DTC.sym, DTC.tf); dtLaden(DTC.sym, 60); dtChartZeichnen();
+  }));
+  dtLaden(DTC.sym, DTC.tf); if (DTC.tf !== 60) dtLaden(DTC.sym, 60);
+  dtChartZeichnen();
+}
+function dtWaehle(sym){
+  DTC.sym = sym;
+  document.querySelectorAll('#dtwahl [data-dts]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.dts === sym)));
+  dtLaden(sym, DTC.tf); if (DTC.tf !== 60) dtLaden(sym, 60);
+  dtChartZeichnen();
+}
+function dtChartZeichnen(){
+  const sym = DTC.sym; if (!sym || !$('dtcv')) return;
+  const info = dtInfo(sym);
+  $('dtname').textContent = info.name + (sym === 'PAXG' ? ' · PAXG/USD' : ` · ${sym}/USD`);
+  const d = DTC.daten.get(sym + '|' + DTC.tf), d1 = DTC.daten.get(sym + '|60');
+  if (!d || (!d.alle && !d.fehler)){ $('dtanalyse').innerHTML = `<p class="leer">Kurse werden von Kraken geladen …</p>`; return; }
+  if (d.fehler){
+    $('dtanalyse').innerHTML = `<div class="note-box bad"><span class="nt">Kraken nicht erreichbar</span>
+      <p>${esc(d.fehler)} — neuer Versuch in 30 Sekunden.</p></div>`;
+    return;
+  }
+  // Die Regel rechnet IMMER auf 1-Std.-Kerzen — auch wenn der Chart 4 Std. zeigt.
+  const btcOk = DTW ? DTW.btc_ueber_ema200 : null;
+  const marktOk = info.klasse === 'coin' ? btcOk : null;
+  const an = d1 && d1.fertig ? dtAnalyse(d1.fertig, marktOk) : null;
+  const emaChart = dtEma(d.alle.map(x => x[4]), 200);
+  dtCanvas($('dtcv'), d.alle, d.fertig.length, dtLinien(sym, an), emaChart, DTC.tf);
+  const live = d.alle[d.alle.length - 1][4];
+  const tag = d1 && d1.alle && d1.alle.length > 24 ? d1.alle[d1.alle.length - 25][4] : null;
+  const px = $('dtpx');
+  if (px){ px.textContent = num(live) + ' $'; px.className = 'px ' + (tag && live >= tag ? 'up' : tag ? 'dn' : ''); }
+  const q = $('dtquelle');
+  if (q) q.textContent = `Kraken live · ${new Date(d.zeit).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}${tag ? ' · 24 Std. ' + pct((live / tag - 1) * 100, 1) : ''}`;
+  $('dtanalyse').innerHTML = dtAnalyseHtml(sym, info, an, live);
+}
+function dtZeile(ok, text, wert){
+  return `<li><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</span><span>${text}</span><span class="v">${wert || ''}</span></li>`;
+}
+function dtAnalyseHtml(sym, info, an, live){
+  if (!an) return `<p class="leer">Zu wenig 1-Std.-Kerzen für die Analyse.</p>`;
+  const welle = DTW ? (DTW.welle || 0) : null, minW = (DTW && DTW.min_welle) || 12;
+  const btc = DTW ? !!DTW.btc_ueber_ema200 : null;
+  const schwelle = an.marke48 + DT_MIN_UEBERHANG * an.atr24;
+  const risiko = (an.kurs - an.stop_bei_signal) / an.kurs * 100;
+  let h = `<div class="karte" style="margin-top:10px">
+    <div class="rowx"><span class="lab">Zustand (letzte volle Stunde)</span><span class="val"><span class="note ${an.status === 'ausbruch' ? 'gut' : an.status === 'nah' ? 'warn' : ''}">${esc(DT_STATUS[an.status] || an.status)}</span></span></div>
+    <div class="rowx"><span class="lab">48-Std.-Hoch (Ausbruchsmarke)</span><span class="val">${num(an.marke48)} $ · ${an.abstand_pct > 0 ? 'noch ' + pct(an.abstand_pct, 2) : 'überschritten'}</span></div>
+    <div class="rowx"><span class="lab">EMA 200 (1 Std.)</span><span class="val">${num(an.ema200)} $ · Kurs ${an.kurs > an.ema200 ? 'darüber' : 'darunter'}</span></div>
+    <div class="rowx"><span class="lab">Schwankung ATR(24)</span><span class="val">${num(an.atr24)} $ (${pct(an.atr24 / an.kurs * 100, 2).replace('+', '')})</span></div>
+    <div class="rowx"><span class="lab">Stop bei einem Signal jetzt</span><span class="val">${num(an.stop_bei_signal)} $ (−${risiko.toFixed(1).replace('.', ',')} %)</span></div>
+    <div class="rowx"><span class="lab">Ausstiegsmarke (24-Std.-Tief)</span><span class="val">${num(an.tief24)} $</span></div>
+  </div>`;
+  if (info.klasse === 'coin'){
+    const c = [
+      [welle != null && welle >= minW, `Welle: ≥ ${minW} von 24 Coins brechen aus`, welle != null ? `${welle}/24` : '—'],
+      [btc === true, 'Bitcoin über EMA 200', btc == null ? '—' : btc ? 'ja' : 'nein'],
+      [an.kurs > an.ema200, 'Stundenschluss über EMA 200', num(an.ema200)],
+      [an.kurs > an.marke48, 'Stundenschluss über dem 48-Std.-Hoch', num(an.marke48)],
+      [an.ueberhang_atr >= DT_MIN_UEBERHANG, 'klar drüber (≥ 0,25 ATR) — sonst lohnt es nicht', `ab ${num(schwelle)}`],
+    ];
+    const alle = c.every(x => x[0]);
+    const fehlt = c.filter(x => !x[0]).length;
+    h += `<h3>Was für einen Einstiegs-Alarm fehlt</h3><div class="karte"><ul class="dtcheck">
+      ${c.map(x => dtZeile(...x)).join('')}</ul>
+      <p class="dturteil ${alle ? 'gut' : fehlt === 1 ? 'warn' : 'warte'}">${alle
+        ? `Alle Bedingungen erfüllt — der Einstieg lohnt sich laut Regel. Der Alarm kommt mit Kauf, Stop und Größe.`
+        : `Noch kein Einstieg. Der Alarm kommt bei einem Stundenschluss über <b>${num(schwelle)} $</b>` +
+          (welle != null && welle < minW ? `, sobald ${minW - welle} weitere Coins ausbrechen (Welle)` : '') +
+          (btc === false ? ' und Bitcoin wieder über seiner EMA 200 steht' : '') + '.'}</p></div>`;
+  } else if (info.klasse === 'gold'){
+    h += `<h3>Gold — was das heißt</h3><div class="karte">
+      <p style="margin:0 0 6px;font-size:13px">Der Gold-<b>Tagesausbruch</b> (dieselbe Regel wie bei den Coins) ist
+      <b>kein Push</b>: in der Studie 2022–24 klar negativ (−0,43 R je Trade), nur 2025/26 positiv. Er läuft still als
+      Paper mit. ${an.signal ? '<b>Gerade ist ein solcher Ausbruch da</b> — als Paper, nicht als Einstieg.' : ''}</p>
+      <p style="margin:0;font-size:13px">Gold-<b>Alarme</b> kommen aus <b>S9</b> (4-Std.-Swing, unten): neues Setup, TP1, TP2,
+      Stop — mit 🧪. ${GD && GD.gold ? `S9 jetzt: <b>${esc(DT_ZUSTAND_TEXT[GD.gold.zustand] || GD.gold.zustand || '—')}</b>.` : ''}
+      ${GD && GD.kraken_faktor ? 'Die S9-Marken sind im Chart auf PAXG umgerechnet.' : ''}</p></div>`;
+  } else {
+    h += `<div class="note-box" style="margin-top:10px"><span class="nt">Nur Orientierung</span>
+      <p>${esc(info.name)} ist nicht Teil der Studie — keine Alarme. Die Marken zeigen, wo die Ausbruchsregel stehen würde.</p></div>`;
+  }
+  const p = dtDeinePosition(sym);
+  if (p && p.einstieg != null){
+    const g = (live / p.einstieg - 1) * 100;
+    const st = p.plan && p.plan.stop != null ? +p.plan.stop : null;
+    h += `<h3>Deine Position</h3><div class="karte">
+      <div class="rowx"><span class="lab">Kauf</span><span class="val">${num(+p.einstieg)} $ · ${num(+p.menge, 4)} Stück</span></div>
+      <div class="rowx"><span class="lab">Jetzt</span><span class="val"><b class="${g >= 0 ? 'up' : 'dn'}">${pct(g, 2)}</b> · ${num((live - p.einstieg) * p.menge, 2)} $</span></div>
+      ${st != null ? `<div class="rowx"><span class="lab">Dein Stop</span><span class="val">${num(st)} $ · ${pct((st / live - 1) * 100, 2)} entfernt</span></div>`
+        : `<div class="rowx"><span class="lab">Stop</span><span class="val" style="color:var(--bad)">keiner eingetragen — im Portfolio setzen</span></div>`}
+      <div class="rowx"><span class="lab">24-Std.-Tief (Ausstiegsmarke der Regel)</span><span class="val">${num(an.tief24)} $</span></div>
+    </div>`;
+  }
+  return h;
+}
+/* Live nachfuehren, solange der Reiter offen ist — jede Minute neue Kerzen. */
+function dtTakt(){
+  if (!$('p11') || $('p11').hidden || !DTC.sym) return;
+  dtLaden(DTC.sym, DTC.tf); if (DTC.tf !== 60) dtLaden(DTC.sym, 60);
+}
+setInterval(dtTakt, 60000);
+window.addEventListener('resize', () => { if ($('p11') && !$('p11').hidden) dtChartZeichnen(); });
+
 function zeichneDaytrading(){
+  try { dtChartAufbau(); } catch(e){ console.error(e); }
   let h = dtKrypto(DTW) + `<h2>🧪 Gold-Swing S9 — experimentell</h2>
   <div class="note-box warn"><span class="nt">Experimentelle Alarme</span>
     <p>Bei einem neuen Gold-Setup, bei TP1, TP2, Stop oder Zeitausstieg kommt ein Alarm —

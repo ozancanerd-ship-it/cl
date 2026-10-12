@@ -29,6 +29,11 @@ TRAIL = 24
 MAX_BARS = 72
 STOP_ATR = 2.0
 MIN_RISIKO = 0.003
+#: "Lohnt sich"-Tor (Nachtrag 12.10.2026, ``docs/DAYTRADE-STUDIE-2026-10.md`` Abschnitt 6):
+#: Welle-Ausbrueche, die nur knapp (< 0,25 ATR(24)) ueber das 48-Std.-Hoch schliessen, waren
+#: in IS (+0,02 R) und OOS (−0,30 R) die schwaechste Gruppe. Mit Tor: IS +0,27 R, OOS +0,28 R,
+#: OOS-Bootstrap-5 % +0,11 R, 18/24 Coins im Plus. Schwellen 0,15–0,5 liefern dasselbe Bild.
+MIN_UEBERHANG_ATR = 0.25
 
 Kerze = tuple  # (t, o, h, l, c)
 
@@ -66,6 +71,60 @@ def ist_signal(
     if c <= max(x[2] for x in k[i - lookback : i]) or c <= e200[i]:
         return False
     return markt_ok is not False
+
+
+def ueberhang(
+    k: list[Kerze], i: int, a: list[float | None], lookback: int = LOOKBACK
+) -> float | None:
+    """Wie weit der Schluss der Kerze ``i`` ueber dem Hoch der ``lookback`` Kerzen davor
+    liegt — in ATR(24). Negativ = noch unter der Marke."""
+    if i < lookback or not a[i]:
+        return None
+    return (k[i][4] - max(x[2] for x in k[i - lookback : i])) / a[i]
+
+
+def analyse(
+    k: list[Kerze], *, markt_ok: bool | None = None, lookback: int = LOOKBACK
+) -> dict | None:
+    """Jetzt-Zustand der letzten abgeschlossenen Kerze — fuer Seite und Chart.
+
+    Liefert die Marken, gegen die die Regel prueft: 48-Std.-Hoch (Ausbruchsmarke), EMA 200,
+    24-Std.-Tief (Ausstiegsmarke), ATR und den Stop, der bei einem Signal jetzt gaelte.
+    """
+    if len(k) < 201:
+        return None
+    i = len(k) - 1
+    e = ema([x[4] for x in k], 200)
+    a = atr(k, 24)
+    if e[i] is None or not a[i]:
+        return None
+    c = k[i][4]
+    marke = max(x[2] for x in k[i - lookback : i])
+    ue = ueberhang(k, i, a, lookback)
+    sig = ist_signal(k, i, e, markt_ok=markt_ok, lookback=lookback)
+    if sig:
+        status = "ausbruch"
+    elif c <= e[i]:
+        status = "unter_ema"
+    elif markt_ok is False:
+        status = "markt_zu"
+    elif (marke - c) <= a[i]:
+        status = "nah"
+    else:
+        status = "ruhig"
+    return {
+        "zeit": k[i][0].isoformat() if hasattr(k[i][0], "isoformat") else k[i][0],
+        "kurs": c,
+        "ema200": e[i],
+        "marke48": marke,
+        "tief24": min(x[3] for x in k[i - TRAIL + 1 : i + 1]),
+        "atr24": a[i],
+        "stop_bei_signal": c - STOP_ATR * a[i],
+        "abstand_pct": (marke - c) / c * 100,
+        "ueberhang_atr": ue,
+        "signal": sig,
+        "status": status,
+    }
 
 
 def verfolge(
@@ -145,4 +204,14 @@ def index_von(k: list[Kerze], t: datetime) -> int | None:
     return None
 
 
-__all__ = ["SETUP_ID", "atr", "ema", "index_von", "ist_signal", "verfolge"]
+__all__ = [
+    "MIN_UEBERHANG_ATR",
+    "SETUP_ID",
+    "analyse",
+    "atr",
+    "ema",
+    "index_von",
+    "ist_signal",
+    "ueberhang",
+    "verfolge",
+]

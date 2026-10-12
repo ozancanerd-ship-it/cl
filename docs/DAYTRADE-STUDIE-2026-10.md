@@ -56,3 +56,33 @@ genau diese weg.
 - Einzelne Ausbrüche ohne Welle, Shorts, M1/M3/M4: **kein Alarm**.
 
 Live und Studie benutzen dasselbe Modul `trading_agent.strategy.setups.daytrade_ausbruch`.
+
+## Lohnt-sich-Tor (Nachtrag 12.10.2026)
+
+Anlass — Ozan, 12.10.: „Benachrichtigung für Entry … aber nur wenn es sich lohnt".
+Skript: `scripts/daytrade_tor_pruefung.py` (gleiche Daten, gleiches Modul, Ø R nach Kosten).
+
+Drei Merkmale der Welle-Trades wurden aufgeteilt, jeweils IS (2022–24) / OOS (2025–09.2026):
+
+| Merkmal | Gruppe | IS | OOS |
+|---|---|---|---|
+| Kosten in R | kein gleichbleibendes Muster (OOS bei großem Stop negativ, IS positiv) | — | — |
+| Wellenbreite | 12–15 / 16–19 / 20–24 | +0,24 / +0,22 / +0,14 | +0,05 / +0,11 / +0,28 |
+| **Überhang über 48-Std.-Hoch** | **< 0,25 ATR (knapp)** | **+0,02 R** (n 433) | **−0,30 R** (n 302) |
+| | ≥ 0,25 ATR (klar) | +0,27 R (n 1.453) | +0,28 R (n 981) |
+
+Mit Tor „≥ 0,25 ATR": OOS-Bootstrap-5 %-Grenze **+0,11 R** (ohne Tor +0,01 R), 18 von 24 Coins
+im OOS im Plus (ohne 16), 2023–2026 jedes Jahr besser, 2022 gleich (~0). Schwellen
+0,10 / 0,15 / 0,35 / 0,50 zeigen dasselbe Bild — keine Messerkante.
+
+**Ehrlich:** IS und OOS wurden gleichzeitig angesehen. IS allein hätte dieselbe Schwelle
+nahegelegt, aber es bleibt ein Nachtrag. Gegenprobe: bei Ausbrüchen OHNE Welle hilft das Tor
+nicht (+0,01/−0,08 vs. −0,09/+0,04) — es ist eine Eigenschaft der Welle, keine allgemeine Regel.
+Welle-Trades laufen gleichzeitig in vielen Coins; der Bootstrap unterstellt Unabhängigkeit und
+überschätzt die Sicherheit. Status bleibt **KANDIDAT**.
+
+**Umsetzung:** Einstiegs-Push nur bei Welle **und** klarem Ausbruch
+(`daytrade_ausbruch.MIN_UEBERHANG_ATR = 0.25`). Knappe Ausbrüche laufen als stille
+Paper-Gegenprobe mit (eigene Forward-Bilanz) — so zeigt die Zukunft, ob das Tor trägt.
+Gold-Tagesausbruch: kein Push mehr (lohnt sich nicht belegt), nur Paper und Chart; Gold-Alarme
+kommen aus S9.

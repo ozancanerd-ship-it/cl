@@ -13,8 +13,11 @@ Krypto und fuer Gold". Grundlage: ``scripts/daytrade_studie.py`` / ``docs/DAYTRA
 3. Eine Welle ist EINE gebuendelte Meldung, nicht 24 — und beim naechsten Lauf mit denselben
    Kerzen kommt nichts doppelt.
 4. Der Ausstieg kommt als eigener Alarm mit R; der Trade landet in der Forward-Bilanz.
-5. Gold kommt ohne Welle, aber immer mit 🧪 und "experimentell".
+5. Gold-Ausbrueche laufen seit 12.10. nur still als Paper mit (lohnt sich nicht belegt).
 6. Die laufende (unfertige) Kraken-Kerze wird nie ausgewertet.
+7. "Lohnt sich"-Tor (Ozan, 12.10.: "Benachrichtigung fuer Entry ... aber nur wenn es sich
+   lohnt"): ein knapper Ausbruch (< 0,25 ATR ueber dem 48-Std.-Hoch) kommt nicht als Push,
+   laeuft aber als stille Gegenprobe mit — und sein Ausstieg kommt auch nicht als Push.
 """
 
 from __future__ import annotations
@@ -129,7 +132,8 @@ def test_welle_ist_eine_gebuendelte_meldung_und_kommt_nur_einmal() -> None:
     assert len(alarme["neu"]) >= da.MIN_WELLE
     texte = da.alarm_texte(alarme, welle)
     assert len(texte) == 1
-    assert "Ausbruchswelle" in texte[0]["titel"]
+    assert "lohnt sich" in texte[0]["titel"]
+    assert "Warum es sich lohnt" in texte[0]["text"]
     assert "Bybit" in texte[0]["text"] and "Kandidat" in texte[0]["text"]
     assert "Größe ≈" in texte[0]["text"]
 
@@ -159,12 +163,70 @@ def test_ausstieg_kommt_mit_r_und_landet_in_der_bilanz() -> None:
     )
 
 
-def test_gold_kommt_ohne_welle_aber_experimentell() -> None:
-    _, alarme, welle = da.fortschreiben(None, _alle(3, gold=True))
+def test_gold_laeuft_still_als_paper_ohne_push() -> None:
+    stand, alarme, welle = da.fortschreiben(None, _alle(3, gold=True))
+    assert da.alarm_texte(alarme, welle) == []
+    assert "PAXG" in stand["offen"]
+    assert stand["offen"]["PAXG"]["alarm"] is False
+
+
+def _knapp(k: list) -> None:
+    """Letzte Kerze schliesst nur hauchduenn ueber dem 48-Std.-Hoch."""
+    t, o, h, lo, _ = k[-1]
+    hoch = max(x[2] for x in k[-49:-1])
+    c = hoch * 1.0001
+    k[-1] = (t, o, max(h, c), lo, c)
+
+
+def test_knapper_ausbruch_kommt_nicht_als_push_aber_als_gegenprobe() -> None:
+    daten = _alle(20)
+    _knapp(daten["ETH"])
+    stand, alarme, welle = da.fortschreiben(None, daten)
+    eth = stand["offen"]["ETH"]
+    assert eth["lohnt"] is False and eth["alarm"] is False
+    assert eth["ueberhang_atr"] < da.m.MIN_UEBERHANG_ATR
+    assert all(t["sym"] != "ETH" for t in alarme["neu"])
     texte = da.alarm_texte(alarme, welle)
-    assert len(texte) == 1
-    assert "🧪" in texte[0]["titel"] and "experimentell" in texte[0]["titel"]
-    assert "EXPERIMENTELL" in texte[0]["text"]
+    assert "(ETH/USDT)" not in texte[0]["text"]
+    # Absturz: der stille Trade wird abgerechnet, aber nicht gemeldet
+    for k in daten.values():
+        t, c = k[-1][0], k[-1][4]
+        k.append((t + timedelta(hours=1), c, c * 1.002, c * 0.998, c))
+        k.append((t + timedelta(hours=2), c, c, c * 0.80, c * 0.81))
+    stand2, alarme2, _ = da.fortschreiben(stand, daten)
+    assert all(t["sym"] != "ETH" for t in alarme2["aus"])
+    assert da.bilanz(stand2, "coin", alarm=False)["anzahl"] == 1
+    assert da.bilanz(stand2, "coin", alarm=True)["anzahl"] == len(alarme2["aus"])
+
+
+def test_alte_trades_ohne_alarm_feld_melden_ihren_ausstieg() -> None:
+    daten = _alle(20)
+    stand, _, _ = da.fortschreiben(None, daten)
+    for t in stand["offen"].values():
+        t.pop("alarm", None)  # Stand von vor dem 12.10.
+    for k in daten.values():
+        t, c = k[-1][0], k[-1][4]
+        k.append((t + timedelta(hours=1), c, c * 1.002, c * 0.998, c))
+        k.append((t + timedelta(hours=2), c, c, c * 0.80, c * 0.81))
+    _, alarme, _ = da.fortschreiben(stand, daten)
+    assert {t["sym"] for t in alarme["aus"]} >= {"BTC", "ETH"}
+
+
+def test_analyse_liefert_die_marken_der_regel() -> None:
+    daten = _alle(20)
+    daten["TAO"] = _reihe(ausbruch=True, basis=300.0)
+    a = da.analysen(daten, da.btc_filter(daten))
+    eth = a["ETH"]
+    for f in ("kurs", "ema200", "marke48", "tief24", "atr24", "stop_bei_signal", "status"):
+        assert f in eth
+    assert eth["signal"] and eth["status"] == "ausbruch" and eth["lohnt"]
+    assert eth["stop_bei_signal"] == pytest.approx(eth["kurs"] - 2 * eth["atr24"])
+    assert a["PAXG"]["klasse"] == "gold" and a["PAXG"]["lohnt"] is False
+    assert a["TAO"]["klasse"] == "extra" and a["TAO"]["lohnt"] is False
+
+
+def test_extra_werte_zaehlen_nicht_zur_welle() -> None:
+    assert "TAO" in da.EXTRA and "TAO" not in da.COINS
 
 
 def test_groesse_ist_gedeckelt() -> None:
