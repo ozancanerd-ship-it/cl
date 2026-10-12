@@ -641,13 +641,22 @@ def pflegen(
                 else " Damit ist der Trade zu."
             )
             rahmen_satz = " (Ziel aus deinem Stop: je 1 R)" if rahmen else ""
+            # Was der Verkauf bringt und wohin der Stop wandert — als feste Zahlen, nicht
+            # als Hinweis auf eine Rechnung, die man selbst machen muss.
+            ein_r = _zahl(pos.get("einstieg"))
+            neu_stop = (ein_r if marke == "TP1" else ziele.get("tp1")) if marke in ("TP1", "TP2") else None
+            extra = ""
+            if neu_stop is not None and ein_r:
+                extra += f" Neuer Stop: {_fmt(neu_stop)}{z}."
+            if menge and menge > 0 and offen > 0:
+                extra += f" Erlös ca. {_fmt((menge / offen) * kurs)}{z} brutto."
             ev.append(
                 Ereignis(
                     "ziel",
                     lg.key,
                     wer,
                     f"{marke} erreicht ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}){rahmen_satz} — {teil} "
-                    f"verkaufen{wo_satz}.{danach}",
+                    f"verkaufen{wo_satz}.{danach}{extra}",
                     True,
                     marke=marke,
                 )
