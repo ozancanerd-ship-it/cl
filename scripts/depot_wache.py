@@ -82,6 +82,11 @@ SYNC_ZWECK = "depot-sync-v1"
 ART_TITEL = {
     "stop": "Stop gerissen — verkaufen",
     "ziel": "Ziel erreicht — Teil verkaufen",
+    "ziel_vorlaeufig": "Ziel berührt — noch nicht bestätigt",
+    "ziel_zurueck": "Teilverkauf-Hinweis zurückgenommen",
+    "nachkauf": "Nachkauf-Hinweis bestätigt — prüfen",
+    "nachkauf_vorlaeufig": "Nachkauf vorläufig — noch nicht bestätigt",
+    "nachkauf_zurueck": "Nachkauf-Hinweis zurückgenommen",
     "ko": "Knock-out berührt",
     "puffer_kritisch": "Knock-out bedrohlich nah — raus",
     "puffer_eng": "Knock-out-Puffer wird eng",
@@ -97,6 +102,9 @@ ART_TITEL = {
 DRINGEND = {
     "stop",
     "ziel",
+    "ziel_vorlaeufig",
+    "nachkauf",
+    "nachkauf_vorlaeufig",
     "ko",
     "puffer_kritisch",
     "puffer_eng",
@@ -110,6 +118,11 @@ HANDLUNG = {
     "ko": "VERKAUFEN",
     "puffer_kritisch": "VERKAUFEN",
     "ziel": "TEIL VERKAUFEN",
+    "ziel_vorlaeufig": "PRÜFEN",
+    "ziel_zurueck": "ENTWARNUNG",
+    "nachkauf": "NACHKAUF PRÜFEN",
+    "nachkauf_vorlaeufig": "PRÜFEN",
+    "nachkauf_zurueck": "ENTWARNUNG",
     "puffer_eng": "TEIL VERKAUFEN",
     "zahlen_ko": "PRÜFEN",
     "entwarnung": "ENTWARNUNG",
@@ -130,7 +143,7 @@ def oeffentlicher_titel(neu: list[Ereignis]) -> str:
         h = HANDLUNG.get(e.art)
         if h:
             zaehl[h] = zaehl.get(h, 0) + 1
-    reihenfolge = ["VERKAUFEN", "TEIL VERKAUFEN", "PRÜFEN", "ENTWARNUNG"]
+    reihenfolge = ["VERKAUFEN", "TEIL VERKAUFEN", "NACHKAUF PRÜFEN", "PRÜFEN", "ENTWARNUNG"]
     teile = [f"{h} ({zaehl[h]})" if zaehl[h] > 1 else h for h in reihenfolge if h in zaehl]
     return "DEPOT · " + " · ".join(teile) if teile else "DEPOT · Meldung"
 

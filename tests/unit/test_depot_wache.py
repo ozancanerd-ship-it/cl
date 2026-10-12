@@ -525,8 +525,8 @@ def test_ziele_eines_fremden_setups_gelten_nicht_fuer_eine_gehaltene_position() 
     assert [e.art for e in ev] == []
     # Selbst gesetzt oder ueber die Signalkarte gekauft: dann schon.
     pos[0]["plan"]["quelle"] = "selbst"
-    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {})
-    assert [e.art for e in ev] == ["ziel"]
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 111.0)), {}, {"SOLUSD": 110.5})
+    assert next(e.art for e in ev) == "ziel"
 
 
 def test_der_waechter_legt_keine_ziele_an() -> None:
@@ -595,7 +595,7 @@ def _pos_rahmen() -> list[dict]:
 def test_ziel_beruehrt_aber_schluss_darunter_ist_nur_vorlaeufig() -> None:
     """Berühren allein bestätigt nichts: erst ein abgeschlossener Stundenschluss über dem Ziel."""
     stand, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", 110.5)), {}, {"SOLUSD": 108.0})
-    assert [e.art for e in ev] == ["ziel"]
+    assert [e.art for e in ev] == ["ziel_vorlaeufig"]
     assert ev[0].text.startswith("VORLÄUFIG")
     assert ev[0].marke == "TP1-vorlaeufig"
     # Zweiter Lauf, gleiche Lage: keine Wiederholung (Merker bleibt gleich, Stand merkt es).
@@ -716,3 +716,78 @@ def test_schluesse_aus_ohlcv_nur_wenn_frisch() -> None:
     assert schluesse_aus_ohlcv(bars[:2], jetzt, 3 * 3600) is None  # zu wenig
     zukunft = [*bars[:2], SimpleNamespace(open_time=jetzt, close_time=jetzt + timedelta(hours=1), close=1.0)]
     assert schluesse_aus_ohlcv(zukunft, jetzt, 3 * 3600) is None  # Kerze noch nicht zu
+
+
+def _nk_zeile(kurs: float, **plan_extra: float) -> dict:
+    """Scan-Zeile mit gültigem Long-Setup und bestandenem Alarm-Tor (Einstieg 100, Stop 95)."""
+    z = _zeile("SOLUSD", kurs, richtung="long")
+    z["handelbar"] = True
+    z["alarm"] = {"ja": True, "grund": ""}
+    z["plan"] = {"einstieg": 100.0, "stop": 95.0, "tp1": 110.0, "tp2": 120.0, **plan_extra}
+    return z
+
+
+def _pos_nk() -> list[dict]:
+    return [{"sym": "SOLUSD", "menge": 6, "einstieg": 90.0, "plan": {"stop": 85.0, "quelle": "selbst"}}]
+
+
+def test_nachkauf_zweistufig_vorlaeufig_dann_bestaetigt() -> None:
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+    stand, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(101.0)), {}, {"SOLUSD": 99.0}, gut)
+    assert [e.art for e in ev if e.art.startswith("nachkauf")] == ["nachkauf_vorlaeufig"]
+    assert "noch nicht über der Marke" in next(e for e in ev if e.art.startswith("nachkauf")).text
+    # Nach bestätigtem Stundenschluss über der Marke: bestätigter Hinweis mit Lage und Obergrenze.
+    _, ev2, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(102.0)), stand, {"SOLUSD": 101.5}, gut)
+    nk = [e for e in ev2 if e.art == "nachkauf"]
+    assert len(nk) == 1
+    assert "bestätigt" in nk[0].text and "Obergrenze: ca. 2 Stück" in nk[0].text
+    assert "Trend stützt den Nachkauf" in nk[0].text and "Invalidierung" in nk[0].text
+
+
+def test_nachkauf_trendkonflikt_wird_gezeigt_und_bestaetigt_nichts() -> None:
+    dagegen = {"SOLUSD": {"d1": "ab", "h4": "auf", "rsi_h1": 55.0}}
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, dagegen)
+    nk = [e for e in ev if e.art.startswith("nachkauf")]
+    assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
+    assert "Trend (D1/H4) steht dagegen" in nk[0].text and "Konflikt" in nk[0].text
+
+
+def test_nachkauf_nie_ohne_frische_daten_bestaetigt() -> None:
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(102.0)), {}, None, None)
+    nk = [e for e in ev if e.art.startswith("nachkauf")]
+    assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
+    assert "keine frischen" in nk[0].text and "keine Daten" in nk[0].text
+
+
+def test_nachkauf_nur_bei_gueltiger_these_und_crv() -> None:
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+    # Tor nicht bestanden → kein Nachkauf
+    z = _nk_zeile(102.0)
+    z["alarm"] = {"ja": False, "grund": "Note zu schwach"}
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z), {}, {"SOLUSD": 101.5}, gut)
+    assert [e for e in ev if e.art.startswith("nachkauf")] == []
+    # Chance-Risiko vom jetzigen Kurs unter 2 (Ziel zu nah) → kein Hinterherlaufen
+    z2 = _nk_zeile(108.0, tp2=111.0)
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z2), {}, {"SOLUSD": 107.5}, gut)
+    assert [e for e in ev if e.art.startswith("nachkauf")] == []
+    # Invalidierung gerissen → kein Nachkauf
+    z3 = _nk_zeile(94.0)
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z3), {}, {"SOLUSD": 94.0}, gut)
+    assert [e for e in ev if e.art.startswith("nachkauf")] == []
+    # Gegenrichtung (Short-Setup bei Long-Position) → kein Nachkauf
+    z4 = _nk_zeile(102.0)
+    z4["richtung"] = "short"
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z4), {}, {"SOLUSD": 101.5}, gut)
+    assert [e for e in ev if e.art.startswith("nachkauf")] == []
+
+
+def test_nachkauf_vorlaeufig_wird_zurueckgenommen() -> None:
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+    stand, _, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(101.0)), {}, {"SOLUSD": 99.0}, gut)
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(98.0)), stand, {"SOLUSD": 99.0}, gut)
+    assert [e.art for e in ev if e.art.startswith("nachkauf")] == ["nachkauf_zurueck"]
+
+
+def test_stop_bleibt_direkt_ohne_jede_bestaetigung() -> None:
+    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(84.0)), {}, None, None)
+    assert ev[0].art == "stop"

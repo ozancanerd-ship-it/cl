@@ -345,7 +345,9 @@ def lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
 
 @dataclass
 class Ereignis:
-    art: str  # stop | ziel | ko | puffer_kritisch | puffer_eng | stop_neu | stop_nach | entwarnung
+    # stop | ziel | ziel_vorlaeufig | ziel_zurueck | nachkauf | nachkauf_vorlaeufig | nachkauf_zurueck
+    # | ko | puffer_kritisch | puffer_eng | stop_neu | stop_nach | entwarnung
+    art: str
     key: str
     name: str
     text: str
@@ -407,8 +409,9 @@ def lage_zeile(
     stop: float | None,
     kontext: dict[str, Any] | None,
     z: str,
+    aktion: str = "verkauf",
 ) -> str:
-    """Die Lage hinter einem Teilverkauf-Hinweis: Trend D1/H4, Momentum, verbleibendes
+    """Die Lage hinter einem Teilverkauf- oder Nachkauf-Hinweis: Trend D1/H4, Momentum, verbleibendes
     Upside, Abstand zum Stop. Ein bestaetigter Stundenschluss ist ein Anlass zum Pruefen —
     kein Befehl; Widersprueche zum Trend stehen im Text statt verschwiegen zu werden."""
     k = kontext or {}
@@ -420,7 +423,14 @@ def lage_zeile(
         t = f"Trend D1 {_TREND_TXT.get(d1, '—')}, H4 {_TREND_TXT.get(h4, '—')}"
         dafuer = "auf" if lang else "ab"
         dagegen = "ab" if lang else "auf"
-        if d1 == dafuer and h4 == dafuer:
+        if aktion == "nachkauf":
+            if dagegen in (d1, h4):
+                t += " — Konflikt: der Trend läuft gegen den Nachkauf"
+            elif d1 == dafuer and h4 == dafuer:
+                t += " — Trend stützt den Nachkauf"
+            else:
+                t += " — Trend uneinheitlich"
+        elif d1 == dafuer and h4 == dafuer:
             t += " — Konflikt: der Trend läuft weiter in Richtung deiner Position, ein Teilverkauf kostet Upside"
         elif dagegen in (d1, h4):
             t += " — Trend dreht gegen die Position, das stützt den Teilverkauf"
@@ -435,6 +445,116 @@ def lage_zeile(
     if stop is not None and kurs:
         teile.append(f"Stop {_fmt(stop)}{z} ({abs(kurs - stop) / kurs * 100:.1f} % entfernt)".replace(".", ","))
     return " Lage: " + "; ".join(teile) + ". Das ist ein Hinweis zum Prüfen, keine Pflicht."
+
+
+NACHKAUF_MIN_CRV = 2.0
+
+
+def _nachkauf(
+    row: dict[str, Any] | None,
+    lang: bool,
+    kurs: float,
+    close: float | None,
+    kontext: dict[str, Any] | None,
+    menge: float | None,
+    st: dict[str, Any],
+    z: str,
+    wer: str,
+    key: str,
+) -> list[Ereignis]:
+    """Nachkauf-Hinweis fuer eine gehaltene Position — zweistufig, nie automatisch.
+
+    Nur wenn die Analyse fuer genau diesen Wert in DIESELBE Richtung ein Setup hat, das das
+    Alarm-Tor besteht (Trading-These gilt), die Invalidierung nicht gerissen ist und das
+    Chance-Risiko vom JETZIGEN Kurs aus noch >= 2 ist (kein Hinterherlaufen). Beruehren der
+    Einstiegsmarke = vorlaeufig; bestaetigt erst, wenn ein frischer, abgeschlossener
+    Stundenschluss darueber liegt UND D1/H4 nicht dagegen stehen. Ein Trend-Konflikt wird
+    angezeigt, nicht verschwiegen — und bestaetigt nichts."""
+    if not row:
+        return []
+    plan = row.get("plan") or {}
+    ein, stp = _zahl(plan.get("einstieg")), _zahl(plan.get("stop"))
+    ziel = _zahl(plan.get("tp2")) or _zahl(plan.get("tp1"))
+    tor = row.get("alarm") or {}
+    if row.get("richtung") != ("long" if lang else "short") or not row.get("handelbar") or tor.get("ja") is not True:
+        return []
+    if ein is None or stp is None or ziel is None:
+        return []
+    if (lang and kurs <= stp) or (not lang and kurs >= stp):
+        return []  # Invalidierung gerissen — kein Nachkauf
+    risiko = abs(kurs - stp)
+    upside = (ziel - kurs) if lang else (kurs - ziel)
+    if risiko <= 0 or upside <= 0 or upside / risiko < NACHKAUF_MIN_CRV:
+        return []
+    zust = dict(st.get("nachkauf") or {})
+    k = f"{ein:.8g}"
+    alt = zust.get(k)
+    beruehrt = kurs >= ein if lang else kurs <= ein
+    if not beruehrt:
+        if alt == "vorlaeufig":
+            del zust[k]
+            st["nachkauf"] = zust
+            return [
+                Ereignis(
+                    "nachkauf_zurueck",
+                    key,
+                    wer,
+                    f"Nachkauf-Hinweis zurückgenommen: Kurs wieder unter der Einstiegsmarke {_fmt(ein)}{z}. Kein Nachkauf.",
+                    False,
+                    marke=f"NK{k}-zurueck",
+                )
+            ]
+        return []
+    ktx = kontext or {}
+    dagegen = "ab" if lang else "auf"
+    konflikt = dagegen in (ktx.get("d1"), ktx.get("h4"))
+    ok = None if close is None else ((close >= ein) if lang else (close <= ein))
+    crv = upside / risiko
+    lage = lage_zeile(lang, kurs, ziel, stp, ktx, z, aktion="nachkauf")
+    menge_satz = (
+        f" Obergrenze: ca. {menge / 3:.4g} Stück (ein Drittel der bestehenden Menge)." if menge and menge > 0 else ""
+    )
+    basis = (
+        f"Das Setup gilt weiter (Alarm-Tor bestanden), Chance-Risiko vom jetzigen Kurs {crv:.1f} zu 1, "
+        f"Stop/Invalidierung {_fmt(stp)}{z}, Ziel {_fmt(ziel)}{z}."
+    )
+    if ok is True and not konflikt:
+        if alt == "bestaetigt":
+            return []
+        zust[k] = "bestaetigt"
+        st["nachkauf"] = zust
+        return [
+            Ereignis(
+                "nachkauf",
+                key,
+                wer,
+                f"NACHKAUF-HINWEIS bestätigt: Stundenschluss {_fmt(close)}{z} über der Marke {_fmt(ein)}{z}. "
+                f"{basis}{menge_satz}{lage}",
+                True,
+                marke=f"NK{k}",
+            )
+        ]
+    if alt in ("vorlaeufig", "bestaetigt"):
+        return []
+    zust[k] = "vorlaeufig"
+    st["nachkauf"] = zust
+    grund = (
+        "Der Trend (D1/H4) steht dagegen — nicht bestätigt."
+        if konflikt
+        else "Es liegen keine frischen, vollständigen Stundendaten vor — nicht bestätigt."
+        if ok is None
+        else "Der letzte abgeschlossene Stundenschluss liegt noch nicht über der Marke."
+    )
+    return [
+        Ereignis(
+            "nachkauf_vorlaeufig",
+            key,
+            wer,
+            f"NACHKAUF VORLÄUFIG: Marke {_fmt(ein)}{z} berührt ({_fmt(kurs)}{z}). {grund} {basis}{lage}",
+            True,
+            marke=f"NK{k}-vorlaeufig",
+        )
+    ]
 
 
 def _fmt(x: float | None) -> str:
@@ -733,7 +853,7 @@ def pflegen(
             )
             ev.append(
                 Ereignis(
-                    "ziel",
+                    "ziel_vorlaeufig",
                     lg.key,
                     wer,
                     f"VORLÄUFIG: {marke} berührt ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}). "
@@ -748,7 +868,7 @@ def pflegen(
             st["vorlaeufig"] = sorted(vor - {marke})
             ev.append(
                 Ereignis(
-                    "ziel",
+                    "ziel_zurueck",
                     lg.key,
                     wer,
                     f"{marke}-Hinweis zurückgenommen: Kurs wieder unter Ziel ({_fmt(kurs)}{z}). Kein Verkauf.",
@@ -803,6 +923,10 @@ def pflegen(
                 )
             )
         break  # immer nur das naechste Ziel pruefen
+
+    # 2c — Nachkauf-Hinweis (nur fuer die Position selbst, nicht fuer einen Basiswert).
+    if lg.ebene == "position" and lang is not None:
+        ev.extend(_nachkauf(lg.row, bool(lang), kurs, close, (kontext or {}).get(inst), menge, st, z, wer, lg.key))
 
     # 3 — Stop setzen / nachziehen.
     kand = list(lg.kandidaten)
