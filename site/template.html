@@ -424,6 +424,13 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .dturteil.gut{background:var(--long-bg); color:var(--long)}
 .dturteil.warte{background:var(--sunk); color:var(--ink-2)}
 .dturteil.warn{background:var(--warn-bg); color:var(--warn)}
+.dtq{appearance:none; border:1px solid var(--rule-strong); background:transparent; color:var(--ink-3);
+  width:18px; height:18px; border-radius:50%; font:600 11px/1 Inter,sans-serif; cursor:pointer; padding:0;
+  vertical-align:2px; margin-left:4px}
+.dtq:hover{color:var(--accent); border-color:var(--accent)}
+.dtbg{padding:8px 0; border-bottom:1px solid var(--rule)}
+.dtbg p{margin:3px 0 0; font-size:13px; color:var(--ink-2)}
+.dtbg.hell{background:var(--accent-soft); border-radius:8px; padding:8px}
 .dtspread{display:flex; flex-wrap:wrap; gap:6px 14px; padding:7px 14px; border-bottom:1px solid var(--rule);
   font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink-2)}
 .dtspread b{color:var(--ink); font-weight:600}
@@ -10005,7 +10012,7 @@ function dtSpannenHtml(sym, info, prog, P, live){
   }).join('');
   const fenster = dtAktivFenster(P, prog.t);
   const fj = prog.jetztFaktor;
-  let h = `<h3>📏 Wie weit kann es laufen?</h3><div class="karte">
+  let h = `<h3>📏 Wie weit kann es laufen?${dtFrage('band')}${dtFrage('profil')}</h3><div class="karte">
     <div class="rowx"><span class="lab">Bewegung in der kommenden Stunde</span><span class="val"><b style="color:${fj >= 1.2 ? 'var(--warn)' : fj <= 0.8 ? 'var(--ink-2)' : 'var(--ink)'}">${fj >= 1.2 ? 'lebhaft' : fj <= 0.8 ? 'ruhig' : 'normal'}</b> (${num(fj, 2)}× Durchschnitt)</span></div>
     ${fenster ? `<div class="rowx"><span class="lab">Bewegteste Stunde (nächste 24)</span><span class="val">ab ${dtUhr(fenster.max.t)} Uhr (${num(fenster.max.f, 2)}×) · ruhigste ab ${dtUhr(fenster.min.t)} Uhr (${num(fenster.min.f, 2)}×)</span></div>` : ''}
     ${zeilen}`;
@@ -10073,8 +10080,8 @@ function dtGoldPanel(live){
         ? `Übergeordnet ${RW[lR]}, kurzfristig ${RW[kR]} — Gegenbewegung im größeren Trend. Gegen den 4-Std.-/Tagestrend zu handeln ist das schwierigere Spiel.`
         : `Übergeordnet ${RW[lR]}, kurzfristig ${RW[kR]} — kein klares gemeinsames Bild.`;
   }
-  let h = `<h3>🥇 Gold-Analyse — anders als bei den Coins</h3>
-    <div class="karte"><div class="rowx"><span class="lab"><b>Zeiteinheiten-Ampel</b></span><span class="val">${n ? `${auf}× auf · ${ab}× ab · ${n - auf - ab}× seitwärts` : ''}</span></div>
+  let h = `<h3>🥇 Gold-Analyse — anders als bei den Coins${dtFrage('swingday')}</h3>
+    <div class="karte"><div class="rowx"><span class="lab"><b>Zeiteinheiten-Ampel</b>${dtFrage('ema')}${dtFrage('rsi')}</span><span class="val">${n ? `${auf}× auf · ${ab}× ab · ${n - auf - ab}× seitwärts` : ''}</span></div>
       ${zeilen.join('')}
       ${mtfSatz ? `<p class="dturteil ${kR === lR && kR !== 'seit' ? 'gut' : 'warte'}">${mtfSatz}</p>` : ''}
       <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Trend = Schluss gegen EMA 20 und EMA 50. Lage = wo der Kurs in der Spanne der letzten 20 Kerzen steht (0 % Tief, 100 % Hoch).</p></div>`;
@@ -10090,7 +10097,7 @@ function dtGoldPanel(live){
     const farbe = a => a == null ? 'var(--ink-2)' : a <= 25 ? 'var(--long)' : a <= 60 ? 'var(--warn)' : 'var(--bad)';
     const NAME = {1: '1 Min.', 5: '5 Min.', 15: '15 Min.', 60: '1 Std.', 240: '4 Std.', 1440: 'Tag'};
     const eins = ko.je.find(x => x.tf === 1);
-    h += `<h3>⏱️ Welche Zeiteinheit lohnt bei Gold überhaupt?</h3><div class="karte">
+    h += `<h3>⏱️ Welche Zeiteinheit lohnt bei Gold überhaupt?${dtFrage('gebuehr')}</h3><div class="karte">
       <div class="rowx"><span class="lab">Deine Gebühr je Seite (Marktorder)</span><span class="val"><input id="dtgeb" class="val" inputmode="decimal" style="width:70px;text-align:right" value="${(geb * 100).toFixed(2).replace('.', ',')}"> %</span></div>
       <div class="rowx"><span class="lab">Kosten einer Runde (Kauf + Verkauf)</span><span class="val">Marktorder ≈ <b>${num(ko.runde, 2)} $</b> · Limit ≈ ${num(kl.runde, 2)} $${spread != null ? ` · Spread ${num(spread, 2)} $` : ''}</span></div>
       ${ko.je.map(x => `<div class="rowx"><span class="lab">${NAME[x.tf]}: Ø Bewegung ${num(x.spanne, 2)} $</span><span class="val">Kosten = <b style="color:${farbe(x.anteil)}">${x.anteil == null ? '—' : x.anteil >= 1000 ? Math.round(x.anteil / 100) + '×' : Math.round(x.anteil) + ' %'}</b> der Bewegung</span></div>`).join('')}
@@ -10129,7 +10136,7 @@ function dtGoldPanel(live){
     spanneSatz += (spanneSatz ? ' ' : '') + (kurs > sz.asien.h ? 'Gold hat die Asien-Spanne nach oben verlassen.'
       : kurs < sz.asien.l ? 'Gold hat die Asien-Spanne nach unten verlassen.' : 'Gold steckt noch in der Asien-Spanne — die Richtung des Tages ist offen.');
   }
-  h += `<h3>Sitzungen & Tagesmarken</h3><div class="karte">${rz.join('')}
+  h += `<h3>Sitzungen & Tagesmarken${dtFrage('sitzung')}</h3><div class="karte">${rz.join('')}
     ${spanneSatz ? `<p class="dturteil warte">${spanneSatz}</p>` : ''}
     <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Sitzungszeiten ungefähr in UTC: Asien 00–07, London 07–13, New York 13–21 (deutsche Zeit +2 Std.).</p></div>`;
 
@@ -10568,13 +10575,128 @@ function dtChartZeichnen(nurChart){
     DTC.analyseZeit = 0; dtChartZeichnen();
   });
 }
+/* ---------------------------------------------------------------- Lernen & Playbook
+   Ozan, 12.10. 15:19: "Hauptfokus ist Swing Trading, aber jetzt haben wir auch Gold drin und
+   das ist Day Trading und da muss man anders vorgehen, anders analysieren ... dass ich auch
+   daraus lerne". Drei Bausteine:
+   * dtPlaybook: was im Gold-Tageshandel geprueft wurde (fuenf Ansaetze, Literatur + eigene
+     Studien) und was daraus praktisch folgt — ehrlich, mit Zahlen.
+   * dtLernen: Lektionen aus der LIVE-Lage (Asien-Spanne verlassen, Stop im Rauschen,
+     Kosten groesser als die Bewegung, Zeiteinheiten uneinig ...) mit "Merke".
+   * DT_BEGRIFFE: Begriffe einfach erklaert; jedes "?" im Reiter springt dorthin. */
+const DT_BEGRIFFE = {
+  swingday: ['Swing- vs. Day-Trading', 'Swing: Trades über Tage bis Wochen, Analyse auf 4 Std. und Tag, Ziele weit, Kosten fallen kaum ins Gewicht — das ist unser Hauptfokus. Day-Trading: rein und raus am selben Tag, Analyse auf 1–15 Min. und Sitzungen, Ziele klein — darum fressen Spread und Gebühren schnell den ganzen Gewinn. Beim Day-Trading zählt zuerst: Kosten, Uhrzeit (Sitzung, US-Daten), erwartete Spanne. Beim Swing: Trend, Struktur, Tagesmarken.'],
+  atr: ['ATR (Average True Range)', 'Die durchschnittliche Schwankung je Kerze, hier über 24 Stunden. Sie sagt, was „normal" ist. Ein Stop enger als etwa eine ATR wird oft vom normalen Rauschen ausgelöst.'],
+  ema: ['EMA (gleitender Durchschnitt)', 'Der Durchschnittskurs der letzten n Kerzen, neuere zählen stärker. EMA 200 = langfristiger Trend der Zeiteinheit: Kurs darüber = eher Aufwärtsmarkt. EMA 20 über EMA 50 = kurzfristig aufwärts.'],
+  rsi: ['RSI (Relative-Stärke-Index)', 'Misst von 0 bis 100, wie einseitig die letzten 14 Kerzen gelaufen sind. Über 70 = stark gestiegen, unter 30 = stark gefallen. Kein Verkaufs- oder Kaufsignal für sich — in starken Trends bleibt der RSI lange hoch.'],
+  lage: ['Lage in der Spanne', 'Wo der Kurs zwischen Hoch (100 %) und Tief (0 %) der letzten 20 Kerzen steht. 90 % heißt: knapp unter dem jüngsten Hoch.'],
+  sitzung: ['Handelssitzungen', 'Gold wird rund um die Uhr gehandelt, aber nicht gleich stark: Asien (ca. 2–9 Uhr deutsche Zeit) ruhig, London (9–15 Uhr) lebhafter, New York (15–23 Uhr) am stärksten — besonders um 14:30 Uhr (US-Daten) und 15:20 Uhr (COMEX). Die Asien-Spanne ist oft die Ruhezone, aus der der Tag dann ausbricht.'],
+  vortag: ['Vortages-Hoch/-Tief', 'Hoch und Tief des gestrigen Tages (UTC). Viele Händler legen dort Orders — der Kurs reagiert dort oft, bricht aber genauso oft durch. Eine Marke, kein Signal.'],
+  band: ['Erwartete Spanne (68 %/95 %)', 'Wie weit der Kurs in den nächsten Stunden typischerweise läuft — aus der aktuellen Schwankung und dem Uhrzeit-Muster. 68 %: in etwa 2 von 3 Fällen bleibt der Kurs darin. 95 %: fast immer. Die App zeigt daneben, wie oft das 2025/26 wirklich gestimmt hat.'],
+  profil: ['Stundenprofil', 'Märkte schwanken je nach Uhrzeit verschieden stark (Andersen & Bollerslev 1997). Faktor 1,3× heißt: diese Stunde ist typischerweise 30 % bewegter als der Durchschnitt.'],
+  spread: ['Spread, Geld und Brief', 'Brief = Preis, zu dem du kaufst; Geld = Preis, zu dem du verkaufst. Der Abstand ist der Spread — sofort verloren, sobald du einsteigst.'],
+  gebuehr: ['Taker, Maker, Gebühr je Runde', 'Taker = Marktorder (sofort, teurer). Maker = Limit-Order, die im Orderbuch wartet (billiger). Eine Runde = Kauf + Verkauf, also zweimal Gebühr plus Spread. Im Day-Trading entscheidet das oft über Gewinn oder Verlust.'],
+  perp: ['Perpetual Future (Perp)', 'Ein Terminkontrakt ohne Verfallstag, z. B. Gold-Perps auf Binance oder BitMEX. Deutlich geringere Gebühren als Spot-Kauf auf Kraken, aber mit Hebel und Finanzierungsgebühr — Hebel vergrößert auch Verluste.'],
+  r: ['R (Risiko-Einheit)', 'Abstand Einstieg → Stop = 1 R. +2 R = doppelt so viel gewonnen wie riskiert. Kosten in R: bei engem Stop werden dieselben Gebühren zu vielen R.'],
+  ausbruch: ['Ausbruch', 'Der Kurs schließt über einer Marke, z. B. dem 48-Std.-Hoch. Ausbrüche scheitern oft; deshalb verlangt die App bei Coins eine Welle (viele Coins gleichzeitig) und einen klaren Abstand zur Marke.'],
+  rauschzone: ['Rauschzone (Noise Area)', 'Die übliche Bewegung seit Sitzungsbeginn zu jeder Uhrzeit (14-Tage-Mittel). Innen = normales Rauschen, außen = ungewöhnlicher Druck. Auf Aktien (SPY) belegt, auf Gold getestet: kein Vorteil.'],
+  vwap: ['VWAP', 'Volumen-gewichteter Durchschnittskurs seit Sitzungsbeginn — der „faire" Preis des Tages. Großanleger messen ihre Ausführung daran.'],
+  orb: ['Opening-Range-Breakout (ORB)', 'Richtung der ersten Minuten nach Eröffnung handeln, Stop an der anderen Seite. Auf US-Indizes brutto leicht positiv, nach Kosten ≈ 0; auf Gold klar negativ (Stop zu eng gegenüber den Kosten).'],
+  oos: ['In-Sample / Out-of-Sample', 'In-Sample = Daten, mit denen eine Regel gebaut wurde (hier 2022–24). Out-of-Sample = Daten, die dabei nicht benutzt wurden (2025/26). Nur was auch dort hält, zählt — sonst ist es Zufall oder Überanpassung.'],
+  bootstrap: ['Bootstrap-Untergrenze', 'Die Trades werden tausendfach neu gemischt gezogen. Die 5-%-Grenze sagt: so schlecht könnte der Schnitt auch durch Zufall sein. Liegt sie über 0, ist der Vorteil wahrscheinlich echt.'],
+};
+function dtFrage(k){ return DT_BEGRIFFE[k] ? ` <button class="dtq" data-erkl="${k}" aria-label="Erklärung: ${esc(DT_BEGRIFFE[k][0])}">?</button>` : ''; }
+function dtBegriffeHtml(){
+  return `<details class="note-box klapp erkl" id="dtbegriffe" style="margin-top:14px"><summary><span class="nt">📖 Begriffe einfach erklärt</span><span class="klapp-hint">antippen</span></summary>
+    ${Object.entries(DT_BEGRIFFE).map(([k, [t, x]]) => `<div class="dtbg" id="erkl-${k}"><b>${esc(t)}</b><p>${esc(x)}</p></div>`).join('')}</details>`;
+}
+/* Lektionen aus der Live-Lage. Jede nur, wenn ihre Bedingung gerade wirklich zutrifft. */
+function dtLernen(sym, info, an, prog, live){
+  const L = [];
+  const jetzt = Date.now();
+  const gold = info.klasse === 'gold';
+  if (gold){
+    const sz = dtSitzungen(dtAlle('PAXG', 15) || dtAlle('PAXG', 5), jetzt);
+    if (sz.asien && isFinite(sz.asien.h) && sz.jetzt !== 'asien'){
+      if (live > sz.asien.h || live < sz.asien.l){
+        const oben = live > sz.asien.h;
+        L.push(['Gold hat die Asien-Spanne verlassen', `Der Kurs steht ${oben ? 'über dem Asien-Hoch' : 'unter dem Asien-Tief'} (${num(oben ? sz.asien.h : sz.asien.l, 2)} $). Viele Day-Trader handeln genau diesen Ausbruch.`,
+          'Unsere Studie (Asien-Range-Ausbruch, 2023–26) fand dafür keinen Vorteil — Ausbrüche aus der Asien-Spanne laufen bei Gold genauso oft zurück wie weiter. Beobachten ja, blind folgen nein.']);
+      } else {
+        L.push(['Gold steckt noch in der Asien-Spanne', `Zwischen ${num(sz.asien.l, 2)} und ${num(sz.asien.h, 2)} $ — die Ruhezone der Nacht.`,
+          'Innerhalb einer Spanne gibt es keine Richtung. Wer hier einsteigt, zahlt Kosten für Rauschen.']);
+      }
+    }
+    const term = dtGoldTermine(S && S.makro && S.makro.termine, jetzt);
+    const naechst = term.find(t => Date.parse(t.zeitpunkt) > jetzt);
+    if (naechst) L.push([`Termin: ${naechst.titel}`, `Um ${zeit(naechst.zeitpunkt)} kommen US-Daten. In den Sekunden danach springt Gold oft um mehrere Dollar, der Spread wird weit, Stops werden mit Slippage ausgeführt.`,
+      'Gold reagiert meist gegen die Überraschung (schwache US-Daten → Gold hoch), aber die Überraschung kennt vorher niemand. Vor den Daten keine neuen Trades; danach erst die ersten Minuten abwarten.']);
+  }
+  if (prog){
+    const p = dtDeinePosition(sym);
+    const e1 = prog.je[1];
+    if (p && p.plan && p.plan.stop != null && +p.plan.stop >= e1.lo68 && +p.plan.stop <= e1.hi68)
+      L.push(['Dein Stop liegt im Rauschen', `Dein Stop ${num(+p.plan.stop)} liegt innerhalb der normalen Bewegung der nächsten Stunde (${num(e1.lo68)}–${num(e1.hi68)}).`,
+        'Ein Stop gehört dorthin, wo die Idee falsch ist — nicht dorthin, wo der Markt normal hin- und herschwingt. Weiter weg setzen heißt dafür kleiner kaufen, damit der Verlust in € gleich bleibt.']);
+    const f = prog.jetztFaktor;
+    if (f <= 0.8) L.push(['Gerade ist ruhige Zeit', `Die kommende Stunde ist typischerweise nur ${num(f, 2)}× so bewegt wie der Durchschnitt.`,
+      'In ruhigen Stunden reichen die Bewegungen oft nicht, um Kosten zu decken. Day-Trader warten auf die aktiven Fenster (London-Start, US-Daten, New-York-Eröffnung).']);
+  }
+  if (gold){
+    const geb = dtGebuehrLesen();
+    const k15 = dtFertig('PAXG', 15);
+    if (k15 && k15.length > 60){
+      const v = k15.slice(-60), sp = v.reduce((a, x) => a + (x[2] - x[3]), 0) / v.length;
+      const kost = 2 * geb * live;
+      if (kost > sp) L.push(['Kosten größer als die Bewegung', `Eine Runde kostet bei deiner Gebühr ≈ ${num(kost, 2)} $, eine 15-Min.-Kerze bewegt sich im Schnitt ${num(sp, 2)} $.`,
+        'Das ist der Hauptgrund, warum die meisten Day-Trader verlieren: Viele kleine Gewinne, aber jeder Trade zahlt die volle Gebühr. Bei Gold rechnet sich Kurzfrist-Handel nur mit sehr niedrigen Kosten (Limit-Orders auf einem Gold-Perp) — und selbst dann zeigte keine geprüfte Regel einen Vorteil.']);
+    }
+    const t4 = dtTrend(dtFertig('PAXG', 240)), tT = dtTrend(dtFertig('PAXG', 1440));
+    if (t4 && tT && t4.richtung !== 'seit' && tT.richtung !== 'seit' && t4.richtung !== tT.richtung)
+      L.push(['Zeiteinheiten widersprechen sich', '4 Std. und Tag zeigen in verschiedene Richtungen.',
+        'Top-Down heißt: erst die große Zeiteinheit (Tag, 4 Std.) bestimmt die Richtung, die kleine (15 Min., 1 Std.) nur den Einstieg. Sind sich die großen uneinig, ist die beste Position oft: keine.']);
+  }
+  if (an && info.klasse === 'coin' && an.status === 'nah')
+    L.push(['Kurz vor dem Ausbruch', `${esc(info.name)} liegt nur ${pct(an.abstand_pct, 2)} unter dem 48-Std.-Hoch.`,
+      'Vorher kaufen („vorwegnehmen") ist verlockend — aber die Regel zählt erst den Stundenschluss darüber, und nur in einer Welle. Ein Ausbruch, der nicht kommt, ist ein Verlust, den die Regel nie gemacht hätte.']);
+  if (!L.length) return '';
+  return `<h3>🎓 Lernen am Live-Markt</h3>` + L.slice(0, 4).map(([t, x, m]) => `<details class="note-box klapp erkl"><summary><span class="nt">${esc(t)}</span><span class="klapp-hint">antippen</span></summary>
+    <p>${x}</p><p style="margin-top:6px"><strong>Merke:</strong> ${m}</p></details>`).join('');
+}
+function dtPlaybook(){
+  const G = DTW && DTW.gold_literatur;
+  const z = (v, e) => v == null ? '—' : (v > 0 ? '+' : '') + num(v, e === 'r' ? 2 : 3) + (e === 'r' ? ' R' : ' %');
+  const zeile = (titel, quelle, ergebnis, ok) => `<div class="rowx"><span class="lab"><b>${titel}</b><br><span style="font-size:11.5px;color:var(--ink-3)">${quelle}</span></span>
+    <span class="val"><span class="note ${ok ? 'gut' : 'bad'}">${ok ? 'Vorteil' : 'kein Vorteil'}</span><br><span style="font-size:12px">${ergebnis}</span></span></div>`;
+  let h = `<h3>📘 Gold-Playbook — was im Tageshandel geprüft wurde${dtFrage('swingday')}</h3><div class="karte">`;
+  h += zeile('Rauschzonen-Momentum' + dtFrage('rauschzone'), 'Zarattini, Aziz & Barbon 2024 (SPY: Sharpe 1,3)',
+    G ? `je Tag nach 0,12 % Kosten: 2022–24 ${z(G.nm.is.markt_perp)}, 2025/26 ${z(G.nm.oos.markt_perp)} · brutto ${z(G.nm.oos.brutto)}` : 'Studie lädt …', false);
+  h += zeile('5-Min.-Opening-Range-Breakout' + dtFrage('orb'), 'Zarattini & Aziz 2023',
+    G ? `je Trade nach Kosten: ${z(G.orb.is.markt_perp, 'r')} / ${z(G.orb.oos.markt_perp, 'r')} · Stop im Median nur ${num(G.orb_risiko_median_pct, 2)} % vom Kurs` : 'Studie lädt …', false);
+  h += zeile('Asien-Range-Ausbruch in London', 'eigene Studie 10.2026, 15 Min.', '2023–25 −0,39 R, 2025/26 −0,06 R je Trade', false);
+  h += zeile('Vortageshoch/-tief-Sweep', 'eigene Studie 10.2026', '−0,73 / −0,57 R je Trade', false);
+  h += zeile('48-Std.-Ausbruch (1 Std.)', 'Daytrade-Studie 10.2026', '2022–24 −0,43 R, nur 2025/26 +0,45 R (Gold-Hausse)', false);
+  h += `<p class="dturteil warn">Fünf dokumentierte Ansätze, keiner bringt bei Gold nach realistischen Kosten Gewinn. Das ist kein Fehler der App — es ist das Ergebnis. Die meisten Privatanleger verlieren im Tageshandel genau deshalb.</p>
+    <p style="margin:8px 0 4px;font-size:13px"><b>Was daraus praktisch folgt</b></p>
+    <ul style="margin:0 0 0 18px;padding:0;font-size:13px;line-height:1.5">
+      <li>Gold mit Aussicht auf Gewinn: <b>Swing</b> (S9 auf 4 Std./Tag, 🧪) — dort fallen Kosten kaum ins Gewicht.</li>
+      <li>Gold intraday nur <b>beobachten und lernen</b> (Paper): Sitzungen, Spannen, Reaktion auf US-Daten.</li>
+      <li>Wenn überhaupt kurzfristig: nur mit <b>Limit-Orders</b> auf einem günstigen Gold-Perp${dtFrage('perp')}, nie mit Kraken-Marktorders${dtFrage('gebuehr')}.</li>
+      <li><b>Stop außerhalb der 1-Std.-Spanne</b>${dtFrage('band')}, Größe nach Risiko (0,25–0,5 % des Depots je Trade).</li>
+      <li>Rund um <b>US-Daten (14:30 Uhr)</b> keine neuen Trades.</li>
+    </ul>
+    <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Belege: docs/GOLD-INTRADAY-LITERATUR-STUDIE-2026-10.md, GOLD-DAYTRADING-STUDIE-2026-10.md, DAYTRADE-STUDIE-2026-10.md</p></div>`;
+  return h;
+}
 function dtZeile(ok, text, wert){
   return `<li><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</span><span>${text}</span><span class="v">${wert || ''}</span></li>`;
 }
 function dtAnalyseHtml(sym, info, an, live){
   let h = '';
+  try { h += dtLernen(sym, info, an, DTC.prog, live); } catch(e){ console.error(e); }
   if (info.klasse === 'gold') h += dtGoldPanel(live);
   try { h += dtSpannenHtml(sym, info, DTC.prog, dtProfilVon(sym), live); } catch(e){ console.error(e); }
+  if (info.klasse === 'gold') h += dtPlaybook();
   if (!an) return h + `<p class="leer">Zu wenig 1-Std.-Kerzen für die Ausbruchsanalyse.</p>`;
   const welle = DTW ? (DTW.welle || 0) : null, minW = (DTW && DTW.min_welle) || 12;
   const btc = DTW ? !!DTW.btc_ueber_ema200 : null;
@@ -10605,7 +10727,7 @@ function dtAnalyseHtml(sym, info, an, live){
     ];
     const alle = c.every(x => x[0]);
     const fehlt = c.filter(x => !x[0]).length;
-    h += `<h3>Was für einen Einstiegs-Alarm fehlt</h3><div class="karte"><ul class="dtcheck">
+    h += `<h3>Was für einen Einstiegs-Alarm fehlt${dtFrage('ausbruch')}</h3><div class="karte"><ul class="dtcheck">
       ${c.map(x => dtZeile(...x)).join('')}</ul>
       <p class="dturteil ${alle ? 'gut' : fehlt === 1 ? 'warn' : 'warte'}">${alle
         ? `Alle Bedingungen erfüllt — der Einstieg lohnt sich laut Regel. Der Alarm kommt mit Kauf, Stop und Größe.`
@@ -10628,7 +10750,7 @@ function dtAnalyseHtml(sym, info, an, live){
       <div class="rowx"><span class="lab">24-Std.-Tief (Ausstiegsmarke der Regel)</span><span class="val">${num(an.tief24)} $</span></div>
     </div>`;
   }
-  return h;
+  return h + dtBegriffeHtml();
 }
 /* Takt: Websocket an/aus je nach Reiter, Historie nachladen (der Websocket haelt nur die
    laufende Kerze — neue Kerzen der anderen Zeiteinheiten kommen per REST). */
@@ -10640,6 +10762,17 @@ function dtTakt(){
 }
 setInterval(dtTakt, 15000);
 window.addEventListener('resize', () => { if ($('p11') && !$('p11').hidden) dtChartZeichnen(true); });
+document.addEventListener('click', ev => {
+  const b = ev.target && ev.target.closest && ev.target.closest('[data-erkl]');
+  if (!b) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const box = $('dtbegriffe'), z = $('erkl-' + b.dataset.erkl);
+  if (!box || !z) return;
+  box.open = true;
+  document.querySelectorAll('.dtbg.hell').forEach(x => x.classList.remove('hell'));
+  z.classList.add('hell');
+  z.scrollIntoView({behavior: 'smooth', block: 'center'});
+});
 document.addEventListener('visibilitychange', () => { if (document.hidden){ if (DTWS.ws) try { DTWS.ws.close(); } catch(e){} } else dtTakt(); });
 
 function zeichneDaytrading(){

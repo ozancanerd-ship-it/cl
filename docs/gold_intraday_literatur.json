@@ -1,0 +1,132 @@
+{
+ "erzeugt": "2026-10-12T13:23:23.225447+00:00",
+ "daten": "PAXG/USDT 5 Min. Binance Vision, 1237 Sitzungen 08:30–15:00 ET",
+ "kosten_je_runde": {
+  "limit_perp": 0.0004,
+  "markt_perp": 0.0012,
+  "kraken": 0.008
+ },
+ "hauptfall": "markt_perp",
+ "nm": {
+  "einheit": "tag_pct",
+  "is": {
+   "n": 766,
+   "brutto": {
+    "schnitt": -0.0233,
+    "sharpe_jahr": -1.11,
+    "treffer": 0.198
+   },
+   "limit_perp": {
+    "schnitt": -0.0668,
+    "sharpe_jahr": -3.05,
+    "treffer": 0.17
+   },
+   "markt_perp": {
+    "schnitt": -0.1539,
+    "sharpe_jahr": -6.19,
+    "treffer": 0.12
+   },
+   "kraken": {
+    "schnitt": -0.8943,
+    "sharpe_jahr": -12.45,
+    "treffer": 0.023
+   },
+   "bootstrap5_haupt": -0.1766
+  },
+  "oos": {
+   "n": 456,
+   "brutto": {
+    "schnitt": -0.0042,
+    "sharpe_jahr": -0.15,
+    "treffer": 0.23
+   },
+   "limit_perp": {
+    "schnitt": -0.0498,
+    "sharpe_jahr": -1.74,
+    "treffer": 0.202
+   },
+   "markt_perp": {
+    "schnitt": -0.1408,
+    "sharpe_jahr": -4.47,
+    "treffer": 0.149
+   },
+   "kraken": {
+    "schnitt": -0.9148,
+    "sharpe_jahr": -10.69,
+    "treffer": 0.037
+   },
+   "bootstrap5_haupt": -0.1795
+  },
+  "jahre_haupt": {
+   "2022": -0.1364,
+   "2023": -0.1126,
+   "2024": -0.2112,
+   "2025": -0.0899,
+   "2026": -0.2089
+  },
+  "bestanden": false
+ },
+ "nm_trades_je_tag": 1.11,
+ "nm_tage_ohne_trade": 0.402,
+ "orb": {
+  "einheit": "r",
+  "is": {
+   "n": 509,
+   "brutto": {
+    "schnitt": -0.3371,
+    "sharpe_jahr": null,
+    "treffer": 0.138
+   },
+   "limit_perp": {
+    "schnitt": -0.7669,
+    "sharpe_jahr": null,
+    "treffer": 0.138
+   },
+   "markt_perp": {
+    "schnitt": -1.6264,
+    "sharpe_jahr": null,
+    "treffer": 0.13
+   },
+   "kraken": {
+    "schnitt": -8.9328,
+    "sharpe_jahr": null,
+    "treffer": 0.031
+   },
+   "bootstrap5_haupt": -1.7839
+  },
+  "oos": {
+   "n": 431,
+   "brutto": {
+    "schnitt": 0.1213,
+    "sharpe_jahr": null,
+    "treffer": 0.153
+   },
+   "limit_perp": {
+    "schnitt": -1.0222,
+    "sharpe_jahr": null,
+    "treffer": 0.151
+   },
+   "markt_perp": {
+    "schnitt": -3.3092,
+    "sharpe_jahr": null,
+    "treffer": 0.146
+   },
+   "kraken": {
+    "schnitt": -22.7489,
+    "sharpe_jahr": null,
+    "treffer": 0.035
+   },
+   "bootstrap5_haupt": -5.2902
+  },
+  "jahre_haupt": {
+   "2022": -1.6374,
+   "2023": -1.4879,
+   "2024": -1.7297,
+   "2025": -3.5843,
+   "2026": -2.9763
+  },
+  "bestanden": false
+ },
+ "orb_risiko_median_pct": 0.1053,
+ "doc": "docs/GOLD-INTRADAY-LITERATUR-STUDIE-2026-10.md"
+}

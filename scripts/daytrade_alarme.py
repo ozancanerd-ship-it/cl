@@ -500,6 +500,33 @@ def _senden(texte: list[dict]) -> None:
     print(f"{raus} von {len(texte)} Daytrade-Alarm(en) verschickt ({n.active_sinks})")
 
 
+def gold_literatur(pfad: str = "docs/gold_intraday_literatur.json") -> dict | None:
+    """Kernzahlen der Gold-Tageshandels-Studie nach der Literatur (Noise-Area-Momentum,
+    5-Min.-ORB) fuer das Gold-Playbook in der App."""
+    f = Path(__file__).resolve().parents[1] / pfad
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    def kurz(x: dict) -> dict:
+        return {
+            teil: {
+                k: (x[teil].get(k) or {}).get("schnitt")
+                for k in ("brutto", "limit_perp", "markt_perp", "kraken")
+            }
+            for teil in ("is", "oos")
+        } | {"bestanden": x.get("bestanden"), "jahre": x.get("jahre_haupt")}
+
+    return {
+        "nm": kurz(d["nm"]),
+        "orb": kurz(d["orb"]),
+        "orb_risiko_median_pct": d.get("orb_risiko_median_pct"),
+        "daten": d.get("daten"),
+        "doc": d.get("doc"),
+    }
+
+
 def stundenprofil(pfad: str = "docs/stundenprofil.json") -> dict | None:
     """Ergebnis der Stundenprofil-Studie (scripts/stundenprofil_studie.py) fuer die App:
     Profil je Wochenstunde, EWMA-lambda, Bandfaktoren und OOS-Treffer je Horizont."""
@@ -545,6 +572,7 @@ def main() -> int:
         "min_welle": MIN_WELLE,
         "min_ueberhang_atr": m.MIN_UEBERHANG_ATR,
         "stundenprofil": stundenprofil(),
+        "gold_literatur": gold_literatur(),
         "fehler": fehler + fehler_extra,
     }
     if "BTC" not in daten or len(daten) < len(COINS) // 2:

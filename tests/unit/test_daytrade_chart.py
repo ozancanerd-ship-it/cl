@@ -398,3 +398,39 @@ def test_alarm_lauf_liefert_profil_an_die_app() -> None:
 
     p = da.stundenprofil()
     assert p and len(p["gold"]["profil"]) == 168 and p["coins"]["lambda"]
+
+
+# ------------------------------------------------------------- Lernen & Playbook (12.10. nachm.)
+def test_jedes_fragezeichen_hat_eine_erklaerung() -> None:
+    roh = VORLAGE.read_text(encoding="utf-8")
+    begriffe = set(
+        re.findall(
+            r"^  (\w+): \['",
+            roh[roh.index("const DT_BEGRIFFE") : roh.index("function dtFrage(")],
+            re.M,
+        )
+    )
+    benutzt = set(re.findall(r"dtFrage\('(\w+)'\)", roh))
+    assert benutzt and benutzt <= begriffe, benutzt - begriffe
+    assert {"swingday", "band", "gebuehr", "perp", "oos", "bootstrap"} <= begriffe
+
+
+def test_playbook_zeigt_die_ehrlichen_zahlen() -> None:
+    sys.path.insert(0, str(VORLAGE.parents[1] / "scripts"))
+    import daytrade_alarme as da
+
+    g = da.gold_literatur()
+    assert g["nm"]["bestanden"] is False and g["orb"]["bestanden"] is False
+    assert g["nm"]["oos"]["markt_perp"] < 0
+    roh = VORLAGE.read_text(encoding="utf-8")
+    pb = _funktion(roh, "dtPlaybook")
+    for teil in (
+        "Rauschzonen-Momentum",
+        "Opening-Range-Breakout",
+        "Asien-Range",
+        "kein Vorteil",
+        "Swing",
+    ):
+        assert teil in pb
+    # Lernkarten nur aus der Live-Lage, immer mit "Merke"
+    assert "<strong>Merke:</strong>" in _funktion(roh, "dtLernen")
