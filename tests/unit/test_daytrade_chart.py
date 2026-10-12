@@ -461,3 +461,68 @@ def test_uebungs_journal_rechnet_richtig() -> None:
     assert r_ziel == pytest.approx(2.0) and r_stop == pytest.approx(-1.0)
     assert r_ziel_geb == pytest.approx(2.0 - 2 * 0.004 * 100 / 1)
     assert (z1, z2, z3) == (4160.12, 4160.12, 0.25)
+
+
+def test_bilanz_gruppen_trennt_setups_und_alarme() -> None:
+    trades = [
+        {
+            "gezaehlt": True,
+            "r_drittel": 1.0,
+            "setup": "Ausbruch aus der Basis",
+            "klasse": "krypto",
+            "gemeldet": True,
+            "begonnen": "2026-09-14",
+        },
+        {
+            "gezaehlt": True,
+            "r_drittel": -1.0,
+            "setup": "Ausbruch aus der Basis",
+            "klasse": "krypto",
+            "gemeldet": False,
+            "begonnen": "2026-09-15",
+        },
+        {
+            "gezaehlt": True,
+            "r_drittel": 0.5,
+            "setup": "Ausbruch aus der Basis",
+            "klasse": "krypto",
+            "gemeldet": False,
+            "begonnen": "2026-09-16",
+        },
+        {
+            "gezaehlt": True,
+            "r_drittel": -1.0,
+            "setup": "",
+            "klasse": "krypto",
+            "gemeldet": False,
+            "begonnen": "2026-09-10",
+        },
+        {
+            "gezaehlt": True,
+            "r_drittel": -1.0,
+            "setup": "Ruecksetzer im Trend",
+            "klasse": "aktien",
+            "gemeldet": False,
+            "begonnen": "2026-09-20",
+        },
+        {
+            "gezaehlt": False,
+            "r_drittel": 9.0,
+            "setup": "x",
+            "klasse": "krypto",
+            "gemeldet": True,
+            "begonnen": "2026-09-20",
+        },
+    ]
+    js = (
+        _gold_js("bilanzGruppen")
+        + f"\nconsole.log(JSON.stringify(bilanzGruppen({json.dumps(trades)})));"
+    )
+    g = {x["k"]: x for x in _node(js)}
+    assert g["coins_setup"]["n"] == 3 and g["coins_setup"]["summe"] == pytest.approx(0.5)
+    assert g["coins_setup"]["h1"] == pytest.approx(1.0) and g["coins_setup"]["h2"] == pytest.approx(
+        -0.25
+    )
+    assert g["ohne_setup"]["n"] == 1 and g["aktien_setup"]["schnitt"] == pytest.approx(-1.0)
+    assert g["alarme"]["n"] == 1  # nicht gezaehlte Trades fallen raus
+    assert "gold_setup" not in g

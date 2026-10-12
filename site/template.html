@@ -9585,8 +9585,53 @@ function strategieKasten(){
       Signalen, alle gleichzeitig ausgestoppt — die Zahl der unabhängigen Wetten ist kleiner als n.</p></div>`;
 }
 
+/* "Was funktioniert gerade?" (12.10.): Die Gesamtbilanz (-106 R) mischt drei Dinge, die
+   nichts miteinander zu tun haben — Signale OHNE benanntes Setup (alte Logik, nie aufs
+   Handy, -0,48 R je Trade), Aktien-Setups (bisher Verlust) und Coin-Setups (bisher Plus).
+   Wer nur die Gesamtzahl sieht, lernt das Falsche. Hier stehen die Gruppen getrennt, jeweils
+   mit erster und zweiter Haelfte — haelt ein Plus in beiden, ist es mehr als ein Zufallsbuckel. */
+function bilanzGruppen(trades){
+  const T = (trades || []).filter(t => t && t.gezaehlt && isFinite(t.r_drittel));
+  const def = [
+    ['coins_setup', 'Coins mit Setup', t => t.setup && t.klasse === 'krypto'],
+    ['aktien_setup', 'Aktien mit Setup', t => t.setup && t.klasse === 'aktien'],
+    ['gold_setup', 'Gold mit Setup', t => t.setup && t.klasse === 'gold'],
+    ['ohne_setup', 'Ohne benanntes Setup (nie aufs Handy)', t => !t.setup],
+    ['alarme', 'Deine Alarme (aufs Handy)', t => t.gemeldet],
+  ];
+  return def.map(([k, name, f]) => {
+    const v = T.filter(f).sort((a, b) => String(a.begonnen).localeCompare(String(b.begonnen)));
+    const r = v.map(t => t.r_drittel);
+    const summe = r.reduce((a, b) => a + b, 0);
+    const h = Math.floor(r.length / 2);
+    const mittel = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    return {k, name, n: r.length, summe, schnitt: mittel(r), treffer: r.length ? r.filter(x => x > 0).length / r.length : null,
+            h1: mittel(r.slice(0, h)), h2: mittel(r.slice(h))};
+  }).filter(g => g.n > 0);
+}
+function wasFunktioniertKasten(){
+  if (!PF || !Array.isArray(PF.trades)) return '';
+  const G = bilanzGruppen(PF.trades);
+  if (!G.length) return '';
+  const rr = v => v == null ? '—' : (v > 0 ? '+' : '') + num(v, 2) + ' R';
+  const zeilen = G.map(g => {
+    const stabil = g.n >= 20 && g.h1 > 0 && g.h2 > 0, schwach = g.n >= 20 && g.h1 < 0 && g.h2 < 0;
+    return `<div class="rowx"><span class="lab"><b>${esc(g.name)}</b><br><span style="font-size:11.5px;color:var(--ink-3)">${g.n} Trades · ${Math.round((g.treffer || 0) * 100)} % im Plus · 1. Hälfte ${rr(g.h1)} · 2. Hälfte ${rr(g.h2)}</span></span>
+      <span class="val"><b class="${g.summe >= 0 ? 'up' : 'dn'}">${rr(g.summe)}</b><br><span style="font-size:12px">${rr(g.schnitt)} je Trade</span>
+      ${stabil ? '<br><span class="note gut">in beiden Hälften im Plus</span>' : schwach ? '<br><span class="note bad">in beiden Hälften im Minus</span>' : g.n < 20 ? '<br><span class="note">zu wenige</span>' : '<br><span class="note warn">wechselhaft</span>'}</span></div>`;
+  }).join('');
+  const cs = G.find(g => g.k === 'coins_setup'), al = G.find(g => g.k === 'alarme'), os = G.find(g => g.k === 'ohne_setup');
+  let satz = '';
+  if (cs && os) satz += `Der große Verlust der Gesamtbilanz kommt aus Signalen ohne benanntes Setup (${rr(os.summe)}) — die gingen nie aufs Handy. `;
+  if (cs && cs.schnitt > 0) satz += `Coins mit Setup liegen bei ${rr(cs.schnitt)} je Trade. `;
+  if (al && cs && al.schnitt < cs.schnitt) satz += `Deine Alarme liegen darunter (${rr(al.schnitt)}): das Alarm-Tor hat bisher nicht die besseren Trades ausgewählt — bei ${al.n} Alarmen ist das aber noch kaum von Zufall zu unterscheiden.`;
+  return `<h2>Was funktioniert gerade?</h2><div class="karte">${zeilen}
+    ${satz ? `<p class="dturteil warte" style="margin-top:10px">${satz}</p>` : ''}
+    <p style="margin:8px 0 0;font-size:11.5px;color:var(--ink-3)">Nach Plan (Drittel an jedem Ziel, Stop auf Einstand). „Beide Hälften im Plus" ist ein Hinweis, kein Beweis — ein Abschnitt, ein Markt. Belegt ist erst, was auch in einem anderen Marktabschnitt hält.</p></div>`;
+}
 function zeichneBilanz(){
   let h = bilanzKasten();
+  h += sicherText(wasFunktioniertKasten);
   h += dauerKasten();
   h += quotenKasten();
   h += historieKasten();
