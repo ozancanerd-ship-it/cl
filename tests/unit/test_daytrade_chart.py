@@ -142,7 +142,9 @@ def test_gold_zuerst_und_von_kraken() -> None:
     assert "PAXG: {paar: 'PAXGUSD'" in roh
     assert "const out = ['PAXG'];" in _funktion(roh, "dtWahlListe")
     assert "if (!DTC.sym){ DTC.sym = 'PAXG';" in roh
-    assert "api.kraken.com/0/public/OHLC?pair=" in _funktion(roh, "dtLaden")
+    assert "api.kraken.com/0/public/OHLC?pair=" in _funktion(roh, "dtPumpe")
+    # Warteschlange: nie mehr als eine Kraken-Anfrage gleichzeitig
+    assert "if (DTC.laedt.size || !DTC.warte.length) return;" in _funktion(roh, "dtPumpe")
 
 
 def test_alarm_schwelle_wie_im_tor() -> None:
@@ -321,3 +323,78 @@ def test_kosten_je_zeiteinheit() -> None:
     assert eins["anteil"] == pytest.approx(0.81 / (40 / 60) * 100)
     assert std["anteil"] == pytest.approx(8.1)
     assert r["ab"] == 60  # erste Zeiteinheit mit Kosten <= 25 % der Bewegung
+
+
+# ------------------------------------------------------------- Spannen-Prognose (12.10.)
+def _profil_studie() -> dict:
+    return json.loads(
+        (VORLAGE.parents[1] / "docs" / "stundenprofil.json").read_text(encoding="utf-8")
+    )
+
+
+def test_studie_liegt_vor_und_ist_ehrlich_beschriftet() -> None:
+    d = _profil_studie()
+    for g in ("gold", "coins"):
+        assert len(d[g]["profil"]) == 168
+        assert sum(d[g]["profil"]) / 168 == pytest.approx(1.0, abs=1e-3)
+        for h in ("1", "4", "24"):
+            x = d[g]["horizonte"][h]
+            assert x["faktor68"] < x["faktor95"]
+            assert x["gueltig"] == (
+                0.63 <= x["abdeckung68_oos"] <= 0.73 and 0.92 <= x["abdeckung95_oos"] <= 0.98
+            )
+    # Gold 24 Std. hielt im OOS nicht — das muss so in der Datei stehen, nicht schoengerechnet
+    assert d["gold"]["horizonte"]["24"]["gueltig"] is False
+
+
+def test_browser_prognose_wie_python() -> None:
+    sys.path.insert(0, str(VORLAGE.parents[1] / "scripts"))
+    import stundenprofil_studie as sp
+
+    d = _profil_studie()
+    rnd = random.Random(3)
+    t0 = datetime(2026, 9, 1, tzinfo=UTC)
+    k, c = [], 4000.0
+    for i in range(720):
+        if i == 400:
+            continue  # eine Luecke — beide Seiten muessen sie gleich behandeln
+        o = c
+        c = o * math.exp(rnd.gauss(0, 0.003))
+        k.append((t0 + timedelta(hours=i), o, max(o, c) * 1.001, min(o, c) * 0.999, c))
+    for g in ("gold", "coins"):
+        P = d[g]
+        js = (
+            _gold_js("dtWochenstunde", "dtSpannePrognose")
+            + f"\nconst P = {json.dumps({'profil': P['profil'], 'lambda': P['lambda'], 'horizonte': P['horizonte']})};"
+            + f"\nconst k = {json.dumps([[x[0].timestamp() * 1000, x[1], x[2], x[3], x[4]] for x in k])};"
+            + "\nconst r = dtSpannePrognose(k, P); console.log(JSON.stringify([r.je[1].sig, r.je[4].sig, r.je[24].sig, r.je[4].hi68, r.kurs]));"
+        )
+        s1, s4, s24, hi68, kurs = _node(js)
+        for h, s_js in ((1, s1), (4, s4), (24, s24)):
+            assert s_js == pytest.approx(
+                sp.prognose_jetzt(k, P["profil"], P["lambda"], h), rel=1e-9
+            )
+        assert hi68 == pytest.approx(
+            kurs * math.exp(P["horizonte"]["4"]["faktor68"] * s4), rel=1e-12
+        )
+
+
+def test_sitzungsrichtung_nur_stabil_wenn_is_und_oos_einig() -> None:
+    sitz = {
+        "asien": {"is": {"mittel_bp": 3, "t": 2.5}, "oos": {"mittel_bp": 2, "t": 2.1}},
+        "london": {"is": {"mittel_bp": 3, "t": 2.5}, "oos": {"mittel_bp": -2, "t": -2.1}},
+        "newyork": {"is": {"mittel_bp": 3, "t": 1.0}, "oos": {"mittel_bp": 2, "t": 2.1}},
+    }
+    js = (
+        _gold_js("dtSitzungsRichtung")
+        + f"\nconsole.log(JSON.stringify(dtSitzungsRichtung({json.dumps(sitz)}).map(x => x.stabil)));"
+    )
+    assert _node(js) == [True, False, False]
+
+
+def test_alarm_lauf_liefert_profil_an_die_app() -> None:
+    sys.path.insert(0, str(VORLAGE.parents[1] / "scripts"))
+    import daytrade_alarme as da
+
+    p = da.stundenprofil()
+    assert p and len(p["gold"]["profil"]) == 168 and p["coins"]["lambda"]

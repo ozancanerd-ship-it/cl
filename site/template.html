@@ -9922,6 +9922,124 @@ function dtKosten(reihen, kurs, spread, gebuehr){
   }
   return {runde, je: out, ab: (out.find(x => x.anteil != null && x.anteil <= 25) || {}).tf ?? null};
 }
+/* ---------------------------------------------------------------- Wie weit kann es laufen?
+   Studie 12.10. (scripts/stundenprofil_studie.py, docs/STUNDENPROFIL-STUDIE-2026-10.md):
+   Schwankung je Wochenstunde multiplikativ herausrechnen (Andersen & Bollerslev 1997), auf dem
+   Rest eine EWMA-Varianz (RiskMetrics), Profil fuer die naechsten Stunden wieder auflegen.
+   Bandfaktoren aus den IS-Quantilen (fette Schwaenze!), im OOS geprueft — die Trefferquote
+   steht in der App neben jedem Band. Spiegel von prognose_jetzt() in Python. */
+function dtWochenstunde(ms){ const d = new Date(ms); return ((d.getUTCDay() + 6) % 7) * 24 + d.getUTCHours(); }
+function dtSpannePrognose(k, P){
+  if (!k || !P || !Array.isArray(P.profil) || P.profil.length !== 168 || !P.lambda) return null;
+  const rr = [];
+  for (let i = 1; i < k.length; i++){
+    const a = k[i-1], b = k[i];
+    if (b[0] - a[0] !== 3600000 || a[4] <= 0 || b[4] <= 0) continue;
+    rr.push([b[0], Math.log(b[4] / a[4])]);
+  }
+  if (rr.length < 300) return null;
+  const z2 = rr.map(([t, r]) => (r / P.profil[dtWochenstunde(t)]) ** 2);
+  let s2 = z2.slice(0, 200).reduce((a, b) => a + b, 0) / 200;
+  for (const z of z2) s2 = P.lambda * s2 + (1 - P.lambda) * z;
+  const t = rr[rr.length - 1][0], kurs = k[k.length - 1][4];
+  const je = {};
+  for (const h of [1, 4, 24]){
+    let summe = 0;
+    for (let j = 1; j <= h; j++) summe += P.profil[dtWochenstunde(t + j * 3600000)] ** 2;
+    const sig = Math.sqrt(s2 * summe), H = (P.horizonte || {})[String(h)] || {};
+    const band = f => f ? [kurs * Math.exp(-f * sig), kurs * Math.exp(f * sig)] : [null, null];
+    const [lo68, hi68] = band(H.faktor68), [lo95, hi95] = band(H.faktor95);
+    je[h] = {sig, lo68, hi68, lo95, hi95, spanne90: H.spanne90 ? H.spanne90 * sig * kurs : null,
+             gueltig: !!H.gueltig, c68: H.abdeckung68_oos, c95: H.abdeckung95_oos};
+  }
+  return {kurs, t, je, jetztFaktor: P.profil[dtWochenstunde(t + 3600000)]};
+}
+/* Die Baender gelten relativ — vom letzten Stundenschluss auf den Live-Kurs verschieben. */
+function dtUmZentrieren(prog, kurs){
+  if (!prog || !isFinite(kurs) || !(kurs > 0)) return prog;
+  const f = kurs / prog.kurs, je = {};
+  for (const [h, x] of Object.entries(prog.je)){
+    je[h] = {...x};
+    for (const k of ['lo68', 'hi68', 'lo95', 'hi95', 'spanne90']) if (x[k] != null) je[h][k] = x[k] * f;
+  }
+  return {...prog, kurs, je};
+}
+function dtProfilVon(sym){
+  const sp = DTW && DTW.stundenprofil;
+  if (!sp) return null;
+  return dtInfo(sym).klasse === 'gold' ? sp.gold : sp.coins;
+}
+/* Die bewegteste und die ruhigste Stunde der naechsten 24 (Profil), in deutscher Zeit. */
+function dtAktivFenster(P, abMs){
+  if (!P || !P.profil) return null;
+  let max = null, min = null;
+  for (let j = 1; j <= 24; j++){
+    const t = abMs + j * 3600000, f = P.profil[dtWochenstunde(t)];
+    if (!max || f > max.f) max = {t, f};
+    if (!min || f < min.f) min = {t, f};
+  }
+  return {max, min};
+}
+function dtUhr(ms){ return new Date(ms).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'}); }
+/* Richtung je Sitzung: nur "stabil", wenn IS und OOS dasselbe Vorzeichen haben und beide |t| >= 2. */
+function dtSitzungsRichtung(sitzungen){
+  const out = [];
+  for (const [k, v] of Object.entries(sitzungen || {})){
+    const a = v.is || {}, b = v.oos || {};
+    const stabil = a.t != null && b.t != null && Math.sign(a.mittel_bp) === Math.sign(b.mittel_bp) && Math.abs(a.t) >= 2 && Math.abs(b.t) >= 2;
+    out.push({sitzung: k, stabil, is: a.mittel_bp, oos: b.mittel_bp});
+  }
+  return out;
+}
+function dtSpannenHtml(sym, info, prog, P, live){
+  if (!prog) return `<p class="leer">Zu wenig Stundenkerzen für die Spannen-Prognose.</p>`;
+  const NAME = {1: 'nächste Stunde', 4: 'nächste 4 Std.', 24: 'nächste 24 Std.'};
+  const zeilen = [1, 4, 24].map(h => {
+    const x = prog.je[h];
+    const pct68 = (x.hi68 / prog.kurs - 1) * 100;
+    const ok = x.gueltig;
+    return `<div class="rowx"><span class="lab">${NAME[h]}${ok ? '' : ' <span class="note warn">hält nicht</span>'}</span>
+      <span class="val">68 %: <b>${num(x.lo68)} – ${num(x.hi68)}</b> (±${pct68.toFixed(2).replace('.', ',')} %)<br>
+      95 %: ${num(x.lo95)} – ${num(x.hi95)} · Hoch–Tief bis ${num(x.spanne90, x.spanne90 >= 1 ? 2 : 4)} $<br>
+      <span style="font-size:11px;color:${ok ? 'var(--ink-3)' : 'var(--warn)'}">getroffen 2025/26: ${Math.round((x.c68 || 0) * 100)} % / ${Math.round((x.c95 || 0) * 100)} %${ok ? '' : ' — Band zu eng, Gold lief weiter als erwartet'}</span></span></div>`;
+  }).join('');
+  const fenster = dtAktivFenster(P, prog.t);
+  const fj = prog.jetztFaktor;
+  let h = `<h3>📏 Wie weit kann es laufen?</h3><div class="karte">
+    <div class="rowx"><span class="lab">Bewegung in der kommenden Stunde</span><span class="val"><b style="color:${fj >= 1.2 ? 'var(--warn)' : fj <= 0.8 ? 'var(--ink-2)' : 'var(--ink)'}">${fj >= 1.2 ? 'lebhaft' : fj <= 0.8 ? 'ruhig' : 'normal'}</b> (${num(fj, 2)}× Durchschnitt)</span></div>
+    ${fenster ? `<div class="rowx"><span class="lab">Bewegteste Stunde (nächste 24)</span><span class="val">ab ${dtUhr(fenster.max.t)} Uhr (${num(fenster.max.f, 2)}×) · ruhigste ab ${dtUhr(fenster.min.t)} Uhr (${num(fenster.min.f, 2)}×)</span></div>` : ''}
+    ${zeilen}`;
+  // Was das fuer Stops und Ziele heisst: eigene Position, Paper-Trade, S9
+  const pruef = [];
+  const p = dtDeinePosition(sym);
+  if (p && p.plan && p.plan.stop != null) pruef.push(['Dein Stop', +p.plan.stop, 'stop']);
+  const pt = DTW && (DTW.offen || []).find(x => x.sym === sym);
+  if (pt) pruef.push(['Paper-Stop', pt.stop, 'stop']);
+  if (sym === 'PAXG' && GD){
+    const f = (GD.offen && GD.offen.kraken_faktor) || GD.kraken_faktor, o = GD.offen;
+    if (f && o){ pruef.push(['S9 Stop', ((o.gemeldet || []).includes('TP1') ? o.entry : o.sl) * f, 'stop'], ['S9 TP1', o.tp1 * f, 'ziel'], ['S9 TP2', o.tp2 * f, 'ziel']); }
+  }
+  for (const [lab, pr, art] of pruef){
+    if (!isFinite(pr)) continue;
+    const e1 = prog.je[1], e24 = prog.je[24];
+    let satz;
+    if (art === 'stop'){
+      satz = pr >= e1.lo68 && pr <= e1.hi68 ? `<b style="color:var(--bad)">liegt in der normalen Schwankung der nächsten Stunde</b> — wird leicht vom Rauschen ausgelöst`
+        : pr >= e1.lo95 && pr <= e1.hi95 ? `<b style="color:var(--warn)">kann schon in der nächsten Stunde fallen</b> (im 95-%-Band)`
+        : pr >= e24.lo68 && pr <= e24.hi68 ? '<b style="color:var(--warn)">liegt in der normalen Schwankung der nächsten 24 Std.</b> — kann heute fallen, ohne dass sich am Bild etwas ändert'
+        : pr >= e24.lo95 && pr <= e24.hi95 ? 'außerhalb der normalen Tagesschwankung — fällt heute nur bei einer größeren Bewegung' : 'weit weg — heute kaum zu erreichen';
+    } else {
+      satz = pr <= e24.hi68 && pr >= e24.lo68 ? '<b style="color:var(--long)">heute realistisch erreichbar</b> (im 68-%-Band)'
+        : pr <= e24.hi95 && pr >= e24.lo95 ? 'heute möglich, aber eher nicht (nur im 95-%-Band)' : '<b>heute kaum erreichbar</b> — braucht mehrere Tage';
+    }
+    h += `<div class="rowx"><span class="lab">${esc(lab)} ${num(pr)}</span><span class="val">${satz}</span></div>`;
+  }
+  const richt = dtSitzungsRichtung(P && P.sitzungen);
+  const stabil = richt.filter(r => r.stabil);
+  h += `<p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Prognose der SCHWANKUNG, nicht der Richtung. Profil je Wochenstunde (UTC) ${info.klasse === 'gold' ? 'aus Pax Gold' : 'aus 24 Coins'} 2022–24, geprüft 2025/26.
+    Richtung je Handelssitzung: ${stabil.length ? stabil.map(r => esc(DT_SITZUNG[r.sitzung] || r.sitzung)).join(', ') + ' mit stabilem Hang' : 'kein belastbares Muster — keine Sitzung steigt oder fällt verlässlich (2022–24 und 2025/26 geprüft)'}.</p></div>`;
+  return h;
+}
 function dtFertig(sym, tf){ const d = DTC.daten.get(sym + '|' + tf); return d && d.fertig ? d.fertig : null; }
 function dtAlle(sym, tf){ const d = DTC.daten.get(sym + '|' + tf); return d && d.alle ? d.alle : null; }
 const DT_RICHTUNG = {auf: ['▲ aufwärts', 'var(--long)'], ab: ['▼ abwärts', 'var(--bad)'], seit: ['◆ seitwärts', 'var(--ink-2)']};
@@ -10054,10 +10172,22 @@ function dtInfo(sym){
 }
 /* Wie lange eine geladene Reihe frisch ist — die laufende Kerze haelt der Websocket aktuell. */
 function dtFrisch(tf){ return tf <= 5 ? 30000 : tf <= 60 ? 60000 : 300000; }
+/* Kraken erlaubt oeffentlich nur etwa eine Anfrage je Sekunde. Gold braucht sechs Reihen
+   auf einmal — parallel kam "Too many requests" zurueck und die Ampel blieb auf "laedt".
+   Darum eine Warteschlange: die Chart-Zeiteinheit zuerst, dann der Rest im Abstand. Ein
+   Fehler beim Nachladen wirft vorhandene Kerzen NICHT weg. */
+DTC.warte = [];
 function dtLaden(sym, tf, zwingen){
   const key = sym + '|' + tf, alt = DTC.daten.get(key);
-  if (DTC.laedt.has(key)) return;
-  if (!zwingen && alt && Date.now() - alt.zeit < (alt.fehler ? 30000 : dtFrisch(tf))) return;
+  if (DTC.laedt.has(key) || DTC.warte.some(w => w.key === key)) return;
+  if (!zwingen && alt && Date.now() - alt.zeit < (alt.fehler && !alt.alle ? 20000 : dtFrisch(tf))) return;
+  const eintrag = {key, sym, tf};
+  if (sym === DTC.sym && tf === DTC.tf) DTC.warte.unshift(eintrag); else DTC.warte.push(eintrag);
+  dtPumpe();
+}
+function dtPumpe(){
+  if (DTC.laedt.size || !DTC.warte.length) return;
+  const {key, sym, tf} = DTC.warte.shift();
   DTC.laedt.add(key);
   fetch('https://api.kraken.com/0/public/OHLC?pair=' + encodeURIComponent(dtInfo(sym).paar) + '&interval=' + tf)
     .then(r => r.json()).then(j => {
@@ -10065,8 +10195,16 @@ function dtLaden(sym, tf, zwingen){
       if (!Array.isArray(roh) || roh.length < 30) throw new Error((j && j.error && j.error[0]) || 'leer');
       const alle = roh.map(x => [x[0] * 1000, +x[1], +x[2], +x[3], +x[4], +x[6]]);
       DTC.daten.set(key, {zeit: Date.now(), alle, fertig: dtNurFertig(alle, tf, Date.now())});
-    }).catch(e => DTC.daten.set(key, {zeit: Date.now(), fehler: String(e && e.message || e)}))
-    .finally(() => { DTC.laedt.delete(key); if (DTC.sym === sym) dtChartZeichnen(tf !== DTC.tf); });
+    }).catch(e => {
+      const alt = DTC.daten.get(key);
+      if (alt && alt.alle) alt.zeit = Date.now() - dtFrisch(tf) + 20000;   // in 20 s erneut, Kerzen bleiben
+      else DTC.daten.set(key, {zeit: Date.now(), fehler: String(e && e.message || e)});
+    })
+    .finally(() => {
+      DTC.laedt.delete(key);
+      if (DTC.sym === sym) dtChartZeichnen(tf !== DTC.tf);
+      setTimeout(dtPumpe, 400);
+    });
 }
 function dtNurFertig(alle, tf, jetztMs){ return alle.filter(x => x[0] + tf * 60000 <= jetztMs); }
 /* Eine Websocket-Kerze (Kraken v2, Kanal "ohlc") in die Reihe einpflegen: gleiche
@@ -10200,10 +10338,10 @@ function dtFarbe(n){ return getComputedStyle(document.documentElement).getProper
 function dtZeitLabel(ms, tf){
   const d = new Date(ms);
   if (tf >= 1440) return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
-  if (tf >= 60) return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}) + ' ' + String(d.getHours()).padStart(2, '0') + 'h';
+  if (tf >= 60) return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}) + ' ' + String(d.getHours()).padStart(2, '0') + ':00';
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
-function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
+function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf, baender){
   if (!cv) return;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   const r = cv.getBoundingClientRect();
@@ -10226,9 +10364,22 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
     if (pr > khi + kspanne * 0.6 || pr < klo - kspanne * 0.6){ rand.push(l); continue; }
     hi = Math.max(hi, pr); lo = Math.min(lo, pr);
   }
+  for (const b of (baender || [])) if (b.zeigen68){
+    if (b.hi < khi + kspanne * 0.6) hi = Math.max(hi, b.hi);
+    if (b.lo > klo - kspanne * 0.6) lo = Math.min(lo, b.lo);
+  }
   const luft = (hi - lo) * 0.06; hi += luft; lo -= luft;
   const y = p => M.t + (hi - p) / (hi - lo) * (H - M.t - M.b);
   const sw = (W - M.l - M.r) / n, kb = Math.max(1, sw * 0.62);
+  // Erwartete Spanne als Band (68 %) — erst das Band, dann Kerzen und Linien darueber
+  for (const b of (baender || [])){
+    const y1 = y(Math.min(hi, b.hi)), y2 = y(Math.max(lo, b.lo));
+    if (!(y2 > y1)) continue;
+    ctx.fillStyle = dtFarbe('--accent'); ctx.globalAlpha = .07;
+    ctx.fillRect(M.l, y1, W - M.l - M.r, y2 - y1); ctx.globalAlpha = 1;
+    ctx.fillStyle = dtFarbe('--accent'); ctx.globalAlpha = .75; ctx.font = '9.5px "JetBrains Mono",monospace';
+    ctx.textBaseline = 'top'; ctx.fillText(b.lab, M.l + 4, y1 + 2); ctx.globalAlpha = 1;
+  }
   const x = i => M.l + i * sw + sw / 2;
   const cGrid = dtFarbe('--grid'), cInk3 = dtFarbe('--ink-3'), cUp = dtFarbe('--long'), cDn = dtFarbe('--bad');
   ctx.font = '10px "JetBrains Mono",monospace'; ctx.textBaseline = 'middle';
@@ -10239,8 +10390,9 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
   }
   // Zeitachse: fuenf gleichmaessig verteilte Marken
   ctx.textBaseline = 'alphabetic';
-  const schritt = Math.max(1, Math.floor(n / 5));
-  for (let i = schritt - 1; i < n - 2; i += schritt){
+  const marken_n = Math.max(2, Math.min(5, Math.floor((W - M.r) / 110)));
+  for (let kk = 0; kk < marken_n; kk++){
+    const i = Math.min(n - 1, Math.round((kk + 0.5) * n / marken_n));
     const lab = dtZeitLabel(v[i][0], tf);
     ctx.strokeStyle = cGrid; ctx.beginPath(); ctx.moveTo(x(i), M.t); ctx.lineTo(x(i), H - M.b); ctx.stroke();
     ctx.fillStyle = cInk3; ctx.fillText(lab, Math.max(M.l, x(i) - ctx.measureText(lab).width / 2), H - 5);
@@ -10374,7 +10526,18 @@ function dtChartZeichnen(nurChart){
   const marktOk = info.klasse === 'coin' ? btcOk : null;
   const an = d1 && d1.fertig ? dtAnalyse(d1.fertig, marktOk) : null;
   const emaChart = dtEma(d.alle.map(x => x[4]), 200);
-  dtCanvas($('dtcv'), d.alle, d.fertig.length, dtLinien(sym, an, DTC.tf), emaChart, DTC.tf);
+  const P = dtProfilVon(sym);
+  const tick0 = DTWS.tick;
+  const live0 = tick0 && isFinite(tick0.last) && Date.now() - tick0.zeit < 60000 ? tick0.last : d.alle[d.alle.length - 1][4];
+  const prog = dtUmZentrieren(d1 && d1.fertig ? dtSpannePrognose(d1.fertig, P) : null, live0);
+  DTC.prog = prog;
+  const baender = [];
+  if (prog){
+    const hz = DTC.tf >= 240 ? 24 : 4, x = prog.je[hz];
+    if (x && x.lo68 && (hz !== 24 || x.gueltig))
+      baender.push({lo: x.lo68, hi: x.hi68, lab: `erwartet ${hz} Std. (68 %)`, zeigen68: true});
+  }
+  dtCanvas($('dtcv'), d.alle, d.fertig.length, dtLinien(sym, an, DTC.tf), emaChart, DTC.tf, baender);
   const tick = DTWS.tick;
   const live = tick && isFinite(tick.last) && Date.now() - tick.zeit < 60000 ? tick.last : d.alle[d.alle.length - 1][4];
   const dd = (d1 && d1.alle) || d.alle;
@@ -10411,6 +10574,7 @@ function dtZeile(ok, text, wert){
 function dtAnalyseHtml(sym, info, an, live){
   let h = '';
   if (info.klasse === 'gold') h += dtGoldPanel(live);
+  try { h += dtSpannenHtml(sym, info, DTC.prog, dtProfilVon(sym), live); } catch(e){ console.error(e); }
   if (!an) return h + `<p class="leer">Zu wenig 1-Std.-Kerzen für die Ausbruchsanalyse.</p>`;
   const welle = DTW ? (DTW.welle || 0) : null, minW = (DTW && DTW.min_welle) || 12;
   const btc = DTW ? !!DTW.btc_ueber_ema200 : null;

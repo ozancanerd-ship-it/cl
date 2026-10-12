@@ -500,6 +500,26 @@ def _senden(texte: list[dict]) -> None:
     print(f"{raus} von {len(texte)} Daytrade-Alarm(en) verschickt ({n.active_sinks})")
 
 
+def stundenprofil(pfad: str = "docs/stundenprofil.json") -> dict | None:
+    """Ergebnis der Stundenprofil-Studie (scripts/stundenprofil_studie.py) fuer die App:
+    Profil je Wochenstunde, EWMA-lambda, Bandfaktoren und OOS-Treffer je Horizont."""
+    f = Path(__file__).resolve().parents[1] / pfad
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    aus = {"doc": d.get("doc"), "daten": d.get("daten")}
+    for g in ("gold", "coins"):
+        x = d.get(g) or {}
+        aus[g] = {
+            "lambda": x.get("lambda"),
+            "profil": x.get("profil"),
+            "horizonte": x.get("horizonte"),
+            "sitzungen": x.get("sitzungen"),
+        }
+    return aus
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", default="web/daytrade.json")
@@ -524,6 +544,7 @@ def main() -> int:
         "studie": STUDIE,
         "min_welle": MIN_WELLE,
         "min_ueberhang_atr": m.MIN_UEBERHANG_ATR,
+        "stundenprofil": stundenprofil(),
         "fehler": fehler + fehler_extra,
     }
     if "BTC" not in daten or len(daten) < len(COINS) // 2:
