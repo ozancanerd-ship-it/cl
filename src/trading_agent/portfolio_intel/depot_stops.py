@@ -608,6 +608,18 @@ def pflegen(
         for m in ("tp1", "tp2", "tp3"):
             if plan.get(m) is not None:
                 ziele[m] = _zahl(plan.get(m))
+    # Teilverkauf-Rahmen (13.10.): Ozan setzt nur den Einstieg und den eigenen Stop. Dann
+    # gelten die Ziele aus dem Abstand zum Stop — 1 R, 2 R, 3 R vom Einstieg aus. Nur wenn
+    # es keine echten Ziele gibt; die Quelle steht im Alarm, damit man nicht raetselt.
+    rahmen = False
+    if lg.ebene == "position" and not ziele and plan and str(plan.get("quelle") or "") == "selbst":
+        e_r = _zahl(pos.get("einstieg"))
+        s_r = _zahl(plan.get("stop"))
+        if e_r and s_r and e_r > 0 and e_r != s_r and ((lang and s_r < e_r) or (not lang and s_r > e_r)):
+            risiko_r = abs(e_r - s_r)
+            for i, m in enumerate(("tp1", "tp2", "tp3"), start=1):
+                ziele[m] = e_r + i * risiko_r if lang else e_r - i * risiko_r
+            rahmen = True
     erledigt = set(pos.get("erledigt") or []) | set(st.get("erreicht") or [])
     menge = _zahl(pos.get("menge"))
     offen = 3 - len({"TP1", "TP2", "TP3"} & erledigt)
@@ -628,12 +640,13 @@ def pflegen(
                 if marke == "TP2"
                 else " Damit ist der Trade zu."
             )
+            rahmen_satz = " (Ziel aus deinem Stop: je 1 R)" if rahmen else ""
             ev.append(
                 Ereignis(
                     "ziel",
                     lg.key,
                     wer,
-                    f"{marke} erreicht ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}) — {teil} "
+                    f"{marke} erreicht ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}){rahmen_satz} — {teil} "
                     f"verkaufen{wo_satz}.{danach}",
                     True,
                     marke=marke,

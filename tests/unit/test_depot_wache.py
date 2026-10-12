@@ -568,3 +568,15 @@ def test_oeffentlicher_betreff_nennt_die_handlung_nicht_den_wert() -> None:
     for name in ("Sei", "Solana", "Optimism", "SEIUSD"):
         assert name not in titel and name not in klingel
     assert "VERKAUFEN" in klingel
+
+
+def test_teilverkauf_rahmen_aus_eigenem_stop() -> None:
+    """Ozan, 13.10.: nur Einstieg und eigener Stop eintragen — dann gilt der Rahmen aus
+    dem Abstand: 1 R = ein Drittel verkaufen, Stop auf Einstand. Fremde Setups bleiben aus."""
+    pos = [{"sym": "SOLUSD", "menge": 3, "einstieg": 100.0, "plan": {"stop": 90.0, "quelle": "selbst"}}]
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {})
+    assert [e.art for e in ev] == ["ziel"]
+    assert "je 1 R" in ev[0].text
+    pos[0]["plan"]["quelle"] = "app"
+    _, ev, _ = pruefe_depot(pos, _scan(_zeile("SOLUSD", 110.5)), {})
+    assert [e.art for e in ev] == []
