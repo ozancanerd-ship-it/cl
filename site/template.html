@@ -424,6 +424,11 @@ h3{font-size:13px; font-weight:600; margin:18px 0 8px; letter-spacing:.01em; col
 .dturteil.gut{background:var(--long-bg); color:var(--long)}
 .dturteil.warte{background:var(--sunk); color:var(--ink-2)}
 .dturteil.warn{background:var(--warn-bg); color:var(--warn)}
+.dtspread{display:flex; flex-wrap:wrap; gap:6px 14px; padding:7px 14px; border-bottom:1px solid var(--rule);
+  font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink-2)}
+.dtspread b{color:var(--ink); font-weight:600}
+.dtspread .live{margin-left:auto; color:var(--long)}
+.tfbar .tfb{padding:5px 8px}
 @media (max-width:640px){#cv{height:420px}}
 .chart-q{margin-left:auto; font-size:10.5px; color:var(--ink-3); align-self:center; text-align:right}
 .chart-q b{font-weight:600; color:var(--accent-2)}
@@ -1053,6 +1058,7 @@ function zeigeTab(i){
   $('kopf').textContent = (i===1||i===2) && AKTIV ? AKTIV.instrument : TITEL[i];
   try { dockMarkieren(i); } catch(e){}
   if (i===1) requestAnimationFrame(()=>chart.groesse());
+  try { dtWsPruefen(); } catch(e){}
   if (i===11) requestAnimationFrame(()=>{ try { dtTakt(); dtChartZeichnen(); } catch(e){} });
   if (i===4) zeichneSync();
   if (i===9) zeichneChat();
@@ -9754,21 +9760,27 @@ function dtKrypto(w){
 /* ============================================================ DAY-TRADING: CHART + ANALYSE
    Ozan, 12.10. 08:26: "ich kann bei den daytrades vor allem gold nicht den chart und die
    analyse sehen und ich will auch benachrichtigung fuer entry bekommen halt aber nur wenn es
-   sich lohnt". Der Reiter zeigte bisher nur Zahlen. Jetzt:
+   sich lohnt". 09:30: "Gold muss alle charts haben, es reicht doch keine 1h wenn sekunden
+   sogar unterschiede machen ... und dort anders analysieren als sonst".
 
-   * ein Kerzenchart je Wert (Gold = Pax Gold PAXG/USD, die 24 Coins der Welle, TAO), Kurse
-     direkt und live von Kraken (oeffentlich, ohne Schluessel), 1 Std. oder 4 Std.;
-   * eingezeichnet, wogegen die Regel prueft: 48-Std.-Hoch (Ausbruchsmarke), die Schwelle,
-     ab der ein Einstieg sich LOHNT (+0,25 ATR), EMA 200, 24-Std.-Tief (Ausstieg), offene
-     Paper-Trades, beim Gold die S9-Marken (auf PAXG umgerechnet) und deine eigene Position;
-   * darunter die Analyse als Checkliste: was fuer einen Einstiegs-Alarm fehlt — und ab
-     welchem Stundenschluss er kommt.
+   * Kerzenchart je Wert (Gold = Pax Gold PAXG/USD, die 24 Coins der Welle, TAO) in ALLEN
+     Zeiteinheiten, die Kraken liefert: 1 Min., 5, 15, 30 Min., 1 Std., 4 Std., Tag, Woche.
+     Die Historie kommt per REST, danach haelt ein eigener Kraken-Websocket die laufende
+     Kerze und Geld/Brief/Spread sekundengenau aktuell — nur solange der Reiter offen ist.
+   * Gold wird ANDERS analysiert als die Coins (dtGoldPanel): Zeiteinheiten-Ampel von 1 Min.
+     bis Tag, Handelssitzungen (Asien/London/New York) mit ihren Hochs und Tiefs, Vortages-
+     Hoch/-Tief, Tagesspanne gegen den 14-Tage-Schnitt, runde Marken, Dollar und US-Renditen
+     als Treiber, anstehende US-Termine (CPI, Arbeitsmarkt, Fed) und der Spread.
+     Das ist Lagebild, kein Signal: Intraday-Gold hatte in zwei Studien keinen Vorteil.
+     Gold-Alarme kommen weiter aus S9.
+   * Fuer die Coins bleibt die Analyse die Checkliste der Ausbruchsregel (1 Std.).
 
-   Die Rechnung ist dieselbe wie im Alarm (daytrade_ausbruch.analyse in Python) und wird
-   im Test gegen sie geprueft. Nur abgeschlossene Kerzen zaehlen; die laufende ist im Chart
-   blasser gezeichnet und bewegt nur den Kurs. */
+   Die Regel-Rechnung ist dieselbe wie im Alarm (daytrade_ausbruch.analyse in Python) und
+   wird im Test gegen sie geprueft. Nur abgeschlossene Kerzen zaehlen. */
 const DT_LOOKBACK = 48, DT_TRAIL = 24, DT_STOP_ATR = 2.0, DT_MIN_UEBERHANG = 0.25;
-const DTC = {sym: null, tf: 60, daten: new Map(), laedt: new Set(), timer: null};
+const DT_TFS = [[1, '1m'], [5, '5m'], [15, '15m'], [30, '30m'], [60, '1 Std.'], [240, '4 Std.'], [1440, 'Tag'], [10080, 'Woche']];
+const DT_TF_NAME = Object.fromEntries(DT_TFS);
+const DTC = {sym: null, tf: 60, tfJe: {PAXG: 15}, daten: new Map(), laedt: new Set(), analyseZeit: 0};
 const DT_FEST = {PAXG: {paar: 'PAXGUSD', name: 'Gold (Pax Gold)', klasse: 'gold'},
                  TAO: {paar: 'TAOUSD', name: 'Bittensor', klasse: 'extra'}};
 const DT_STATUS = {ausbruch: 'Ausbruch', nah: 'Kurz vor der Marke', unter_ema: 'Unter EMA 200 — kein Long',
@@ -9815,6 +9827,224 @@ function dtAnalyse(k, marktOk){
           stop_bei_signal: c - DT_STOP_ATR * a[i], abstand_pct: (marke - c) / c * 100,
           ueberhang_atr: ueber, signal: sig, status, emaReihe: e};
 }
+
+/* ---------------------------------------------------------------- Gold: eigene Analyse */
+/* RSI nach Wilder (14). */
+function dtRsi(werte, n){
+  if (!werte || werte.length <= n) return null;
+  let auf = 0, ab = 0;
+  for (let i = 1; i <= n; i++){ const d = werte[i] - werte[i-1]; if (d > 0) auf += d; else ab -= d; }
+  auf /= n; ab /= n;
+  for (let i = n + 1; i < werte.length; i++){
+    const d = werte[i] - werte[i-1];
+    auf = (auf * (n - 1) + Math.max(d, 0)) / n;
+    ab = (ab * (n - 1) + Math.max(-d, 0)) / n;
+  }
+  return ab === 0 ? 100 : 100 - 100 / (1 + auf / ab);
+}
+/* Trend einer Zeiteinheit: Schluss gegen EMA 20 und EMA 50, RSI 14, Lage in der Spanne der
+   letzten 20 Kerzen (0 = am Tief, 100 = am Hoch). Nur abgeschlossene Kerzen. */
+function dtTrend(k){
+  if (!k || k.length < 60) return null;
+  const c = k.map(x => x[4]), i = c.length - 1;
+  const e20 = dtEma(c, 20)[i], e50 = dtEma(c, 50)[i];
+  const richtung = c[i] > e20 && e20 > e50 ? 'auf' : c[i] < e20 && e20 < e50 ? 'ab' : 'seit';
+  let hi = -Infinity, lo = Infinity;
+  for (const x of k.slice(-20)){ hi = Math.max(hi, x[2]); lo = Math.min(lo, x[3]); }
+  return {richtung, rsi: dtRsi(c, 14), lage: hi > lo ? (c[i] - lo) / (hi - lo) * 100 : 50, e20, e50};
+}
+/* Handelssitzungen in UTC (ungefaehr, ohne Sommerzeit-Feinheiten):
+   Asien 00–07, London 07–13, New York 13–21, danach ruhig. */
+function dtSitzungVon(stundeUtc){
+  return stundeUtc < 7 ? 'asien' : stundeUtc < 13 ? 'london' : stundeUtc < 21 ? 'newyork' : 'spaet';
+}
+/* Hoch/Tief je Sitzung des aktuellen UTC-Tages aus Kerzen bis 1 Std. (inkl. laufender). */
+function dtSitzungen(k, jetztMs){
+  const tag0 = Math.floor(jetztMs / 86400000) * 86400000;
+  const out = {jetzt: dtSitzungVon(new Date(jetztMs).getUTCHours())};
+  for (const x of (k || [])){
+    if (x[0] < tag0 || x[0] > jetztMs) continue;
+    const s = dtSitzungVon(new Date(x[0]).getUTCHours());
+    const z = out[s] || (out[s] = {h: -Infinity, l: Infinity});
+    z.h = Math.max(z.h, x[2]); z.l = Math.min(z.l, x[3]);
+  }
+  return out;
+}
+/* Tageskerzen: Vortages-Hoch/-Tief, Ø Tagesspanne (14 abgeschlossene Tage), heutige Spanne. */
+function dtTagesSpanne(kTag, jetztMs){
+  if (!kTag || kTag.length < 16) return null;
+  const tag0 = Math.floor(jetztMs / 86400000) * 86400000;
+  const heute = kTag.find(x => x[0] === tag0) || null;
+  const fertig = kTag.filter(x => x[0] < tag0);
+  if (fertig.length < 15) return null;
+  const vortag = fertig[fertig.length - 1];
+  const spannen = fertig.slice(-14).map(x => x[2] - x[3]);
+  const adr = spannen.reduce((a, b) => a + b, 0) / spannen.length;
+  const hs = heute ? heute[2] - heute[3] : null;
+  return {vortagH: vortag[2], vortagL: vortag[3], adr, heute: hs, anteil: hs != null && adr > 0 ? hs / adr * 100 : null,
+          tagesOpen: heute ? heute[1] : null};
+}
+function dtRunde(kurs){
+  const schritt = kurs >= 1000 ? 25 : kurs >= 100 ? 5 : kurs >= 10 ? 1 : 0.1;
+  return {unten: Math.floor(kurs / schritt) * schritt, oben: Math.ceil(kurs / schritt) * schritt, schritt};
+}
+const DT_SITZUNG = {asien: 'Asien', london: 'London', newyork: 'New York', spaet: 'Spät (US-Schluss)'};
+const DT_GOLD_TERMIN = /CPI|PCE|Non-Farm|NFP|Employment|Unemployment|Jobless|FOMC|Fed|Powell|Federal Funds|GDP|PPI|Retail Sales|ISM|JOLTS|Interest Rate/i;
+function dtGoldTermine(termine, jetztMs){
+  return (termine || []).filter(t => {
+    const z = Date.parse(t.zeitpunkt);
+    if (!isFinite(z) || z < jetztMs - 30 * 60000 || z > jetztMs + 48 * 3600000) return false;
+    if (t.land !== 'USD' && t.land !== 'ALL') return false;
+    return t.wirkung === 'High' || (t.wirkung === 'Medium' && DT_GOLD_TERMIN.test(t.titel || ''));
+  }).sort((a, b) => Date.parse(a.zeitpunkt) - Date.parse(b.zeitpunkt));
+}
+/* Was eine Runde (Kauf + Verkauf) kostet, gemessen an der typischen Bewegung je Zeiteinheit.
+   Kosten = Spread + 2 x Gebuehr. Kraken-Spot Einstiegsstufe: 0,40 % Taker (Marktorder),
+   0,25 % Maker (Limit) je Seite — bei mehr Volumen weniger. Bewegung = Ø (Hoch − Tief) der
+   letzten 60 abgeschlossenen Kerzen. ``leer`` = Anteil Kerzen ohne Abschluss (Hoch = Tief). */
+const DT_GEBUEHR = {taker: 0.004, maker: 0.0025};
+/* Die eigene Gebuehrenstufe — Kraken staffelt nach Volumen und seit 07.2026 auch nach
+   Guthaben; die Quellen nennen fuer die Einstiegsstufe 0,40 bis 0,80 % Taker. Darum
+   einstellbar und nur in diesem Browser gemerkt (reine Anzeige-Bequemlichkeit). */
+function dtGebuehrLesen(){
+  try { const v = parseFloat(localStorage.getItem('desk.dt.gebuehr')); if (isFinite(v) && v >= 0 && v < 2) return v / 100; } catch(e){}
+  return DT_GEBUEHR.taker;
+}
+function dtKosten(reihen, kurs, spread, gebuehr){
+  const runde = (spread || 0) + 2 * gebuehr * kurs;
+  const out = [];
+  for (const [tf, k] of reihen){
+    if (!k || k.length < 30) continue;
+    const v = k.slice(-60);
+    const spanne = v.reduce((a, x) => a + (x[2] - x[3]), 0) / v.length;
+    const leer = v.filter(x => x[2] === x[3]).length / v.length * 100;
+    out.push({tf, spanne, leer, anteil: spanne > 0 ? runde / spanne * 100 : null});
+  }
+  return {runde, je: out, ab: (out.find(x => x.anteil != null && x.anteil <= 25) || {}).tf ?? null};
+}
+function dtFertig(sym, tf){ const d = DTC.daten.get(sym + '|' + tf); return d && d.fertig ? d.fertig : null; }
+function dtAlle(sym, tf){ const d = DTC.daten.get(sym + '|' + tf); return d && d.alle ? d.alle : null; }
+const DT_RICHTUNG = {auf: ['▲ aufwärts', 'var(--long)'], ab: ['▼ abwärts', 'var(--bad)'], seit: ['◆ seitwärts', 'var(--ink-2)']};
+function dtGoldPanel(live){
+  const jetzt = Date.now();
+  const zeilen = [];
+  let auf = 0, ab = 0, n = 0;
+  for (const [tf, name] of [[1, '1 Min.'], [5, '5 Min.'], [15, '15 Min.'], [60, '1 Std.'], [240, '4 Std.'], [1440, 'Tag']]){
+    const t = dtTrend(dtFertig('PAXG', tf));
+    if (!t){ zeilen.push(`<div class="rowx"><span class="lab">${name}</span><span class="val">lädt …</span></div>`); continue; }
+    n++; if (t.richtung === 'auf') auf++; if (t.richtung === 'ab') ab++;
+    const [txt, kl] = DT_RICHTUNG[t.richtung];
+    zeilen.push(`<div class="rowx"><span class="lab">${name}</span><span class="val"><b style="color:${kl}">${txt}</b>
+      · RSI ${t.rsi == null ? '—' : Math.round(t.rsi)} · Lage ${Math.round(t.lage)} %</span></div>`);
+  }
+  const kurz = [1, 5, 15].map(tf => dtTrend(dtFertig('PAXG', tf))).filter(Boolean);
+  const lang = [240, 1440].map(tf => dtTrend(dtFertig('PAXG', tf))).filter(Boolean);
+  const mehr = arr => { const a = arr.filter(t => t.richtung === 'auf').length, b = arr.filter(t => t.richtung === 'ab').length;
+    return a > b ? 'auf' : b > a ? 'ab' : 'seit'; };
+  const kR = kurz.length ? mehr(kurz) : null, lR = lang.length ? mehr(lang) : null;
+  const t4 = dtTrend(dtFertig('PAXG', 240)), tT = dtTrend(dtFertig('PAXG', 1440));
+  const uneinig = t4 && tT && t4.richtung !== 'seit' && tT.richtung !== 'seit' && t4.richtung !== tT.richtung;
+  const RW = {auf: 'aufwärts', ab: 'abwärts', seit: 'seitwärts'};
+  let mtfSatz = '';
+  if (uneinig){
+    mtfSatz = `4 Std. ${t4.richtung === 'auf' ? 'aufwärts' : 'abwärts'}, Tag ${tT.richtung === 'auf' ? 'aufwärts' : 'abwärts'} — die großen Zeiteinheiten widersprechen sich, kurzfristig ${({auf: 'aufwärts', ab: 'abwärts', seit: 'seitwärts'})[kR] || '—'}. Unklare Lage: eher abwarten, bis 4 Std. und Tag in dieselbe Richtung zeigen.`;
+  } else if (kR && lR){
+    mtfSatz = kR === lR && kR !== 'seit'
+      ? `Kurz- und langfristig ${RW[kR]} — die Zeiteinheiten sind sich einig.`
+      : lR !== 'seit' && kR !== 'seit' && kR !== lR
+        ? `Übergeordnet ${RW[lR]}, kurzfristig ${RW[kR]} — Gegenbewegung im größeren Trend. Gegen den 4-Std.-/Tagestrend zu handeln ist das schwierigere Spiel.`
+        : `Übergeordnet ${RW[lR]}, kurzfristig ${RW[kR]} — kein klares gemeinsames Bild.`;
+  }
+  let h = `<h3>🥇 Gold-Analyse — anders als bei den Coins</h3>
+    <div class="karte"><div class="rowx"><span class="lab"><b>Zeiteinheiten-Ampel</b></span><span class="val">${n ? `${auf}× auf · ${ab}× ab · ${n - auf - ab}× seitwärts` : ''}</span></div>
+      ${zeilen.join('')}
+      ${mtfSatz ? `<p class="dturteil ${kR === lR && kR !== 'seit' ? 'gut' : 'warte'}">${mtfSatz}</p>` : ''}
+      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Trend = Schluss gegen EMA 20 und EMA 50. Lage = wo der Kurs in der Spanne der letzten 20 Kerzen steht (0 % Tief, 100 % Hoch).</p></div>`;
+
+  // Sekunden- und Minutenhandel: was eine Runde von einer typischen Bewegung frisst
+  const tk = DTWS.tick;
+  const spread = tk && isFinite(tk.bid) && isFinite(tk.ask) && tk.ask > tk.bid ? tk.ask - tk.bid : null;
+  const reihen = [[1, dtFertig('PAXG', 1)], [5, dtFertig('PAXG', 5)], [15, dtFertig('PAXG', 15)],
+                  [60, dtFertig('PAXG', 60)], [240, dtFertig('PAXG', 240)], [1440, dtFertig('PAXG', 1440)]];
+  const geb = dtGebuehrLesen();
+  const ko = dtKosten(reihen, live, spread, geb), kl = dtKosten(reihen, live, spread, Math.min(geb, DT_GEBUEHR.maker));
+  if (ko.je.length){
+    const farbe = a => a == null ? 'var(--ink-2)' : a <= 25 ? 'var(--long)' : a <= 60 ? 'var(--warn)' : 'var(--bad)';
+    const NAME = {1: '1 Min.', 5: '5 Min.', 15: '15 Min.', 60: '1 Std.', 240: '4 Std.', 1440: 'Tag'};
+    const eins = ko.je.find(x => x.tf === 1);
+    h += `<h3>⏱️ Welche Zeiteinheit lohnt bei Gold überhaupt?</h3><div class="karte">
+      <div class="rowx"><span class="lab">Deine Gebühr je Seite (Marktorder)</span><span class="val"><input id="dtgeb" class="val" inputmode="decimal" style="width:70px;text-align:right" value="${(geb * 100).toFixed(2).replace('.', ',')}"> %</span></div>
+      <div class="rowx"><span class="lab">Kosten einer Runde (Kauf + Verkauf)</span><span class="val">Marktorder ≈ <b>${num(ko.runde, 2)} $</b> · Limit ≈ ${num(kl.runde, 2)} $${spread != null ? ` · Spread ${num(spread, 2)} $` : ''}</span></div>
+      ${ko.je.map(x => `<div class="rowx"><span class="lab">${NAME[x.tf]}: Ø Bewegung ${num(x.spanne, 2)} $</span><span class="val">Kosten = <b style="color:${farbe(x.anteil)}">${x.anteil == null ? '—' : x.anteil >= 1000 ? Math.round(x.anteil / 100) + '×' : Math.round(x.anteil) + ' %'}</b> der Bewegung</span></div>`).join('')}
+      <p class="dturteil ${ko.ab != null && ko.ab >= 60 ? 'warn' : 'warte'}">${ko.ab != null
+        ? `Erst ab <b>${NAME[ko.ab]}</b> ist eine typische Bewegung mindestens viermal so groß wie die Kosten einer Runde mit Marktorder. Darunter frisst die Gebühr den Gewinn, bevor er entsteht.`
+        : 'Auf keiner Zeiteinheit ist die typische Bewegung viermal so groß wie die Kosten — Gold-Tageshandel mit Kraken-Marktorders rechnet sich so nicht.'}
+        ${eins && eins.leer >= 30 ? ` Dazu: in ${Math.round(eins.leer)} % der Minuten gibt es auf Kraken gar keinen Pax-Gold-Abschluss (flache Striche im 1-Min.-Chart) — für Sekunden-Trading ist das der falsche Markt.` : ''}</p>
+      <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Gebühr: Kraken staffelt nach Volumen und Guthaben — Quellen nennen für die Einstiegsstufe 0,40–0,80 % Taker. Trag oben deine Stufe aus Kraken ein. Bewegung = Ø Hoch–Tief der letzten 60 Kerzen.</p></div>`;
+  }
+
+  // Sitzungen + Tagesmarken
+  const k15 = dtAlle('PAXG', 15) || dtAlle('PAXG', 5);
+  const sz = dtSitzungen(k15, jetzt);
+  const ts = dtTagesSpanne(dtAlle('PAXG', 1440), jetzt);
+  const kurs = live;
+  const rz = [];
+  rz.push(`<div class="rowx"><span class="lab">Jetzt</span><span class="val"><b>${esc(DT_SITZUNG[sz.jetzt])}</b>-Sitzung (UTC ${String(new Date(jetzt).getUTCHours()).padStart(2, '0')}:${String(new Date(jetzt).getUTCMinutes()).padStart(2, '0')})</span></div>`);
+  const lageZu = (z) => kurs > z.h ? `darüber (+${num(kurs - z.h, 2)} $)` : kurs < z.l ? `darunter (−${num(z.l - kurs, 2)} $)` : 'innerhalb';
+  for (const s of ['asien', 'london', 'newyork']){
+    const z = sz[s];
+    if (!z || !isFinite(z.h)) continue;
+    rz.push(`<div class="rowx"><span class="lab">${DT_SITZUNG[s]} heute: Hoch / Tief</span><span class="val">${num(z.h, 2)} / ${num(z.l, 2)} $ · Kurs ${lageZu(z)}</span></div>`);
+  }
+  let spanneSatz = '';
+  if (ts){
+    rz.push(`<div class="rowx"><span class="lab">Vortag: Hoch / Tief</span><span class="val">${num(ts.vortagH, 2)} / ${num(ts.vortagL, 2)} $</span></div>`);
+    if (ts.anteil != null){
+      rz.push(`<div class="rowx"><span class="lab">Tagesspanne heute / Ø 14 Tage</span><span class="val">${num(ts.heute, 2)} / ${num(ts.adr, 2)} $ · <b>${Math.round(ts.anteil)} %</b></span></div>`);
+      spanneSatz = ts.anteil >= 100 ? 'Die typische Tagesbewegung ist heute schon gelaufen — weitere Ziele weit weg vom Kurs sind weniger realistisch.'
+        : ts.anteil < 50 ? 'Heute ist erst wenig passiert — die Bewegung des Tages kann noch kommen (oft mit London oder US-Daten).' : '';
+    }
+  }
+  const r = dtRunde(kurs);
+  rz.push(`<div class="rowx"><span class="lab">Runde Marken (${num(r.schritt, 0)} $)</span><span class="val">${num(r.unten, 0)} darunter · ${num(r.oben === r.unten ? r.oben + r.schritt : r.oben, 0)} darüber</span></div>`);
+  if (sz.asien && isFinite(sz.asien.h) && sz.jetzt !== 'asien'){
+    spanneSatz += (spanneSatz ? ' ' : '') + (kurs > sz.asien.h ? 'Gold hat die Asien-Spanne nach oben verlassen.'
+      : kurs < sz.asien.l ? 'Gold hat die Asien-Spanne nach unten verlassen.' : 'Gold steckt noch in der Asien-Spanne — die Richtung des Tages ist offen.');
+  }
+  h += `<h3>Sitzungen & Tagesmarken</h3><div class="karte">${rz.join('')}
+    ${spanneSatz ? `<p class="dturteil warte">${spanneSatz}</p>` : ''}
+    <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Sitzungszeiten ungefähr in UTC: Asien 00–07, London 07–13, New York 13–21 (deutsche Zeit +2 Std.).</p></div>`;
+
+  // Treiber: Dollar, Renditen, Termine
+  const M = S && S.makro;
+  const w = k => M && (M.werte || []).find(x => x.schluessel === k);
+  const dxy = w('dxy'), y10 = w('us10y');
+  const tz = [];
+  const treiber = (x, name) => {
+    if (!x) return;
+    const d5 = x.aenderung_5t_pct, d20 = x.aenderung_20t_pct;
+    const wind = d5 > 0.15 ? '<b style="color:var(--bad)">Gegenwind</b>' : d5 < -0.15 ? '<b style="color:var(--long)">Rückenwind</b>' : 'neutral';
+    tz.push(`<div class="rowx"><span class="lab">${name}</span><span class="val">${num(x.wert, 2)} · 5 T ${pct(d5, 1)} · 20 T ${pct(d20, 1)} → ${wind}</span></div>`);
+  };
+  treiber(dxy, 'US-Dollar-Index (DXY)');
+  treiber(y10, '10-jährige US-Rendite');
+  const termine = dtGoldTermine(M && M.termine, jetzt);
+  const bald = termine.find(t => Math.abs(Date.parse(t.zeitpunkt) - jetzt) <= 60 * 60000);
+  for (const t of termine.slice(0, 5)){
+    tz.push(`<div class="rowx"><span class="lab">${t.wirkung === 'High' ? '🔴' : '🟠'} ${esc(t.titel)}</span><span class="val">${zeit(t.zeitpunkt)}${t.prognose ? ` · Prognose ${esc(t.prognose)}` : ''}${t.vorher ? ` · vorher ${esc(t.vorher)}` : ''}</span></div>`);
+  }
+  if (!termine.length) tz.push(`<div class="rowx"><span class="lab">US-Termine (48 Std.)</span><span class="val">keine wichtigen</span></div>`);
+  h += `<h3>Was Gold gerade bewegt</h3><div class="karte">${tz.join('')}
+    ${bald ? `<p class="dturteil warn">⚠️ ${esc(bald.titel)} um ${zeit(bald.zeitpunkt)} — rund um US-Daten springt Gold oft in Sekunden um mehrere Dollar, der Spread wird weit. Vor und direkt nach den Daten kein neuer Einstieg.</p>` : ''}
+    <p style="margin:6px 0 0;font-size:11.5px;color:var(--ink-3)">Steigender Dollar und steigende US-Renditen bremsen Gold meist, fallende helfen. Daten vom letzten Scan (Börsenschluss).</p></div>`;
+
+  h += `<div class="note-box"><span class="nt">Ehrlich</span><p>Das ist das Lagebild für Gold, kein Kaufsignal.
+    Zwei Studien zum Gold-Tageshandel (Asien-Range/Sweep auf 15 Min., Tagesausbruch) fanden keinen belastbaren Vorteil.
+    Alarme für Gold kommen aus <b>S9</b> (unten, 🧪 experimentell).</p></div>`;
+  return h;
+}
+
+/* ---------------------------------------------------------------- Daten: REST + Websocket */
 function dtInfo(sym){
   const a = DTW && DTW.analyse && DTW.analyse[sym];
   const f = DT_FEST[sym];
@@ -9822,23 +10052,94 @@ function dtInfo(sym){
           name: (a && a.name) || (f && f.name) || sym,
           klasse: (a && a.klasse) || (f && f.klasse) || 'coin', server: a || null};
 }
+/* Wie lange eine geladene Reihe frisch ist — die laufende Kerze haelt der Websocket aktuell. */
+function dtFrisch(tf){ return tf <= 5 ? 30000 : tf <= 60 ? 60000 : 300000; }
 function dtLaden(sym, tf, zwingen){
   const key = sym + '|' + tf, alt = DTC.daten.get(key);
   if (DTC.laedt.has(key)) return;
-  if (!zwingen && alt && Date.now() - alt.zeit < (alt.fehler ? 30000 : 55000)) return;
+  if (!zwingen && alt && Date.now() - alt.zeit < (alt.fehler ? 30000 : dtFrisch(tf))) return;
   DTC.laedt.add(key);
   fetch('https://api.kraken.com/0/public/OHLC?pair=' + encodeURIComponent(dtInfo(sym).paar) + '&interval=' + tf)
     .then(r => r.json()).then(j => {
       const roh = j && j.result ? j.result[Object.keys(j.result).find(x => x !== 'last')] : null;
       if (!Array.isArray(roh) || roh.length < 30) throw new Error((j && j.error && j.error[0]) || 'leer');
       const alle = roh.map(x => [x[0] * 1000, +x[1], +x[2], +x[3], +x[4], +x[6]]);
-      const jetzt = Date.now();
-      const fertig = alle.filter(x => x[0] + tf * 60000 <= jetzt);
-      DTC.daten.set(key, {zeit: jetzt, alle, fertig});
+      DTC.daten.set(key, {zeit: Date.now(), alle, fertig: dtNurFertig(alle, tf, Date.now())});
     }).catch(e => DTC.daten.set(key, {zeit: Date.now(), fehler: String(e && e.message || e)}))
-    .finally(() => { DTC.laedt.delete(key); if (DTC.sym === sym && DTC.tf === tf) dtChartZeichnen(); });
+    .finally(() => { DTC.laedt.delete(key); if (DTC.sym === sym) dtChartZeichnen(tf !== DTC.tf); });
 }
-/* Eigene Position im Depot zum Wert (nur Coin, nur in USD — sonst stimmt die Achse nicht). */
+function dtNurFertig(alle, tf, jetztMs){ return alle.filter(x => x[0] + tf * 60000 <= jetztMs); }
+/* Eine Websocket-Kerze (Kraken v2, Kanal "ohlc") in die Reihe einpflegen: gleiche
+   Anfangszeit = ersetzen, neuere = anhaengen, aeltere = ignorieren. Gibt die neue Reihe. */
+function dtKerzeEinpflegen(alle, c){
+  const t = Date.parse(c.interval_begin);
+  if (!alle || !alle.length || !isFinite(t)) return alle;
+  const neu = [t, +c.open, +c.high, +c.low, +c.close, +c.volume];
+  const letzte = alle[alle.length - 1][0];
+  if (t === letzte){ const a = alle.slice(); a[a.length - 1] = neu; return a; }
+  if (t > letzte) return alle.concat([neu]).slice(-1000);
+  return alle;
+}
+function dtWsSymbol(sym){ return `${sym}/USD`; }
+const DTWS = {ws: null, abo: null, versuch: 0, tick: null, rahmen: false, zuletzt: 0, timer: null};
+function dtWsSoll(){ return !document.hidden && $('p11') && !$('p11').hidden && DTC.sym ? {sym: DTC.sym, tf: DTC.tf} : null; }
+function dtWsSenden(methode, abo){
+  const s = dtWsSymbol(abo.sym);
+  try {
+    DTWS.ws.send(JSON.stringify({method: methode, params: {channel: 'ohlc', symbol: [s], interval: abo.tf, snapshot: false}}));
+    if (abo.tf !== 60 && dtInfo(abo.sym).klasse !== 'gold')
+      DTWS.ws.send(JSON.stringify({method: methode, params: {channel: 'ohlc', symbol: [s], interval: 60, snapshot: false}}));
+    DTWS.ws.send(JSON.stringify({method: methode, params: {channel: 'ticker', symbol: [s]}}));
+  } catch(e){}
+}
+function dtWsPruefen(){
+  const soll = dtWsSoll();
+  if (!soll){ if (DTWS.ws){ try { DTWS.ws.close(); } catch(e){} DTWS.ws = null; DTWS.abo = null; } return; }
+  if (DTWS.ws && DTWS.ws.readyState === 1){
+    if (!DTWS.abo || DTWS.abo.sym !== soll.sym || DTWS.abo.tf !== soll.tf){
+      if (DTWS.abo) dtWsSenden('unsubscribe', DTWS.abo);
+      if (!DTWS.abo || DTWS.abo.sym !== soll.sym) DTWS.tick = null;
+      DTWS.abo = soll; dtWsSenden('subscribe', soll);
+    }
+    return;
+  }
+  if (DTWS.ws && DTWS.ws.readyState === 0) return;
+  let ws;
+  try { ws = new WebSocket('wss://ws.kraken.com/v2'); } catch(e){ return; }
+  DTWS.ws = ws; DTWS.abo = null;
+  ws.onopen = () => { DTWS.versuch = 0; const s = dtWsSoll(); if (s){ DTWS.abo = s; dtWsSenden('subscribe', s); } };
+  ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch(e){ return; } dtWsNachricht(m); };
+  ws.onclose = () => {
+    if (DTWS.ws !== ws) return;
+    DTWS.ws = null; DTWS.abo = null;
+    if (!dtWsSoll()) return;
+    const warte = Math.min(30000, 1000 * Math.pow(2, DTWS.versuch++));
+    clearTimeout(DTWS.timer); DTWS.timer = setTimeout(dtWsPruefen, warte);
+  };
+  ws.onerror = () => { try { ws.close(); } catch(e){} };
+}
+function dtWsNachricht(m){
+  if (!m || !m.channel || !Array.isArray(m.data)) return;
+  if (m.channel === 'ohlc'){
+    for (const c of m.data){
+      const sym = String(c.symbol || '').split('/')[0];
+      const key = sym + '|' + c.interval, d = DTC.daten.get(key);
+      if (!d || !d.alle) continue;
+      d.alle = dtKerzeEinpflegen(d.alle, c);
+      d.fertig = dtNurFertig(d.alle, Number(c.interval), Date.now());
+    }
+  } else if (m.channel === 'ticker'){
+    const t = m.data[0];
+    if (t && String(t.symbol || '').split('/')[0] === DTC.sym)
+      DTWS.tick = {bid: +t.bid, ask: +t.ask, last: +t.last, zeit: Date.now()};
+  } else return;
+  // Hoechstens 4x je Sekunde zeichnen — und dann nur Chart und Kopf, nicht die Analyse.
+  if (DTWS.rahmen) return;
+  DTWS.rahmen = true;
+  setTimeout(() => { DTWS.rahmen = false; requestAnimationFrame(() => dtChartZeichnen(true)); }, 250);
+}
+
+/* ---------------------------------------------------------------- Zeichnen */
 function dtDeinePosition(sym){
   try {
     for (const p of ladePositionen()){
@@ -9851,9 +10152,21 @@ function dtDeinePosition(sym){
   return null;
 }
 /* Linien fuer den Chart: [Beschriftung, Preis, Farbvariable, gestrichelt] */
-function dtLinien(sym, an){
-  const L = [], info = dtInfo(sym);
-  if (an){
+function dtLinien(sym, an, tf){
+  const L = [], info = dtInfo(sym), gold = info.klasse === 'gold';
+  if (gold){
+    // Gold: auf kurzen Zeiteinheiten die Marken, auf die Gold-Haendler schauen.
+    const jetzt = Date.now();
+    const ts = dtTagesSpanne(dtAlle('PAXG', 1440), jetzt);
+    if (ts) L.push(['Vortag-Hoch', ts.vortagH, '--accent-2', true], ['Vortag-Tief', ts.vortagL, '--accent-2', true]);
+    if (tf <= 60){
+      const sz = dtSitzungen(dtAlle('PAXG', 15) || dtAlle('PAXG', 5), jetzt);
+      if (sz.asien && isFinite(sz.asien.h) && sz.jetzt !== 'asien')
+        L.push(['Asien-Hoch', sz.asien.h, '--warn', true], ['Asien-Tief', sz.asien.l, '--warn', true]);
+      if (sz.london && isFinite(sz.london.h) && sz.jetzt === 'newyork')
+        L.push(['London-Hoch', sz.london.h, '--ink-2', true], ['London-Tief', sz.london.l, '--ink-2', true]);
+    }
+  } else if (an){
     L.push(['48-Std.-Hoch', an.marke48, '--accent-2', true]);
     if (info.klasse === 'coin') L.push(['Alarm ab', an.marke48 + DT_MIN_UEBERHANG * an.atr24, '--accent', false]);
     L.push(['24-Std.-Tief', an.tief24, '--warn', true]);
@@ -9884,6 +10197,12 @@ function dtLinien(sym, an){
   return L.filter(x => x[1] != null && isFinite(x[1]) && x[1] > 0);
 }
 function dtFarbe(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+function dtZeitLabel(ms, tf){
+  const d = new Date(ms);
+  if (tf >= 1440) return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+  if (tf >= 60) return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}) + ' ' + String(d.getHours()).padStart(2, '0') + 'h';
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
 function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
   if (!cv) return;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -9894,7 +10213,7 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const W = r.width, H = r.height, M = {l: 4, r: 86, t: 10, b: 20};
   ctx.clearRect(0, 0, W, H);
-  const n = Math.min(alle.length, tf >= 240 ? 90 : (W < 500 ? 60 : 96));
+  const n = Math.min(alle.length, tf >= 10080 ? 60 : tf >= 240 ? 90 : (W < 500 ? 60 : 96));
   const a0 = alle.length - n, v = alle.slice(a0);
   let hi = -Infinity, lo = Infinity;
   for (const b of v){ hi = Math.max(hi, b[2]); lo = Math.min(lo, b[3]); }
@@ -9913,24 +10232,19 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
   const x = i => M.l + i * sw + sw / 2;
   const cGrid = dtFarbe('--grid'), cInk3 = dtFarbe('--ink-3'), cUp = dtFarbe('--long'), cDn = dtFarbe('--bad');
   ctx.font = '10px "JetBrains Mono",monospace'; ctx.textBaseline = 'middle';
-  // Gitter + Preisachse
   for (let g = 0; g <= 4; g++){
     const pr = lo + (hi - lo) * g / 4, yy = y(pr);
     ctx.strokeStyle = cGrid; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(M.l, yy); ctx.lineTo(W - M.r, yy); ctx.stroke();
     ctx.fillStyle = cInk3; ctx.fillText(num(pr), W - M.r + 4, yy);
   }
-  // Zeitachse: Tageswechsel
+  // Zeitachse: fuenf gleichmaessig verteilte Marken
   ctx.textBaseline = 'alphabetic';
-  let letzterTag = null;
-  for (let i = 0; i < n; i++){
-    const d = new Date(v[i][0]), tag = d.getDate();
-    if (tag !== letzterTag && (tf >= 240 ? d.getHours() < 4 : d.getHours() === 0)){
-      ctx.fillStyle = cInk3; ctx.fillText(d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}), x(i) - 12, H - 5);
-      ctx.strokeStyle = cGrid; ctx.beginPath(); ctx.moveTo(x(i), M.t); ctx.lineTo(x(i), H - M.b); ctx.stroke();
-    }
-    letzterTag = tag;
+  const schritt = Math.max(1, Math.floor(n / 5));
+  for (let i = schritt - 1; i < n - 2; i += schritt){
+    const lab = dtZeitLabel(v[i][0], tf);
+    ctx.strokeStyle = cGrid; ctx.beginPath(); ctx.moveTo(x(i), M.t); ctx.lineTo(x(i), H - M.b); ctx.stroke();
+    ctx.fillStyle = cInk3; ctx.fillText(lab, Math.max(M.l, x(i) - ctx.measureText(lab).width / 2), H - 5);
   }
-  // EMA 200
   if (emaReihe){
     ctx.strokeStyle = dtFarbe('--ink-2'); ctx.globalAlpha = .55; ctx.lineWidth = 1.4; ctx.beginPath();
     let auf = false;
@@ -9943,11 +10257,10 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
     const eEnde = emaReihe[a0 + n - 1];
     if (eEnde != null && eEnde <= hi && eEnde >= lo){
       ctx.fillStyle = dtFarbe('--ink-3'); ctx.font = '9.5px "JetBrains Mono",monospace'; ctx.textBaseline = 'bottom';
-      ctx.fillText(`EMA 200 (${tf >= 240 ? '4' : '1'} Std.)`, Math.max(M.l + 2, x(n - 1) - 104), y(eEnde) - 3);
+      ctx.fillText(`EMA 200 (${DT_TF_NAME[tf] || tf})`, Math.max(M.l + 2, x(n - 1) - 110), y(eEnde) - 3);
       ctx.textBaseline = 'alphabetic';
     }
   }
-  // Kerzen (die laufende blasser)
   for (let i = 0; i < n; i++){
     const [, o, h, l, c] = v[i];
     const col = c >= o ? cUp : cDn;
@@ -9959,7 +10272,6 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
     ctx.fillRect(x(i) - kb / 2, yo, kb, Math.max(1, yc - yo));
   }
   ctx.globalAlpha = 1;
-  // Linien mit Beschriftung rechts (ueberlappende auseinanderschieben)
   const marken = linien.filter(l => !rand.includes(l)).map(([lab, pr, col, gestr]) => ({lab, pr, col: dtFarbe(col), gestr, yy: y(pr)}));
   marken.sort((a, b) => a.yy - b.yy);
   for (let i = 0; i < marken.length; i++)
@@ -9974,21 +10286,18 @@ function dtCanvas(cv, alle, fertigN, linien, emaReihe, tf){
     ctx.fillStyle = mk.col; ctx.font = '9.5px "JetBrains Mono",monospace';
     ctx.fillText(mk.lab.slice(0, 13), W - M.r + 4, ty);
   }
-  // Ausserhalb liegende Marken als Pfeil am Rand
   ctx.font = '10px "JetBrains Mono",monospace';
   let oben = M.t + 8, unten = H - M.b - 8;
   for (const [lab, pr, col] of rand){
-    const auf = pr > hi; ctx.fillStyle = dtFarbe(col);
-    ctx.fillText(`${auf ? '↑' : '↓'} ${lab} ${num(pr)}`, M.l + 4, auf ? oben : unten);
-    if (auf) oben += 13; else unten -= 13;
+    const aufw = pr > hi; ctx.fillStyle = dtFarbe(col);
+    ctx.fillText(`${aufw ? '↑' : '↓'} ${lab} ${num(pr)}`, M.l + 4, aufw ? oben : unten);
+    if (aufw) oben += 13; else unten -= 13;
   }
-  // aktueller Kurs
   const last = v[v.length - 1][4], yl = y(last);
   ctx.fillStyle = dtFarbe('--ink'); ctx.fillRect(W - M.r + 1, yl - 8, M.r - 2, 16);
   ctx.fillStyle = dtFarbe('--bg'); ctx.font = '600 10px "JetBrains Mono",monospace';
   ctx.fillText(num(last), W - M.r + 4, yl);
 }
-/* Die Wahl-Leiste: Gold, deine Coins, offene Trades, dann die Coins am naechsten am Ausbruch. */
 function dtWahlListe(){
   const out = ['PAXG'];
   try { for (const p of ladePositionen()){ const m = muenzeVon(p.sym); if ((DT_FEST[m] || (DTW && DTW.analyse && DTW.analyse[m])) && !out.includes(m)) out.push(m); } } catch(e){}
@@ -10005,16 +10314,25 @@ function dtPunkt(sym){
   if (!a) return '';
   return a.status === 'ausbruch' ? 'aus' : a.status === 'nah' ? 'nah' : (a.status === 'unter_ema' || a.status === 'markt_zu') ? 'zu' : '';
 }
+/* Was fuer den gewaehlten Wert geladen werden muss: die Chart-Zeiteinheit, 1 Std. fuer die
+   Regel — und bei Gold alle Zeiteinheiten der Ampel plus Tag fuer die Tagesmarken. */
+function dtBenoetigt(sym){
+  const tfs = new Set([DTC.tf, 60]);
+  if (dtInfo(sym).klasse === 'gold') for (const t of [1, 5, 15, 240, 1440]) tfs.add(t);
+  return [...tfs];
+}
+function dtAllesLaden(sym, zwingen){ for (const t of dtBenoetigt(sym)) dtLaden(sym, t, zwingen); }
 function dtChartAufbau(){
   const box = $('dtchart'); if (!box) return;
-  if (!DTC.sym) DTC.sym = 'PAXG';
+  if (!DTC.sym){ DTC.sym = 'PAXG'; DTC.tf = DTC.tfJe.PAXG || 15; }
   const liste = dtWahlListe();
   box.innerHTML = `<h2>📈 Chart & Analyse</h2>
     <div class="chartbox">
       <div class="dtwahl" id="dtwahl">${liste.map(s => `<button class="dtw" data-dts="${esc(s)}" aria-pressed="${s === DTC.sym}">
         <span class="pu ${dtPunkt(s)}"></span>${esc(s === 'PAXG' ? 'Gold' : s)}</button>`).join('')}</div>
       <div class="chart-h"><span class="nm" id="dtname"></span><span class="px" id="dtpx">—</span></div>
-      <div class="tfbar">${[[60, '1 Std.'], [240, '4 Std.']].map(([t, l]) =>
+      <div class="dtspread" id="dtspread"></div>
+      <div class="tfbar">${DT_TFS.map(([t, l]) =>
         `<button class="tfb" data-dtf="${t}" aria-pressed="${t === DTC.tf}">${l}</button>`).join('')}
         <span class="chart-q" id="dtquelle" style="margin-left:auto;font-size:11px;color:var(--ink-3)"></span></div>
       <canvas id="dtcv" role="img" aria-label="Kerzenchart"></canvas>
@@ -10022,54 +10340,89 @@ function dtChartAufbau(){
     <div id="dtanalyse"></div>`;
   box.querySelectorAll('[data-dts]').forEach(b => b.addEventListener('click', () => dtWaehle(b.dataset.dts)));
   box.querySelectorAll('[data-dtf]').forEach(b => b.addEventListener('click', () => {
-    DTC.tf = Number(b.dataset.dtf);
+    DTC.tf = Number(b.dataset.dtf); DTC.tfJe[DTC.sym] = DTC.tf;
     box.querySelectorAll('[data-dtf]').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.dtf) === DTC.tf)));
-    dtLaden(DTC.sym, DTC.tf); dtLaden(DTC.sym, 60); dtChartZeichnen();
+    dtAllesLaden(DTC.sym); dtWsPruefen(); dtChartZeichnen();
   }));
-  dtLaden(DTC.sym, DTC.tf); if (DTC.tf !== 60) dtLaden(DTC.sym, 60);
+  dtAllesLaden(DTC.sym); dtWsPruefen();
   dtChartZeichnen();
 }
 function dtWaehle(sym){
   DTC.sym = sym;
+  DTC.tf = DTC.tfJe[sym] || (dtInfo(sym).klasse === 'gold' ? 15 : 60);
   document.querySelectorAll('#dtwahl [data-dts]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.dts === sym)));
-  dtLaden(sym, DTC.tf); if (DTC.tf !== 60) dtLaden(sym, 60);
+  document.querySelectorAll('#dtchart [data-dtf]').forEach(x => x.setAttribute('aria-pressed', String(Number(x.dataset.dtf) === DTC.tf)));
+  DTWS.tick = null;
+  dtAllesLaden(sym); dtWsPruefen();
   dtChartZeichnen();
 }
-function dtChartZeichnen(){
+/* ``nurChart``: bei Live-Ticks nur Chart, Kurs und Spread neu — die Analyse darunter
+   hoechstens alle 10 Sekunden, damit beim Lesen nichts springt. */
+function dtChartZeichnen(nurChart){
   const sym = DTC.sym; if (!sym || !$('dtcv')) return;
   const info = dtInfo(sym);
-  $('dtname').textContent = info.name + (sym === 'PAXG' ? ' · PAXG/USD' : ` · ${sym}/USD`);
+  $('dtname').textContent = info.name + ` · ${sym}/USD`;
   const d = DTC.daten.get(sym + '|' + DTC.tf), d1 = DTC.daten.get(sym + '|60');
-  if (!d || (!d.alle && !d.fehler)){ $('dtanalyse').innerHTML = `<p class="leer">Kurse werden von Kraken geladen …</p>`; return; }
+  if (!d || (!d.alle && !d.fehler)){ if (!nurChart) $('dtanalyse').innerHTML = `<p class="leer">Kurse werden von Kraken geladen …</p>`; return; }
   if (d.fehler){
     $('dtanalyse').innerHTML = `<div class="note-box bad"><span class="nt">Kraken nicht erreichbar</span>
       <p>${esc(d.fehler)} — neuer Versuch in 30 Sekunden.</p></div>`;
     return;
   }
-  // Die Regel rechnet IMMER auf 1-Std.-Kerzen — auch wenn der Chart 4 Std. zeigt.
+  // Die Ausbruchsregel rechnet IMMER auf 1-Std.-Kerzen — egal, welche Zeiteinheit der Chart zeigt.
   const btcOk = DTW ? DTW.btc_ueber_ema200 : null;
   const marktOk = info.klasse === 'coin' ? btcOk : null;
   const an = d1 && d1.fertig ? dtAnalyse(d1.fertig, marktOk) : null;
   const emaChart = dtEma(d.alle.map(x => x[4]), 200);
-  dtCanvas($('dtcv'), d.alle, d.fertig.length, dtLinien(sym, an), emaChart, DTC.tf);
-  const live = d.alle[d.alle.length - 1][4];
-  const tag = d1 && d1.alle && d1.alle.length > 24 ? d1.alle[d1.alle.length - 25][4] : null;
+  dtCanvas($('dtcv'), d.alle, d.fertig.length, dtLinien(sym, an, DTC.tf), emaChart, DTC.tf);
+  const tick = DTWS.tick;
+  const live = tick && isFinite(tick.last) && Date.now() - tick.zeit < 60000 ? tick.last : d.alle[d.alle.length - 1][4];
+  const dd = (d1 && d1.alle) || d.alle;
+  const tag = dd.length > 24 && (d1 && d1.alle) ? d1.alle[d1.alle.length - 25][4] : null;
   const px = $('dtpx');
   if (px){ px.textContent = num(live) + ' $'; px.className = 'px ' + (tag && live >= tag ? 'up' : tag ? 'dn' : ''); }
+  const sp = $('dtspread');
+  if (sp){
+    sp.innerHTML = tick && isFinite(tick.bid) && isFinite(tick.ask) && tick.ask > 0
+      ? `<span>Geld <b>${num(tick.bid)}</b></span><span>Brief <b>${num(tick.ask)}</b></span>
+         <span>Spread <b>${num(tick.ask - tick.bid, tick.ask >= 100 ? 2 : 4)} $</b> (${((tick.ask - tick.bid) / tick.ask * 100).toFixed(3).replace('.', ',')} %)</span>
+         <span class="live">● live · ${Math.max(0, Math.round((Date.now() - tick.zeit) / 1000))} s</span>`
+      : `<span style="color:var(--ink-3)">Geld/Brief: Verbindung zum Kraken-Websocket …</span>`;
+  }
   const q = $('dtquelle');
-  if (q) q.textContent = `Kraken live · ${new Date(d.zeit).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}${tag ? ' · 24 Std. ' + pct((live / tag - 1) * 100, 1) : ''}`;
+  if (q) q.textContent = `Kraken · ${new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}${tag ? ' · 24 Std. ' + pct((live / tag - 1) * 100, 1) : ''}`;
+  if (nurChart && Date.now() - DTC.analyseZeit < 10000) return;
+  if (nurChart && $('dtanalyse').querySelector('details[open]')) return;
+  if (nurChart && document.activeElement && document.activeElement.id === 'dtgeb') return;
+  DTC.analyseZeit = Date.now();
+  // Wer gerade in der Analyse liest, verliert beim Neuaufbau seine Scrollposition nicht:
+  // die Hoehe bleibt gleich, nur der Inhalt wechselt.
   $('dtanalyse').innerHTML = dtAnalyseHtml(sym, info, an, live);
+  const gi = $('dtgeb');
+  if (gi) gi.addEventListener('change', () => {
+    const v = parseFloat(String(gi.value).replace(',', '.'));
+    if (isFinite(v) && v >= 0 && v < 2){ try { localStorage.setItem('desk.dt.gebuehr', String(v)); } catch(e){} }
+    DTC.analyseZeit = 0; dtChartZeichnen();
+  });
 }
 function dtZeile(ok, text, wert){
   return `<li><span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'}</span><span>${text}</span><span class="v">${wert || ''}</span></li>`;
 }
 function dtAnalyseHtml(sym, info, an, live){
-  if (!an) return `<p class="leer">Zu wenig 1-Std.-Kerzen für die Analyse.</p>`;
+  let h = '';
+  if (info.klasse === 'gold') h += dtGoldPanel(live);
+  if (!an) return h + `<p class="leer">Zu wenig 1-Std.-Kerzen für die Ausbruchsanalyse.</p>`;
   const welle = DTW ? (DTW.welle || 0) : null, minW = (DTW && DTW.min_welle) || 12;
   const btc = DTW ? !!DTW.btc_ueber_ema200 : null;
   const schwelle = an.marke48 + DT_MIN_UEBERHANG * an.atr24;
   const risiko = (an.kurs - an.stop_bei_signal) / an.kurs * 100;
-  let h = `<div class="karte" style="margin-top:10px">
+  if (info.klasse === 'gold'){
+    h += `<details class="note-box klapp erkl" style="margin-top:10px"><summary><span class="nt">Ausbruchsregel (1 Std.) auf Gold — nur Paper</span>
+      <span class="klapp-hint">antippen</span></summary>
+      <p>Zustand: <b>${esc(DT_STATUS[an.status] || an.status)}</b>. 48-Std.-Hoch ${num(an.marke48)} $ (${an.abstand_pct > 0 ? 'noch ' + pct(an.abstand_pct, 2) : 'überschritten'}),
+      EMA 200 ${num(an.ema200)} $, 24-Std.-Tief ${num(an.tief24)} $. In der Studie 2022–24 klar negativ — darum kein Push.</p></details>`;
+  } else {
+    h += `<div class="karte" style="margin-top:10px">
     <div class="rowx"><span class="lab">Zustand (letzte volle Stunde)</span><span class="val"><span class="note ${an.status === 'ausbruch' ? 'gut' : an.status === 'nah' ? 'warn' : ''}">${esc(DT_STATUS[an.status] || an.status)}</span></span></div>
     <div class="rowx"><span class="lab">48-Std.-Hoch (Ausbruchsmarke)</span><span class="val">${num(an.marke48)} $ · ${an.abstand_pct > 0 ? 'noch ' + pct(an.abstand_pct, 2) : 'überschritten'}</span></div>
     <div class="rowx"><span class="lab">EMA 200 (1 Std.)</span><span class="val">${num(an.ema200)} $ · Kurs ${an.kurs > an.ema200 ? 'darüber' : 'darunter'}</span></div>
@@ -10077,6 +10430,7 @@ function dtAnalyseHtml(sym, info, an, live){
     <div class="rowx"><span class="lab">Stop bei einem Signal jetzt</span><span class="val">${num(an.stop_bei_signal)} $ (−${risiko.toFixed(1).replace('.', ',')} %)</span></div>
     <div class="rowx"><span class="lab">Ausstiegsmarke (24-Std.-Tief)</span><span class="val">${num(an.tief24)} $</span></div>
   </div>`;
+  }
   if (info.klasse === 'coin'){
     const c = [
       [welle != null && welle >= minW, `Welle: ≥ ${minW} von 24 Coins brechen aus`, welle != null ? `${welle}/24` : '—'],
@@ -10094,15 +10448,7 @@ function dtAnalyseHtml(sym, info, an, live){
         : `Noch kein Einstieg. Der Alarm kommt bei einem Stundenschluss über <b>${num(schwelle)} $</b>` +
           (welle != null && welle < minW ? `, sobald ${minW - welle} weitere Coins ausbrechen (Welle)` : '') +
           (btc === false ? ' und Bitcoin wieder über seiner EMA 200 steht' : '') + '.'}</p></div>`;
-  } else if (info.klasse === 'gold'){
-    h += `<h3>Gold — was das heißt</h3><div class="karte">
-      <p style="margin:0 0 6px;font-size:13px">Der Gold-<b>Tagesausbruch</b> (dieselbe Regel wie bei den Coins) ist
-      <b>kein Push</b>: in der Studie 2022–24 klar negativ (−0,43 R je Trade), nur 2025/26 positiv. Er läuft still als
-      Paper mit. ${an.signal ? '<b>Gerade ist ein solcher Ausbruch da</b> — als Paper, nicht als Einstieg.' : ''}</p>
-      <p style="margin:0;font-size:13px">Gold-<b>Alarme</b> kommen aus <b>S9</b> (4-Std.-Swing, unten): neues Setup, TP1, TP2,
-      Stop — mit 🧪. ${GD && GD.gold ? `S9 jetzt: <b>${esc(DT_ZUSTAND_TEXT[GD.gold.zustand] || GD.gold.zustand || '—')}</b>.` : ''}
-      ${GD && GD.kraken_faktor ? 'Die S9-Marken sind im Chart auf PAXG umgerechnet.' : ''}</p></div>`;
-  } else {
+  } else if (info.klasse !== 'gold'){
     h += `<div class="note-box" style="margin-top:10px"><span class="nt">Nur Orientierung</span>
       <p>${esc(info.name)} ist nicht Teil der Studie — keine Alarme. Die Marken zeigen, wo die Ausbruchsregel stehen würde.</p></div>`;
   }
@@ -10120,13 +10466,17 @@ function dtAnalyseHtml(sym, info, an, live){
   }
   return h;
 }
-/* Live nachfuehren, solange der Reiter offen ist — jede Minute neue Kerzen. */
+/* Takt: Websocket an/aus je nach Reiter, Historie nachladen (der Websocket haelt nur die
+   laufende Kerze — neue Kerzen der anderen Zeiteinheiten kommen per REST). */
 function dtTakt(){
+  dtWsPruefen();
   if (!$('p11') || $('p11').hidden || !DTC.sym) return;
-  dtLaden(DTC.sym, DTC.tf); if (DTC.tf !== 60) dtLaden(DTC.sym, 60);
+  dtAllesLaden(DTC.sym);
+  dtChartZeichnen(true);
 }
-setInterval(dtTakt, 60000);
-window.addEventListener('resize', () => { if ($('p11') && !$('p11').hidden) dtChartZeichnen(); });
+setInterval(dtTakt, 15000);
+window.addEventListener('resize', () => { if ($('p11') && !$('p11').hidden) dtChartZeichnen(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden){ if (DTWS.ws) try { DTWS.ws.close(); } catch(e){} } else dtTakt(); });
 
 function zeichneDaytrading(){
   try { dtChartAufbau(); } catch(e){ console.error(e); }

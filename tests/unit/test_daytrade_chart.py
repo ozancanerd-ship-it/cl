@@ -9,6 +9,14 @@ und erklaert darunter, was fuer einen Einstiegs-Alarm fehlt. Festgehalten wird:
 2. Gold steht als erster Wert in der Auswahl, mit Pax Gold (PAXG/USD) von Kraken.
 3. Die Alarm-Schwelle im Chart ist dieselbe wie im Lohnt-sich-Tor (0,25 ATR).
 4. Der Chart hat einen eigenen Container — der 5-Minuten-Neuaufbau zerreisst ihn nicht.
+
+Ozan, 12.10. 09:30: "Gold muss alle charts haben ... wenn sekunden sogar unterschiede machen
+... und dort anders analysieren". Dazu:
+
+5. Alle Kraken-Zeiteinheiten von 1 Min. bis Woche; Websocket-Kerzen werden richtig
+   eingepflegt (gleiche Zeit ersetzt, neue haengt an, alte wird ignoriert).
+6. Gold-Analyse: Sitzungs-Hochs/-Tiefs, Vortag, Tagesspanne, RSI (Wilder) und Trend rechnen
+   nachpruefbar richtig; US-Termine werden fuer Gold gefiltert.
 """
 
 from __future__ import annotations
@@ -133,7 +141,7 @@ def test_gold_zuerst_und_von_kraken() -> None:
     roh = VORLAGE.read_text(encoding="utf-8")
     assert "PAXG: {paar: 'PAXGUSD'" in roh
     assert "const out = ['PAXG'];" in _funktion(roh, "dtWahlListe")
-    assert "if (!DTC.sym) DTC.sym = 'PAXG';" in roh
+    assert "if (!DTC.sym){ DTC.sym = 'PAXG';" in roh
     assert "api.kraken.com/0/public/OHLC?pair=" in _funktion(roh, "dtLaden")
 
 
@@ -148,3 +156,168 @@ def test_chart_hat_eigenen_container_und_wird_beim_tabwechsel_gemessen() -> None
     assert '<div id="dtchart"></div>\n    <div id="daytrading"></div>' in roh
     assert "try { dtChartAufbau(); } catch(e){ console.error(e); }" in roh
     assert "if (i===11) requestAnimationFrame(" in roh
+
+
+def _node(skript: str):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node nicht vorhanden")
+    out = subprocess.run([node, "-e", skript], capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
+def _gold_js(*namen: str) -> str:
+    roh = VORLAGE.read_text(encoding="utf-8")
+    return "".join(_funktion(roh, n) for n in namen)
+
+
+def test_alle_zeiteinheiten_von_minute_bis_woche() -> None:
+    roh = VORLAGE.read_text(encoding="utf-8")
+    zeile = _konst(roh, "DT_TFS")
+    for tf in (1, 5, 15, 30, 60, 240, 1440, 10080):
+        assert f"[{tf}, " in zeile
+    assert "wss://ws.kraken.com/v2" in _funktion(roh, "dtWsPruefen")
+    assert "channel: 'ohlc'" in _funktion(roh, "dtWsSenden")
+    assert "channel: 'ticker'" in _funktion(roh, "dtWsSenden")
+
+
+def test_websocket_kerze_einpflegen() -> None:
+    js = (
+        _gold_js("dtKerzeEinpflegen")
+        + """
+    const a = [[0,1,2,0.5,1.5,10],[60000,1.5,2,1,1.8,5]];
+    const k = (t,c) => ({interval_begin: new Date(t).toISOString(), open:1.5, high:3, low:1, close:c, volume:7});
+    console.log(JSON.stringify([
+      dtKerzeEinpflegen(a, k(60000, 2.5)),
+      dtKerzeEinpflegen(a, k(120000, 2.7)),
+      dtKerzeEinpflegen(a, k(0, 9)),
+    ]));"""
+    )
+    ersetzt, neu, alt = _node(js)
+    assert len(ersetzt) == 2 and ersetzt[-1][4] == 2.5
+    assert len(neu) == 3 and neu[-1][0] == 120000
+    assert alt[0][4] == 1.5  # aeltere Kerze aendert nichts
+
+
+def test_sitzungen_und_tagesspanne() -> None:
+    # 15-Min.-Kerzen eines UTC-Tages: Asien 00-07 Spanne 100-110, London 07-13 Spanne 105-120
+    tag0 = 1_790_000_000_000 // 86_400_000 * 86_400_000
+    k = []
+    for i in range(0, 13 * 4):
+        t = tag0 + i * 15 * 60_000
+        stunde = i // 4
+        h, lo = (110, 100) if stunde < 7 else (120, 105)
+        k.append([t, lo + 1, h, lo, h - 1, 1])
+    tage = []
+    for d in range(20, 0, -1):
+        t = tag0 - d * 86_400_000
+        tage.append([t, 100, 100 + d, 100 - d, 100, 1])
+    tage.append([tag0, 101, 130, 95, 120, 1])
+    jetzt = tag0 + 12 * 3_600_000 + 5 * 60_000
+    js = (
+        _gold_js("dtSitzungVon", "dtSitzungen", "dtTagesSpanne")
+        + f"""
+    console.log(JSON.stringify([dtSitzungen({json.dumps(k)}, {jetzt}), dtTagesSpanne({json.dumps(tage)}, {jetzt})]));"""
+    )
+    sz, ts = _node(js)
+    assert sz["jetzt"] == "london"
+    assert sz["asien"] == {"h": 110, "l": 100}
+    assert sz["london"] == {"h": 120, "l": 105}
+    assert ts["vortagH"] == 101 and ts["vortagL"] == 99
+    assert ts["adr"] == pytest.approx(sum(2 * d for d in range(1, 15)) / 14)
+    assert ts["heute"] == 35 and ts["tagesOpen"] == 101
+
+
+def _rsi_wilder(werte: list[float], n: int = 14) -> float:
+    auf = sum(max(werte[i] - werte[i - 1], 0) for i in range(1, n + 1)) / n
+    ab = sum(max(werte[i - 1] - werte[i], 0) for i in range(1, n + 1)) / n
+    for i in range(n + 1, len(werte)):
+        d = werte[i] - werte[i - 1]
+        auf = (auf * (n - 1) + max(d, 0)) / n
+        ab = (ab * (n - 1) + max(-d, 0)) / n
+    return 100.0 if ab == 0 else 100 - 100 / (1 + auf / ab)
+
+
+def test_trend_und_rsi() -> None:
+    k = [[i, 0, 0, 0, 0] for i in range(80)]
+    k = [[x[0], c, c + 1, c - 1, c] for x, c in zip(k, _reihe_werte(), strict=False)]
+    js = (
+        _gold_js("dtEma", "dtRsi", "dtTrend")
+        + f"""
+    const k = {json.dumps(k)};
+    console.log(JSON.stringify([dtTrend(k), dtRsi(k.map(x => x[4]), 14),
+      dtTrend(k.map(x => [x[0], -x[1], -x[3], -x[2], -x[4]])), dtTrend(k.slice(0, 40))]));"""
+    )
+    t, rsi, t_ab, zu_kurz = _node(js)
+    assert rsi == pytest.approx(_rsi_wilder([x[4] for x in k]))
+    assert t["richtung"] == "auf" and t_ab["richtung"] == "ab"
+    assert 0 <= t["lage"] <= 100
+    assert zu_kurz is None
+
+
+def _reihe_werte() -> list[float]:
+    rnd = random.Random(7)
+    c, out = 100.0, []
+    for _ in range(80):
+        c += 0.4 + rnd.gauss(0, 0.3)
+        out.append(round(c, 4))
+    return out
+
+
+def test_gold_termine_nur_wichtige_us_daten() -> None:
+    jetzt = 1_790_000_000_000
+    iso = lambda m: datetime.fromtimestamp((jetzt + m * 60_000) / 1000, UTC).isoformat()  # noqa: E731
+    termine = [
+        {"titel": "CPI m/m", "land": "USD", "zeitpunkt": iso(90), "wirkung": "High"},
+        {"titel": "Retail Sales m/m", "land": "USD", "zeitpunkt": iso(30), "wirkung": "Medium"},
+        {"titel": "Bank Holiday", "land": "USD", "zeitpunkt": iso(10), "wirkung": "Holiday"},
+        {"titel": "GDP q/q", "land": "GBP", "zeitpunkt": iso(20), "wirkung": "High"},
+        {"titel": "FOMC Member Speaks", "land": "USD", "zeitpunkt": iso(40), "wirkung": "Low"},
+        {"titel": "NFP", "land": "USD", "zeitpunkt": iso(60 * 60), "wirkung": "High"},  # > 48 Std.
+    ]
+    roh = VORLAGE.read_text(encoding="utf-8")
+    js = (
+        _konst(roh, "DT_GOLD_TERMIN")
+        + _gold_js("dtGoldTermine")
+        + f"""
+    console.log(JSON.stringify(dtGoldTermine({json.dumps(termine)}, {jetzt}).map(t => t.titel)));"""
+    )
+    assert _node(js) == ["Retail Sales m/m", "CPI m/m"]
+
+
+def test_gold_hat_eigene_analyse_und_marken() -> None:
+    roh = VORLAGE.read_text(encoding="utf-8")
+    assert "if (info.klasse === 'gold') h += dtGoldPanel(live);" in roh
+    lin = _funktion(roh, "dtLinien")
+    for marke in ("Vortag-Hoch", "Asien-Hoch", "London-Hoch"):
+        assert marke in lin
+    panel = _funktion(roh, "dtGoldPanel")
+    for teil in (
+        "Zeiteinheiten-Ampel",
+        "Sitzungen & Tagesmarken",
+        "Was Gold gerade bewegt",
+        "kein Kaufsignal",
+    ):
+        assert teil in panel
+    # Websocket nur, solange der Reiter offen und die Seite sichtbar ist
+    assert "!document.hidden && $('p11') && !$('p11').hidden" in roh
+
+
+def test_kosten_je_zeiteinheit() -> None:
+    k1 = [[i * 60000, 100, 101, 100, 100.5, 1] for i in range(40)] + [
+        [i * 60000, 100, 100, 100, 100, 0] for i in range(40, 60)
+    ]
+    k60 = [[i * 3_600_000, 100, 110, 100, 105, 1] for i in range(60)]
+    js = (
+        _gold_js("dtKosten")
+        + f"""
+    console.log(JSON.stringify(dtKosten([[1, {json.dumps(k1)}], [60, {json.dumps(k60)}], [5, null]], 100, 0.01, 0.004)));"""
+    )
+    r = _node(js)
+    assert r["runde"] == pytest.approx(0.01 + 0.8)
+    eins, std = r["je"]
+    assert eins["tf"] == 1 and eins["spanne"] == pytest.approx(40 / 60)
+    assert eins["leer"] == pytest.approx(20 / 60 * 100)
+    assert eins["anteil"] == pytest.approx(0.81 / (40 / 60) * 100)
+    assert std["anteil"] == pytest.approx(8.1)
+    assert r["ab"] == 60  # erste Zeiteinheit mit Kosten <= 25 % der Bewegung
