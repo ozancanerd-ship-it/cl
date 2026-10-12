@@ -48,3 +48,21 @@ def test_glossar_fuehrt_beide_listen_zusammen() -> None:
 def test_kurz_karte_nennt_richtung() -> None:
     s = _s()
     assert s.count("o.richtung==='short'?'Short über':'Kaufen bei'") >= 3
+
+
+def test_einstiegs_rangliste_sortiert_beste_zuerst() -> None:
+    s = _s()
+    a = s.index("function einstiegsPunkte(x){")
+    b = s.index("function einstiegsRangHtml")
+    js = (
+        "const NOTE_RANG={'A+':6,'A':5,'A−':4,'B+':3,'B':2,'WATCH':1,'—':0};"
+        "const alarmReif=x=>x.ja; const crvVon=o=>o.crv;"
+        + s[a:b]
+        + "const hoch=einstiegsPunkte({w:{note:'A'},o:{crv:3,score:80,rs:80,warnungen:[]},ja:true,live:true}).punkte;"
+        "const tief=einstiegsPunkte({w:{note:'B'},o:{crv:2,score:45,rs:27,warnungen:['a','b','c','d']},ja:false,live:false}).punkte;"
+        "console.log(JSON.stringify([hoch,tief]));"
+    )
+    out = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout
+    hoch, tief = json.loads(out)
+    assert hoch > tief and 0 <= tief and hoch <= 100
+    assert "sicherText(()=>einstiegsRangHtml(amEinstieg))" in s

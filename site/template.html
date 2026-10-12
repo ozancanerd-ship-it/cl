@@ -8294,6 +8294,46 @@ function kaufAlarmLeiste(){
   </div>`;
 }
 
+/* Einstiegs-Rangliste (12.10.): "alle anzeigen, aber gerankt — was ist jetzt sofort am besten?"
+   Ein Punktwert 0–100 aus dem, was die App schon weiss: Note (bis 48), Alarm-Tor bestanden (20),
+   Chance-Risiko (bis 14), Scan-Score (bis 10), relative Staerke (bis 5), je Warnung −4 (max −12),
+   Kurs nur aus dem Scan −3. Kein neues Modell — nur eine sichtbare Reihenfolge. */
+function einstiegsPunkte(x){
+  const w = x.w || {}, o = x.o || {};
+  const teile = [];
+  let p = (NOTE_RANG[w.note] || 0) * 8; teile.push(`Note ${w.note || '—'} +${(NOTE_RANG[w.note] || 0) * 8}`);
+  if (alarmReif(x)){ p += 20; teile.push('Alarm-Tor ✓ +20'); }
+  const c = (typeof crvVon === 'function') ? crvVon(o) : null;
+  if (c != null){ const b = Math.round(Math.min(Math.max(c, 0), 4) / 4 * 14); p += b; teile.push(`CRV 1:${c.toFixed(1)} +${b}`); }
+  if (o.score != null){ const b = Math.round(Math.min(o.score, 100) / 10); p += b; teile.push(`Score +${b}`); }
+  if (o.rs != null){ const b = Math.round(Math.min(o.rs, 100) / 20); p += b; teile.push(`RS +${b}`); }
+  const wn = Math.min((o.warnungen || []).length, 3) * 4;
+  if (wn){ p -= wn; teile.push(`Warnungen −${wn}`); }
+  if (!x.live){ p -= 3; teile.push('Kurs nur aus Scan −3'); }
+  return {punkte: Math.max(0, Math.min(100, p)), teile};
+}
+function einstiegsRangHtml(liste){
+  if (!liste.length) return '';
+  const r = liste.map(x => ({x, ...einstiegsPunkte(x)})).sort((a, b) => b.punkte - a.punkte);
+  const zeilen = r.map(({x, punkte, teile}, i) => {
+    const w = x.w, o = x.o || {}, d = digits(w.einstieg), c = crvVon(o);
+    const ja = alarmReif(x);
+    return `<div class="ka-z" data-sym="${esc(w.instrument)}" style="cursor:pointer">
+      <div class="ka-k"><b>${i + 1}. ${esc(name(w.instrument))}</b>
+        <span class="mono">${x.lang ? 'KAUFEN' : 'SHORT'} · ${esc(w.note)}</span>
+        <span class="ka-t"><b>${punkte}</b>/100</span></div>
+      <div class="ka-s"><span>Einstieg ${num(w.einstieg, d)} · Stop ${num(w.stop, d)}${c != null ? ` · CRV 1:${c.toFixed(1)}` : ''}</span>
+        <span class="${ja ? 'up' : ''}" style="${ja ? '' : 'color:var(--warn)'}">${ja ? 'Alarm ✓' : 'kein Alarm'}</span></div>
+      <div class="ka-s" style="color:var(--ink-3);font-size:11.5px">${esc(teile.join(' · '))}</div>
+    </div>`;
+  }).join('');
+  return `<div class="ka"><div class="ka-h"><span class="nt">🏁 Wo jetzt einsteigen? Rangliste</span>
+      <span class="ka-zahl">${r.length} am Einstieg — bester oben</span></div>
+    ${zeilen}
+    <p class="ka-frei">Punkte = Note, Alarm-Tor, Chance-Risiko, Score, relative Stärke, minus Warnungen. Das ist eine Reihenfolge der Qualität, keine Gewinn-Prognose. Antippen öffnet den Wert; die vollständigen Karten stehen darunter.</p>
+  </div>`;
+}
+
 function zeichneAlarme(){
   // Dieselbe Quelle wie der Markt-Reiter — nicht dieselbe Rechnung noch einmal.
   const signale = [...rangLagen().values()];
@@ -8309,13 +8349,14 @@ function zeichneAlarme(){
      gehoert — und genau dafuer stand unten schon die Zusage "nur ab A−".
      Weggeworfen wird nichts: die schwaecheren stehen darunter, mit dem Grund. */
   const amEinstieg = amEinstiegListe();
-  const jetzt   = amEinstieg.filter(alarmReif);
-  const knapp   = amEinstieg.filter(x=>!alarmReif(x));
+  const nachPunkten = (a,b)=>einstiegsPunkte(b).punkte-einstiegsPunkte(a).punkte;
+  const jetzt   = amEinstieg.filter(alarmReif).sort(nachPunkten);
+  const knapp   = amEinstieg.filter(x=>!alarmReif(x)).sort(nachPunkten);
   const imTrade = signale.filter(x=>x.stufe==='im_trade'||x.stufe==='stop');
   const warten = tot ? [] : signale.filter(x=>x.stufe==='bald'||x.stufe==='beobachten');
   jetzt.forEach(benachrichtige);
 
-  let h = altersBanner() + stoerungsBanner() + sicherText(kaufAlarmLeiste) + pushBlock();
+  let h = altersBanner() + stoerungsBanner() + sicherText(kaufAlarmLeiste) + sicherText(()=>einstiegsRangHtml(amEinstieg)) + pushBlock();
   h += `<details class="mehr" style="margin-bottom:6px"><summary>Wie diese Seite funktioniert — Alarme = handeln, Markt = lesen</summary><div class="note-box" style="border-color:rgba(0,229,255,.28)">
     <span class="nt" style="color:var(--accent)">Hier wird gekauft</span>
     <p style="font-size:13.5px"><strong>Diese Seite ist die Handlungsliste.</strong> Was unter
