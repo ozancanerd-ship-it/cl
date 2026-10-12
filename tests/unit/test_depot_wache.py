@@ -727,17 +727,26 @@ def _nk_zeile(kurs: float, **plan_extra: float) -> dict:
     return z
 
 
-def _pos_nk() -> list[dict]:
-    return [{"sym": "SOLUSD", "menge": 6, "einstieg": 90.0, "plan": {"stop": 85.0, "quelle": "selbst"}}]
+def _pos_nk(gross: bool = True) -> list[dict]:
+    """SOL-Position (Stop 85) plus — wenn ``gross`` — ein grosses ETH-Depot, damit das
+    Risiko des Nachkaufs im Rahmen bleibt (6 SOL allein waeren das ganze Depot)."""
+    p = [{"sym": "SOLUSD", "menge": 6, "einstieg": 90.0, "plan": {"stop": 85.0, "quelle": "selbst"}}]
+    if gross:
+        p.append({"sym": "ETHUSD", "menge": 100, "einstieg": 900.0, "plan": {"stop": 990.0, "quelle": "selbst"}})
+    return p
+
+
+def _nk_scan(z: dict) -> dict:
+    return _scan(z, _zeile("ETHUSD", 1000.0))
 
 
 def test_nachkauf_zweistufig_vorlaeufig_dann_bestaetigt() -> None:
     gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
-    stand, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(101.0)), {}, {"SOLUSD": 99.0}, gut)
+    stand, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(101.0)), {}, {"SOLUSD": 99.0}, gut)
     assert [e.art for e in ev if e.art.startswith("nachkauf")] == ["nachkauf_vorlaeufig"]
     assert "noch nicht über der Marke" in next(e for e in ev if e.art.startswith("nachkauf")).text
     # Nach bestätigtem Stundenschluss über der Marke: bestätigter Hinweis mit Lage und Obergrenze.
-    _, ev2, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(102.0)), stand, {"SOLUSD": 101.5}, gut)
+    _, ev2, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(102.0)), stand, {"SOLUSD": 101.5}, gut)
     nk = [e for e in ev2 if e.art == "nachkauf"]
     assert len(nk) == 1
     assert "bestätigt" in nk[0].text and "Obergrenze: ca. 2 Stück" in nk[0].text
@@ -746,14 +755,14 @@ def test_nachkauf_zweistufig_vorlaeufig_dann_bestaetigt() -> None:
 
 def test_nachkauf_trendkonflikt_wird_gezeigt_und_bestaetigt_nichts() -> None:
     dagegen = {"SOLUSD": {"d1": "ab", "h4": "auf", "rsi_h1": 55.0}}
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, dagegen)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, dagegen)
     nk = [e for e in ev if e.art.startswith("nachkauf")]
     assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
     assert "Trend (D1/H4) steht dagegen" in nk[0].text and "Konflikt" in nk[0].text
 
 
 def test_nachkauf_nie_ohne_frische_daten_bestaetigt() -> None:
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(102.0)), {}, None, None)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(102.0)), {}, None, None)
     nk = [e for e in ev if e.art.startswith("nachkauf")]
     assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
     assert "keine frischen" in nk[0].text and "keine Daten" in nk[0].text
@@ -764,30 +773,120 @@ def test_nachkauf_nur_bei_gueltiger_these_und_crv() -> None:
     # Tor nicht bestanden → kein Nachkauf
     z = _nk_zeile(102.0)
     z["alarm"] = {"ja": False, "grund": "Note zu schwach"}
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z), {}, {"SOLUSD": 101.5}, gut)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(z), {}, {"SOLUSD": 101.5}, gut)
     assert [e for e in ev if e.art.startswith("nachkauf")] == []
     # Chance-Risiko vom jetzigen Kurs unter 2 (Ziel zu nah) → kein Hinterherlaufen
     z2 = _nk_zeile(108.0, tp2=111.0)
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z2), {}, {"SOLUSD": 107.5}, gut)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(z2), {}, {"SOLUSD": 107.5}, gut)
     assert [e for e in ev if e.art.startswith("nachkauf")] == []
     # Invalidierung gerissen → kein Nachkauf
     z3 = _nk_zeile(94.0)
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z3), {}, {"SOLUSD": 94.0}, gut)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(z3), {}, {"SOLUSD": 94.0}, gut)
     assert [e for e in ev if e.art.startswith("nachkauf")] == []
     # Gegenrichtung (Short-Setup bei Long-Position) → kein Nachkauf
     z4 = _nk_zeile(102.0)
     z4["richtung"] = "short"
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(z4), {}, {"SOLUSD": 101.5}, gut)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(z4), {}, {"SOLUSD": 101.5}, gut)
     assert [e for e in ev if e.art.startswith("nachkauf")] == []
 
 
 def test_nachkauf_vorlaeufig_wird_zurueckgenommen() -> None:
     gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
-    stand, _, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(101.0)), {}, {"SOLUSD": 99.0}, gut)
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(98.0)), stand, {"SOLUSD": 99.0}, gut)
+    stand, _, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(101.0)), {}, {"SOLUSD": 99.0}, gut)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(98.0)), stand, {"SOLUSD": 99.0}, gut)
     assert [e.art for e in ev if e.art.startswith("nachkauf")] == ["nachkauf_zurueck"]
 
 
 def test_stop_bleibt_direkt_ohne_jede_bestaetigung() -> None:
-    _, ev, _ = pruefe_depot(_pos_nk(), _scan(_nk_zeile(84.0)), {}, None, None)
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(84.0)), {}, None, None)
     assert ev[0].art == "stop"
+
+
+# --------------------------------------------------------------------------- Risiko / H4 / Neustart
+
+
+def test_nachkauf_ohne_risikospielraum_wird_nie_bestaetigt() -> None:
+    """Ein CRV >= 2 reicht nicht: ist die Position (fast) das ganze Depot, bleibt es vorläufig."""
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+    _, ev, _ = pruefe_depot(_pos_nk(gross=False), _scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, gut)
+    nk = [e for e in ev if e.art.startswith("nachkauf")]
+    assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
+    assert "Risiko der Position" in nk[0].text and "nicht bestätigt" in nk[0].text
+
+
+def test_nachkauf_summenrisiko_des_depots_wird_geprueft() -> None:
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+    pos = _pos_nk()
+    pos[1]["plan"]["stop"] = 700.0  # ETH-Stop weit weg: offenes Risiko ~30 % des Depots
+    _, ev, _ = pruefe_depot(pos, _nk_scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, gut)
+    nk = [e for e in ev if e.art.startswith("nachkauf")]
+    assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
+    assert "offene Stop-Risiko" in nk[0].text or "Risiko der Position" in nk[0].text
+
+
+def test_nachkauf_unvollstaendiges_depot_bestaetigt_nichts() -> None:
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+    pos = [*_pos_nk(), {"sym": "UNBEKANNT", "menge": 1.0}]
+    _, ev, _ = pruefe_depot(pos, _nk_scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, gut)
+    nk = [e for e in ev if e.art.startswith("nachkauf")]
+    assert [e.art for e in nk] == ["nachkauf_vorlaeufig"]
+    assert "unvollständig" in nk[0].text
+
+
+def test_fehlendes_h4_wird_als_einschraenkung_gezeigt() -> None:
+    aktie = {"SOLUSD": {"d1": "auf", "h4": None, "rsi_h1": 60.0}}
+    _, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(102.0)), {}, {"SOLUSD": 101.5}, aktie)
+    nk = next(e for e in ev if e.art.startswith("nachkauf"))
+    assert "Einschränkung: H4-Daten fehlen" in nk.text
+
+
+def test_zustand_bleibt_nach_neustart_und_erneutem_scan_konsistent() -> None:
+    """Stand wird als JSON gespeichert und neu geladen (Neustart): gleicher Scan = keine Wiederholung,
+    kein Sprung von vorläufig auf bestätigt ohne frischen Schluss, Rücknahme nur einmal."""
+    import json
+
+    gut = {"SOLUSD": {"d1": "auf", "h4": "auf", "rsi_h1": 60.0}}
+
+    def lauf(stand: dict, kurs: float, schluss: float | None) -> tuple[dict, list]:
+        stand = json.loads(json.dumps(stand))  # Neustart: nur das Gespeicherte lebt weiter
+        s = {"SOLUSD": schluss} if schluss is not None else None
+        st, ev, _ = pruefe_depot(_pos_nk(), _nk_scan(_nk_zeile(kurs)), stand, s, gut)
+        return st, [e.art for e in ev if e.art.startswith("nachkauf")]
+
+    st, a = lauf({}, 101.0, 99.0)
+    assert a == ["nachkauf_vorlaeufig"]
+    st, a = lauf(st, 101.0, 99.0)  # Neustart + gleicher Scan
+    assert a == []
+    st, a = lauf(st, 101.0, None)  # Stundendaten fehlen → weiter nicht bestätigt
+    assert a == []
+    st, a = lauf(st, 102.0, 101.5)  # frischer Schluss über der Marke → bestätigt
+    assert a == ["nachkauf"]
+    st, a = lauf(st, 102.0, 101.5)  # Neustart + erneuter Scan → keine zweite Bestätigung
+    assert a == []
+    st, a = lauf(st, 98.0, 101.5)  # Kurs fällt zurück: bestätigter Stand wird nicht als "zurück" gemeldet
+    assert "nachkauf" not in a
+
+
+def test_teilverkauf_vorlaeufig_bestaetigt_zurueck_ueber_neustarts() -> None:
+    import json
+
+    def lauf(stand: dict, kurs: float, schluss: float | None) -> tuple[dict, list[str]]:
+        stand = json.loads(json.dumps(stand))  # Neustart
+        s = {"SOLUSD": schluss} if schluss is not None else None
+        st, ev, _ = pruefe_depot(_pos_rahmen(), _scan(_zeile("SOLUSD", kurs)), stand, s)
+        return st, [e.marke for e in ev if e.art.startswith("ziel")]
+
+    st, a = lauf({}, 110.5, 108.0)
+    assert a == ["TP1-vorlaeufig"]
+    st, a = lauf(st, 110.5, 108.0)  # Neustart, gleiche Lage
+    assert a == []
+    st, a = lauf(st, 110.6, None)  # Stundendaten weg: keine Bestätigung
+    assert a == []
+    st, a = lauf(st, 104.0, 108.0)  # Rücknahme
+    assert a == ["TP1-zurueck"]
+    st, a = lauf(st, 104.0, 108.0)  # Neustart: Rücknahme nicht doppelt
+    assert a == []
+    st, a = lauf(st, 111.0, 110.4)  # frischer Schluss über Ziel → bestätigt
+    assert a == ["TP1"]
+    st, a = lauf(st, 111.0, 110.4)  # Neustart + erneuter Scan: kein zweiter Verkaufshinweis
+    assert a == []

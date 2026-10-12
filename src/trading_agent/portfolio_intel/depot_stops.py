@@ -421,6 +421,10 @@ def lage_zeile(
         teile.append("Trend D1/H4: keine Daten")
     else:
         t = f"Trend D1 {_TREND_TXT.get(d1, '—')}, H4 {_TREND_TXT.get(h4, '—')}"
+        if h4 is None:
+            t += " [Einschränkung: H4-Daten fehlen, nur D1 geprüft]"
+        elif d1 is None:
+            t += " [Einschränkung: D1-Daten fehlen, nur H4 geprüft]"
         dafuer = "auf" if lang else "ab"
         dagegen = "ab" if lang else "auf"
         if aktion == "nachkauf":
@@ -448,6 +452,71 @@ def lage_zeile(
 
 
 NACHKAUF_MIN_CRV = 2.0
+#: Risikogrenzen fuer einen Nachkauf (in % des gesamten Depotwerts, nach dem Nachkauf):
+#: Verlust der Position bis zu ihrem Stop, Summe aller offenen Stop-Risiken, Gewicht der Position.
+NACHKAUF_MAX_POS_RISIKO_PCT = 1.0
+NACHKAUF_MAX_PF_RISIKO_PCT = 3.0
+NACHKAUF_MAX_GEWICHT_PCT = 25.0
+
+
+def depot_risiko(
+    positionen: list[dict[str, Any]], idx: ScanIndex, alt_pos: dict[str, Any]
+) -> dict[str, Any]:
+    """Wert und offenes Stop-Risiko des Depots in EUR (nur Positionen auf Positions-Ebene, die
+    sich umrechnen lassen). ``vollstaendig`` ist False, wenn Positionen fehlen — dann gilt
+    die Risikopruefung als nicht belastbar."""
+    wert = risiko = 0.0
+    je: dict[str, tuple[float, float]] = {}
+    fehlt = 0
+    for pos in positionen:
+        if not isinstance(pos, dict) or not pos.get("sym") or ist_bar(pos):
+            continue
+        lg = lage_fuer(pos, idx)
+        m = _zahl(pos.get("menge"))
+        if lg.ebene != "position" or lg.kurs is None or not m:
+            fehlt += 1
+            continue
+        w = umrechnen(lg.kurs * m, lg.waehrung, "EUR", lg.eurusd)
+        plan = pos.get("plan") or {}
+        stp = (
+            _zahl(plan.get("stop")) if str(plan.get("ebene") or "position") == "position" else None
+        ) or _zahl((alt_pos.get(lg.key) or {}).get("stop"))
+        r = umrechnen(abs(lg.kurs - stp) * m, lg.waehrung, "EUR", lg.eurusd) if stp is not None else None
+        if w is None:
+            fehlt += 1
+            continue
+        wert += w
+        if r is None:
+            fehlt += 1  # ohne Stop ist das Risiko unbekannt
+            r = w  # vorsichtig: ganzer Wert gilt als gefaehrdet
+        risiko += r
+        je[lg.key] = (w, r)
+    return {"wert": wert, "risiko": risiko, "je": je, "vollstaendig": fehlt == 0}
+
+
+def nachkauf_risiko_grund(depot: dict[str, Any] | None, key: str, menge: float | None) -> str | None:
+    """None = Risiko im Rahmen. Sonst der Grund, warum NICHT bestaetigt wird."""
+    if not depot or not depot.get("wert") or not menge or menge <= 0:
+        return "Das Depotrisiko ist nicht prüfbar (Depotwert/Menge fehlt) — nicht bestätigt."
+    w, r = (depot.get("je") or {}).get(key, (None, None))
+    if w is None:
+        return "Das Depotrisiko ist nicht prüfbar (Position nicht umrechenbar) — nicht bestätigt."
+    if not depot.get("vollstaendig"):
+        return "Das Depotrisiko ist unvollständig (Positionen ohne Kurs, Stop oder Umrechnung) — nicht bestätigt."
+    f = 1 / 3  # Nachkauf = ein Drittel der Menge
+    # Nachkauf-Stueck zum jetzigen Kurs, Stop wie bisher.
+    zu_w, zu_r = w * f, r * f if r else 0.0
+    gesamt_w = depot["wert"] + zu_w
+    pos_r = (r + zu_r) / gesamt_w * 100
+    pf_r = (depot["risiko"] + zu_r) / gesamt_w * 100
+    gew = (w + zu_w) / gesamt_w * 100
+    if pos_r > NACHKAUF_MAX_POS_RISIKO_PCT:
+        return f"Das Risiko der Position wäre nach dem Nachkauf {pos_r:.1f} % des Depots (Grenze {NACHKAUF_MAX_POS_RISIKO_PCT:.0f} %) — nicht bestätigt.".replace(".", ",")
+    if pf_r > NACHKAUF_MAX_PF_RISIKO_PCT:
+        return f"Das gesamte offene Stop-Risiko wäre {pf_r:.1f} % des Depots (Grenze {NACHKAUF_MAX_PF_RISIKO_PCT:.0f} %) — nicht bestätigt.".replace(".", ",")
+    if gew > NACHKAUF_MAX_GEWICHT_PCT:
+        return f"Die Position hätte danach {gew:.0f} % Depotgewicht (Grenze {NACHKAUF_MAX_GEWICHT_PCT:.0f} %) — nicht bestätigt."
+    return None
 
 
 def _nachkauf(
@@ -461,6 +530,7 @@ def _nachkauf(
     z: str,
     wer: str,
     key: str,
+    depot: dict[str, Any] | None = None,
 ) -> list[Ereignis]:
     """Nachkauf-Hinweis fuer eine gehaltene Position — zweistufig, nie automatisch.
 
@@ -509,6 +579,7 @@ def _nachkauf(
     dagegen = "ab" if lang else "auf"
     konflikt = dagegen in (ktx.get("d1"), ktx.get("h4"))
     ok = None if close is None else ((close >= ein) if lang else (close <= ein))
+    risiko_grund = nachkauf_risiko_grund(depot, key, menge)
     crv = upside / risiko
     lage = lage_zeile(lang, kurs, ziel, stp, ktx, z, aktion="nachkauf")
     menge_satz = (
@@ -518,7 +589,7 @@ def _nachkauf(
         f"Das Setup gilt weiter (Alarm-Tor bestanden), Chance-Risiko vom jetzigen Kurs {crv:.1f} zu 1, "
         f"Stop/Invalidierung {_fmt(stp)}{z}, Ziel {_fmt(ziel)}{z}."
     )
-    if ok is True and not konflikt:
+    if ok is True and not konflikt and risiko_grund is None:
         if alt == "bestaetigt":
             return []
         zust[k] = "bestaetigt"
@@ -541,6 +612,8 @@ def _nachkauf(
     grund = (
         "Der Trend (D1/H4) steht dagegen — nicht bestätigt."
         if konflikt
+        else risiko_grund
+        if risiko_grund and ok is True
         else "Es liegen keine frischen, vollständigen Stundendaten vor — nicht bestätigt."
         if ok is None
         else "Der letzte abgeschlossene Stundenschluss liegt noch nicht über der Marke."
@@ -579,6 +652,7 @@ def pflegen(
     alt: dict[str, Any] | None,
     schluss: dict[str, float] | None = None,
     kontext: dict[str, dict[str, Any]] | None = None,
+    depot: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], list[Ereignis]]:
     """Neuer Stand fuer eine Position plus das, was zu melden ist.
 
@@ -926,7 +1000,7 @@ def pflegen(
 
     # 2c — Nachkauf-Hinweis (nur fuer die Position selbst, nicht fuer einen Basiswert).
     if lg.ebene == "position" and lang is not None:
-        ev.extend(_nachkauf(lg.row, bool(lang), kurs, close, (kontext or {}).get(inst), menge, st, z, wer, lg.key))
+        ev.extend(_nachkauf(lg.row, bool(lang), kurs, close, (kontext or {}).get(inst), menge, st, z, wer, lg.key, depot))
 
     # 3 — Stop setzen / nachziehen.
     kand = list(lg.kandidaten)
@@ -1027,6 +1101,7 @@ def pruefe_depot(
     neu_pos: dict[str, Any] = {}
     alle: list[Ereignis] = []
     mit_stop = ohne_kurs = 0
+    depot = depot_risiko(positionen, idx, alt_pos)
     for pos in positionen:
         if not isinstance(pos, dict) or not pos.get("sym") or ist_bar(pos):
             continue
@@ -1046,7 +1121,7 @@ def pruefe_depot(
                 for k, v in alt.items()
                 if k not in ("ausgestoppt", "stop", "gemeldet_stop", "quelle")
             }
-        st, ev = pflegen(pos, lg, alt, schluss, kontext)
+        st, ev = pflegen(pos, lg, alt, schluss, kontext, depot)
         st["menge"] = menge
         neu_pos[key] = st
         alle.extend(ev)
