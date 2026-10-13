@@ -1,0 +1,174 @@
+{
+ "daten": {
+  "coins": 24,
+  "von": 1781496000,
+  "bis": 1791849600,
+  "gepaarte_trades": 198,
+  "verworfen_je_variante": {
+   "V0": 25,
+   "V1": 11,
+   "V2": 36
+  }
+ },
+ "teilmengen": {
+  "alle": {
+   "V0": {
+    "n": 198,
+    "erwartung_R": 0.19999762583112965,
+    "profit_factor": 1.3431951280458627,
+    "trefferquote": 0.48484848484848486,
+    "max_drawdown_R": 27.509282722459787,
+    "mfe_mittel_R": 1.8102318933802777,
+    "abgegeben_anteil": 0.7107366232373324,
+    "n_mfe_ge_1R": 109,
+    "summe_R": 39.59952991456367
+   },
+   "V1": {
+    "n": 198,
+    "erwartung_R": 0.5738739295549687,
+    "profit_factor": 2.100008192206155,
+    "trefferquote": 0.4393939393939394,
+    "max_drawdown_R": 32.069325307275975,
+    "mfe_mittel_R": 2.977823633351149,
+    "abgegeben_anteil": 0.7826428935870169,
+    "n_mfe_ge_1R": 102,
+    "summe_R": 113.62703805188382
+   },
+   "V2": {
+    "n": 198,
+    "erwartung_R": 0.21266152780929568,
+    "profit_factor": 1.416380394013833,
+    "trefferquote": 0.4797979797979798,
+    "max_drawdown_R": 27.276005178049076,
+    "mfe_mittel_R": 1.6944448064968312,
+    "abgegeben_anteil": 0.6487972848631868,
+    "n_mfe_ge_1R": 102,
+    "summe_R": 42.10698250624054
+   }
+  },
+  "IS": {
+   "V0": {
+    "n": 113,
+    "erwartung_R": 0.3449008521959349,
+    "profit_factor": 1.6289206455762162,
+    "trefferquote": 0.5309734513274337,
+    "max_drawdown_R": 27.509282722459787,
+    "mfe_mittel_R": 2.0040567550673147,
+    "abgegeben_anteil": 0.7302975318128041,
+    "n_mfe_ge_1R": 68,
+    "summe_R": 38.97379629814065
+   },
+   "V1": {
+    "n": 113,
+    "erwartung_R": 0.9517629470210368,
+    "profit_factor": 2.9549731725310764,
+    "trefferquote": 0.48672566371681414,
+    "max_drawdown_R": 32.069325307275975,
+    "mfe_mittel_R": 3.59313429681426,
+    "abgegeben_anteil": 0.7768752866385896,
+    "n_mfe_ge_1R": 64,
+    "summe_R": 107.54921301337716
+   },
+   "V2": {
+    "n": 113,
+    "erwartung_R": 0.3570133424516927,
+    "profit_factor": 1.7395325775632822,
+    "trefferquote": 0.5309734513274337,
+    "max_drawdown_R": 27.276005178049076,
+    "mfe_mittel_R": 1.8728818357290855,
+    "abgegeben_anteil": 0.65450673719721,
+    "n_mfe_ge_1R": 64,
+    "summe_R": 40.34250769704128
+   }
+  },
+  "OOS": {
+   "V0": {
+    "n": 85,
+    "erwartung_R": 0.007361571957917883,
+    "profit_factor": 1.0117144477955424,
+    "trefferquote": 0.4235294117647059,
+    "max_drawdown_R": 20.306990677319213,
+    "mfe_mittel_R": 1.5525588419610399,
+    "abgegeben_anteil": 0.6782941407219159,
+    "n_mfe_ge_1R": 41,
+    "summe_R": 0.6257336164230201
+   },
+   "V1": {
+    "n": 85,
+    "erwartung_R": 0.0715038239824313,
+    "profit_factor": 1.125878154784841,
+    "trefferquote": 0.3764705882352941,
+    "max_drawdown_R": 15.11930514368033,
+    "mfe_mittel_R": 2.159822398394307,
+    "abgegeben_anteil": 0.7923567579212103,
+    "n_mfe_ge_1R": 38,
+    "summe_R": 6.077825038506661
+   },
+   "V2": {
+    "n": 85,
+    "erwartung_R": 0.02075852716705017,
+    "profit_factor": 1.0378846903086345,
+    "trefferquote": 0.4117647058823529,
+    "max_drawdown_R": 15.614363978471303,
+    "mfe_mittel_R": 1.4572285205763043,
+    "abgegeben_anteil": 0.6391813651427265,
+    "n_mfe_ge_1R": 38,
+    "summe_R": 1.7644748091992646
+   }
+  }
+ },
+ "zu_frueh": {
+  "V0": {
+   "verkaeufe": 380,
+   "zu_frueh_anteil": 0.7078947368421052,
+   "verpasst_mittel_R": 3.4982601116090053
+  },
+  "V1": {
+   "verkaeufe": 302,
+   "zu_frueh_anteil": 0.6059602649006622,
+   "verpasst_mittel_R": 2.4472539695043243
+  },
+  "V2": {
+   "verkaeufe": 404,
+   "zu_frueh_anteil": 0.6831683168316832,
+   "verpasst_mittel_R": 3.317482563775397
+  }
+ },
+ "walk_forward": [
+  {
+   "fenster": 1,
+   "n": 40,
+   "diff_V2_minus_V0": -0.005980874904298127
+  },
+  {
+   "fenster": 2,
+   "n": 39,
+   "diff_V2_minus_V0": 0.035094744493175054
+  },
+  {
+   "fenster": 3,
+   "n": 61,
+   "diff_V2_minus_V0": 0.02256994872612845
+  },
+  {
+   "fenster": 4,
+   "n": 58,
+   "diff_V2_minus_V0": 2.1132419329912123e-05
+  }
+ ],
+ "bootstrap_OOS_V2_minus_V0": [
+  -0.051944077221591826,
+  0.014827236430028477,
+  0.09999025264613712
+ ],
+ "diff_OOS_V2_minus_V0": 0.013396955209132286,
+ "entscheidung": {
+  "bedingungen": {
+   "1_OOS_erwartung_besser": true,
+   "2_bootstrap_q05_ueber_0": false,
+   "3_mind_3_von_4_fenstern": true,
+   "4_drawdown_nicht_groesser": true
+  },
+  "im_test_besser": false
+ }
+}

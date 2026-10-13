@@ -4550,6 +4550,78 @@ function stopsPflegen(bew){
 
 /* Die Liste oben im Depot. Sie ist die Handlungsanweisung an den Broker — ohne sie
    waere der schoenste nachgezogene Stop eine Zahl, die nur in dieser App existiert. */
+/* ============================ GEWINNSCHUTZ-URTEIL (Paper/Shadow-Hinweis)
+
+   Der Waechter bewertet jede Position im Plus waehrend der ganzen Haltedauer (Struktur, Ablehnung,
+   Momentum, Volumen, Trend D1/H4, Abgabe vom Hoechstgewinn) und legt das Urteil VERSIEGELT ab —
+   dasselbe Verfahren und derselbe Schluessel wie der Auto-Abgleich. Hier wird es geoeffnet und
+   angezeigt. Kein Auftrag, keine Order: ein Hinweis zum Pruefen. Fehlende Daten stehen als fehlend da. */
+let GSU = null;
+const GSU_URL = 'https://raw.githubusercontent.com/ozancanerd-ship-it/cl/main/data/repository_real/live/depot_urteil.siegel';
+async function oeffnenJS(text, geheimnis){
+  const roh = Uint8Array.from(atob(String(text).trim()), c => c.charCodeAt(0));
+  if (roh.length < 2 + 16 + 32 || roh[0] !== 0x76 || roh[1] !== 0x31) return null;
+  const key = new Uint8Array(await crypto.subtle.digest('SHA-256', _te.encode('depot-sync-v1|' + geheimnis)));
+  const kEnc = await _hmac(key, _te.encode('enc')), kMac = await _hmac(key, _te.encode('mac'));
+  const kenn = roh.slice(0,2), nonce = roh.slice(2,18), tag = roh.slice(18,50), geheim = roh.slice(50);
+  const soll = await _hmac(kMac, _cat(kenn, nonce, geheim));
+  if (soll.length !== tag.length || soll.some((b,i) => b !== tag[i])) return null;
+  const strom = [];
+  for (let z = 0; z < Math.ceil(geheim.length / 32); z++){
+    const ctr = new Uint8Array(8); new DataView(ctr.buffer).setBigUint64(0, BigInt(z));
+    strom.push(await _hmac(kEnc, _cat(nonce, ctr)));
+  }
+  const st = _cat(...strom);
+  return new TextDecoder().decode(geheim.map((b,i) => b ^ st[i]));
+}
+async function ladeUrteil(){
+  const c = syncCfg(); if (!c || !c.schluessel) return;
+  try {
+    const r = await fetch(GSU_URL + '?v=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) return;
+    const klar = await oeffnenJS(await r.text(), c.schluessel);
+    const neu = klar ? JSON.parse(klar) : null;
+    if (neu && JSON.stringify(neu) !== JSON.stringify(GSU)){ GSU = neu; try { zeichnePortfolio(); } catch(e){} }
+  } catch(e){}
+}
+const GS_WORT = {HOLD:'HOLD', PROFIT_PROTECTION:'PROFIT PROTECTION', PARTIAL_TAKE_PROFIT:'PARTIAL TAKE PROFIT', EXIT:'EXIT', UNBEWERTET:'nicht bewertet'};
+const GS_FARBE = {HOLD:'gut', PROFIT_PROTECTION:'warn', PARTIAL_TAKE_PROFIT:'warn', EXIT:'schlecht', UNBEWERTET:''};
+const GS_TREND = {auf:'aufwärts', ab:'abwärts', gemischt:'uneins'};
+function gewinnschutzKasten(){
+  if (!GSU || !Array.isArray(GSU.p) || !GSU.p.length) return '';
+  const alter = GSU.t ? Math.round((Date.now() - Date.parse(GSU.t)) / 60000) : null;
+  const pos = ladePositionen();
+  const karten = GSU.p.filter(r => r && r.urteil).map(r => {
+    const p = pos.find(x => x.sym === r.sym) || {};
+    const name = p.name || r.sym;
+    const sig = (r.signale || []).map(s => `<li>${esc(s.text)}</li>`).join('');
+    const st = (r.staerken || []).map(s => `<li>${esc(s)}</li>`).join('');
+    const fehlt = (r.fehlt || []).map(s => `<li>${esc(s)}</li>`).join('');
+    const vorl = r.vorlaeufig && r.vorlaeufig !== r.bestaetigt
+      ? `<p style="margin:4px 0 0;font-size:12.5px;color:var(--ink-3)">Neue Einschätzung <strong>${esc(GS_WORT[r.vorlaeufig]||r.vorlaeufig)}</strong> noch nicht bestätigt — sie gilt erst, wenn sie nach einem weiteren Stundenschluss unverändert bleibt.</p>` : '';
+    const zahl = (v, d=2) => v==null ? '—' : num(v, d);
+    return `<div class="karte ${GS_FARBE[r.urteil]||''}" style="margin-bottom:8px">
+      <h3>${esc(name)} · ${esc(GS_WORT[r.urteil]||r.urteil)}
+        <span style="float:right;font-weight:400;color:var(--ink-3);font-size:12.5px">bestätigt: ${esc(GS_WORT[r.bestaetigt]||r.bestaetigt||'HOLD')}</span></h3>
+      <div class="kpi" style="margin-top:6px">
+        <span>Gewinn <b>${r.gewinn_pct==null?'—':pctK(r.gewinn_pct)}</b></span>
+        <span>Höchstgewinn <b>${r.hoch_pct==null?'—':pctK(r.hoch_pct)}</b></span>
+        <span>zurück <b>${r.rueckgang_pct==null?'—':pctK(r.rueckgang_pct)}</b></span>
+        <span>Restpotenzial <b>${r.upside_pct==null?'—':pctK(r.upside_pct)}</b></span></div>
+      <p style="margin:6px 0 0;font-size:13px">Bias: D1 <strong>${esc(GS_TREND[(r.bias||{}).d1]||'fehlt')}</strong> · H4 <strong>${esc(GS_TREND[(r.bias||{}).h4]||'fehlt')}</strong>${r.zeitebene?` · Struktur auf ${esc(r.zeitebene)}`:''}</p>
+      <p style="margin:6px 0 0;font-size:14px"><strong>${esc(r.aktion||'')}</strong></p>
+      ${r.teil_menge!=null?`<div class="kpi" style="margin-top:6px"><span>Teilverkauf <b>${zahl(r.teil_menge, r.teil_menge<1?6:4)}</b></span><span>danach <b>${zahl(r.rest_menge, r.rest_menge<1?6:4)}</b></span></div>`:''}
+      ${sig?`<p style="margin:8px 0 2px;font-size:12.5px;color:var(--ink-3)">Schwächesignale</p><ul style="margin:0;padding-left:18px;font-size:13px">${sig}</ul>`:''}
+      ${st?`<p style="margin:8px 0 2px;font-size:12.5px;color:var(--ink-3)">Spricht fürs Halten</p><ul style="margin:0;padding-left:18px;font-size:13px">${st}</ul>`:''}
+      ${vorl}
+      <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-2)">${esc(r.neubewertung||'')}${r.trail_stop!=null?` Stop-Vorschlag: <strong>${zahl(r.trail_stop, 4)}</strong>.`:''}</p>
+      ${fehlt?`<details style="margin-top:6px;font-size:12.5px"><summary style="cursor:pointer;color:var(--ink-3)">Was fehlt</summary><ul style="margin:4px 0 0;padding-left:18px">${fehlt}</ul></details>`:''}
+    </div>`;
+  }).join('');
+  return `<h2>Gewinnschutz</h2>
+    <p style="margin:0 0 8px;font-size:12.5px;color:var(--ink-3)">Prüft jede Position im Plus laufend auf Struktur, Ablehnung, Momentum, Volumen und Trend — kein einzelnes Signal entscheidet, und ein hoher Gewinn allein ist kein Verkaufsgrund.
+      Hinweis zum Prüfen (Paper/Shadow, noch nicht als Vorteil belegt), kein Auftrag.${alter!=null?` Stand vor ${alter} Min.`:''}</p>${karten}`;
+}
 function stopKasten(geschehen, bew){
   const offen = bew.filter(b => {
     const p = stopPflege(b);
@@ -7186,6 +7258,7 @@ function zeichnePortfolio(){
 
     h += gesundheitKasten(stand);
     h += stopKasten(stopLauf, bew);
+    h += sicherText(gewinnschutzKasten);
 
     /* Die Handlungsliste ganz oben. Wer das Depot aufmacht, will nicht vierzehn Karten
        lesen, sondern wissen, ob heute etwas zu tun ist — und wenn ja, was und wie viel. */
@@ -11209,7 +11282,8 @@ function start(){
   ladeScan();
   // Der Scan wird alle zehn Minuten neu gebaut. Alle fuenf Minuten nachsehen kostet
   // nichts und erspart das manuelle Neuladen.
-  setInterval(()=>{ ladeScan(); }, 5*60*1000);
+  setInterval(()=>{ ladeScan(); ladeUrteil(); }, 5*60*1000);
+  ladeUrteil();
 
   // Den Service Worker bei jedem Start registrieren, nicht erst beim Anmelden. Ein
   // Geraet, das sich frueher einmal angemeldet hat, braucht ihn beim naechsten

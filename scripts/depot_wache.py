@@ -97,6 +97,9 @@ ART_TITEL = {
     "entwarnung": "früherer Stop-Alarm hinfällig — nicht deswegen verkaufen",
     "ueberdehnt": "deutlich im Plus und überdehnt — Rückschlags-Alarm statt Verkauf",
     "gewinn_rueckgang": "Gewinn fällt vom Hoch zurück — jetzt Teil verkaufen",
+    "gewinnschutz": "Gewinnschutz — Schwäche nimmt zu, Stop/Teilverkauf prüfen",
+    "gewinnschutz_teil": "Gewinnschutz — Teilgewinn mitnehmen prüfen",
+    "gewinnschutz_exit": "Gewinnschutz — Aufwärtsthese gebrochen, Ausstieg prüfen",
 }
 #: Diese Arten verlangen JETZT eine Entscheidung und bekommen die Klingel auch oeffentlich.
 DRINGEND = {
@@ -111,6 +114,8 @@ DRINGEND = {
     "zahlen_ko",
     "entwarnung",
     "gewinn_rueckgang",
+    "gewinnschutz_teil",
+    "gewinnschutz_exit",
 }
 #: Was die oeffentliche Klingel im Betreff sagt — die Handlung, nie der Wert.
 HANDLUNG = {
@@ -127,7 +132,44 @@ HANDLUNG = {
     "zahlen_ko": "PRÜFEN",
     "entwarnung": "ENTWARNUNG",
     "gewinn_rueckgang": "TEIL VERKAUFEN",
+    "gewinnschutz": "PRÜFEN",
+    "gewinnschutz_teil": "TEILVERKAUF PRÜFEN",
+    "gewinnschutz_exit": "AUSSTIEG PRÜFEN",
 }
+
+
+URTEIL = "data/repository_real/live/depot_urteil.siegel"
+
+
+def urteil_schreiben(pfad: str, stand: dict[str, Any], schluessel: bytes, jetzt: datetime) -> bool:
+    """Das aktuelle Gewinnschutz-Urteil je Position — VERSIEGELT (wie das Depot), damit die App es
+    mit ihrem Schluessel lesen kann, im oeffentlichen Repository aber nur Zeichensalat steht."""
+    pos = [
+        {"sym": v.get("sym"), "key": k, **(v.get("gs") or {}).get("anzeige", {})}
+        for k, v in (stand.get("positionen") or {}).items()
+        if (v.get("gs") or {}).get("anzeige")
+    ]
+    p = Path(pfad)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    def kern(liste: list[dict[str, Any]]) -> list[Any]:
+        return [
+            (a.get("sym"), a.get("urteil"), a.get("bestaetigt"), a.get("vorlaeufig"), [x.get("name") for x in a.get("signale") or []])
+            for a in liste
+        ]
+
+    if p.exists():  # inhaltlich unveraendert und juenger als eine Stunde ⇒ kein neuer Commit
+        try:
+            alt = oeffnen(p.read_text(encoding="utf-8"), schluessel)
+            if alt is not None:
+                d = json.loads(alt.decode("utf-8"))
+                alter = (jetzt - datetime.fromisoformat(d["t"])).total_seconds()
+                if kern(d.get("p") or []) == kern(json.loads(json.dumps(pos))) and 0 <= alter < 3600:
+                    return False
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    klar = json.dumps({"t": jetzt.isoformat(), "p": pos}, ensure_ascii=False)
+    p.write_text(versiegeln(klar.encode("utf-8"), schluessel) + "\n", encoding="utf-8")
+    return True
 
 
 def oeffentlicher_titel(neu: list[Ereignis]) -> str:
@@ -143,7 +185,7 @@ def oeffentlicher_titel(neu: list[Ereignis]) -> str:
         h = HANDLUNG.get(e.art)
         if h:
             zaehl[h] = zaehl.get(h, 0) + 1
-    reihenfolge = ["VERKAUFEN", "TEIL VERKAUFEN", "NACHKAUF PRÜFEN", "PRÜFEN", "ENTWARNUNG"]
+    reihenfolge = ["VERKAUFEN", "TEIL VERKAUFEN", "AUSSTIEG PRÜFEN", "TEILVERKAUF PRÜFEN", "NACHKAUF PRÜFEN", "PRÜFEN", "ENTWARNUNG"]
     teile = [f"{h} ({zaehl[h]})" if zaehl[h] > 1 else h for h in reihenfolge if h in zaehl]
     return "DEPOT · " + " · ".join(teile) if teile else "DEPOT · Meldung"
 
@@ -341,6 +383,28 @@ def schluesse_aus_ohlcv(bars: list[Any], jetzt: datetime, max_alter_s: float) ->
     return closes if all(c > 0 for c in closes[-3:]) else None
 
 
+def geschlossene_kerzen_kraken(kerzen: list[Any], intervall_s: int, jetzt_ts: float) -> list[tuple[float, float, float, float, float]] | None:
+    """(open, high, low, close, volume) der ABGESCHLOSSENEN Kerzen mit denselben Frische-Regeln
+    wie ``geschlossene_schluesse`` (Kraken-Zeilen: t, o, h, l, c, vwap, vol, n)."""
+    if geschlossene_schluesse(kerzen, intervall_s, jetzt_ts) is None:
+        return None
+    try:
+        return [(float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[6])) for k in kerzen[:-1]]
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def kerzen_aus_ohlcv(bars: list[Any], jetzt: datetime, max_alter_s: float) -> list[tuple[float, float, float, float, float]] | None:
+    """Wie ``schluesse_aus_ohlcv``, aber mit Open/High/Low/Volumen fuer die Strukturanalyse."""
+    if schluesse_aus_ohlcv(bars, jetzt, max_alter_s) is None:
+        return None
+    try:
+        bars = sorted(bars, key=lambda b: b.open_time)
+        return [(float(b.open), float(b.high), float(b.low), float(b.close), float(b.volume or 0.0)) for b in bars]
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 async def marktdaten(
     scan: dict[str, Any], positionen: list[dict[str, Any]], jetzt: datetime
 ) -> tuple[dict[str, float], dict[str, dict[str, Any]]]:
@@ -364,14 +428,18 @@ async def marktdaten(
     kontext: dict[str, dict[str, Any]] = {}
     jetzt_ts = jetzt.timestamp()
 
-    async def holen(c: Any, inst: str, minuten: int) -> list[float] | None:
+    async def holen(c: Any, inst: str, minuten: int) -> tuple[list[float], list[tuple[float, float, float, float, float]], float] | None:
         try:
             r = await c.get("https://api.kraken.com/0/public/OHLC", params={"pair": inst, "interval": minuten})
             d = r.json()
             if d.get("error"):
                 return None
             werte = [v for k, v in (d.get("result") or {}).items() if k != "last" and isinstance(v, list)]
-            return geschlossene_schluesse(werte[0], minuten * 60, jetzt_ts) if werte else None
+            if not werte:
+                return None
+            cl = geschlossene_schluesse(werte[0], minuten * 60, jetzt_ts)
+            kz = geschlossene_kerzen_kraken(werte[0], minuten * 60, jetzt_ts)
+            return (cl, kz, float(werte[0][-2][0])) if cl and kz else None
         except Exception:
             return None
         finally:
@@ -381,15 +449,20 @@ async def marktdaten(
         for inst in sorted(brauche):
             if not inst.endswith("USD"):
                 continue
-            h1 = await holen(c, inst, 60)
-            h4 = await holen(c, inst, 240)
-            d1 = await holen(c, inst, 1440)
+            r1 = await holen(c, inst, 60)
+            r4 = await holen(c, inst, 240)
+            rd = await holen(c, inst, 1440)
+            h1, h4, d1 = (r1[0] if r1 else None), (r4[0] if r4 else None), (rd[0] if rd else None)
             if h1:
                 schluss[inst] = h1[-1]
             kontext[inst] = {
                 "d1": trend_von(d1) if d1 else None,
                 "h4": trend_von(h4) if h4 else None,
                 "rsi_h1": rsi14(h1) if h1 else None,
+                # abgeschlossene Kerzen fuer den Gewinnschutz; fehlt eine Zeitebene, fehlt sie hier
+                "k": {"h1": r1[1] if r1 else None, "h4": r4[1] if r4 else None, "d1": rd[1] if rd else None},
+                # Zeitstempel der letzten abgeschlossenen Stundenkerze (Takt fuer die Bestaetigung)
+                "h1_ts": r1[2] if r1 else None,
             }
     # Aktien: Yahoo-Stundenkerzen, nur waehrend der Boersenzeit (sonst gibt es keine frische
     # Kerze). Yahoo liefert keine 4-Stunden-Kerzen — H4 bleibt hier ausdruecklich leer.
@@ -420,6 +493,12 @@ async def marktdaten(
                     "d1": trend_von(d1) if d1 else None,
                     "h4": None,
                     "rsi_h1": rsi14(h1) if h1 else None,
+                    "k": {
+                        "h1": kerzen_aus_ohlcv(h1b, jetzt, 2 * 3600 + 1800) if h1 else None,
+                        "h4": None,
+                        "d1": kerzen_aus_ohlcv(d1b, jetzt, 4 * 86400) if d1 else None,
+                    },
+                    "h1_ts": sorted(h1b, key=lambda b: b.open_time)[-1].open_time.timestamp() if h1 else None,
                 }
         finally:
             with contextlib.suppress(Exception):
@@ -674,7 +753,19 @@ def main() -> int:
         },
     )
     if not args.dry_run:
-        geschrieben = stand_sichern(args.stand, neuer_stand, schluessel)
+        urteil_ok = False
+        if sync_geheim:
+            urteil_ok = urteil_schreiben(URTEIL, neuer_stand, schluessel_aus(sync_geheim, SYNC_ZWECK), jetzt)
+        # Die Anzeige-Werte (Kurs-abhaengig) gehoeren nur in die Urteils-Datei, nicht in den Stand —
+        # sonst gaebe es bei jedem 5-Minuten-Lauf einen Commit.
+        rein = {
+            **neuer_stand,
+            "positionen": {
+                k: {**v, "gs": {a: b for a, b in (v.get("gs") or {}).items() if a != "anzeige"}} if v.get("gs") else v
+                for k, v in neuer_stand["positionen"].items()
+            },
+        }
+        geschrieben = stand_sichern(args.stand, rein, schluessel) or urteil_ok
         marker = Path(os.environ.get("GITHUB_OUTPUT", ""))
         if marker.name:
             with open(marker, "a", encoding="utf-8") as fh:

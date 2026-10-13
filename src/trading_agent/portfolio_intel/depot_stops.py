@@ -42,6 +42,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from trading_agent.portfolio_intel import gewinnschutz as gs_mod
 from trading_agent.refdata import zahlen as zahlen_ref
 
 #: Unter diesem Schritt lohnt das Nachziehen die Ordergebuehr nicht (wie in der App).
@@ -449,6 +450,112 @@ def lage_zeile(
     if stop is not None and kurs:
         teile.append(f"Stop {_fmt(stop)}{z} ({abs(kurs - stop) / kurs * 100:.1f} % entfernt)".replace(".", ","))
     return " Lage: " + "; ".join(teile) + ". Das ist ein Hinweis zum Prüfen, keine Pflicht."
+
+
+def _gewinnschutz(
+    lg: Lage,
+    pos: dict[str, Any],
+    st: dict[str, Any],
+    kontext: dict[str, Any] | None,
+    kurs: float,
+    lang: bool,
+    menge: float | None,
+    stop: float | None,
+    ziele: dict[str, Any],
+    erledigt: set[str],
+    z: str,
+    wer: str,
+) -> list[Ereignis]:
+    """Gewinnschutz fuer eine Position im Plus (Bausteine: ``gewinnschutz.py``).
+
+    Hier nur die Buchfuehrung: zweistufig und restart-fest im Stand ``st["gs"]``.
+    Ein Urteil ueber HOLD wird erst gemeldet, wenn es nach einem WEITEREN abgeschlossenen
+    Stundenschluss unveraendert gilt (kein Alarm aus einer einzelnen Kerze). Fehlen frische
+    Stundendaten, bleibt es beim bisherigen bestaetigten Stand — nie eine Bestaetigung aus
+    veralteten Daten. Abstufungen (schwaecher werdende Schwaeche) laufen ebenso verzoegert
+    und still; gemeldet wird nur die Verschlechterung. Der Stop-Alarm bleibt davon unberuehrt."""
+    ktx = kontext or {}
+    ein = _zahl(pos.get("einstieg"))
+    ziel_next = next((_zahl(ziele.get(m.lower())) for m in ("TP1", "TP2", "TP3") if m not in erledigt and _zahl(ziele.get(m.lower())) is not None), None)
+    plan_stop = stop if stop is not None else _zahl((pos.get("plan") or {}).get("stop"))
+    zt = (lg.zahlen or {}).get("tage")
+    bew = gs_mod.bewerte(
+        lang=lang,
+        kurs=kurs,
+        einstieg=ein,
+        hoch_gv_pct=_zahl(st.get("hoch_gv_pct")),
+        menge=menge,
+        stop=plan_stop,
+        ziel_next=ziel_next,
+        kerzen=ktx.get("k"),
+        trend={"d1": ktx.get("d1"), "h4": ktx.get("h4")},
+        zahlen_tage=zt if isinstance(zt, int) else None,
+        z=z,
+    )
+    gs = dict(st.get("gs") or {})
+    bar = ktx.get("h1_ts")
+    bar = float(bar) if isinstance(bar, int | float) else None
+    ev: list[Ereignis] = []
+    if bew.urteil == gs_mod.UNBEWERTET:
+        gs["anzeige"] = {**bew.als_dict(), "bestaetigt": gs.get("stufe", gs_mod.HOLD)}
+        st["gs"] = gs
+        return ev
+    gewinn_eur = None
+    if ein and menge:
+        roh = ((kurs - ein) if lang else (ein - kurs)) * menge
+        gewinn_eur = umrechnen(roh, lg.waehrung, "EUR", lg.eurusd)
+    neu = bew.urteil
+    best = str(gs.get("stufe") or gs_mod.HOLD)
+    if neu == best:
+        gs.pop("kand", None)
+        gs.pop("kand_ts", None)
+    elif bar is None:
+        pass  # keine frische Stundenkerze: weder bestaetigen noch zuruecksetzen
+    elif gs.get("kand") == neu and gs.get("kand_ts") is not None and bar > float(gs["kand_ts"]):
+        # nach einem weiteren Stundenschluss unveraendert ⇒ bestaetigt
+        hoeher = gs_mod.RANG[neu] > gs_mod.RANG[best]
+        gs["stufe"] = neu
+        gs.pop("kand", None)
+        gs.pop("kand_ts", None)
+        if neu == gs_mod.HOLD:
+            gs["zyklus"] = int(gs.get("zyklus") or 0) + 1
+        if hoeher:
+            titel = {
+                gs_mod.PROFIT_PROTECTION: "GEWINNSCHUTZ prüfen",
+                gs_mod.PARTIAL: "TEILGEWINN MITNEHMEN prüfen",
+                gs_mod.EXIT: "AUSSTIEG prüfen",
+            }[neu]
+            eur = f" (ca. {_fmt(gewinn_eur)} €)" if gewinn_eur is not None else ""
+            teile = [
+                f"{titel}: {lg.name} — Gewinn {_pct(bew.gewinn_pct or 0)}{eur}, Höchstgewinn {_pct(bew.hoch_pct or 0)}, davon {_pct(bew.rueckgang_pct or 0)} zurück.",
+                bew.aktion,
+                "Schwächesignale: " + (bew.begruendung or "—") + ".",
+            ]
+            if bew.upside_pct is not None:
+                teile.append(f"Restpotenzial bis zum nächsten Ziel ca. {_pct(bew.upside_pct)}.")
+            if bew.staerken:
+                teile.append("Dagegen spricht: " + "; ".join(bew.staerken) + ".")
+            bias = ", ".join(f"{k.upper()} {_TREND_TXT.get(v, 'fehlt')}" for k, v in bew.bias.items())
+            teile.append(f"Bias: {bias}.")
+            teile.append(bew.neubewertung)
+            if bew.fehlt:
+                teile.append("Fehlt: " + "; ".join(bew.fehlt) + ".")
+            teile.append("Ein Hinweis zum Prüfen, kein Auftrag — die Entscheidung bleibt bei dir.")
+            ev.append(
+                Ereignis(
+                    {gs_mod.PROFIT_PROTECTION: "gewinnschutz", gs_mod.PARTIAL: "gewinnschutz_teil", gs_mod.EXIT: "gewinnschutz_exit"}[neu],
+                    lg.key,
+                    wer,
+                    " ".join(teile),
+                    neu in (gs_mod.PARTIAL, gs_mod.EXIT),
+                    marke=f"GS-{neu}-{int(gs.get('zyklus') or 0)}",
+                )
+            )
+    else:
+        gs["kand"], gs["kand_ts"] = neu, bar  # erster Befund: vorlaeufig, wartet auf den naechsten Schluss
+    gs["anzeige"] = {**bew.als_dict(), "bestaetigt": gs.get("stufe", gs_mod.HOLD), "vorlaeufig": gs.get("kand")}
+    st["gs"] = gs
+    return ev
 
 
 NACHKAUF_MIN_CRV = 2.0
@@ -1002,6 +1109,10 @@ def pflegen(
     if lg.ebene == "position" and lang is not None:
         ev.extend(_nachkauf(lg.row, bool(lang), kurs, close, (kontext or {}).get(inst), menge, st, z, wer, lg.key, depot))
 
+    # 2d — Gewinnschutz (nur Position im Plus, nur Positions-Ebene).
+    if lg.ebene == "position" and lang is not None and not st.get("ausgestoppt"):
+        ev.extend(_gewinnschutz(lg, pos, st, kontext and kontext.get(inst), kurs, bool(lang), menge, _zahl(st.get("stop")), ziele, erledigt, z, wer))
+
     # 3 — Stop setzen / nachziehen.
     kand = list(lg.kandidaten)
     einstieg = _zahl(pos.get("einstieg")) if lg.ebene == "position" else None
@@ -1123,6 +1234,7 @@ def pruefe_depot(
             }
         st, ev = pflegen(pos, lg, alt, schluss, kontext, depot)
         st["menge"] = menge
+        st["sym"] = str(pos.get("sym") or "")
         neu_pos[key] = st
         alle.extend(ev)
         if st.get("stop") is not None:

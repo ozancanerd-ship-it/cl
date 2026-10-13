@@ -62,4 +62,41 @@ Weiterbewegung in R nach diesen Verkäufen.
 
 ## Ergebnis
 
-*(wird nach dem Lauf eingetragen)*
+Gerechnet am 13.10.2026 mit `scripts/gewinnschutz_replay.py` (Rohzahlen:
+`docs/GEWINNSCHUTZ-STUDIE-2026-10-ERGEBNIS.json`). Zeitraum 15.06.–13.10.2026, 24 Coins, **198 gepaarte
+Trades** (IS 113 / OOS 85; je Variante wurden 11–36 Trades verworfen, weil nach einem anderen Ausstieg
+ein anderer Folge-Einstieg entstand — verglichen werden nur Einstiege, die in allen Varianten vorkommen).
+
+| Teilmenge | Variante | Erwartung R | Profit Factor | größter Drawdown R | abgegeben (MFE ≥ 1R) |
+|---|---|---:|---:|---:|---:|
+| IS | V0 Bisher | +0,345 | 1,63 | 27,5 | 73 % |
+| IS | V2 + Gewinnschutz | +0,357 | 1,74 | 27,3 | 65 % |
+| IS | V1 nur Gewinnschutz | +0,952 | 2,95 | 32,1 | 78 % |
+| OOS | V0 Bisher | +0,007 | 1,01 | 20,3 | 68 % |
+| OOS | V2 + Gewinnschutz | +0,021 | 1,04 | 15,6 | 64 % |
+| OOS | V1 nur Gewinnschutz | +0,072 | 1,13 | 15,1 | 79 % |
+
+* **V2 − V0, OOS:** +0,013 R je Trade. Bootstrap 5 %/50 %/95 %: −0,052 / +0,015 / +0,100.
+* **Walk-Forward** (vier Fenster, V2 − V0): −0,006 · +0,035 · +0,023 · +0,00002.
+* **„Zu früh verkauft“** (Kurs stieg in den nächsten 5 Tagen noch ≥ 1R höher): V0 71 %, V2 68 %,
+  V1 61 % — in diesem Zeitraum liefen fast alle Ausbrüche weiter; die Zahl sagt mehr über das
+  Marktumfeld als über die Regeln.
+
+**Urteil nach der vorab festgelegten Regel: nicht erfüllt.**
+(1) OOS-Erwartung besser: ja · (2) Bootstrap-5-%-Quantil > 0: **nein** (−0,052) · (3) mindestens drei von
+vier Fenstern: ja · (4) Drawdown nicht größer: ja.
+
+**Einordnung (entscheidet nichts):**
+* V2 ist im Test nicht schlechter und gibt etwas weniger Buchgewinn ab, der Unterschied ist aber
+  **statistisch nicht von null zu unterscheiden**. Es gibt also keinen Beleg, dass der Baustein Geld
+  bringt — nur, dass er (hier) nicht schadet.
+* V1 (keine festen Ziele, nur Gewinnschutz + Trailing) sieht vor allem im IS stark aus, im OOS liegt
+  er nur bei +0,07 R. V1 war eine **Nebenvariante** der Vorab-Festlegung und zählt nicht für die
+  Entscheidung; ein Zufallstreffer in einem kurzen Aufwärts-Zeitraum ist nicht ausgeschlossen.
+* Grenzen: nur Long-Ausbrüche, ein Marktumfeld, H4 statt H1-Bestätigung (der Wächter bestätigt mit
+  H1-Schlüssen), keine Aktien, keine News/Makro (im Baustein als „fehlt“ ausgewiesen).
+
+**Entscheidung:** Der Baustein bleibt als **Paper-/Shadow-Hinweis** in der App und im Wächter
+(Alarmtext „Ein Hinweis zum Prüfen, kein Auftrag“). Die bisherige Regel `gewinn_rueckgang` und der
+Plan ⅓–⅓–⅓ bleiben unverändert aktiv. Schwellen wurden **nicht** nachgestellt. Nächster Schritt:
+Nachtest auf längerer Historie und über Wochen im Paper-Betrieb mit den echten Wächter-Urteilen.
