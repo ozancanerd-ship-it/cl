@@ -171,6 +171,7 @@
     "setup:NFLX:A:short": "2026-10-15T14:12:44.936109+00:00",
     "setup:NKE:A:short": "2026-10-15T13:46:46.018074+00:00",
     "setup:NKE:A_MINUS:short": "2026-10-15T15:13:24.003150+00:00",
+    "setup:NOW:B_PLUS:long": "2026-10-15T16:41:35.172456+00:00",
     "setup:NVO:A:short": "2026-10-13T17:15:49.987724+00:00",
     "setup:ONDOUSD:B:short": "2026-10-14T17:15:38.277311+00:00",
     "setup:ORCL:B_PLUS:long": "2026-10-13T18:43:44.119914+00:00",
@@ -194,6 +195,7 @@
     "setup:SEIUSD:B:short": "2026-10-15T04:54:44.147387+00:00",
     "setup:SHIBUSD:B:short": "2026-10-14T16:15:40.800071+00:00",
     "setup:SHIBUSD:B_PLUS:short": "2026-10-14T21:17:48.248375+00:00",
+    "setup:SHOP:A:long": "2026-10-15T16:41:35.172456+00:00",
     "setup:SKRUSD:B:short": "2026-10-14T17:00:42.888296+00:00",
     "setup:SLB:A:short": "2026-10-14T14:17:25.919348+00:00",
     "setup:SLB:A_PLUS:short": "2026-10-14T18:41:17.183233+00:00",
@@ -247,6 +249,7 @@
     "weg:AVGO:B": "2026-10-14T14:40:30.238403+00:00",
     "weg:AVGO:B_PLUS": "2026-10-15T14:47:00.897089+00:00",
     "weg:AXON:A": "2026-10-15T15:38:22.753751+00:00",
+    "weg:AXON:A_MINUS": "2026-10-15T16:41:35.172456+00:00",
     "weg:AXP:A_MINUS": "2026-10-15T14:47:00.897089+00:00",
     "weg:BAC:A": "2026-10-14T13:41:38.772557+00:00",
     "weg:BCHUSD:B": "2026-10-14T19:56:45.029125+00:00",
@@ -270,8 +273,9 @@
     "weg:CROUSD:B": "2026-10-15T06:07:16.026366+00:00",
     "weg:CRVUSD:B": "2026-10-15T12:27:28.028567+00:00",
     "weg:CRVUSD:B_PLUS": "2026-10-15T11:43:39.690430+00:00",
+    "weg:CRWD:A": "2026-10-15T16:41:35.172456+00:00",
     "weg:CVXUSD:B": "2026-10-15T16:14:50.482990+00:00",
-    "weg:DDOG:A_MINUS": "2026-10-14T13:41:38.772557+00:00",
+    "weg:DDOG:A_MINUS": "2026-10-15T16:41:35.172456+00:00",
     "weg:DDOG:B_PLUS": "2026-10-14T20:10:47.514376+00:00",
     "weg:DE:B_PLUS": "2026-10-14T16:15:40.800071+00:00",
     "weg:DOGEUSD:B": "2026-10-15T06:41:33.312095+00:00",
@@ -307,6 +311,7 @@
     "weg:MORPHOUSD:B": "2026-10-15T06:07:16.026366+00:00",
     "weg:MRK:A_MINUS": "2026-10-14T19:14:12.184737+00:00",
     "weg:MRK:B_PLUS": "2026-10-14T15:14:42.585319+00:00",
+    "weg:MSFT:A_MINUS": "2026-10-15T16:41:35.172456+00:00",
     "weg:NEE:A": "2026-10-14T14:17:25.919348+00:00",
     "weg:NEE:A_MINUS": "2026-10-14T15:39:36.779163+00:00",
     "weg:NEM:B_PLUS": "2026-10-15T14:47:00.897089+00:00",
@@ -355,15 +360,15 @@
     "weg:ZECUSD:B_PLUS": "2026-10-15T10:54:34.563440+00:00"
   },
   "instrumente": {
+    "AAPL": {
+      "richtung": "long",
+      "score": 45.4,
+      "urteil": "WATCH"
+    },
     "AAVEUSD": {
       "richtung": "short",
       "score": 78.5,
       "urteil": "WATCH"
-    },
-    "ABBV": {
-      "richtung": "long",
-      "score": 24.4,
-      "urteil": "NO_TRADE"
     },
     "ABNB": {
       "richtung": "long",
@@ -432,13 +437,13 @@
     },
     "AMD": {
       "richtung": "long",
-      "score": 62.2,
+      "score": 66.2,
       "urteil": "WATCH"
     },
     "AMGN": {
-      "richtung": "long",
-      "score": 54.9,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 10.0,
+      "urteil": "NO_TRADE"
     },
     "AMZN": {
       "richtung": "long",
@@ -447,7 +452,7 @@
     },
     "ANET": {
       "richtung": "long",
-      "score": 56.8,
+      "score": 56.7,
       "urteil": "WATCH"
     },
     "APEUSD": {
@@ -472,7 +477,7 @@
     },
     "ARM": {
       "richtung": "short",
-      "score": 58.7,
+      "score": 57.0,
       "urteil": "WATCH"
     },
     "ARUSD": {
@@ -522,12 +527,12 @@
     },
     "AXON": {
       "richtung": "short",
-      "score": 79.1,
-      "urteil": "A_MINUS"
+      "score": 77.0,
+      "urteil": "WATCH"
     },
     "AXP": {
       "richtung": "short",
-      "score": 65.6,
+      "score": 65.0,
       "urteil": "WATCH"
     },
     "BA": {
@@ -562,8 +567,8 @@
     },
     "BILLUSD": {
       "richtung": "short",
-      "score": 37.7,
-      "urteil": "WATCH"
+      "score": 34.6,
+      "urteil": "NO_TRADE"
     },
     "BKNG": {
       "richtung": "short",
@@ -582,7 +587,7 @@
     },
     "BMY": {
       "richtung": "short",
-      "score": 65.5,
+      "score": 66.7,
       "urteil": "WATCH"
     },
     "BNBUSD": {
@@ -607,7 +612,7 @@
     },
     "CAPUSD": {
       "richtung": "long",
-      "score": 43.1,
+      "score": 42.5,
       "urteil": "WATCH"
     },
     "CAT": {
@@ -636,9 +641,9 @@
       "urteil": "A"
     },
     "COIN": {
-      "richtung": "short",
-      "score": 57.8,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 0.9,
+      "urteil": "NO_TRADE"
     },
     "COP": {
       "richtung": null,
@@ -647,7 +652,7 @@
     },
     "COST": {
       "richtung": "long",
-      "score": 70.6,
+      "score": 68.7,
       "urteil": "B_PLUS"
     },
     "COWUSD": {
@@ -662,7 +667,7 @@
     },
     "CRM": {
       "richtung": "long",
-      "score": 59.8,
+      "score": 56.8,
       "urteil": "WATCH"
     },
     "CROUSD": {
@@ -677,8 +682,8 @@
     },
     "CRWD": {
       "richtung": "long",
-      "score": 85.7,
-      "urteil": "A"
+      "score": 86.8,
+      "urteil": "WATCH"
     },
     "CSCO": {
       "richtung": "long",
@@ -687,7 +692,7 @@
     },
     "CVX": {
       "richtung": "long",
-      "score": 46.1,
+      "score": 45.9,
       "urteil": "WATCH"
     },
     "CVXUSD": {
@@ -702,13 +707,13 @@
     },
     "DCRUSD": {
       "richtung": "long",
-      "score": 48.5,
+      "score": 49.9,
       "urteil": "WATCH"
     },
     "DDOG": {
       "richtung": "long",
       "score": 80.6,
-      "urteil": "A_MINUS"
+      "urteil": "WATCH"
     },
     "DE": {
       "richtung": "long",
@@ -729,6 +734,11 @@
       "richtung": "short",
       "score": 45.9,
       "urteil": "WATCH"
+    },
+    "DOGUSD": {
+      "richtung": null,
+      "score": 6.3,
+      "urteil": "NO_TRADE"
     },
     "DOTUSD": {
       "richtung": "short",
@@ -757,7 +767,7 @@
     },
     "EOG": {
       "richtung": "long",
-      "score": 49.0,
+      "score": 47.0,
       "urteil": "WATCH"
     },
     "ETCUSD": {
@@ -817,7 +827,7 @@
     },
     "GE": {
       "richtung": "short",
-      "score": 74.8,
+      "score": 74.7,
       "urteil": "A"
     },
     "GILD": {
@@ -847,7 +857,7 @@
     },
     "GS": {
       "richtung": "short",
-      "score": 72.6,
+      "score": 72.2,
       "urteil": "WATCH"
     },
     "HBARUSD": {
@@ -877,7 +887,7 @@
     },
     "IBM": {
       "richtung": "long",
-      "score": 65.2,
+      "score": 68.9,
       "urteil": "WATCH"
     },
     "ICNTUSD": {
@@ -900,11 +910,6 @@
       "score": 0.0,
       "urteil": "NO_TRADE"
     },
-    "INTU": {
-      "richtung": "short",
-      "score": 85.1,
-      "urteil": "WATCH"
-    },
     "IPUSD": {
       "richtung": "short",
       "score": 45.0,
@@ -922,7 +927,7 @@
     },
     "JNJ": {
       "richtung": "long",
-      "score": 66.5,
+      "score": 65.6,
       "urteil": "WATCH"
     },
     "JPM": {
@@ -947,7 +952,7 @@
     },
     "KLAC": {
       "richtung": "short",
-      "score": 66.4,
+      "score": 63.7,
       "urteil": "WATCH"
     },
     "KMNOUSD": {
@@ -970,11 +975,6 @@
       "score": 41.0,
       "urteil": "WATCH"
     },
-    "KTAUSD": {
-      "richtung": null,
-      "score": 4.5,
-      "urteil": "NO_TRADE"
-    },
     "LDOUSD": {
       "richtung": null,
       "score": 4.6,
@@ -992,13 +992,13 @@
     },
     "LLY": {
       "richtung": "long",
-      "score": 58.8,
+      "score": 57.6,
       "urteil": "WATCH"
     },
     "LMT": {
       "richtung": "short",
-      "score": 73.0,
-      "urteil": "B"
+      "score": 78.0,
+      "urteil": "A"
     },
     "LOW": {
       "richtung": "short",
@@ -1067,7 +1067,7 @@
     },
     "MINAUSD": {
       "richtung": "short",
-      "score": 55.5,
+      "score": 55.0,
       "urteil": "WATCH"
     },
     "MNTUSD": {
@@ -1102,17 +1102,17 @@
     },
     "MSFT": {
       "richtung": "long",
-      "score": 65.6,
-      "urteil": "A_MINUS"
+      "score": 70.6,
+      "urteil": "WATCH"
     },
     "MSTR": {
       "richtung": "short",
-      "score": 41.9,
+      "score": 46.7,
       "urteil": "WATCH"
     },
     "MU": {
       "richtung": "short",
-      "score": 64.9,
+      "score": 63.1,
       "urteil": "WATCH"
     },
     "NANOUSD": {
@@ -1122,13 +1122,13 @@
     },
     "NEARUSD": {
       "richtung": "short",
-      "score": 48.5,
+      "score": 46.6,
       "urteil": "WATCH"
     },
     "NEE": {
       "richtung": "short",
       "score": 72.4,
-      "urteil": "A"
+      "urteil": "B_PLUS"
     },
     "NEM": {
       "richtung": null,
@@ -1168,7 +1168,7 @@
     "NOW": {
       "richtung": "long",
       "score": 66.9,
-      "urteil": "WATCH"
+      "urteil": "B_PLUS"
     },
     "NPCUSD": {
       "richtung": "short",
@@ -1177,12 +1177,12 @@
     },
     "NVDA": {
       "richtung": "short",
-      "score": 65.0,
+      "score": 58.3,
       "urteil": "WATCH"
     },
     "NVO": {
       "richtung": "short",
-      "score": 84.0,
+      "score": 84.6,
       "urteil": "WATCH"
     },
     "ONDOUSD": {
@@ -1212,7 +1212,7 @@
     },
     "PANW": {
       "richtung": "long",
-      "score": 76.5,
+      "score": 81.5,
       "urteil": "WATCH"
     },
     "PAXGUSD": {
@@ -1222,7 +1222,7 @@
     },
     "PEAQUSD": {
       "richtung": "short",
-      "score": 45.1,
+      "score": 44.5,
       "urteil": "WATCH"
     },
     "PENDLEUSD": {
@@ -1232,13 +1232,13 @@
     },
     "PENGUUSD": {
       "richtung": "short",
-      "score": 50.0,
+      "score": 53.7,
       "urteil": "WATCH"
     },
     "PEP": {
       "richtung": "short",
       "score": 67.9,
-      "urteil": "A_MINUS"
+      "urteil": "B_PLUS"
     },
     "PEPEUSD": {
       "richtung": null,
@@ -1252,17 +1252,17 @@
     },
     "PG": {
       "richtung": "long",
-      "score": 62.7,
+      "score": 62.8,
       "urteil": "B_PLUS"
     },
     "PLTR": {
-      "richtung": "short",
-      "score": 66.9,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 10.0,
+      "urteil": "NO_TRADE"
     },
     "PLUMEUSD": {
       "richtung": "short",
-      "score": 28.7,
+      "score": 23.0,
       "urteil": "WATCH"
     },
     "POLUSD": {
@@ -1284,11 +1284,6 @@
       "richtung": null,
       "score": 4.7,
       "urteil": "NO_TRADE"
-    },
-    "PYPL": {
-      "richtung": "long",
-      "score": 47.5,
-      "urteil": "WATCH"
     },
     "PYTHUSD": {
       "richtung": null,
@@ -1352,17 +1347,17 @@
     },
     "SBUX": {
       "richtung": "short",
-      "score": 66.7,
+      "score": 71.7,
       "urteil": "WATCH"
     },
     "SCHW": {
       "richtung": "short",
-      "score": 83.1,
+      "score": 81.6,
       "urteil": "WATCH"
     },
     "SEIUSD": {
       "richtung": "short",
-      "score": 48.9,
+      "score": 47.3,
       "urteil": "WATCH"
     },
     "SENTUSD": {
@@ -1378,11 +1373,11 @@
     "SHOP": {
       "richtung": "long",
       "score": 72.6,
-      "urteil": "WATCH"
+      "urteil": "A"
     },
     "SHXUSD": {
       "richtung": "short",
-      "score": 34.5,
+      "score": 34.9,
       "urteil": "WATCH"
     },
     "SKRUSD": {
@@ -1397,17 +1392,17 @@
     },
     "SLB": {
       "richtung": "short",
-      "score": 86.1,
+      "score": 84.2,
       "urteil": "A"
     },
     "SMCI": {
       "richtung": "short",
-      "score": 59.1,
+      "score": 59.6,
       "urteil": "WATCH"
     },
     "SNOW": {
       "richtung": "long",
-      "score": 65.8,
+      "score": 63.8,
       "urteil": "WATCH"
     },
     "SOLUSD": {
@@ -1422,7 +1417,7 @@
     },
     "SPXUSD": {
       "richtung": "short",
-      "score": 50.3,
+      "score": 51.3,
       "urteil": "WATCH"
     },
     "STORJUSD": {
@@ -1442,7 +1437,7 @@
     },
     "SUIUSD": {
       "richtung": "short",
-      "score": 51.3,
+      "score": 44.3,
       "urteil": "WATCH"
     },
     "SUPERUSD": {
@@ -1467,7 +1462,7 @@
     },
     "T": {
       "richtung": "short",
-      "score": 71.1,
+      "score": 71.2,
       "urteil": "WATCH"
     },
     "TAOUSD": {
@@ -1492,7 +1487,7 @@
     },
     "TMUS": {
       "richtung": "long",
-      "score": 60.4,
+      "score": 52.7,
       "urteil": "WATCH"
     },
     "TONUSD": {
@@ -1507,7 +1502,7 @@
     },
     "TRUMPUSD": {
       "richtung": "short",
-      "score": 41.0,
+      "score": 47.0,
       "urteil": "WATCH"
     },
     "TRXUSD": {
@@ -1518,12 +1513,12 @@
     "TSLA": {
       "richtung": "short",
       "score": 70.6,
-      "urteil": "B_PLUS"
+      "urteil": "B"
     },
     "TSM": {
       "richtung": "long",
       "score": 60.1,
-      "urteil": "B"
+      "urteil": "B_PLUS"
     },
     "TXN": {
       "richtung": null,
@@ -1542,7 +1537,7 @@
     },
     "UMXMUSD": {
       "richtung": "short",
-      "score": 22.5,
+      "score": 24.9,
       "urteil": "WATCH"
     },
     "UNH": {
@@ -1557,8 +1552,8 @@
     },
     "UNP": {
       "richtung": "long",
-      "score": 66.3,
-      "urteil": "B_PLUS"
+      "score": 60.5,
+      "urteil": "WATCH"
     },
     "UPS": {
       "richtung": "short",
@@ -1597,7 +1592,7 @@
     },
     "VRTX": {
       "richtung": "long",
-      "score": 72.1,
+      "score": 72.0,
       "urteil": "A_MINUS"
     },
     "VVVUSD": {
@@ -1667,7 +1662,7 @@
     },
     "XOM": {
       "richtung": "long",
-      "score": 40.4,
+      "score": 39.2,
       "urteil": "WATCH"
     },
     "XPLUSD": {
@@ -1677,17 +1672,12 @@
     },
     "XRPUSD": {
       "richtung": "short",
-      "score": 50.0,
+      "score": 50.4,
       "urteil": "WATCH"
     },
     "XTZUSD": {
       "richtung": null,
       "score": 4.9,
-      "urteil": "NO_TRADE"
-    },
-    "XYZ": {
-      "richtung": null,
-      "score": 5.4,
       "urteil": "NO_TRADE"
     },
     "ZECUSD": {
@@ -2442,6 +2432,6 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "LOW",
-  "stand": "2026-10-15T16:25:34.501481+00:00",
+  "stand": "2026-10-15T16:41:35.172456+00:00",
   "stumme_klassen": []
 }
