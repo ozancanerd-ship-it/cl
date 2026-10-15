@@ -13,6 +13,7 @@
     "schub:AUTUSD:6": "2026-10-15T04:54:44.147387+00:00",
     "schub:AVAXUSD:5": "2026-10-14T20:10:47.514376+00:00",
     "schub:BA:7": "2026-10-13T20:42:12.992111+00:00",
+    "schub:BCHUSD:5": "2026-10-15T19:55:40.649455+00:00",
     "schub:BCHUSD:7": "2026-10-14T23:42:28.843253+00:00",
     "schub:BNBUSD:6": "2026-10-15T12:18:05.775912+00:00",
     "schub:BTCUSD:6": "2026-10-14T18:03:31.314971+00:00",
@@ -79,7 +80,6 @@
     "setup:AMGN:B_PLUS:long": "2026-10-14T16:15:40.800071+00:00",
     "setup:AMZN:B_PLUS:long": "2026-10-15T15:13:24.003150+00:00",
     "setup:ANET:A:long": "2026-10-14T14:17:25.919348+00:00",
-    "setup:ANET:A_MINUS:long": "2026-10-13T19:54:08.662027+00:00",
     "setup:ANET:B:long": "2026-10-14T16:15:40.800071+00:00",
     "setup:ATOMUSD:B:short": "2026-10-15T05:27:48.585091+00:00",
     "setup:AUSD:A_MINUS:long": "2026-10-15T17:58:24.368821+00:00",
@@ -275,7 +275,7 @@
     "weg:BMY:A": "2026-10-14T16:15:40.800071+00:00",
     "weg:BMY:B_PLUS": "2026-10-15T13:46:46.018074+00:00",
     "weg:BNBUSD:B": "2026-10-15T12:59:57.943727+00:00",
-    "weg:BNBUSD:B_PLUS": "2026-10-14T16:40:56.757432+00:00",
+    "weg:BNBUSD:B_PLUS": "2026-10-15T19:55:40.649455+00:00",
     "weg:BONKUSD:B": "2026-10-14T16:51:41.779241+00:00",
     "weg:BONKUSD:B_PLUS": "2026-10-14T14:49:47.072222+00:00",
     "weg:CCUSD:B_PLUS": "2026-10-14T02:54:23.426840+00:00",
@@ -303,6 +303,7 @@
     "weg:GS:A_MINUS": "2026-10-15T14:12:44.936109+00:00",
     "weg:HBARUSD:B": "2026-10-15T19:22:10.286894+00:00",
     "weg:HBARUSD:B_PLUS": "2026-10-14T15:39:36.779163+00:00",
+    "weg:HYPEUSD:A_MINUS": "2026-10-15T19:55:40.649455+00:00",
     "weg:HYPEUSD:B": "2026-10-14T16:40:56.757432+00:00",
     "weg:HYPEUSD:B_PLUS": "2026-10-14T18:16:43.711583+00:00",
     "weg:IBM:B_PLUS": "2026-10-15T13:46:46.018074+00:00",
@@ -311,7 +312,6 @@
     "weg:JNJ:B_PLUS": "2026-10-15T16:14:50.482990+00:00",
     "weg:KO:A_MINUS": "2026-10-13T20:42:12.992111+00:00",
     "weg:LIN:B": "2026-10-15T13:46:46.018074+00:00",
-    "weg:LIN:B_PLUS": "2026-10-13T19:54:08.662027+00:00",
     "weg:LLY:B_PLUS": "2026-10-15T14:12:44.936109+00:00",
     "weg:LMT:B": "2026-10-14T13:41:38.772557+00:00",
     "weg:LOW:A_PLUS": "2026-10-15T16:14:50.482990+00:00",
@@ -497,11 +497,6 @@
       "score": 8.0,
       "urteil": "NO_TRADE"
     },
-    "ARCUSD": {
-      "richtung": null,
-      "score": 7.9,
-      "urteil": "NO_TRADE"
-    },
     "ARM": {
       "richtung": "short",
       "score": 48.7,
@@ -518,9 +513,9 @@
       "urteil": "NO_TRADE"
     },
     "ASTERUSD": {
-      "richtung": "long",
-      "score": 39.8,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 8.7,
+      "urteil": "NO_TRADE"
     },
     "ATOMUSD": {
       "richtung": "short",
@@ -579,13 +574,13 @@
     },
     "BATUSD": {
       "richtung": "long",
-      "score": 58.6,
+      "score": 62.9,
       "urteil": "WATCH"
     },
     "BCHUSD": {
-      "richtung": null,
-      "score": 7.5,
-      "urteil": "NO_TRADE"
+      "richtung": "long",
+      "score": 50.0,
+      "urteil": "WATCH"
     },
     "BCNUSD": {
       "richtung": null,
@@ -618,9 +613,9 @@
       "urteil": "WATCH"
     },
     "BNBUSD": {
-      "richtung": "long",
-      "score": 70.0,
-      "urteil": "B_PLUS"
+      "richtung": null,
+      "score": 6.6,
+      "urteil": "NO_TRADE"
     },
     "BONKUSD": {
       "richtung": "long",
@@ -649,7 +644,7 @@
     },
     "CCUSD": {
       "richtung": "short",
-      "score": 39.6,
+      "score": 38.4,
       "urteil": "WATCH"
     },
     "CFGUSD": {
@@ -913,9 +908,9 @@
       "urteil": "WATCH"
     },
     "HYPEUSD": {
-      "richtung": "long",
-      "score": 60.0,
-      "urteil": "A_MINUS"
+      "richtung": null,
+      "score": 7.5,
+      "urteil": "NO_TRADE"
     },
     "IBM": {
       "richtung": "long",
@@ -973,9 +968,9 @@
       "urteil": "B_PLUS"
     },
     "JTOUSD": {
-      "richtung": "long",
-      "score": 50.4,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 2.1,
+      "urteil": "NO_TRADE"
     },
     "KASUSD": {
       "richtung": "short",
@@ -1114,7 +1109,7 @@
     },
     "MINAUSD": {
       "richtung": "short",
-      "score": 53.8,
+      "score": 53.9,
       "urteil": "WATCH"
     },
     "MNTUSD": {
@@ -1305,7 +1300,7 @@
     "PLAYUSD": {
       "richtung": "short",
       "score": 28.7,
-      "urteil": "WATCH"
+      "urteil": "NO_TRADE"
     },
     "PLTR": {
       "richtung": null,
@@ -1334,7 +1329,7 @@
     },
     "PUMPUSD": {
       "richtung": "long",
-      "score": 39.8,
+      "score": 47.8,
       "urteil": "WATCH"
     },
     "PYPL": {
@@ -1374,12 +1369,12 @@
     },
     "RIVERUSD": {
       "richtung": "short",
-      "score": 25.0,
+      "score": 29.7,
       "urteil": "NO_TRADE"
     },
     "RLCUSD": {
       "richtung": "long",
-      "score": 54.5,
+      "score": 52.6,
       "urteil": "WATCH"
     },
     "RSRUSD": {
@@ -1429,7 +1424,7 @@
     },
     "SHXUSD": {
       "richtung": "short",
-      "score": 25.0,
+      "score": 19.5,
       "urteil": "WATCH"
     },
     "SKRUSD": {
@@ -1469,7 +1464,7 @@
     },
     "SPXUSD": {
       "richtung": "short",
-      "score": 49.9,
+      "score": 51.3,
       "urteil": "WATCH"
     },
     "STRKUSD": {
@@ -1514,7 +1509,7 @@
     },
     "TAOUSD": {
       "richtung": "short",
-      "score": 72.5,
+      "score": 76.1,
       "urteil": "WATCH"
     },
     "TGT": {
@@ -1584,7 +1579,7 @@
     },
     "UMXMUSD": {
       "richtung": "short",
-      "score": 22.5,
+      "score": 24.9,
       "urteil": "WATCH"
     },
     "UNH": {
@@ -1669,7 +1664,7 @@
     },
     "WLDUSD": {
       "richtung": "long",
-      "score": 44.8,
+      "score": 41.6,
       "urteil": "WATCH"
     },
     "WLFIUSD": {
@@ -1734,7 +1729,7 @@
     },
     "ZEREBROUSD": {
       "richtung": "short",
-      "score": 53.9,
+      "score": 50.4,
       "urteil": "WATCH"
     },
     "ZKUSD": {
@@ -2480,6 +2475,6 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "LOW",
-  "stand": "2026-10-15T19:45:36.198206+00:00",
+  "stand": "2026-10-15T19:55:40.649455+00:00",
   "stumme_klassen": []
 }
