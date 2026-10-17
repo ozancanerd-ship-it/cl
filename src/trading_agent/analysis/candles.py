@@ -48,13 +48,19 @@ def _f(b: Any, name: str) -> float:
     return float(getattr(b, name))
 
 
-def _ort(b: Any, atr: float, tiefs: Sequence[float], hochs: Sequence[float]) -> str:
-    """Liegt die Kerze an einer bekannten Marke (Swing/Liquiditaet)?"""
+def _ort(
+    b: Any, atr: float, tiefs: Sequence[float], hochs: Sequence[float], d: str | None = None
+) -> str:
+    """Liegt die Kerze an einer bekannten Marke (Swing/Liquiditaet)?
+
+    Ein Long-Muster zaehlt nur an einem Tief, ein Short-Muster nur an einem Hoch —
+    ein Pin-Bar nach oben an einem Hoch ist keine Kaufstelle.
+    """
     tol = 0.5 * atr
     lo, hi = _f(b, "low"), _f(b, "high")
-    if any(abs(lo - p) <= tol or (lo < p <= _f(b, "close")) for p in tiefs):
+    if d != "short" and any(abs(lo - p) <= tol or (lo < p <= _f(b, "close")) for p in tiefs):
         return "am_tief"
-    if any(abs(hi - p) <= tol or (hi > p >= _f(b, "close")) for p in hochs):
+    if d != "long" and any(abs(hi - p) <= tol or (hi > p >= _f(b, "close")) for p in hochs):
         return "am_hoch"
     return "frei"
 
@@ -82,12 +88,10 @@ def erkenne_kerzen(
         ober = h - max(o, c)
         unter = min(o, c) - lo
         zur = n - 1 - i
-        ort = _ort(b, atr, tiefs, hochs)
-        bonus = 0.0 if ort == "frei" else 0.25
 
-        def add(
-            art: str, d: str | None, st: float, text: str, *, i=i, zur=zur, ort=ort, bonus=bonus
-        ) -> None:
+        def add(art: str, d: str | None, st: float, text: str, *, i=i, zur=zur, b=b) -> None:
+            ort = _ort(b, atr, tiefs, hochs, d)
+            bonus = 0.0 if ort == "frei" else 0.25
             out.append(Kerzenmuster(art, d, max(0.0, min(1.0, st + bonus)), i, zur, ort, text))
 
         # Impulskerze: grosser Koerper, Schluss nahe dem Extrem.
@@ -138,8 +142,11 @@ def erkenne_kerzen(
                 )
 
         # Sweep mit Rueckschluss: Marke per Docht genommen, Schluss wieder davor.
+        # Nur der ERSTE Durchstich zaehlt: wurde die Marke in den 20 Kerzen davor schon
+        # unterschritten/ueberschritten, ist sie keine Liquiditaet mehr, sondern verbraucht.
+        vor = bars[max(0, i - 20) : i]
         for t in tiefs:
-            if lo < t <= c and rng >= 0.6 * atr:
+            if lo < t <= c and rng >= 0.6 * atr and not any(_f(x, "low") < t for x in vor):
                 add(
                     "sweep",
                     "long",
@@ -148,7 +155,7 @@ def erkenne_kerzen(
                 )
                 break
         for t in hochs:
-            if h > t >= c and rng >= 0.6 * atr:
+            if h > t >= c and rng >= 0.6 * atr and not any(_f(x, "high") > t for x in vor):
                 add(
                     "sweep",
                     "short",

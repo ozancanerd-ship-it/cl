@@ -96,3 +96,13 @@ def test_zeichnung_enthaelt_nur_berechnete_muster():
     bars = tuple([*ruhig(), K(100.0, 100.3, 97.0, 100.1)])
     assert [m["art"] for m in _kerzenmuster(T(bars, 1.0))] == ["pin"]
     assert _kerzenmuster(T(tuple(ruhig()), 1.0)) == []
+
+
+def test_verbrauchte_marke_ist_kein_sweep_und_ort_folgt_richtung():
+    # Marke 99.0 wurde schon unterschritten -> ein weiterer Docht ist kein Sweep mehr
+    bars = [*ruhig(), K(99.5, 99.6, 98.0, 99.4), K(99.6, 99.8, 98.5, 99.7)]
+    assert ("sweep", "long") not in arten(erkenne_kerzen(bars, 1.0, tiefs=[99.0], fenster=1))
+    # Pin nach oben an einem TIEF ist kein Short am Hoch -> Ort "frei"
+    pin_oben = [*ruhig(), K(100.0, 103.0, 99.9, 100.1)]
+    m = erkenne_kerzen(pin_oben, 1.0, tiefs=[103.0])
+    assert next(x for x in m if x.art == "pin").ort == "frei"
