@@ -253,19 +253,29 @@ def bewerte(
     trend: dict[str, str | None] | None,
     zahlen_tage: int | None = None,
     z: str = "",
+    gewinn_pct: float | None = None,
+    ko: float | None = None,
 ) -> Bewertung:
     """Urteil fuer EINE Position im Gewinn. ``kerzen``: ``{"h1","h4","d1"}`` abgeschlossene
     Kerzen (oder fehlend). ``trend``: ``{"d1","h4"}`` mit ``auf``/``ab``/``gemischt``/``None``
     in Sicht der RICHTUNG DER MARKT-Kurve (nicht gespiegelt). ``hoch_gv_pct``: bisheriger
-    Hoechstgewinn in % (Gedaechtnis des Waechters)."""
+    Hoechstgewinn in % (Gedaechtnis des Waechters).
+
+    Hebelschein: ``kurs``/``einstieg``/``stop``/``ziel_next`` in Basiswert-Einheiten (``einstieg`` =
+    Basis-Einstand, darf fehlen), ``gewinn_pct`` = Gewinn des SCHEINS (nicht des Basiswerts),
+    ``ko`` = Knock-out-Schwelle des Basiswerts."""
     b = Bewertung()
     kerzen = kerzen or {}
     trend = trend or {}
-    if not einstieg or einstieg <= 0 or kurs <= 0:
+    if kurs <= 0 or (gewinn_pct is None and (not einstieg or einstieg <= 0)):
         b.fehlt.append("Einstiegskurs fehlt — Gewinn nicht berechenbar")
         b.aktion = "Nicht bewertet: Einstiegskurs fehlt."
         return b
-    gv = ((kurs / einstieg - 1.0) if lang else (einstieg / kurs - 1.0)) * 100.0  # wie der Waechter rechnet
+    if gewinn_pct is not None:
+        gv = gewinn_pct
+    else:
+        e = float(einstieg or 0.0)
+        gv = ((kurs / e - 1.0) if lang else (e / kurs - 1.0)) * 100.0  # wie der Waechter rechnet
     hoch = max(hoch_gv_pct if hoch_gv_pct is not None else gv, gv)
     b.gewinn_pct, b.hoch_pct, b.rueckgang_pct = gv, hoch, hoch - gv
     if gv < MIN_GEWINN_PCT:
@@ -321,6 +331,10 @@ def bewerte(
             sig.append(Signal("gewinn_abgabe", 1.5, f"{anteil * 100:.0f} % des Höchstgewinns ({b.hoch_pct:.1f} %) sind wieder abgegeben"))
         elif anteil >= 0.3:
             sig.append(Signal("gewinn_abgabe", 1.0, f"{anteil * 100:.0f} % des Höchstgewinns ({b.hoch_pct:.1f} %) sind wieder abgegeben"))
+    if ko is not None and ko > 0:
+        puffer = ((kurs - ko) if lang else (ko - kurs)) / kurs * 100.0
+        if puffer < 15.0:
+            sig.append(Signal("ko_puffer", 1.0, f"Knock-out-Puffer nur {puffer:.1f} % — bei weiterem Rückgang droht der Totalverlust des Scheins"))
     if zahlen_tage is not None and 0 <= zahlen_tage <= 3:
         sig.append(Signal("ereignis", 1.0, f"Quartalszahlen in {zahlen_tage} Tag(en) — Gap-Risiko"))
 
@@ -367,7 +381,10 @@ def bewerte(
         kand.append(kurs_l - 1.5 * a)
     for t_l in sorted(kand, reverse=True):  # bester (naechster) zuerst
         t = t_l if lang else -t_l
-        t = max(t, einstieg) if lang else min(t, einstieg)
+        if einstieg:
+            t = max(t, einstieg) if lang else min(t, einstieg)
+        if ko is not None and ko > 0 and ((t <= ko) if lang else (t >= ko)):
+            continue  # ein Stop jenseits des Knock-outs schuetzt nichts
         ok = (t < kurs) if lang else (t > kurs)
         schlaegt = stop is None or ((t > stop) if lang else (t < stop))
         if ok and schlaegt:

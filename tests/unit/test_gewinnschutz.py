@@ -275,3 +275,108 @@ def test_app_oeffnet_das_versiegelte_urteil_wie_python_und_zeigt_alle_felder(tmp
     for feld in ("gewinn_pct", "hoch_pct", "rueckgang_pct", "upside_pct", "bias", "aktion", "neubewertung", "trail_stop", "signale", "fehlt", "teil_menge", "rest_menge"):
         assert f"r.{feld}" in s[s.index("function gewinnschutzKasten"):s.index("function stopKasten")], feld
     assert "sicherText(gewinnschutzKasten)" in s
+
+
+# --------------------------------------------------------------------------- Hebelscheine (17.10.)
+
+
+def _schein(**extra) -> dict:
+    """Open-End-Long auf Amazon: Knock-out 194,36 $, Bezugsverhältnis 10, Einstieg 4,80 € je Schein."""
+    return {
+        "sym": "AMZN-TURBO-LONG",
+        "basis": "AMZN",
+        "basis_richtung": "long",
+        "hebel_richtung": "long",
+        "ko": 194.36,
+        "ratio": 10.0,
+        "einstieg": 4.80,
+        "menge": 15,
+        "waehrung": "EUR",
+        "konto": "Trade Republic",
+        **extra,
+    }
+
+
+def _scan_amzn(kurs: float) -> dict:
+    from tests.unit.test_depot_wache import _scan, _zeile
+
+    return _scan(_zeile("AMZN", kurs, klasse="aktien", name="Amazon"), eurusd=1.10)
+
+
+def test_schein_gewinn_wird_am_scheinpreis_gemessen_nicht_am_basiskurs() -> None:
+    from trading_agent.portfolio_intel.depot_stops import ScanIndex, lage_fuer, schein_produkt
+
+    lg = lage_fuer(_schein(), ScanIndex(_scan_amzn(250.0)))
+    sp = schein_produkt(_schein(), lg)
+    # (250 − 194,36) / 10 = 5,564 $ = 5,058 € je Schein
+    assert abs(sp["kurs"] - 5.564 / 1.10) < 1e-6
+    # Basis-Einstand: Knock-out + 4,80 € × 1,10 × 10 = 247,16 $
+    assert abs(sp["basis_einstand"] - (194.36 + 4.80 * 1.10 * 10)) < 1e-6
+    from trading_agent.portfolio_intel.depot_stops import pruefe_depot
+
+    stand, ev, _ = pruefe_depot([_schein()], _scan_amzn(250.0), {})
+    st = stand["positionen"]["AMZN-TURBO-LONG|trade republic"]
+    assert 5.0 < st["hoch_gv_pct"] < 5.8  # ≈ +5,4 % — nicht „+5.100 %" aus 250 $ gegen 4,80 €
+    assert not any(e.art in ("ueberdehnt", "gewinn_rueckgang") for e in ev)
+
+
+def test_alter_hoechstgewinn_in_gemischten_einheiten_loest_keinen_fehlalarm_aus() -> None:
+    from trading_agent.portfolio_intel.depot_stops import pruefe_depot
+
+    alt = {"positionen": {"AMZN-TURBO-LONG|trade republic": {"hoch_gv_pct": 5100.0, "regel": 2}}, "gemeldet": {}}
+    stand, ev, _ = pruefe_depot([_schein()], _scan_amzn(250.0), alt)
+    assert not any(e.art == "gewinn_rueckgang" for e in ev)
+    assert stand["positionen"]["AMZN-TURBO-LONG|trade republic"]["hoch_gv_pct"] < 10
+
+
+def test_ohne_bezugsverhaeltnis_kein_stilles_verhaeltnis_eins() -> None:
+    from trading_agent.portfolio_intel.depot_stops import pruefe_depot
+
+    pos = _schein()
+    pos.pop("ratio")
+    stand, _ev, _ = pruefe_depot([pos], _scan_amzn(250.0), {})
+    st = stand["positionen"]["AMZN-TURBO-LONG|trade republic"]
+    assert st.get("hoch_gv_pct") is None
+    anz = st["gs"]["anzeige"]
+    assert anz["urteil"] == UNBEWERTET and "Bezugsverhältnis" in " ".join(anz["fehlt"])
+    # Mit dem aktuellen Wert aus Trade Republic (wert_manuell) wird es abgeleitet
+    pos["wert_manuell"] = 15 * 5.564 / 1.10
+    stand, _, _ = pruefe_depot([pos], _scan_amzn(250.0), {})
+    st = stand["positionen"]["AMZN-TURBO-LONG|trade republic"]
+    assert 5.0 < st["hoch_gv_pct"] < 5.8
+    assert any("abgeleitet" in f for f in st["gs"]["anzeige"]["fehlt"])
+
+
+def test_gewinnschutz_fuer_schein_strukturiert_am_basiswert_mit_ko_signal() -> None:
+    """Struktur kommt aus den Basiswert-Kerzen, Gewinn aus dem Schein, Knock-out-Nähe zählt mit."""
+    pfad = [150 + 0.8 * i + 2.0 * math.sin(i * 0.9) for i in range(70)]
+    spitze = pfad[-1]
+    pfad += [spitze - 1, spitze - 3, spitze - 2.0, spitze - 4.5, spitze - 3.5, spitze - 6.5, spitze - 8.0, spitze - 10.0]
+    k = _kerzen(pfad)
+    kurs = k[-1][3]  # ≈ 195
+    r = bewerte(lang=True, kurs=kurs, einstieg=None, hoch_gv_pct=80.0, menge=15, stop=None, ziel_next=kurs * 1.3,
+                kerzen={"h4": k, "d1": k}, trend={"d1": "auf", "h4": "ab"}, gewinn_pct=40.0, ko=kurs * 0.9)
+    namen = [s.name for s in r.signale]
+    assert "ko_puffer" in namen and "choch" in namen
+    assert r.gewinn_pct == 40.0 and r.urteil in (PROFIT_PROTECTION, PARTIAL, EXIT)
+    if r.trail_stop is not None:
+        assert r.trail_stop > kurs * 0.9  # nie ein Stop jenseits des Knock-outs
+
+
+def test_bezugsverhaeltnis_wie_bei_trade_republic_als_faktor() -> None:
+    """„0,1" (Trade Republic) und „10" (Teiler) ergeben denselben Scheinpreis — in Python und in der App."""
+    import subprocess
+    from pathlib import Path
+
+    from trading_agent.portfolio_intel.depot_stops import ScanIndex, lage_fuer, schein_produkt
+
+    idx = ScanIndex(_scan_amzn(250.0))
+    a = schein_produkt(_schein(ratio=0.1), lage_fuer(_schein(ratio=0.1), idx))["kurs"]
+    b = schein_produkt(_schein(ratio=10.0), lage_fuer(_schein(ratio=10.0), idx))["kurs"]
+    assert abs(a - b) < 1e-12
+    s = (Path(__file__).resolve().parents[2] / "site" / "template.html").read_text(encoding="utf-8")
+    js = s[s.index("function scheinTeiler"):s.index("function hebelLage")] + (
+        "console.log(JSON.stringify([scheinTeiler({ratio:0.1}), scheinTeiler({ratio:10}), scheinTeiler({}), scheinTeiler({ratio:0})]));"
+    )
+    out = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout
+    assert [round(x, 9) if x else x for x in __import__("json").loads(out)] == [10, 10, None, None]

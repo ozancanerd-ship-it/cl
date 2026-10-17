@@ -289,7 +289,7 @@ def lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
             else (str(pos.get("hebel_richtung")) == "long")
         )
         bk = float(brow["kurs"])
-        lg = Lage(pos, key, name, lang_basis, "basis", bk, zeile_waehrung(brow), brow)
+        lg = Lage(pos, key, name, lang_basis, "basis", bk, zeile_waehrung(brow), brow, eurusd=_zahl(brow.get("eurusd")) or idx.eurusd)
         lg.zahlen = (brow.get("info") or {}).get("zahlen")
         ko = _zahl(pos.get("ko"))
         if ko is not None and ko > 0:
@@ -452,6 +452,58 @@ def lage_zeile(
     return " Lage: " + "; ".join(teile) + ". Das ist ein Hinweis zum Prüfen, keine Pflicht."
 
 
+def schein_produkt(pos: dict[str, Any], lg: Lage) -> dict[str, Any]:
+    """Was der SCHEIN (nicht der Basiswert) gerade wert ist — wie in der App gerechnet:
+    Scheinpreis ≈ (Basiskurs − Knock-out) / Bezugsverhaeltnis, umgerechnet in die Waehrung der
+    Position. Ohne Bezugsverhaeltnis wird es aus einem von Hand eingetragenen aktuellen Wert
+    abgeleitet (``wert_manuell`` / Stueckzahl); fehlt auch der, bleibt der Scheinpreis UNBEKANNT —
+    nie ein stilles Verhaeltnis 1. Rueckgabe: ``kurs`` (Scheinpreis, Positionswaehrung),
+    ``ratio``, ``quelle``, ``basis_einstand`` (Basiskurs, bei dem der Schein auf dem Einstieg
+    stuende), ``fehlt`` (Liste)."""
+    aus: dict[str, Any] = {"kurs": None, "ratio": None, "quelle": "", "basis_einstand": None, "fehlt": []}
+    ko, bk = lg.ko, lg.kurs
+    if ko is None or bk is None:
+        aus["fehlt"].append("Knock-out-Schwelle" if ko is None else "Kurs des Basiswerts")
+        return aus
+    lang = bool(lg.lang)
+    abstand = (bk - ko) if lang else (ko - bk)
+    if abstand <= 0:
+        aus["kurs"] = 0.0
+        aus["quelle"] = "ausgeknockt"
+        return aus
+    pw, bw = pos_waehrung(pos), lg.waehrung
+    fx = lg.eurusd
+
+    def in_pos(v: float) -> float | None:
+        return umrechnen(v, bw, pw, fx)
+
+    def in_basis(v: float) -> float | None:
+        return umrechnen(v, pw, bw, fx)
+
+    ratio = _zahl(pos.get("ratio"))
+    if ratio is not None and ratio > 0:
+        # Trade Republic schreibt das Verhaeltnis als Faktor („0,1" = ein Schein auf 0,1 Aktien),
+        # die App rechnet mit dem Teiler (10). Unter 1 ist es daher der Faktor — wie in der App.
+        ratio = 1.0 / ratio if ratio < 1 else ratio
+        aus["quelle"] = "Bezugsverhältnis eingetragen"
+    else:
+        wm, m = _zahl(pos.get("wert_manuell")), _zahl(pos.get("menge"))
+        stueck = in_basis(wm / m) if wm and m and m > 0 else None
+        if stueck and stueck > 0:
+            ratio = abstand / stueck
+            aus["quelle"] = "Bezugsverhältnis aus deinem eingetragenen Wert abgeleitet"
+        else:
+            aus["fehlt"].append("Bezugsverhältnis (oder aktueller Wert der Position)")
+            return aus
+    aus["ratio"] = ratio
+    aus["kurs"] = in_pos(abstand / ratio)
+    ein = _zahl(pos.get("einstieg"))
+    ein_b = in_basis(ein) if ein else None
+    if ein_b is not None:
+        aus["basis_einstand"] = (ko + ein_b * ratio) if lang else (ko - ein_b * ratio)
+    return aus
+
+
 def _gewinnschutz(
     lg: Lage,
     pos: dict[str, Any],
@@ -476,6 +528,14 @@ def _gewinnschutz(
     und still; gemeldet wird nur die Verschlechterung. Der Stop-Alarm bleibt davon unberuehrt."""
     ktx = kontext or {}
     ein = _zahl(pos.get("einstieg"))
+    schein = schein_produkt(pos, lg) if lg.ebene == "basis" else None
+    gewinn_extern: float | None = None
+    if schein is not None:
+        # Struktur am Basiswert, Gewinn am SCHEIN: der Einstieg ist ein Scheinpreis, der Kurs ein
+        # Basiskurs — die beiden duerfen nie direkt verglichen werden.
+        if schein["kurs"] is not None and ein:
+            gewinn_extern = (schein["kurs"] / ein - 1.0) * 100.0
+        ein = schein["basis_einstand"]
     ziel_next = next((_zahl(ziele.get(m.lower())) for m in ("TP1", "TP2", "TP3") if m not in erledigt and _zahl(ziele.get(m.lower())) is not None), None)
     plan_stop = stop if stop is not None else _zahl((pos.get("plan") or {}).get("stop"))
     zt = (lg.zahlen or {}).get("tage")
@@ -491,7 +551,16 @@ def _gewinnschutz(
         trend={"d1": ktx.get("d1"), "h4": ktx.get("h4")},
         zahlen_tage=zt if isinstance(zt, int) else None,
         z=z,
+        gewinn_pct=gewinn_extern,
+        ko=lg.ko if schein is not None else None,
     )
+    if schein is not None:
+        if gewinn_extern is None:
+            bew.urteil = gs_mod.UNBEWERTET
+            bew.aktion = "Nicht bewertet: Scheinpreis unbekannt — " + ", ".join(schein["fehlt"] or ["Einstiegspreis des Scheins"]) + " fehlt."
+            bew.fehlt.insert(0, "Hebelschein: " + (", ".join(schein["fehlt"]) or "Einstiegspreis") + " fehlt — ohne das kein Gewinn des Scheins")
+        elif schein["quelle"]:
+            bew.fehlt.append(f"Hebelschein: {schein['quelle']} (Schätzung ohne Aufgeld, Finanzierung und Spread des Emittenten)")
     gs = dict(st.get("gs") or {})
     bar = ktx.get("h1_ts")
     bar = float(bar) if isinstance(bar, int | float) else None
@@ -501,7 +570,11 @@ def _gewinnschutz(
         st["gs"] = gs
         return ev
     gewinn_eur = None
-    if ein and menge:
+    if schein is not None:
+        e0 = _zahl(pos.get("einstieg"))
+        if schein["kurs"] is not None and e0 and menge:
+            gewinn_eur = umrechnen((schein["kurs"] - e0) * menge, pos_waehrung(pos), "EUR", lg.eurusd)
+    elif ein and menge:
         roh = ((kurs - ein) if lang else (ein - kurs)) * menge
         gewinn_eur = umrechnen(roh, lg.waehrung, "EUR", lg.eurusd)
     neu = bew.urteil
@@ -870,11 +943,22 @@ def pflegen(
     # +30 % nach starkem Lauf, H4-RSI ueberdehnt — selbe Lage, die die App im Nacht-Plan
     # zeigt, hier zusaetzlich per Mail, auch wenn Ozan die App nicht offen hat).
     einstieg_ud = _zahl(pos.get("einstieg"))
-    gv_pct = (
-        ((kurs / einstieg_ud - 1) if lang else (einstieg_ud / kurs - 1)) * 100
-        if einstieg_ud and einstieg_ud > 0 and kurs > 0
-        else None
-    )
+    if lg.ebene == "basis":
+        # Hebelschein: Einstieg ist ein SCHEINpreis, ``kurs`` der Basiskurs. Bis 17.10. wurden die
+        # beiden direkt verglichen (Gewinn in gemischten Einheiten, z. B. „+2.000 %").
+        if not st.get("gv_schein_v1"):
+            # Einmalig: der alte Hoechstgewinn war in gemischten Einheiten gerechnet und waere
+            # sonst ein riesiger „Rueckgang" (Fehlalarm). Er wird verworfen und neu gemessen.
+            st.pop("hoch_gv_pct", None)
+            st["gv_schein_v1"] = True
+        sp = schein_produkt(pos, lg)["kurs"]
+        gv_pct = (sp / einstieg_ud - 1) * 100 if sp is not None and einstieg_ud and einstieg_ud > 0 else None
+    else:
+        gv_pct = (
+            ((kurs / einstieg_ud - 1) if lang else (einstieg_ud / kurs - 1)) * 100
+            if einstieg_ud and einstieg_ud > 0 and kurs > 0
+            else None
+        )
     ueberdehnt = next(
         (w for w in ((lg.row or {}).get("warnungen") or []) if "ueberdehnt" in str(w).lower()),
         None,
@@ -1110,7 +1194,7 @@ def pflegen(
         ev.extend(_nachkauf(lg.row, bool(lang), kurs, close, (kontext or {}).get(inst), menge, st, z, wer, lg.key, depot))
 
     # 2d — Gewinnschutz (nur Position im Plus, nur Positions-Ebene).
-    if lg.ebene == "position" and lang is not None and not st.get("ausgestoppt"):
+    if lg.ebene in ("position", "basis") and lang is not None and not st.get("ausgestoppt") and not lg.ausgeknockt:
         ev.extend(_gewinnschutz(lg, pos, st, kontext and kontext.get(inst), kurs, bool(lang), menge, _zahl(st.get("stop")), ziele, erledigt, z, wer))
 
     # 3 — Stop setzen / nachziehen.

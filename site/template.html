@@ -4044,6 +4044,11 @@ function margenLage(pos, kurs){
   };
 }
 
+function scheinTeiler(pos){
+  const r = Number(pos && pos.ratio);
+  if (!(pos && pos.ratio != null) || !isFinite(r) || r <= 0) return null;
+  return r < 1 ? 1 / r : r;
+}
 function hebelLage(pos, basisRow, eurusd){
   if (!pos || pos.ko == null || !basisRow) return null;
   const basisKurs = basisRow.kurs;
@@ -4053,14 +4058,25 @@ function hebelLage(pos, basisRow, eurusd){
   const lang = (pos.hebel_richtung || 'long') === 'long';
   const abstand = lang ? basisKurs - ko : ko - basisKurs;
   if (abstand <= 0) return {ausgeknockt: true, basisKurs, ko, lang};
-  const ratio = (pos.ratio != null && Number(pos.ratio) > 0) ? Number(pos.ratio) : 1;
-  const scheinBasis = abstand / ratio;          // in der Währung des Basiswerts
+  /* Bezugsverhaeltnis (17.10.): bis dahin galt ein fehlendes still als 1 — dann war der
+     Scheinpreis bei einem Turbo mit 0,1 zehnfach falsch, und Wert und Gewinn mit ihm.
+     Trade Republic schreibt das Verhaeltnis als Faktor („0,1" = ein Schein auf 0,1 Aktien);
+     Werte unter 1 werden deshalb als Faktor gelesen, Werte ab 1 als Teiler („10").
+     Fehlt es, wird es aus einem eingetragenen aktuellen Wert abgeleitet — sonst bleibt der
+     Scheinpreis unbekannt. Hebel und Puffer haengen nicht daran. */
   const rw = basisRow.waehrung === 'EUR' ? 'EUR' : 'USD';
   const pw = posWaehrung(pos);
-  let schein = scheinBasis;
-  if (pw !== rw && eurusd) schein = pw === 'EUR' ? scheinBasis / eurusd : scheinBasis * eurusd;
+  const inPos = v => (pw !== rw && eurusd) ? (pw === 'EUR' ? v / eurusd : v * eurusd) : v;
+  const inBasis = v => (pw !== rw && eurusd) ? (pw === 'EUR' ? v * eurusd : v / eurusd) : v;
+  let ratio = scheinTeiler(pos), ratioQuelle = ratio != null ? 'eingetragen' : '';
+  if (ratio == null && pos.wert_manuell != null && Number(pos.menge) > 0){
+    const stueck = inBasis(Number(pos.wert_manuell) / Number(pos.menge));
+    if (stueck > 0){ ratio = abstand / stueck; ratioQuelle = 'aus deinem eingetragenen Wert abgeleitet'; }
+  }
+  const schein = ratio != null ? inPos(abstand / ratio) : null;
   return {
-    ausgeknockt: false, basisKurs, ko, lang, ratio,
+    ausgeknockt: false, basisKurs, ko, lang, ratio, ratioQuelle,
+    ratio_fehlt: ratio == null,
     schein,
     hebel: basisKurs / abstand,
     puffer_pct: abstand / basisKurs * 100,
@@ -4089,7 +4105,7 @@ function bewertePosition(pos){
       const bl = L.get(brow.instrument);
       const browLive = bl ? {...brow, kurs: bl.p} : brow;
       hebel = hebelLage(pos, browLive, (brow.eurusd || (S && S.eurusd)));
-      if (hebel && !hebel.ausgeknockt) kurs = hebel.schein;
+      if (hebel && !hebel.ausgeknockt) kurs = hebel.schein; // null bei fehlendem Bezugsverhaeltnis: dann zaehlt ein eingetragener Wert
       if (hebel) hebel.basisName = brow.name || bv.sym;
       if (hebel) hebel.basisSym = bv.sym;
     }
@@ -4754,7 +4770,8 @@ function ausstiegsKasten(b, a){
   if (basis && hb && !hb.ausgeknockt && pl.stop != null && hb.ko != null){
     const abst = hb.lang ? pl.stop - hb.ko : hb.ko - pl.stop;
     if (abst > 0){
-      let je = abst / (hb.ratio || 1);
+      if (hb.ratio == null) return '';
+      let je = abst / hb.ratio;
       const kEU = (b.basis && b.basis.row && b.basis.row.eurusd) || (S && S.eurusd);
       if (b.w === 'EUR' && pl.waehrung !== 'EUR' && kEU) je = je / kEU;
       const wert = je * (Number(b.pos.menge) || 1);
@@ -5051,6 +5068,11 @@ function hebelKasten(b){
     ins Minus läuft, sondern weg ist. Ein Stop hilft dagegen nicht, die Schwelle greift auch
     nachts. Der Scheinpreis hier ist aus Basiswert und Schwelle gerechnet; der Emittent rechnet
     zusätzlich Aufgeld und Finanzierungskosten, dein Depot zeigt also ein paar Cent daneben.</p>
+    ${h.ratio_fehlt ? `<p style="margin:8px 0 0;font-size:12.5px"><strong>Bezugsverhältnis fehlt</strong> —
+    ohne es ist der Scheinpreis unbekannt, und damit auch Wert und Gewinn dieser Position (Hebel und
+    Puffer stimmen trotzdem). In Trade Republic steht es in den Produktdetails (z. B. „0,1"). Alternativ
+    den aktuellen Wert der Position eintragen, dann wird es daraus abgeleitet.</p>`
+    : h.ratioQuelle && h.ratioQuelle !== 'eingetragen' ? `<p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">Bezugsverhältnis ${esc(h.ratioQuelle)}.</p>` : ''}
   </div>`;
 }
 
@@ -6663,8 +6685,9 @@ function scheinBei(b, basisPreis){
   const h = b.hebel; if (!h || h.ko == null || basisPreis == null) return null;
   const ab = h.lang ? basisPreis - h.ko : h.ko - basisPreis;
   if (ab <= 0) return 0;
-  const proBasis = ab / (h.ratio || 1);
-  return (h.schein && h.basisKurs) ? proBasis * (h.schein / ((h.lang ? h.basisKurs - h.ko : h.ko - h.basisKurs) / (h.ratio || 1))) : proBasis;
+  if (h.ratio == null) return null; // ohne Bezugsverhaeltnis kein Scheinpreis
+  const proBasis = ab / h.ratio;
+  return (h.schein && h.basisKurs) ? proBasis * (h.schein / ((h.lang ? h.basisKurs - h.ko : h.ko - h.basisKurs) / h.ratio)) : proBasis;
 }
 const NACHT_BROKER = {
   traderepublic: {stop: 'Stop-Loss-Order (Stop-Market, „Stop") — Verkauf, sobald der Kurs die Marke berührt',
@@ -7456,10 +7479,11 @@ function zeichnePortfolio(){
       <div class="rowx"><span class="lab">Knock-out <span style="color:var(--ink-3)">Schwelle im Basiswert</span></span>
         <input id="pf_ko" class="val" inputmode="decimal" placeholder="148,20" style="width:52%"></div>
       <div class="rowx"><span class="lab">Bezugsverhältnis</span>
-        <input id="pf_ratio" class="val" inputmode="decimal" placeholder="1" style="width:52%"></div>
+        <input id="pf_ratio" class="val" inputmode="decimal" placeholder="0,1 (wie bei Trade Republic)" style="width:52%"></div>
       <p style="margin:6px 0 0;font-size:12.5px;color:var(--ink-2)">Bei einem Turbo reichen
-      <strong>Basiswert und Knock-out</strong> — Hebel, Scheinpreis und der Puffer bis zur
-      Schwelle werden daraus gerechnet. Den Hebel musst du nicht eintragen, er ergibt sich.</p>
+      <strong>Basiswert und Knock-out</strong> für Hebel und Puffer bis zur Schwelle. Für
+      Scheinpreis, Wert und Gewinn braucht es zusätzlich das <strong>Bezugsverhältnis</strong>
+      (Produktdetails bei Trade Republic, z. B. 0,1). Den Hebel musst du nicht eintragen.</p>
       <p style="margin:11px 0 0"><button class="btn" id="pf_add">Hinzufügen</button>
         ${bew.length?` <button class="link" id="pf_clear" style="margin-left:12px">alle löschen</button>`:''}</p>
     </div>
