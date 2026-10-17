@@ -3841,10 +3841,25 @@ function istKurzDirekt(pos){
 function scanRowGenau(sym){
   return (S?.gesamt||[]).find(o => o.instrument === sym) || null;
 }
+/* Der S&P 500 steht nicht im Scan (der fuehrt Einzelwerte, Coins, Gold). Sein Stand kommt aus
+   der Makro-Messung (Yahoo ^GSPC, Tagesschluss). Das ist KEIN Livekurs: die Zeile traegt
+   ``nurTagesschluss`` und ``kursStand``, damit Puffer und Hebel eines Index-Scheins als
+   „Stand Vortagesschluss" gekennzeichnet werden koennen. */
+const INDEX_NAMEN = new Set(['SPX','SP500','S&P500','^GSPC','GSPC']);
+function indexZeile(sym){
+  const k = String(sym||'').toUpperCase().replace(/[\s_-]/g, '');
+  if (!INDEX_NAMEN.has(k)) return null;
+  const w = ((S && S.makro && S.makro.werte) || []).find(x => x.schluessel === 'spx');
+  if (!w || !(Number(w.wert) > 0)) return null;
+  return {instrument:'SPX', name:'S&P 500', klasse:'index', kurs:Number(w.wert), waehrung:'USD',
+          nurTagesschluss:true, kursStand:w.stand || null};
+}
 function scanRow(sym){
   const g = (S?.gesamt||[]);
   const genau = g.find(o => o.instrument === sym);
   if (genau) return genau;
+  const ix = indexZeile(sym);
+  if (ix) return ix;
   const m = muenzeVon(sym);
   return g.find(o => muenzeVon(o.instrument) === m) || null;
 }
@@ -3921,6 +3936,8 @@ function errateBasis(sym){
 }
 function basisVon(pos){
   if (!pos) return null;
+  // ``basis_offen``: der Basiswert ist nicht bestaetigt — dann wird er NICHT aus dem Namen geraten.
+  if (pos.basis_offen && !pos.basis) return null;
   if (pos.basis) return {sym: String(pos.basis).toUpperCase(), art:'turbo',
                          richtung: pos.basis_richtung || 'long'};
   const s = String(pos.sym||'').toUpperCase();
@@ -4069,7 +4086,7 @@ function hebelLage(pos, basisRow, eurusd){
   const inPos = v => (pw !== rw && eurusd) ? (pw === 'EUR' ? v / eurusd : v * eurusd) : v;
   const inBasis = v => (pw !== rw && eurusd) ? (pw === 'EUR' ? v * eurusd : v / eurusd) : v;
   let ratio = scheinTeiler(pos), ratioQuelle = ratio != null ? 'eingetragen' : '';
-  if (ratio == null && pos.wert_manuell != null && Number(pos.menge) > 0){
+  if (ratio == null && pos.wert_manuell != null && Number(pos.menge) > 0 && !pos.platzhalter){
     const stueck = inBasis(Number(pos.wert_manuell) / Number(pos.menge));
     if (stueck > 0){ ratio = abstand / stueck; ratioQuelle = 'aus deinem eingetragenen Wert abgeleitet'; }
   }
@@ -4172,7 +4189,10 @@ function bewertePosition(pos){
       }
     } else if (b && b.sym){
       const brow = scanRow(b.sym);
-      if (brow){
+      if (brow && brow.nurTagesschluss){
+        // Index ohne eigene Analyse: nur der Tagesschluss ist bekannt — kein Urteil erfunden.
+        basis = {art:'index', sym: b.sym, row: brow, richtung: b.richtung || 'long'};
+      } else if (brow){
         basis = {art:'turbo', sym: b.sym, row: brow, richtung: b.richtung || 'long',
                  geraten: !!b.geraten};
         /* Bis 27.09. entschied hier der SCORE des Basiswerts (unter 40 → REDUZIEREN). Der
@@ -5089,6 +5109,14 @@ function basisKasten(b){
       <span>Makro <b>${esc((REGIME_TEXT||{})[ba.lage]||ba.lage)}</b></span>
     </div>`;
   }
+  if (ba.art === 'index'){
+    return `<div class="zt" style="margin-top:8px">
+      <span>Basiswert <b>${esc(ba.row.name)}</b></span>
+      <span>Tagesschluss <b>${num(ba.row.kurs, 2)}</b>${ba.row.kursStand ? ' · ' + esc(ba.row.kursStand) : ''}</span>
+    </div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-3)">Für den Index gibt es keinen Livekurs und keine eigene Chart-Analyse —
+      Puffer und Hebel gelten für den Stand vom Vortagesschluss.</p>`;
+  }
   const r = ba.row;
   const d = digits(r.kurs||1);
   return `<div class="zt" style="margin-top:8px">
@@ -5165,6 +5193,21 @@ const MIN_ORDER_EUR = 25;
    was neu ist und was sich ändert — sonst löscht ein Import vom Mac die Positionen, die
    nur auf dem Handy stehen. Genau das wäre hier passiert. */
 const DEPOT_CODE_VERSION = 1;
+/* ISIN: 2 Buchstaben, 9 alphanumerisch, 1 Pruefziffer. Gueltig nur, wenn die Pruefziffer stimmt —
+   eine falsch abgetippte ISIN darf nie zwei Produkte gleichsetzen. */
+function isinNorm(v){
+  const s = String(v||'').toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s)) return '';
+  let z = '';
+  for (const c of s) z += /[A-Z]/.test(c) ? String(c.charCodeAt(0) - 55) : c;
+  let sum = 0, zweite = false;
+  for (let i = z.length - 1; i >= 0; i--){
+    let d = +z[i];
+    if (zweite){ d *= 2; if (d > 9) d -= 9; }
+    sum += d; zweite = !zweite;
+  }
+  return sum % 10 === 0 ? s : '';
+}
 function depotCode(){
   const daten = {v: DEPOT_CODE_VERSION, t: Date.now(), p: ladePositionen()};
   const roh = JSON.stringify(daten);
@@ -5225,6 +5268,10 @@ function kontoNorm(k){
 }
 function abgleichKern(p){
   const s = String((p && p.sym) || '').toUpperCase();
+  // Die ISIN ist das einzige, was ein Produkt eindeutig macht: zwei Scheine auf denselben
+  // Basiswert sind zwei Posten, und derselbe Schein unter zwei Namen ist einer.
+  const isin = isinNorm(p && p.isin);
+  if (isin) return 'I:' + isin;
   // Scheine (Turbo, Knock-out …) über ihren Basiswert — „TURBO-TSMC-LONG" und ein Turbo
   // mit basis TSM sind derselbe Posten. Nie über muenzeVon: die kürzt „TURBO-…" auf
   // „TURBO", und dann wären alle Scheine ein und derselbe.
@@ -7006,6 +7053,109 @@ function stBeta(nm, faktor){
   cov /= namen.length; varK /= namen.length * namen.length;
   return varK > 0 ? cov / varK : null;
 }
+/* ============================================== PRODUKTDATEN-CHECK + GEMEINSAMES RISIKO (seit 17.10.)
+   Ozan, 17.10.: Jeder Hebelschein braucht Basiswert, Kennung, Bezugsverhaeltnis, Stueckzahl,
+   Einstiegskurs, aktuellen Scheinkurs und Knock-out — und was fehlt, muss SICHTBAR fehlen.
+   Ein Basiswert wird nicht aus einem Logo oder einem Namen festgelegt: nur, was du eingetragen
+   hast, gilt als gesetzt; Geratenes steht als „geraten, nicht bestaetigt" da. */
+function produktCheck(b){
+  const pos = b.pos, ph = !!pos.platzhalter;
+  const bv = basisVon(pos);
+  const felder = [];
+  const add = (feld, ok, text) => felder.push({feld, ok, text});
+  add('Basiswert', !!pos.basis, pos.basis ? esc(String(pos.basis).toUpperCase()) + ' (von dir eingetragen)'
+      : (bv && bv.geraten ? 'geraten: ' + esc(bv.sym) + ' — nicht bestätigt' : 'fehlt'));
+  add('ISIN', !!isinNorm(pos.isin), isinNorm(pos.isin) || 'fehlt');
+  add('Bezugsverhältnis', scheinTeiler(pos) != null, scheinTeiler(pos) != null ? 'eingetragen' : 'fehlt');
+  add('Stückzahl', Number(pos.menge) > 0 && !ph, ph ? 'Platzhalter (1 = ganze Position)' : (Number(pos.menge) > 0 ? num(pos.menge, 4) : 'fehlt'));
+  add('Einstiegskurs je Schein', pos.einstieg != null && !ph, ph ? 'Platzhalter (Einsatz der ganzen Position)' : (pos.einstieg != null ? num(pos.einstieg, 2) : 'fehlt'));
+  const sk = b.hebel && b.hebel.schein != null && !b.hebel.ausgeknockt ? b.hebel.schein : null;
+  add('Aktueller Scheinkurs', sk != null, sk != null ? num(sk, 3) + ' (gerechnet aus Basiswert)' : 'fehlt (braucht Basiswert + Bezugsverhältnis)');
+  add('Knock-out', pos.ko != null && Number(pos.ko) > 0, pos.ko != null ? num(pos.ko, 2) + (pos.ko_bestaetigt ? '' : ' (als Schwelle gelesen, Bedeutung von „Long X“ unbestätigt)') : 'fehlt');
+  return felder;
+}
+function produktdatenKasten(){
+  const st = depotStand(); if (!st) return '';
+  const scheine = st.bew.filter(b => istSchein(b.pos));
+  if (!scheine.length) return '';
+  const zeilen = scheine.map(b => ({b, f: produktCheck(b)}));
+  const fehlt = zeilen.reduce((s, z) => s + z.f.filter(x => !x.ok).length, 0);
+  return `<h2>Produktdaten der Hebelscheine</h2><div class="karte ${fehlt ? 'warn' : 'gut'}">
+    <p style="margin:0 0 8px;font-size:13.5px"><strong>${fehlt ? fehlt + ' Angabe' + (fehlt === 1 ? '' : 'n') + ' fehlen oder sind unbestätigt' : 'Alles erfasst'}</strong>
+      bei ${scheine.length} Schein${scheine.length === 1 ? '' : 'en'}. Was fehlt, wird nicht geschätzt — die Rechnungen
+      (Scheinpreis, Gewinn, Gewinnschutz) laufen dann nur, soweit die Daten reichen.</p>
+    <div class="tw"><table class="mtf" style="font-size:12.5px"><thead><tr><th>Schein</th><th>Fehlt / unbestätigt</th></tr></thead><tbody>
+    ${zeilen.map(({b, f}) => { const off = f.filter(x => !x.ok);
+      return `<tr><td>${esc(posName(b))}<br><span class="nu" style="font-size:11px">${esc(b.pos.sym)}</span></td>
+        <td>${off.length ? off.map(x => `<span class="dn">${esc(x.feld)}</span>: ${x.text}`).join('<br>') : '<span class="up">vollständig</span>'}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
+}
+
+const GR_SCHOCKS = [-5, -10, -15, -20, -30];
+function gemeinsamesRisikoKasten(stand){
+  const {bew, inEuro, gesamt} = stand;
+  if (!bew.length || !(gesamt > 0)) return '';
+  const teile = []; let sonstige = 0;
+  for (const b of bew){
+    const eu = inEuro(b, b.wert) || 0;
+    if (istBar(b.pos)){ continue; }
+    if (istSchein(b.pos)){
+      const h = b.hebel;
+      const ok = h && !h.ausgeknockt && h.basisKurs > 0 && h.ko > 0;
+      teile.push({b, eu, art:'schein', ok, lang: ok ? h.lang !== false : true,
+                  K: ok ? h.basisKurs : null, KO: ok ? h.ko : null, puffer: ok ? h.puffer_pct : null,
+                  tag: ok && h.basisSym ? h.basisSym : null});
+    } else if (b.row && b.row.klasse === 'aktien'){
+      teile.push({b, eu, art:'aktie', ok:true, lang: !istKurzDirekt(b.pos), puffer:null});
+    } else sonstige += eu;
+  }
+  if (!teile.length) return '';
+  const usEU = teile.filter(t => t.ok).reduce((s, t) => s + t.eu, 0);   // nur, was ein bekannter Basiswert belegt
+  const scheinEU = teile.filter(t => t.art === 'schein').reduce((s, t) => s + t.eu, 0);
+  const unbek = teile.filter(t => t.art === 'schein' && !t.ok);
+  const unbekEU = unbek.reduce((s, t) => s + t.eu, 0);
+  const zeilen = GR_SCHOCKS.map(sch => {
+    let verlust = 0; const ko = [];
+    for (const t of teile){
+      if (!t.ok) continue;
+      const s = sch / 100;
+      let f;
+      if (t.art === 'aktie') f = t.lang ? 1 + s : 1 - s;
+      else if (t.lang) f = Math.max(0, (t.K * (1 + s) - t.KO) / (t.K - t.KO));
+      else f = Math.max(0, (t.KO - t.K * (1 - s)) / (t.KO - t.K));
+      if (t.art === 'schein' && f <= 0) ko.push(posName(t.b));
+      verlust += t.eu * (f - 1);
+    }
+    return {sch, verlust, ko};
+  });
+  const kos = teile.filter(t => t.art === 'schein' && t.ok).sort((a, c) => a.puffer - c.puffer);
+  const pr = v => (v / gesamt * 100).toFixed(1).replace('.', ',') + ' %';
+  const bekannteBasen = new Set(teile.filter(t => t.tag).map(t => t.tag));
+  return `<h2>Gemeinsames Risiko</h2><div class="karte">
+    <p style="margin:0 0 6px;font-size:13.5px">
+      <strong>${num(usEU, 0)} € (${pr(usEU)} vom Depot)</strong> hängen belegbar am US-Aktienmarkt — Aktien und Scheine mit bekanntem Basiswert.
+      Davon sind <strong>${num(scheinEU - unbekEU, 0)} €</strong> Hebelscheine.${unbek.length ? ` Zusätzlich gibt es <strong>${unbek.length}</strong>
+      Schein${unbek.length === 1 ? '' : 'e'} (${num(unbekEU, 0)} €, ${pr(unbekEU)}) mit unbekanntem Basiswert oder Knock-out: die sind weder hier noch in der Tabelle
+      enthalten — im ungünstigen Fall ist der Einsatz weg.` : ''}
+      Die Positionen laufen im Absturz gemeinsam; als Annahme gilt hier ein <em>gleichzeitiger</em> Rückgang
+      aller Basiswerte um denselben Prozentsatz (Beta 1, Korrelation 1 — bewusst pessimistisch, nicht gemessen).</p>
+    <div class="tw"><table class="mtf" style="font-size:13px"><thead><tr><th>Basiswerte fallen um</th>
+      <th style="text-align:right">Verlust (berechenbar)</th><th style="text-align:right">in % Depot</th></tr></thead><tbody>
+    ${zeilen.map(z => `<tr><td>${z.sch} %${z.ko.length ? `<br><span class="dn" style="font-size:11.5px"><b>Knock-out:</b> ${z.ko.map(esc).join(', ')}</span>` : ''}</td>
+      <td style="text-align:right" class="dn"><b>−${num(Math.abs(z.verlust), 0)} €</b></td>
+      <td style="text-align:right">${pr(z.verlust)}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${kos.length ? `<h3 style="margin:10px 0 4px;font-size:13.5px">Abstand zum Knock-out</h3>
+    <div class="tw"><table class="mtf" style="font-size:12.5px"><thead><tr><th>Schein</th><th style="text-align:right">Puffer</th><th style="text-align:right">Hebel</th></tr></thead><tbody>
+    ${kos.map(t => `<tr><td>${esc(posName(t.b))}</td><td style="text-align:right" class="${t.puffer < 12 ? 'dn' : ''}">${num(t.puffer, 1)} %</td>
+      <td style="text-align:right">${t.b.hebel.hebel ? num(t.b.hebel.hebel, 1) + '×' : '—'}</td></tr>`).join('')}
+    </tbody></table></div>` : ''}
+    <p class="nu" style="font-size:11.5px;margin:8px 0 0">Gerechnet ohne Finanzierungskosten, Spread und Kurslücken über Nacht: ein Schein kann
+      <b>über</b> die Knock-out-Schwelle hinaus fallen, bevor der Emittent ihn schließt. Basiswerte im Szenario: ${bekannteBasen.size ? [...bekannteBasen].map(esc).join(', ') : 'nur direkt gehaltene Aktien'}.
+      ${sonstige > 0 ? `Nicht im Szenario: ${num(sonstige, 0)} € in Krypto, Gold und sonstigem.` : ''}
+      Ein Index-Schein auf den S&P 500 rechnet mit dem Vortagesschluss, nicht live.</p></div>`;
+}
+
 function stresstest(stand){
   const schocks = [['BTCUSD', -5], ['BTCUSD', -10], ['KORB', -3], ['KORB', -5]];
   const zeilen = [];
@@ -7282,6 +7432,7 @@ function zeichnePortfolio(){
     h += gesundheitKasten(stand);
     h += stopKasten(stopLauf, bew);
     h += sicherText(gewinnschutzKasten);
+    h += sicherText(produktdatenKasten);
 
     /* Die Handlungsliste ganz oben. Wer das Depot aufmacht, will nicht vierzehn Karten
        lesen, sondern wissen, ob heute etwas zu tun ist — und wenn ja, was und wie viel. */
@@ -7364,6 +7515,7 @@ function zeichnePortfolio(){
       return {b, eu, st};
     }).sort((x, y) => (y.eu || 0) - (x.eu || 0));
     h += depotGrafik(stand);
+    try { h += gemeinsamesRisikoKasten(stand); } catch(e){ console.error(e); }
     try { h += stresstest(stand); } catch(e){}
     h += `<h2>Auf einen Blick</h2>
       <div class="tw"><table class="mtf" style="font-size:13px">
@@ -7476,6 +7628,8 @@ function zeichnePortfolio(){
         <input id="pf_konto" class="val" placeholder="Bybit / Trade Republic" style="width:52%"></div>
       <div class="rowx"><span class="lab">Basiswert <span style="color:var(--ink-3)">nur bei Schein</span></span>
         <input id="pf_basis" class="val" placeholder="TSM, NFLX, BTCUSD …" style="width:52%"></div>
+      <div class="rowx"><span class="lab">ISIN <span style="color:var(--ink-3)">bei Schein</span></span>
+        <input id="pf_isin" class="val" placeholder="DE000… (Produktdetails)" style="width:52%"></div>
       <div class="rowx"><span class="lab">Knock-out <span style="color:var(--ink-3)">Schwelle im Basiswert</span></span>
         <input id="pf_ko" class="val" inputmode="decimal" placeholder="148,20" style="width:52%"></div>
       <div class="rowx"><span class="lab">Bezugsverhältnis</span>
@@ -7631,7 +7785,8 @@ function zeichnePortfolio(){
             konto: ($('pf_konto').value||'').trim(), seit: Date.now(),
             ...(basisFeld ? {basis: basisFeld} : {}),
             ...(zahl('pf_ko') != null ? {ko: zahl('pf_ko')} : {}),
-            ...(zahl('pf_ratio') != null ? {ratio: zahl('pf_ratio')} : {})});
+            ...(zahl('pf_ratio') != null ? {ratio: zahl('pf_ratio')} : {}),
+            ...(isinNorm(($('pf_isin')||{}).value) ? {isin: isinNorm($('pf_isin').value)} : {})});
     speicherePositionen(a); zeichnePortfolio();
   });
   const clear = $('pf_clear');
@@ -9823,6 +9978,22 @@ function zeichneSystem(){
       angezeigten Kurs und den Ausstieg gar nicht. Stablecoins, Hebel-Token und
       verpackte Doppel (WBTC …) fliegen raus, weil sie keine eigene Wette sind.</p></div>`;
   }
+  const ak = u.aktien || {};
+  const aktienZeilen = (S?.gesamt||[]).filter(o => o.klasse === 'aktien').length;
+  h += `<h2>Aktien-Universum</h2><div class="karte">
+      <div class="rowx"><span class="lab">feste Liste im Code</span><span class="val">${ak.angefragt != null ? ak.angefragt : '—'}</span></div>
+      <div class="rowx"><span class="lab">im Scan analysiert</span><span class="val">${aktienZeilen}</span></div>
+      <div class="rowx"><span class="lab">ausgefallen</span><span class="val">${ak.ausfaelle != null ? ak.ausfaelle : '—'}</span></div>
+      ${ak.ausfall_namen && Object.keys(ak.ausfall_namen).length ? `<p class="nu" style="font-size:11.5px;margin:6px 0 0">Ausgefallen (letzter eigener Lauf): ${
+        Object.entries(ak.ausfall_namen).map(([n, g]) => esc(n) + ' (' + esc(g) + ')').join('; ')}</p>`
+        : '<p class="nu" style="font-size:11.5px;margin:6px 0 0">Welche Werte ausgefallen sind, steht erst nach dem nächsten eigenen Aktien-Lauf hier.</p>'}
+    </div>
+    <div class="note-box"><span class="nt">Grenzen dieses Aktien-Scans</span>
+      <p>Der Aktien-Scan ist <strong>keine Suche über den ganzen Markt</strong>, sondern eine feste Liste von Einzelwerten
+      (ohne ETFs), nach Branchen gestreut. Eine Aktie außerhalb dieser Liste wird nicht bewertet und kann deshalb auch nicht
+      als Chance auftauchen. Kurse kommen von Yahoo, nur zu Börsenzeiten, ohne H4-Zeitebene. Eine Erweiterung auf eine
+      Index-Mitgliederliste braucht eine verlässliche Quelle und einen gestuften Lauf (erst grober Tagesfilter, dann Detailanalyse),
+      sonst sprengt sie das Zeitbudget des Laufs.</p></div>`;
   const M = S?.makro;
   if (M){
     h += `<h2>Makro</h2><div class="karte">

@@ -467,7 +467,18 @@ async def _aktien(
         )
         if erg.ausfaelle:
             print(f"  {len(erg.ausfaelle)} Ausfall/Ausfaelle: {list(erg.ausfaelle)[:5]}")
-        return erg.chancen, {"dauer_s": erg.dauer_s, "ausfaelle": len(erg.ausfaelle)}, None
+        return (
+            erg.chancen,
+            {
+                "dauer_s": erg.dauer_s,
+                "ausfaelle": len(erg.ausfaelle),
+                # Abdeckung offenlegen: wie viele angefragt, welche ausgefallen und warum.
+                "angefragt": len(AKTIEN[:limit]),
+                "ausfall_namen": {str(k): str(v)[:90] for k, v in erg.ausfaelle.items()},
+                "liste": "feste Liste im Code (scripts/build_scan_data.py::AKTIEN), kein Index-Abruf",
+            },
+            None,
+        )
     except Exception as exc:
         return [], {}, f"{type(exc).__name__}: {exc}"
     finally:

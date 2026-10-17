@@ -90,6 +90,45 @@ def muenze(sym: str) -> str:
     return s
 
 
+def isin_norm(v: Any) -> str:
+    """Gueltige ISIN (Pruefziffer stimmt) in Grossbuchstaben, sonst leer."""
+    t = re.sub(r"\s+", "", str(v or "")).upper()
+    if not re.fullmatch(r"[A-Z]{2}[A-Z0-9]{9}[0-9]", t):
+        return ""
+    z = "".join(str(ord(c) - 55) if c.isalpha() else c for c in t)
+    summe, zweite = 0, False
+    for ch in reversed(z):
+        d = int(ch)
+        if zweite:
+            d *= 2
+            if d > 9:
+                d -= 9
+        summe += d
+        zweite = not zweite
+    return t if summe % 10 == 0 else ""
+
+
+def depot_bereinigen(positionen: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Doppelte Eintraege entfernen: gleiches Kuerzel+Konto oder gleiche (gueltige) ISIN.
+    Es gewinnt der SPAETERE Eintrag (die App haengt neue Staende hinten an). Zurueck:
+    (Liste, Zaehler) — Zaehler enthalten keine Namen, damit sie oeffentlich stehen duerfen."""
+    ergebnis: dict[str, dict[str, Any]] = {}
+    zaehl = {"doppelt_schluessel": 0, "doppelt_isin": 0}
+    isin_zu_key: dict[str, str] = {}
+    for p in positionen:
+        key = schluessel(p)
+        isin = isin_norm(p.get("isin"))
+        if isin and isin in isin_zu_key and isin_zu_key[isin] != key:
+            zaehl["doppelt_isin"] += 1
+            ergebnis.pop(isin_zu_key[isin], None)
+        if key in ergebnis:
+            zaehl["doppelt_schluessel"] += 1
+        ergebnis[key] = p
+        if isin:
+            isin_zu_key[isin] = key
+    return list(ergebnis.values()), zaehl
+
+
 def ist_schein(pos: dict[str, Any]) -> bool:
     """Turbo, Knock-out, Faktor — alles, was ueber einen Basiswert laeuft."""
     if pos.get("ko") is not None or pos.get("basis"):
@@ -147,6 +186,19 @@ class ScanIndex:
     def __init__(self, scan: dict[str, Any]) -> None:
         self.eurusd = _zahl(scan.get("eurusd"))
         self.genau: dict[str, dict[str, Any]] = {}
+        # Der S&P 500 steht nicht im Scan, aber in der Makro-Messung (Yahoo ^GSPC, Tagesschluss).
+        # Er wird als Zeile mit Hinweis angeboten — KEIN Livekurs.
+        for w in (scan.get("makro") or {}).get("werte") or []:
+            if w.get("schluessel") == "spx" and _zahl(w.get("wert")):
+                self.index_spx = {
+                    "instrument": "SPX",
+                    "name": "S&P 500",
+                    "klasse": "index",
+                    "kurs": float(w["wert"]),
+                    "waehrung": "USD",
+                    "nur_tagesschluss": True,
+                    "kurs_stand": w.get("stand"),
+                }
         self.je_muenze: dict[str, dict[str, Any]] = {}
         for r in scan.get("gesamt") or []:
             name = str(r.get("instrument") or "").upper()
@@ -155,16 +207,23 @@ class ScanIndex:
             self.genau.setdefault(name, r)
             self.je_muenze.setdefault(muenze(name), r)
 
+    index_spx: dict[str, Any] | None = None
+
     def zeile(self, sym: str, *, nur_genau: bool = False) -> dict[str, Any] | None:
         s = str(sym or "").upper()
         if s in self.genau:
             return self.genau[s]
+        if self.index_spx and re.sub(r"[\s_-]", "", s) in {"SPX", "SP500", "S&P500", "^GSPC", "GSPC"}:
+            return self.index_spx
         if nur_genau:
             return None
         return self.je_muenze.get(muenze(s))
 
 
 def basis_von(pos: dict[str, Any]) -> tuple[str, str] | None:
+    # Basiswert nicht bestaetigt: nie aus dem Namen raten (wie in der App).
+    if pos.get("basis_offen") and not pos.get("basis"):
+        return None
     if pos.get("basis"):
         return str(pos["basis"]).upper(), str(pos.get("basis_richtung") or "long")
     s = str(pos.get("sym") or "").upper()
@@ -488,6 +547,9 @@ def schein_produkt(pos: dict[str, Any], lg: Lage) -> dict[str, Any]:
         aus["quelle"] = "Bezugsverhältnis eingetragen"
     else:
         wm, m = _zahl(pos.get("wert_manuell")), _zahl(pos.get("menge"))
+        # Platzhalter-Stueckzahl (1 = ganze Position): daraus darf kein Verhaeltnis folgen.
+        if pos.get("platzhalter"):
+            wm = None
         stueck = in_basis(wm / m) if wm and m and m > 0 else None
         if stueck and stueck > 0:
             ratio = abstand / stueck

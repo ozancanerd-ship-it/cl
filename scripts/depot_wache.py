@@ -67,6 +67,7 @@ from trading_agent.ops.notify import (
 )
 from trading_agent.portfolio_intel.depot_stops import (
     Ereignis,
+    depot_bereinigen,
     pruefe_depot,
     stand_kennung,
 )
@@ -212,7 +213,14 @@ def depot_lesen(roh: str) -> list[dict[str, Any]]:
     liste = d if isinstance(d, list) else d.get("p") if isinstance(d, dict) else None
     if not isinstance(liste, list):
         return []
-    return [p for p in liste if isinstance(p, dict) and p.get("sym")]
+    sauber = [p for p in liste if isinstance(p, dict) and p.get("sym")]
+    sauber, zaehl = depot_bereinigen(sauber)
+    if zaehl["doppelt_schluessel"] or zaehl["doppelt_isin"]:
+        print(
+            f"::warning::Depot enthielt Doppelte (gleiches Kuerzel/Konto: {zaehl['doppelt_schluessel']},"
+            f" gleiche ISIN: {zaehl['doppelt_isin']}) — je eines zaehlt."
+        )
+    return sauber
 
 
 def sync_lesen(pfad: str | Path, geheim: str) -> str:
