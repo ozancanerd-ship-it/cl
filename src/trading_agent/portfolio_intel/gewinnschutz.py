@@ -204,6 +204,24 @@ def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], 
             sig.append(Signal("wick_rejection", 1.0, f"{tf}: lange obere Lunte nahe dem Hoch ({obere / rng * 100:.0f} % der Kerze) — Ablehnung", True))
             break
 
+    # 3b) Kerzenlesen (analysis/candles): verschlingende bzw. Impuls-Abwaertskerze in den
+    #     letzten 2 Kerzen. Bewusst nur 0,25 Gewicht: eine Kerze ist eine Stimme, kein Urteil —
+    #     sie macht ein knappes Bild kippbar, ohne allein eine Stufe hochzuziehen.
+    if a > 0:
+        from types import SimpleNamespace
+
+        from trading_agent.analysis.candles import erkenne_kerzen
+
+        kb = [SimpleNamespace(open=b[0], high=b[1], low=b[2], close=b[3]) for b in bars[-12:]]
+        for m in erkenne_kerzen(kb, a, hochs=[hh20], fenster=2):
+            if m.richtung == "short" and m.art in ("verschlingen", "impuls") and m.staerke >= 0.45:
+                sig.append(Signal("kerze_gegen", 0.25, f"{tf}: {m.text} — Verkäufer übernehmen"))
+                break
+        else:
+            if any(m.richtung == "long" and m.art in ("verschlingen", "impuls", "pin")
+                   and m.staerke >= 0.45 for m in erkenne_kerzen(kb, a, fenster=2)):
+                stark.append(f"{tf}: kräftige Käuferkerze zuletzt — Käufer verteidigen")
+
     # 4) Gescheiterter Ausbruch: neues 20er-Hoch in den letzten 6 Kerzen, Schluss wieder darunter
     if len(bars) >= 27:
         for k in range(2, 8):

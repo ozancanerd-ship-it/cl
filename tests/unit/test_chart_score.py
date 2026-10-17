@@ -77,6 +77,8 @@ class _Tfc:
     liquidity: tuple = ()
     premium_discount: Any = None
     structure: Any = None
+    bars: tuple = ()
+    swings: tuple = ()
 
 
 @dataclass
@@ -303,3 +305,37 @@ def test_markteinstieg_ohne_ruecklaufzone_wird_nur_beobachtet() -> None:
     assert not c.handelbar, "ein Markt-Einstieg ohne Ausloeser darf nicht handelbar sein"
     assert c.urteil == "WATCH"
     assert c.deckel == "kein Einstiegsniveau, nur der aktuelle Kurs"
+
+
+# ── Kerzen beeinflussen den Score nachweislich ───────────────────────────────────
+@dataclass
+class _Bar:
+    open: float
+    high: float
+    low: float
+    close: float
+
+
+@dataclass
+class _SwingT:
+    price: float
+    is_high: bool = False
+
+
+def _mit_kerzen(letzte: _Bar) -> Any:
+    bars = (*tuple(_Bar(100, 100.5, 99.5, 100.1) for _ in range(10)), letzte)
+    tfc = _tfc_long(bars=bars, swings=(_SwingT(97.2),), atr=1.0)
+    per_tf = {tf: tfc for tf in (Timeframe.D1, Timeframe.H4, Timeframe.H1, Timeframe.M15)}
+    return bewerte_chart("TEST", _Mtf(per_tf), 100.0)
+
+
+def test_kerzenfaktor_hebt_und_warnt() -> None:
+    pin = _mit_kerzen(_Bar(100.0, 100.3, 97.0, 100.1))  # Ablehnung am Swing-Tief
+    ruhig = _mit_kerzen(_Bar(100.0, 100.5, 99.5, 100.1))
+    gegen = _mit_kerzen(_Bar(100.0, 103.0, 99.9, 100.1))  # Docht nach oben, gegen Long
+    k = {c: next(f for f in x.faktoren if f.name == "kerzen") for c, x in
+         (("pin", pin), ("ruhig", ruhig), ("gegen", gegen))}
+    assert k["pin"].punkte > k["ruhig"].punkte == 0
+    assert pin.score > ruhig.score
+    assert "Ablehnung nach unten" in k["pin"].detail
+    assert sum(MAX_PUNKTE.values()) == 100.0

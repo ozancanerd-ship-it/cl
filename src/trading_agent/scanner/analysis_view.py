@@ -87,6 +87,31 @@ def _swings(tfc: Any, grenze: int = 40) -> list[dict[str, Any]]:
     return out
 
 
+def _kerzenmuster(tfc: Any, fenster: int = 40) -> list[dict[str, Any]]:
+    """Echte Kerzenmuster der letzten Kerzen — nur aus dem, was berechnet wurde.
+
+    Nur Muster mit Richtung und ordentlicher Staerke; Inside Bars/Dojis ohne Richtung
+    wuerden den Chart nur zumuellen.
+    """
+    from trading_agent.analysis.candles import erkenne_kerzen
+
+    bars = list(getattr(tfc, "bars", ()) or ())
+    atr = float(getattr(tfc, "atr", 0.0) or 0.0)
+    if len(bars) < 5 or atr <= 0:
+        return []
+    tiefs, hochs = [], []
+    for sw in getattr(tfc, "swings", ()) or ():
+        (hochs if getattr(sw, "is_high", False) else tiefs).append(float(sw.price))
+    out = []
+    for m in erkenne_kerzen(bars, atr, tiefs=tiefs[-6:], hochs=hochs[-6:], fenster=fenster):
+        if m.richtung is None or m.staerke < 0.4:
+            continue
+        d = m.as_dict()
+        d["t"] = _iso(getattr(bars[m.index], "open_time", None))
+        out.append(d)
+    return out[-12:]
+
+
 def _brueche(tfc: Any, grenze: int = 8) -> list[dict[str, Any]]:
     out = []
     for b in list(getattr(tfc, "structure_breaks", ()) or ())[-grenze:]:
@@ -193,6 +218,7 @@ def zeichnung(
         out[tf.value] = {
             "kerzen": _kerzen(tfc, kerzen),
             "swings": _swings(tfc),
+            "kerzenmuster": _kerzenmuster(tfc),
             "brueche": _brueche(tfc),
             "liquiditaet": _liquiditaet(tfc),
             "zonen": _zonen(tfc),

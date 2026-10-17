@@ -1639,7 +1639,7 @@ const chart = (()=>{
   let cv = null, ctx = null, B = [], Z = null, C = null, P = null;
   let i0 = 0, anz = 120, hoverX = null, hoverY = null;
   let ziehen = null, kneifen = null, letzterPreis = null, wasserzeichen = '';
-  const EBENEN = {swings:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true, rsi:true, vol:true};
+  const EBENEN = {swings:true, kerzen:true, brueche:true, liq:true, zonen:true, pd:false, ziele:true, rsi:true, vol:true};
   const M = {l: 6, r: 62, t: 10, b: 22};
   /* Höhe des RSI-Streifens unter den Kerzen. 0 = aus. Der RSI teilt sich die
      Zeitachse mit dem Chart — sonst vergleicht man zwei verschiedene Ausschnitte. */
@@ -1928,6 +1928,25 @@ const chart = (()=>{
           ctx.fillText(s.label === 'EQUAL' ? 'EQ' : s.label, x, y + (s.hoch ? -9 : 12));
         }
       });
+    }
+
+    // Kerzenmuster — Pfeil an der Kerze, Kürzel darüber/darunter. Nur berechnete Muster.
+    if (EBENEN.kerzen && Z){
+      const idx = new Map(v.map((b,i)=>[b.t, i]));
+      const KZ = {impuls:'IMP', verschlingen:'ENG', pin:'PIN', sweep:'SWP'};
+      ctx.font = `bold 8px ${MONO}`; ctx.textAlign = 'center';
+      for (const m of (Z.kerzenmuster||[])){
+        const i = idx.get(m.t); if (i == null) continue;
+        const b = v[i], x = X(i), lang = m.richtung === 'long';
+        const y = lang ? Y(b.l) + 8 : Y(b.h) - 8;
+        ctx.fillStyle = lang ? cLong : cBad;
+        ctx.beginPath();
+        if (lang){ ctx.moveTo(x, y-5); ctx.lineTo(x-4, y+1); ctx.lineTo(x+4, y+1); }
+        else { ctx.moveTo(x, y+5); ctx.lineTo(x-4, y-1); ctx.lineTo(x+4, y-1); }
+        ctx.fill();
+        ctx.fillStyle = cInk3;
+        ctx.fillText(KZ[m.art]||'', x, lang ? y+12 : y-8);
+      }
     }
 
     // Strukturbrüche
@@ -3425,7 +3444,7 @@ function zeichneChartAnsicht(){
   const d = digits(kurs);
   const E = chart.ebenen();
   const P = chartPlan(AKTIV.instrument, c);
-  const lagen = [['ziele','Entry/SL/TP'],['swings','Swings'],['brueche','BOS/CHoCH'],
+  const lagen = [['ziele','Entry/SL/TP'],['swings','Swings'],['kerzen','Kerzen'],['brueche','BOS/CHoCH'],
                  ['liq','Liquidität'],['zonen','FVG/OB'],['vol','Volumen'],['rsi','RSI'],
                  ['pd','Premium/Discount']];
   const beruehrung = matchMedia && matchMedia('(pointer: coarse)').matches;

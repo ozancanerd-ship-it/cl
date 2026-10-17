@@ -134,12 +134,13 @@ RAUM_BAND = (1.5, 4.0)
 RAUM_AUS = 8.0
 
 MAX_PUNKTE: dict[str, float] = {
-    "mtf_ausrichtung": 25.0,
-    "struktur_frisch": 20.0,
-    "bewegungsraum": 20.0,
-    "zonen": 15.0,
-    "momentum": 10.0,
-    "lage": 10.0,
+    "mtf_ausrichtung": 22.0,
+    "struktur_frisch": 18.0,
+    "bewegungsraum": 18.0,
+    "zonen": 14.0,
+    "momentum": 8.0,
+    "lage": 8.0,
+    "kerzen": 12.0,
 }
 
 
@@ -542,6 +543,11 @@ def bewerte_chart(
         break
     f.append(ChartFaktor("lage", punkte, MAX_PUNKTE["lage"], detail))
 
+    # 7 — Was sagt die einzelne Kerze an der Marke? Ablehnung, Wucht, Verschlingen.
+    kerzen_punkte, kerzen_detail, kerzen_warn, _kerzen_muster = _kerzen_faktor(per_tf, richtung)
+    f.append(ChartFaktor("kerzen", MAX_PUNKTE["kerzen"] * kerzen_punkte, MAX_PUNKTE["kerzen"],
+                         kerzen_detail))
+
     score = sum(x.punkte for x in f)
     inval = _invalidierung(per_tf, kurs, richtung, atr) if richtung else None
     bew_pct = (abs(ziel - kurs) / kurs * 100) if ziel else None
@@ -575,6 +581,7 @@ def bewerte_chart(
     warnungen = _warnungen(zusatz, per_tf, richtung, score)
     gegenwind = _gegenwind(per_tf, richtung)
     warnungen = list(gegenwind) + [w for w in warnungen if w not in gegenwind]
+    warnungen += [w for w in kerzen_warn if w not in warnungen]
 
     # --- Das Setup. Der Punkt, an dem aus Zahlen ein Trade wird (oder eben nicht).
     #
@@ -785,6 +792,32 @@ def bewerte_chart(
         setup=setup,
         plan=handelsplan,
     )
+
+
+def _kerzen_faktor(
+    per_tf: dict[Timeframe, Any], richtung: Direction | None
+) -> tuple[float, str, list[str], list[Any]]:
+    """Kerzenmuster auf H4 (Gewicht 1) und H1 (0,7); das bessere in Richtung zaehlt."""
+    from trading_agent.analysis.candles import erkenne_kerzen, kerzen_urteil
+
+    if richtung is None:
+        return 0.0, "keine Richtung", [], []
+    beste: tuple[float, str, list[str], list[Any]] = (0.0, "keine Kerzendaten", [], [])
+    for tf, gew in ((Timeframe.H4, 1.0), (Timeframe.H1, 0.7)):
+        tfc = per_tf.get(tf)
+        bars = list(getattr(tfc, "bars", ()) or ()) if tfc is not None else []
+        atr = float(getattr(tfc, "atr", 0.0) or 0.0)
+        if len(bars) < 5 or atr <= 0:
+            continue
+        tiefs, hochs = [], []
+        for sw in getattr(tfc, "swings", ()) or ():
+            (hochs if getattr(sw, "is_high", False) else tiefs).append(float(sw.price))
+        muster = erkenne_kerzen(bars, atr, tiefs=tiefs[-6:], hochs=hochs[-6:])
+        anteil, text, warn = kerzen_urteil(muster, richtung.value)
+        anteil *= gew
+        if anteil >= beste[0] or not beste[3]:
+            beste = (anteil, f"{tf.value}: {text}", warn, muster)
+    return beste
 
 
 def _gegenwind(per_tf: dict[Timeframe, Any], richtung: Direction | None) -> list[str]:
