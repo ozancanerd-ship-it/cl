@@ -87,3 +87,31 @@ console.log(JSON.stringify([GR_SCHOCKS, f(100,90,-0.05), f(100,90,-0.10), f(100,
     schocks, a, b, c = _node(js)  # type: ignore[misc]
     assert schocks[0] == -5 and abs(a - 0.5) < 1e-9 and b == 0 and abs(c - 0.5) < 1e-9
     assert "(t.K * (1 + s) - t.KO) / (t.K - t.KO)" in TEMPLATE
+
+
+def test_echte_tr_daten_sp500_schein_rendite_am_scheinpreis() -> None:
+    """3 Stück, Einstand 13,74 €, Wert 39,39 €: Rendite −4,4 % AM SCHEIN (nicht am Index);
+    das Bezugsverhältnis wird aus dem eingetragenen Wert abgeleitet und als solches gekennzeichnet."""
+    scan = {"eurusd": 1.1213, "gesamt": [],
+            "makro": {"werte": [{"schluessel": "spx", "wert": 7659.44, "stand": "2026-10-16"}]}}
+    pos = {"sym": "TR-SP500-6183-LONG", "basis": "SPX", "ko": 6183.07, "menge": 3, "einstieg": 13.74,
+           "wert_manuell": 39.39, "platzhalter": False, "konto": "Trade Republic"}
+    p = schein_produkt(pos, lage_fuer(pos, ScanIndex(scan)))
+    assert p["kurs"] is not None and abs(p["kurs"] - 13.13) < 0.01
+    assert "abgeleitet" in p["quelle"] and abs(p["ratio"] - 100.3) < 0.2
+    assert abs((p["kurs"] / 13.74 - 1) * 100 - (-4.45)) < 0.1
+    # Index-Kerzen kommen im Waechter ueber Yahoo ^GSPC
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("dw", Path(__file__).resolve().parents[2] / "scripts" / "depot_wache.py")
+    dw = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(dw)  # type: ignore[union-attr]
+    assert dw.YAHOO_INDEX["SPX"] == "^GSPC"
+
+
+def test_ungeklaerter_basiswert_bleibt_ohne_rechnung() -> None:
+    scan = {"eurusd": 1.12, "gesamt": [{"instrument": "AMZN", "kurs": 250.0, "name": "Amazon", "klasse": "aktien"}]}
+    pos = {"sym": "TR-A-194-LONG", "ko": 194.36, "basis_offen": True, "basis_vorschlag": "AMZN",
+           "menge": 13, "einstieg": 5.60, "wert_manuell": 65.0, "konto": "Trade Republic"}
+    lg = lage_fuer(pos, ScanIndex(scan))
+    assert lg.kurs is None  # der Vorschlag fliesst nirgends in die Rechnung

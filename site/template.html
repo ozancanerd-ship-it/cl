@@ -7064,9 +7064,11 @@ function produktCheck(b){
   const felder = [];
   const add = (feld, ok, text) => felder.push({feld, ok, text});
   add('Basiswert', !!pos.basis, pos.basis ? esc(String(pos.basis).toUpperCase()) + ' (von dir eingetragen)'
-      : (bv && bv.geraten ? 'geraten: ' + esc(bv.sym) + ' — nicht bestätigt' : 'fehlt'));
+      : (pos.basis_vorschlag ? 'UNGEKLÄRT — Vorschlag ' + esc(String(pos.basis_vorschlag)) + ' (nicht bestätigt, nicht in der Rechnung)'
+      : (bv && bv.geraten ? 'geraten: ' + esc(bv.sym) + ' — nicht bestätigt' : 'UNGEKLÄRT')));
   add('ISIN', !!isinNorm(pos.isin), isinNorm(pos.isin) || 'fehlt');
-  add('Bezugsverhältnis', scheinTeiler(pos) != null, scheinTeiler(pos) != null ? 'eingetragen' : 'fehlt');
+  add('Bezugsverhältnis', scheinTeiler(pos) != null, scheinTeiler(pos) != null ? 'eingetragen'
+      : (b.hebel && b.hebel.ratio != null ? 'nicht eingetragen — aus deinem Wert abgeleitet (≈ ' + num(b.hebel.ratio, 1) + '), bitte aus den Produktdetails prüfen' : 'fehlt'));
   add('Stückzahl', Number(pos.menge) > 0 && !ph, ph ? 'Platzhalter (1 = ganze Position)' : (Number(pos.menge) > 0 ? num(pos.menge, 4) : 'fehlt'));
   add('Einstiegskurs je Schein', pos.einstieg != null && !ph, ph ? 'Platzhalter (Einsatz der ganzen Position)' : (pos.einstieg != null ? num(pos.einstieg, 2) : 'fehlt'));
   const sk = b.hebel && b.hebel.schein != null && !b.hebel.ausgeknockt ? b.hebel.schein : null;

@@ -73,6 +73,9 @@ from trading_agent.portfolio_intel.depot_stops import (
 )
 from trading_agent.security.siegel import oeffnen, schluessel_aus, versiegeln
 
+#: Indizes, die nicht im Scan stehen, aber ueber Yahoo Kerzen liefern.
+YAHOO_INDEX = {"SPX": "^GSPC"}
+
 STAND = "data/repository_real/live/depot_stand.siegel"
 OEFFENTLICH = "web/waechter.json"
 ZWECK = "depot-waechter-stand-v1"
@@ -477,7 +480,7 @@ async def marktdaten(
     aktien: set[str] = set()
     for pos in positionen:
         lg = lage_fuer(pos, idx)
-        if lg.row and str(lg.row.get("klasse") or "") == "aktien" and lg.row.get("instrument"):
+        if lg.row and str(lg.row.get("klasse") or "") in ("aktien", "index") and lg.row.get("instrument"):
             aktien.add(str(lg.row["instrument"]))
     if aktien and _boerse_offen(jetzt):
         from datetime import timedelta
@@ -489,8 +492,9 @@ async def marktdaten(
         try:
             for inst in sorted(aktien):
                 try:
-                    h1b = await prov.fetch_ohlcv(inst, Timeframe.H1, jetzt - timedelta(days=30), jetzt)
-                    d1b = await prov.fetch_ohlcv(inst, Timeframe.D1, jetzt - timedelta(days=500), jetzt)
+                    ysym = YAHOO_INDEX.get(inst, inst)  # der S&P 500 steht bei Yahoo als ^GSPC
+                    h1b = await prov.fetch_ohlcv(ysym, Timeframe.H1, jetzt - timedelta(days=30), jetzt)
+                    d1b = await prov.fetch_ohlcv(ysym, Timeframe.D1, jetzt - timedelta(days=500), jetzt)
                 except Exception:
                     continue
                 h1 = schluesse_aus_ohlcv(h1b, jetzt, 2 * 3600 + 1800)
