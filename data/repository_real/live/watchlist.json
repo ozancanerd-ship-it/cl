@@ -1,15 +1,17 @@
 {
-  "stand": "2026-10-18T19:41:17.790509+00:00",
+  "stand": "2026-10-18T19:49:28.401963+00:00",
   "wachen": {
     "AAVEUSD": {
       "aufgenommen": "2026-10-17T17:04:35.855807+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.0,
+      "bestes_r": 1.48,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 152.57,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 152.4,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 5.59,
       "eurusd": 1.1213,
       "gemeldet": "2026-10-17T19:35:45.177829+00:00",
@@ -24,7 +26,7 @@
       "rr": 2.0,
       "rs": 69.9,
       "schlechtestes_r": -0.53,
-      "schutz": null,
+      "schutz": 152.4,
       "score": 67.5,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 156.84,
@@ -35,20 +37,21 @@
       "tp3": 137.39,
       "trigger": "Der Kurs muss unter 163,83 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 1017160.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "AIUSD": {
       "aufgenommen": "2026-10-14T14:26:28.844458+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 3.43,
+      "bestes_r": 3.66,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.01863,
       "einstieg_art": "sofort",
       "einstiegskurs": 0.01862,
       "erreicht": [
         "TP1",
-        "TP2"
+        "TP2",
+        "TP3"
       ],
       "erwartet_pct": 3.97,
       "eurusd": 1.116,
@@ -78,13 +81,13 @@
       "tp3": 0.016495000000000003,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,01877 — nicht beim Antippen.",
       "umsatz_24h": 127413.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
+      "zustand": "ziel_erreicht"
     },
     "AKTUSD": {
       "aufgenommen": "2026-10-17T18:52:03.979281+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.41,
+      "bestes_r": 1.52,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.7049,
       "einstieg_art": "sofort",
@@ -115,7 +118,7 @@
       "tp3": 0.5648999999999998,
       "trigger": "Der Kurs muss unter 0,74380 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 340232.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "ALGOUSD": {
@@ -311,7 +314,7 @@
     "ARBUSD": {
       "aufgenommen": "2026-10-17T17:34:54.921478+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.38,
+      "bestes_r": 0.52,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.1817,
       "einstieg_art": "sofort",
@@ -342,7 +345,7 @@
       "tp3": 0.14095,
       "trigger": "Der Kurs muss unter 0,19920 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 595601.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "ASTERUSD": {
@@ -497,7 +500,7 @@
       "tp3": 4076.1499999999987,
       "trigger": "",
       "umsatz_24h": 288764.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "AVGO": {
@@ -697,7 +700,7 @@
     "BCHUSD": {
       "aufgenommen": "2026-10-18T15:21:50.618198+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.26,
+      "bestes_r": 0.53,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 271.39,
       "einstieg_art": "Ruecklauf in FVG H1",
@@ -728,7 +731,7 @@
       "tp3": 227.49999999999991,
       "trigger": "",
       "umsatz_24h": 481747.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "BKNG": {
@@ -808,12 +811,14 @@
     "BNBUSD": {
       "aufgenommen": "2026-10-16T17:28:13.137990+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.93,
+      "bestes_r": 1.29,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 722.79,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 720.52,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 2.63,
       "eurusd": 1.1195,
       "gemeldet": "",
@@ -828,7 +833,7 @@
       "rr": 2.0,
       "rs": 37.3,
       "schlechtestes_r": -0.37,
-      "schutz": null,
+      "schutz": 720.52,
       "score": 63.5,
       "setup": "",
       "stop": 734.23,
@@ -839,7 +844,7 @@
       "tp3": 672.33,
       "trigger": "",
       "umsatz_24h": 919028.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "BONKUSD": {
@@ -901,7 +906,7 @@
       "richtung": "long",
       "rr": 2.0,
       "rs": 55.4,
-      "schlechtestes_r": -0.86,
+      "schlechtestes_r": -1.0,
       "schutz": null,
       "score": 63.0,
       "setup": "",
@@ -913,13 +918,13 @@
       "tp3": 86847.2,
       "trigger": "",
       "umsatz_24h": 53047196.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "CCUSD": {
       "aufgenommen": "2026-10-18T11:18:23.776099+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.61,
+      "bestes_r": 0.96,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.10105,
       "einstieg_art": "sofort",
@@ -950,7 +955,7 @@
       "tp3": 0.08558000000000002,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,10194 — nicht beim Antippen.",
       "umsatz_24h": 1227513.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "CMCSA": {
@@ -1868,7 +1873,7 @@
     "HYPEUSD": {
       "aufgenommen": "2026-10-17T18:23:02.596830+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.47,
+      "bestes_r": 0.59,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 79.13,
       "einstieg_art": "Ruecklauf in FVG H4",
@@ -1899,7 +1904,7 @@
       "tp3": 67.54499999999999,
       "trigger": "",
       "umsatz_24h": 3173918.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "INITUSD": {
@@ -2225,7 +2230,7 @@
     "LINKUSD": {
       "aufgenommen": "2026-10-17T15:51:24.577566+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.52,
+      "bestes_r": 0.82,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 11.952,
       "einstieg_art": "sofort",
@@ -2256,7 +2261,7 @@
       "tp3": 10.4981,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 11,81 — nicht beim Antippen.",
       "umsatz_24h": 3085481.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "LLY": {
@@ -2413,7 +2418,7 @@
       "tp3": 54.77500000000002,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 1947798.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "LTCUSDT": {
@@ -2534,7 +2539,7 @@
     "MONUSD": {
       "aufgenommen": "2026-10-16T17:28:13.137990+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.39,
+      "bestes_r": 1.56,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.0224,
       "einstieg_art": "sofort",
@@ -2567,7 +2572,7 @@
       "tp3": 0.017779999999999994,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,02203 — nicht beim Antippen.",
       "umsatz_24h": 444460.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "MSFT": {
@@ -3540,7 +3545,7 @@
     "SOLUSD": {
       "aufgenommen": "2026-10-16T18:14:40.582875+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.91,
+      "bestes_r": 1.05,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 104.5,
       "einstieg_art": "Ruecklauf in FVG H1",
@@ -3571,7 +3576,7 @@
       "tp3": 94.66499999999999,
       "trigger": "",
       "umsatz_24h": 26756386.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "SPXUSD": {
@@ -3686,8 +3691,8 @@
       "tp3": 0.22944589907962026,
       "trigger": "Der Kurs muss ueber 0,18530 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 141341.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
-      "zustand": "wartet_auf_einstieg"
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
+      "zustand": "invalidiert"
     },
     "SUSHIUSD": {
       "aufgenommen": "2026-10-16T00:49:02.594093+00:00",
@@ -3766,12 +3771,14 @@
     "TAOUSD": {
       "aufgenommen": "2026-10-16T17:19:43.167852+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.59,
+      "bestes_r": 1.86,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 279.9499,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 274.4436,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 9.11,
       "eurusd": 1.1195,
       "gemeldet": "",
@@ -3786,7 +3793,7 @@
       "rr": 2.87,
       "rs": 42.7,
       "schlechtestes_r": -0.51,
-      "schutz": null,
+      "schutz": 274.4436,
       "score": 74.5,
       "setup": "",
       "stop": 290.8425,
@@ -3797,7 +3804,7 @@
       "tp3": 241.82580000000016,
       "trigger": "",
       "umsatz_24h": 8015479.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "TGT": {
@@ -3840,7 +3847,7 @@
     "TRUMPUSD": {
       "aufgenommen": "2026-10-18T14:54:40.358942+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.17,
+      "bestes_r": 0.42,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 1.684,
       "einstieg_art": "sofort",
@@ -3871,7 +3878,7 @@
       "tp3": 1.4774999999999994,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 1,7080 — nicht beim Antippen.",
       "umsatz_24h": 395191.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "TRXUSD": {
@@ -4105,7 +4112,7 @@
     "VELOUSD": {
       "aufgenommen": "2026-10-16T16:18:57.837389+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.7,
+      "bestes_r": 0.84,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.004188,
       "einstieg_art": "sofort",
@@ -4136,7 +4143,7 @@
       "tp3": 0.0034389999999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,00422400 — nicht beim Antippen.",
       "umsatz_24h": 102079.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "VRTX": {
@@ -4292,13 +4299,13 @@
       "tp3": 0.003864999999999999,
       "trigger": "Der Kurs muss unter 0,00479000 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 815325.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "XDCUSD": {
       "aufgenommen": "2026-10-17T18:15:41.452304+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.36,
+      "bestes_r": 0.39,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.03329,
       "einstieg_art": "sofort",
@@ -4329,7 +4336,7 @@
       "tp3": 0.026570000000000007,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,03313 — nicht beim Antippen.",
       "umsatz_24h": 446056.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "XLMUSD": {
@@ -4403,7 +4410,7 @@
       "tp3": 675.3250000000003,
       "trigger": "",
       "umsatz_24h": 4344208.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     },
     "XOM": {
@@ -4561,7 +4568,7 @@
       "tp3": 0.04284500000000002,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,05189 — nicht beim Antippen.",
       "umsatz_24h": 175709.0,
-      "zuletzt": "2026-10-18T19:40:47.844085+00:00",
+      "zuletzt": "2026-10-18T19:48:57.570163+00:00",
       "zustand": "aktiv"
     }
   }
