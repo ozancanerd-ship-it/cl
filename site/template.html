@@ -747,6 +747,52 @@ a{color:var(--accent); text-underline-offset:3px}
 .nb-l{margin:4px 0 0;padding-left:18px;font-size:13.5px;line-height:1.45}.nb-l li{margin:3px 0}
 
 .ta-in h4{margin:12px 0 4px;font-size:14px}.ta-in p{font-size:13.5px;line-height:1.5;margin:4px 0}
+
+/* ---- Labor / Aktivität (19.10.) ---- */
+.h2-n{font-size:11px;font-weight:400;color:var(--ink-3);margin-left:8px;letter-spacing:.02em}
+.ticker{overflow:hidden;margin:8px 0 2px;mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.ticker:empty{display:none}
+.tk-in{white-space:nowrap;font:11px/1.6 "JetBrains Mono",monospace;color:var(--ink-2)}
+.tk-spur{display:inline-block;animation:tk 70s linear -12s infinite;padding-left:100%}
+.tk-spur span{margin-right:34px}.tk-spur b{color:var(--accent);font-weight:600;margin-right:4px}
+.tk-spur .bad b{color:var(--bad)}.tk-spur .warn b{color:var(--warn)}.tk-spur .gut b{color:var(--long)}
+.tk-spur em{color:var(--ink-3);font-style:normal}
+@keyframes tk{to{transform:translateX(-50%)}}
+.ticker:hover .tk-spur{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){.tk-spur{animation:none;padding-left:0}.ticker{overflow-x:auto}}
+.feed-k{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--ink-3);margin-bottom:6px}
+.live{display:inline-flex;align-items:center;gap:6px;color:var(--accent);font:600 10.5px "JetBrains Mono",monospace;letter-spacing:.08em}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 0 var(--accent);animation:puls 2s infinite}
+@keyframes puls{70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.live i{animation:none}}
+.feed-b{margin:2px 0 10px;font-size:13px;color:var(--ink-2);line-height:1.5}
+.feed-l{list-style:none;margin:0;padding:0}
+.feed-l li{display:grid;grid-template-columns:78px 68px 1fr;gap:8px;align-items:baseline;padding:7px 4px;border-top:1px solid var(--rule);font-size:12.5px;cursor:pointer;border-radius:6px;transition:background .15s}
+.feed-l li:hover,.feed-l li:focus-visible{background:var(--glass-2);outline:none}
+.feed-l .t{color:var(--ink-3);font:11px "JetBrains Mono",monospace}
+.feed-l .a{font:600 10px "JetBrains Mono",monospace;letter-spacing:.06em;color:var(--accent)}
+.feed-l .bad .a{color:var(--bad)}.feed-l .warn .a{color:var(--warn)}.feed-l .gut .a{color:var(--long)}
+.feed-l .x{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:10px;margin-bottom:12px}
+.kpi .k{font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font:600 18px "JetBrains Mono",monospace;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .v.gut,.rg-v.gut{color:var(--long)}.kpi .v.schlecht,.rg-v.schlecht{color:var(--bad)}
+.kv-t{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--ink-3);margin:12px 0 4px}
+.kv-t span:first-child{color:var(--ink-2);font-weight:600}
+.kurve{display:block;width:100%;height:auto;max-height:170px;background:var(--sunk);border-radius:10px}
+.wb-kopf{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);margin:14px 0 4px}
+.wb-kopf span:first-child{color:var(--ink-2);font-weight:600}
+.wb{display:flex;gap:4px;align-items:stretch;height:96px}
+.wb-s{flex:1;display:flex;flex-direction:column;min-width:0}
+.wb-o,.wb-u{flex:1;display:flex;align-items:flex-end}.wb-u{align-items:flex-start;border-top:1px solid var(--rule-strong)}
+.wb-s i{display:block;width:100%;border-radius:3px}.wb-s i.gut{background:var(--long)}.wb-s i.schlecht{background:var(--bad)}
+.wb-s.dünn i{opacity:.35}.wb-s b{font:10px "JetBrains Mono",monospace;color:var(--ink-3);text-align:center;font-weight:400;margin-top:2px}
+.rang .rg{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(40px,1fr) 52px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--rule)}
+.rg-n{font-size:13px}.rg-n small{display:block;color:var(--ink-3);font-size:11px;margin-top:1px}
+.rg-b{height:6px;background:var(--sunk);border-radius:4px;overflow:hidden}.rg-b i{display:block;height:100%;border-radius:4px}
+.rg-b i.gut{background:var(--long)}.rg-b i.schlecht{background:var(--bad)}
+.rg-v{font:600 12.5px "JetBrains Mono",monospace;text-align:right}
+.kv-hinweis{font-size:12px;color:var(--ink-3);line-height:1.5;margin:12px 0 0}
 </style>
 </head>
 <body>
@@ -759,6 +805,7 @@ a{color:var(--accent); text-underline-offset:3px}
     </div>
     <h1 id="kopf">Markt</h1>
     <div class="stamp" id="stempel">—</div>
+    <div class="ticker" id="ticker" aria-label="Letzte Ereignisse"></div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" aria-selected="true"  aria-controls="p0" id="t0">Markt</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="p1" id="t1">Chart</button>
@@ -2189,9 +2236,11 @@ function zeichneStatus(){
   const handelbar = g.filter(o=>o.handelbar).length;
   const alter = vorMin(S.erzeugt);
   const fehler = Object.keys(S.fehler||{}).length;
+  let feedHtml = ''; try { feedHtml = aktivitaetsKasten(); aktivitaetsLeiste(); } catch(e){ console.error('[Feed]', e); }
   $('marktstatus').innerHTML = `
     ${altersBanner()}
     ${stoerungsBanner()}
+    ${feedHtml}
     <div class="status">
       <div><div class="k">Gescannt</div><div class="v">${g.length}</div>
         <div class="n">${Object.entries(S.anzahl||{}).map(([k,v])=>`${k} ${v}`).join(' · ')}</div></div>
@@ -9985,8 +10034,172 @@ function wasFunktioniertKasten(){
     ${satz ? `<p class="dturteil warte" style="margin-top:10px">${satz}</p>` : ''}
     <p style="margin:8px 0 0;font-size:11.5px;color:var(--ink-3)">Nach Plan (Drittel an jedem Ziel, Stop auf Einstand). „Beide Hälften im Plus" ist ein Hinweis, kein Beweis — ein Abschnitt, ein Markt. Belegt ist erst, was auch in einem anderen Marktabschnitt hält.</p></div>`;
 }
+/* ============================================================ LABOR + AKTIVITAET (19.10.)
+   Referenz war das JARVIS-Video: ein Strategie-Labor mit Rangliste, Equity-Kurve und
+   Drawdown, dazu ein Feed, der zeigt, was das System gerade tut. Beides gab es bei uns
+   nur als Zahlen. Hier kommen sie als Bild — aus denselben Daten wie die Bilanz
+   (performance.json, Alarme, Wächter), nichts davon ist neu erhoben oder geschönt.
+   Ist die Kurve rot, ist sie rot. */
+const R1 = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1).replace('.', ',')} R`;
+
+/* Equity in R nach Plan-Regel (Drittel): jeder gezählte, ausgelöste Trade in der
+   Reihenfolge seines Endes. Liefert auch den Drawdown gegen den bisherigen Höchststand. */
+function equityReihe(trades){
+  const t = (trades || []).filter(x => x.beendet && x.gezaehlt !== false && x.eingestiegen !== false)
+    .sort((a, b) => String(a.beendet).localeCompare(String(b.beendet)));
+  let s = 0, peak = 0, maxdd = 0;
+  const pts = t.map(x => {
+    s += Number(x.r_drittel) || 0; peak = Math.max(peak, s);
+    const dd = s - peak; maxdd = Math.min(maxdd, dd);
+    return {t: x.beendet, eq: s, dd};
+  });
+  return {pts, summe: s, maxdd, n: pts.length};
+}
+
+function kurveSvg(pts, key, {farbe, flaeche = true, nullLinie = true, h = 150} = {}){
+  if (pts.length < 2) return '';
+  const W = 600, pad = 4;
+  const ys = pts.map(p => p[key]);
+  let lo = Math.min(0, ...ys), hi = Math.max(0, ...ys);
+  if (hi === lo) hi = lo + 1;
+  const X = i => pad + (W - 2 * pad) * i / (pts.length - 1);
+  const Y = v => pad + (h - 2 * pad) * (1 - (v - lo) / (hi - lo));
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p[key]).toFixed(1)}`).join('');
+  const y0 = Y(0).toFixed(1);
+  const fl = flaeche ? `<path d="${d}L${X(pts.length - 1).toFixed(1)},${y0}L${X(0).toFixed(1)},${y0}Z" fill="${farbe}" opacity=".13"/>` : '';
+  const nl = nullLinie ? `<line x1="0" x2="${W}" y1="${y0}" y2="${y0}" stroke="var(--rule-strong)" stroke-dasharray="3 4"/>` : '';
+  return `<svg class="kurve" viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" role="img" aria-label="Kurve">${nl}${fl}<path d="${d}" fill="none" stroke="${farbe}" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function wochenBalken(wochen){
+  const e = Object.entries(wochen || {}).filter(([, v]) => v && v.anzahl).sort((a, b) => a[0].localeCompare(b[0]));
+  if (!e.length) return '';
+  const m = Math.max(1, ...e.map(([, v]) => Math.abs(v.summe_r || 0)));
+  const plus = e.filter(([, v]) => (v.summe_r || 0) > 0).length;
+  return `<div class="wb-kopf"><span>Robustheit je Woche</span><span>${plus} von ${e.length} Wochen im Plus</span></div>
+  <div class="wb">${e.map(([k, v]) => {
+    const r = v.summe_r || 0, hh = Math.max(3, Math.abs(r) / m * 100);
+    return `<div class="wb-s${v.belastbar ? '' : ' dünn'}" title="${esc(k)}: ${R1(r)} bei ${v.anzahl} Trades${v.belastbar ? '' : ' — zu wenige Trades, nicht belastbar'}">
+      <div class="wb-o">${r > 0 ? `<i class="gut" style="height:${hh}%"></i>` : ''}</div>
+      <div class="wb-u">${r < 0 ? `<i class="schlecht" style="height:${hh}%"></i>` : ''}</div>
+      <b>${esc(k.replace('KW', ''))}</b></div>`;
+  }).join('')}</div>`;
+}
+
+function laborKasten(){
+  if (!PF || !PF.trades || !PF.trades.length) return '';
+  const E = equityReihe(PF.trades);
+  if (E.n < 2) return '';
+  const g = (PF.je_regel || {}).drittel || {};
+  const minus = E.summe < 0;
+  const farbe = minus ? 'var(--bad)' : 'var(--long)';
+  const setups = Object.entries(PF.je_setup || {}).filter(([, v]) => v && v.anzahl)
+    .sort((a, b) => (b[1].erwartungswert || 0) - (a[1].erwartungswert || 0));
+  const SN = s => String(s).replace('Rueck', 'Rück').replace('Liquiditaets', 'Liquiditäts');
+  const maxE = Math.max(0.01, ...setups.map(([, v]) => Math.abs(v.erwartungswert || 0)));
+  return `<h2>Labor <span class="h2-n">Stand ${esc(zeit(PF.erzeugt))} · Paper</span></h2>
+  <div class="karte labor ${minus ? 'bad' : 'gut'}">
+    <div class="kpi">
+      <div><div class="k">Summe</div><div class="v ${minus ? 'schlecht' : 'gut'}">${R1(E.summe)}</div></div>
+      <div><div class="k">Trades</div><div class="v">${E.n}</div></div>
+      <div><div class="k">Treffer</div><div class="v">${Math.round((g.trefferquote || 0) * 100)} %</div></div>
+      <div><div class="k">Ø je Trade</div><div class="v ${(g.erwartungswert || 0) < 0 ? 'schlecht' : 'gut'}">${(g.erwartungswert || 0).toFixed(2).replace('.', ',')} R</div></div>
+      <div><div class="k">Profitfaktor</div><div class="v ${(g.profitfaktor || 0) < 1 ? 'schlecht' : 'gut'}">${(g.profitfaktor || 0).toFixed(2).replace('.', ',')}</div></div>
+      <div><div class="k">Max. Rückgang</div><div class="v schlecht">${R1(E.maxdd)}</div></div>
+    </div>
+    <div class="kv-t"><span>Equity-Kurve in R</span><span>nach Plan (Drittel-Regel), je Trade bei Ende</span></div>
+    ${kurveSvg(E.pts, 'eq', {farbe})}
+    <div class="kv-t"><span>Drawdown</span><span>Abstand zum bisherigen Höchststand</span></div>
+    ${kurveSvg(E.pts, 'dd', {farbe: 'var(--bad)', nullLinie: false, h: 70})}
+    ${wochenBalken(PF.je_woche_plan)}
+    ${setups.length ? `<div class="kv-t" style="margin-top:14px"><span>Setups im Vergleich</span><span>Ø R je Trade, nur Forward-Paper</span></div>
+    <div class="rang">${setups.map(([n, v]) => {
+      const ev = v.erwartungswert || 0, br = Math.max(4, Math.abs(ev) / maxE * 100);
+      return `<div class="rg"><div class="rg-n">${esc(SN(n))}<small>${v.anzahl} Trades · Treffer ${Math.round((v.trefferquote || 0) * 100)} % · PF ${(v.profitfaktor || 0).toFixed(2).replace('.', ',')}</small></div>
+        <div class="rg-b"><i class="${ev >= 0 ? 'gut' : 'schlecht'}" style="width:${br}%"></i></div>
+        <div class="rg-v ${ev >= 0 ? 'gut' : 'schlecht'}">${ev >= 0 ? '+' : '−'}${Math.abs(ev).toFixed(2).replace('.', ',')}</div></div>`;
+    }).join('')}</div>` : ''}
+    <p class="kv-hinweis">${minus
+      ? 'Die Gesamtkurve liegt im Minus. Einzelne Setups und Wochen sind positiv, das reicht noch nicht als Beleg für einen Vorteil — deshalb bleibt alles Paper.'
+      : 'Positiv, aber nur Forward-Paper. Erst viele Trades über verschiedene Marktphasen belegen einen Vorteil.'}
+    Ein Setup mit wenigen Trades ist Zufall, kein Ergebnis.</p>
+  </div>`;
+}
+
+/* Aktivität: was ist zuletzt passiert? Quellen sind ausschließlich vorhandene Daten:
+   Alarme, abgeschlossene Signale, letzter Scan, letzte Wächter-Prüfung. */
+function aktivitaet(){
+  const ev = [];
+  for (const a of (D.alarme || []).slice(0, 40)){
+    const kl = a.severity === 'CRITICAL' ? 'bad' : a.severity === 'WARNING' ? 'warn' : 'info';
+    ev.push({t: Date.parse(a.ts), art: 'ALARM', txt: a.title, kl, tab: 6});
+  }
+  for (const x of ((PF && PF.trades) || []).filter(x => x.beendet && x.gezaehlt !== false && x.eingestiegen !== false).slice(0, 25)){
+    const r = Number(x.r_drittel) || 0;
+    ev.push({t: Date.parse(x.beendet), r, art: 'SIGNAL', kl: r > 0 ? 'gut' : r < 0 ? 'bad' : 'info', tab: 8,
+      txt: `${name(x.instrument)} ${x.zustand === 'stop' ? 'Stop' : x.zustand === 'ziel_erreicht' ? 'Ziel' : 'beendet'} ${R1(r)}`});
+  }
+  if (S && S.erzeugt) ev.push({t: Date.parse(S.erzeugt), art: 'SCAN', kl: 'info', tab: 0,
+    txt: `${(S.gesamt || []).length} Werte gescannt · ${(S.gesamt || []).filter(o => o.handelbar).length} handelbar`});
+  if (WA && WA.geprueft) ev.push({t: Date.parse(WA.geprueft), art: 'WÄCHTER', kl: WA.aktiv ? 'info' : 'warn', tab: 3,
+    txt: WA.aktiv ? `${WA.positionen} Positionen geprüft · ${WA.mit_stop} mit Stop` : 'Wächter nicht aktiv'});
+  return ev.filter(e => isFinite(e.t)).sort((a, b) => b.t - a.t);
+}
+
+function vorText(t){
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 1) return 'jetzt'; if (m < 60) return `vor ${m} Min.`;
+  const h = Math.round(m / 60); if (h < 48) return `vor ${h} Std.`;
+  return `vor ${Math.round(h / 24)} Tg.`;
+}
+
+function tagesbericht(ev){
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const t0 = heute.getTime();
+  const h = ev.filter(e => e.t >= t0);
+  const alarme = h.filter(e => e.art === 'ALARM');
+  const krit = alarme.filter(e => e.kl === 'bad').length;
+  const sig = h.filter(e => e.art === 'SIGNAL');
+  const rsum = sig.reduce((q, e) => q + (e.r || 0), 0);
+  const teile = [];
+  teile.push(alarme.length ? `${alarme.length} Alarm${alarme.length > 1 ? 'e' : ''} seit Mitternacht${krit ? `, davon ${krit} kritisch` : ''}` : 'bisher keine Alarme heute');
+  teile.push(sig.length ? `${sig.length} Signal${sig.length > 1 ? 'e' : ''} beendet (${R1(rsum)})` : 'noch kein Signal beendet');
+  const att = (S && S.gesamt || []).filter(o => o.handelbar).length;
+  teile.push(`${att} handelbare Setups im letzten Scan`);
+  return teile.join(' · ');
+}
+
+function aktivitaetsKasten(){
+  const ev = aktivitaet();
+  if (!ev.length) return '';
+  return `<div class="karte feed">
+    <div class="feed-k"><span class="live"><i></i>LIVE</span><span>Was das System zuletzt getan hat</span></div>
+    <p class="feed-b">${esc(tagesbericht(ev))}</p>
+    <ul class="feed-l">${ev.slice(0, 8).map(e => `<li class="${e.kl}" data-tab="${e.tab}" tabindex="0" role="link">
+      <span class="t">${esc(vorText(e.t))}</span><span class="a">${esc(e.art)}</span><span class="x">${esc(e.txt)}</span></li>`).join('')}</ul>
+  </div>`;
+}
+
+document.addEventListener('click', ev => {
+  const li = ev.target.closest && ev.target.closest('.feed-l li[data-tab]');
+  if (li) zeigeTab(parseInt(li.dataset.tab, 10));
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return;
+  const li = ev.target.closest && ev.target.closest('.feed-l li[data-tab]');
+  if (li) zeigeTab(parseInt(li.dataset.tab, 10));
+});
+function aktivitaetsLeiste(){
+  const el = $('ticker'); if (!el) return;
+  const ev = aktivitaet().slice(0, 6);
+  if (!ev.length){ el.innerHTML = ''; return; }
+  const zeile = ev.map(e => `<span class="${e.kl}"><b>${esc(e.art)}</b> ${esc(e.txt)} <em>${esc(vorText(e.t))}</em></span>`).join('');
+  el.innerHTML = `<div class="tk-in"><div class="tk-spur">${zeile}${zeile}</div></div>`;
+}
+
 function zeichneBilanz(){
-  let h = bilanzKasten();
+  let h = laborKasten();
+  h += bilanzKasten();
   h += sicherText(wasFunktioniertKasten);
   h += dauerKasten();
   h += quotenKasten();
