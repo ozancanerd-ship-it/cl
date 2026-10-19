@@ -325,7 +325,9 @@ def warnungen_fuer(lage: MacroLage | None, klasse: str, richtung: str | None) ->
     # gewarnt, statt sicherheitshalber alle — eine verpasste Warnung fuer eine seltene
     # Waehrung ist harmlos, eine falsche auf hundert Setups gleichzeitig nicht.
     naechste = [
-        t for t in lage.naechste_termine(stunden=36) if klasse in KLASSE_JE_LAND.get(t.land.upper(), ())
+        t
+        for t in lage.naechste_termine(stunden=36)
+        if klasse in KLASSE_JE_LAND.get(t.land.upper(), ())
     ]
     if naechste:
         t = naechste[0]

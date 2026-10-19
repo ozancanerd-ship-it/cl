@@ -61,7 +61,7 @@ def fed_statement(seite: str) -> str:
     if a < 0:
         return ""
     e = t.find("For media inquiries", a)
-    return t[a: e if e > 0 else a + 3500].strip()
+    return t[a : e if e > 0 else a + 3500].strip()
 
 
 def fed_entscheid(text: str) -> dict[str, Any]:
@@ -73,7 +73,13 @@ def fed_entscheid(text: str) -> dict[str, Any]:
     )
     if m:
         w = m.group(1).lower()
-        aktion = "anheben" if w in ("raise", "increase") else "senken" if w in ("lower", "reduce") else "halten"
+        aktion = (
+            "anheben"
+            if w in ("raise", "increase")
+            else "senken"
+            if w in ("lower", "reduce")
+            else "halten"
+        )
     schritt = re.search(r"by (\d+/\d+|\d+(?:\.\d+)?)\s*percentage point", t, re.I)
     spanne = re.search(r"target range[^.]*? to ([\d\-/ ]+(?: to [\d\-/ ]+)?)\s*percent", t, re.I)
     stimmen = re.search(r"(\d+)\s*[–\-]\s*(\d+) vote", t)
@@ -82,8 +88,12 @@ def fed_entscheid(text: str) -> dict[str, Any]:
         "schritt": schritt.group(1) if schritt else None,
         "spanne": spanne.group(1).strip() if spanne else None,
         "stimmen": f"{stimmen.group(1)}:{stimmen.group(2)}" if stimmen else None,
-        "inflation_hoch": bool(re.search(r"inflation (remains|is|has remained)? ?elevated", t, re.I)),
-        "arbeitsmarkt": "stabil" if re.search(r"unemployment rate has (changed little|remained low)", t, re.I) else None,
+        "inflation_hoch": bool(
+            re.search(r"inflation (remains|is|has remained)? ?elevated", t, re.I)
+        ),
+        "arbeitsmarkt": "stabil"
+        if re.search(r"unemployment rate has (changed little|remained low)", t, re.I)
+        else None,
         "unsicherheit": bool(re.search(r"uncertainty[^.]*elevated", t, re.I)),
     }
 
@@ -100,7 +110,11 @@ def _bruch(s: str | None) -> str:
 
 def fed_satz(e: dict[str, Any]) -> str:
     a = e.get("aktion")
-    sp = f" auf {e['spanne'].replace(' to ', ' bis ').replace('-', ' ')} %" if e.get("spanne") else ""
+    sp = (
+        f" auf {e['spanne'].replace(' to ', ' bis ').replace('-', ' ')} %"
+        if e.get("spanne")
+        else ""
+    )
     st = f" ({e['stimmen']} Stimmen)" if e.get("stimmen") else ""
     if a == "anheben":
         s = _bruch(e.get("schritt"))

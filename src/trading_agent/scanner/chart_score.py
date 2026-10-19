@@ -545,8 +545,11 @@ def bewerte_chart(
 
     # 7 — Was sagt die einzelne Kerze an der Marke? Ablehnung, Wucht, Verschlingen.
     kerzen_punkte, kerzen_detail, kerzen_warn, _kerzen_muster = _kerzen_faktor(per_tf, richtung)
-    f.append(ChartFaktor("kerzen", MAX_PUNKTE["kerzen"] * kerzen_punkte, MAX_PUNKTE["kerzen"],
-                         kerzen_detail))
+    f.append(
+        ChartFaktor(
+            "kerzen", MAX_PUNKTE["kerzen"] * kerzen_punkte, MAX_PUNKTE["kerzen"], kerzen_detail
+        )
+    )
 
     score = sum(x.punkte for x in f)
     inval = _invalidierung(per_tf, kurs, richtung, atr) if richtung else None

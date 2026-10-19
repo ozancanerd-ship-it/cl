@@ -792,6 +792,16 @@ a{color:var(--accent); text-underline-offset:3px}
 .rg-b{height:6px;background:var(--sunk);border-radius:4px;overflow:hidden}.rg-b i{display:block;height:100%;border-radius:4px}
 .rg-b i.gut{background:var(--long)}.rg-b i.schlecht{background:var(--bad)}
 .rg-v{font:600 12.5px "JetBrains Mono",monospace;text-align:right}
+.fort{padding:9px 0;border-top:1px solid var(--line,rgba(255,255,255,.08))}.fort:first-child{border-top:0}
+.fort-k{display:flex;justify-content:space-between;gap:8px;font-size:13px}.fort-k span{font-size:11.5px}
+.fort-k .warn{color:var(--warn)}.fort-k .bad{color:var(--bad)}.fort-k .gut{color:var(--long)}
+.fort-b{height:5px;border-radius:3px;background:rgba(255,255,255,.07);margin:6px 0 4px;overflow:hidden}
+.fort-b i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.wk{border-top:1px solid rgba(255,255,255,.08);padding:8px 0}.wk summary{cursor:pointer;font-size:13.5px}
+.wk p{font-size:12.5px;color:var(--ink-2,#aab);line-height:1.5;margin:6px 0}.wk-s{color:var(--ink-3)!important}
+.wk-fb button{background:transparent;border:1px solid rgba(255,255,255,.18);color:inherit;border-radius:14px;padding:4px 12px;margin-right:8px;font-size:12px;min-height:32px}
+.wk-fb button.on{border-color:var(--accent);color:var(--accent)}
+.fort small{color:var(--ink-3);font-size:11.5px}
 .kv-hinweis{font-size:12px;color:var(--ink-3);line-height:1.5;margin:12px 0 0}
 </style>
 </head>
@@ -10126,6 +10136,71 @@ function laborKasten(){
   </div>`;
 }
 
+/* Strategie-Diagnose: nur aus abgeschlossenen Forward-Paper-Trades (performance.json).
+   Gruppen sind nach Zustand bei Aufnahme bekannte Merkmale (Klasse, Richtung, Setup, Note).
+   Haltedauer, MFE/MAE und Ausgang sind Ergebnis-Merkmale und taugen NICHT als Filter. */
+const GENUG_N = 30;
+function gruppenStat(trades, schl){
+  const m = {};
+  for (const t of trades){ const k = schl(t) || 'unbekannt'; (m[k] = m[k] || []).push(t); }
+  return Object.entries(m).map(([k, a]) => {
+    const rs = a.map(x => Number(x.r_drittel) || 0);
+    const sum = rs.reduce((s, x) => s + x, 0);
+    const gw = rs.filter(x => x > 0).reduce((s, x) => s + x, 0);
+    const vl = -rs.filter(x => x < 0).reduce((s, x) => s + x, 0);
+    const nr = a.filter(x => x.r_real != null && x.kosten_r != null);
+    const netto = nr.length === a.length && a.length ? nr.reduce((s, x) => s + x.r_real - x.kosten_r, 0) : null;
+    return {k, n: a.length, sum, ev: sum / a.length, pf: vl > 0 ? gw / vl : (gw > 0 ? Infinity : 0), netto};
+  }).sort((x, y) => x.sum - y.sum);
+}
+function diagZeilen(liste){
+  const maxA = Math.max(0.01, ...liste.map(g => Math.abs(g.sum)));
+  return `<div class="rang">${liste.map(g => {
+    const br = Math.max(4, Math.abs(g.sum) / maxA * 100), gut = g.sum >= 0;
+    const n = g.n < GENUG_N ? ` · <em>zu wenig (${g.n}/${GENUG_N})</em>` : '';
+    return `<div class="rg"><div class="rg-n">${esc(String(g.k).replace('Rueck', 'Rück'))}<small>${g.n} Trades · Ø ${g.ev.toFixed(2).replace('.', ',')} R · PF ${isFinite(g.pf) ? g.pf.toFixed(2).replace('.', ',') : '∞'}${g.netto != null ? ' · netto ' + R1(g.netto) : ''}${n}</small></div>
+      <div class="rg-b"><i class="${gut ? 'gut' : 'schlecht'}" style="width:${br}%"></i></div>
+      <div class="rg-v ${gut ? 'gut' : 'schlecht'}">${R1(g.sum)}</div></div>`;
+  }).join('')}</div>`;
+}
+function diagnoseKasten(){
+  const T = ((PF && PF.trades) || []).filter(x => x.gezaehlt !== false && x.eingestiegen !== false);
+  if (T.length < 10) return '';
+  const jr = (PF.je_regel || {});
+  const nom = jr.drittel || {}, rl = jr.drittel_real, nt = jr.drittel_netto;
+  const f = v => v == null ? '—' : R1(v.summe != null ? v.summe : (v.erwartungswert || 0) * (v.anzahl || 0));
+  const pfx = v => v && v.profitfaktor != null ? v.profitfaktor.toFixed(2).replace('.', ',') : '—';
+  const reihen = [['Nach Plan (nominell)', nom], ['Mit echtem Füllkurs', rl], ['Nach angenommenen Kosten', nt]];
+  const kl = gruppenStat(T, t => t.klasse), ri = gruppenStat(T, t => t.richtung || 'unbekannt'),
+        su = gruppenStat(T, t => t.setup || 'ohne Setup'), no = gruppenStat(T, t => t.note);
+  const kr = kl.map(g => g.k + ' ' + g.n).join(' · ');
+  return `<h2>Strategie-Diagnose <span class="h2-n">${T.length} Trades · Paper</span></h2>
+  <div class="karte labor bad">
+    <div class="kv-t"><span>Dieselben Trades, drei Maßstäbe</span><span>R-Summe · Profitfaktor</span></div>
+    ${reihen.map(([l, v]) => `<div class="rowx"><span class="lab">${l}</span><span class="val ${v && (v.erwartungswert || 0) < 0 ? 'schlecht' : ''}">${f(v)} · PF ${pfx(v)}</span></div>`).join('')}
+    <p class="kv-hinweis">Die Kosten (Krypto 0,35 %, Aktien 0,10 %, Gold 0,05 % Roundtrip) sind eine <strong>Annahme</strong>, nicht gemessen. Weichen die Zeilen stark voneinander ab, liegt die Differenz in Ausführung und Kosten, nicht im Signal selbst.</p>
+    <div class="kv-t" style="margin-top:14px"><span>Nach Klasse</span><span>R-Summe je Gruppe (${esc(kr)})</span></div>${diagZeilen(kl)}
+    <div class="kv-t" style="margin-top:14px"><span>Nach Richtung</span><span>bei Aufnahme bekannt</span></div>${diagZeilen(ri)}
+    <div class="kv-t" style="margin-top:14px"><span>Nach Setup</span><span>bei Aufnahme bekannt</span></div>${diagZeilen(su)}
+    <div class="kv-t" style="margin-top:14px"><span>Nach Note</span><span>bei Aufnahme bekannt</span></div>${diagZeilen(no)}
+    <p class="kv-hinweis"><strong>Lesehilfe:</strong> Gruppen unter ${GENUG_N} Trades sind Rauschen. Haltedauer, bestes/schlechtestes R und Ausgang kennt man erst hinterher — sie als Filter zu nutzen wäre Look-ahead. Im Walk-Forward-Test (Entscheidung nur mit damals bereits beendeten Trades) hat bisher <strong>keine</strong> Filterregel das Ergebnis robust verbessert. Nichts davon ist „vielversprechend“, alles bleibt Paper.</p>
+  </div>${fortschrittKasten(T)}`;
+}
+/* Strategie-Fortschritt: Wo steht jedes Setup auf dem Weg zur Echtgeld-Reife? */
+function fortschrittKasten(T){
+  const su = gruppenStat(T, t => t.setup || 'ohne Setup').sort((a, b) => b.n - a.n);
+  const stufe = g => g.n < GENUG_N ? ['Paper · zu wenig Daten', 0.25, 'warn']
+    : g.ev <= 0 ? ['Forward negativ', 0.5, 'bad']
+    : (g.netto != null && g.netto <= 0) ? ['Brutto +, netto ≤ 0', 0.6, 'warn']
+    : ['Forward positiv · Walk-Forward offen', 0.75, 'gut'];
+  return `<div class="kv-t" style="margin-top:6px"><span>Strategie-Fortschritt</span><span>Weg: Idee → Paper → Forward → Walk-Forward/OOS → Kosten → Mini-Live</span></div>
+  <div class="karte">${su.map(g => { const [t, p, k] = stufe(g);
+    return `<div class="fort"><div class="fort-k"><b>${esc(String(g.k).replace('Rueck', 'Rück'))}</b><span class="${k}">${esc(t)}</span></div>
+    <div class="fort-b"><i style="width:${Math.round(p * 100)}%"></i></div>
+    <small>${g.n}/${GENUG_N} Trades · Ø ${g.ev.toFixed(2).replace('.', ',')} R${g.netto != null ? ' · netto ' + R1(g.netto) : ''}</small></div>`; }).join('')}
+    <p class="kv-hinweis">Keine Stufe ist „Echtgeld-reif“: dafür fehlen Walk-Forward/OOS-Beleg, Kostenbeleg und stabile 24/7-Laufzeit. Echtgeld ist nicht freigegeben.</p></div>`;
+}
+
 /* Aktivität: was ist zuletzt passiert? Quellen sind ausschließlich vorhandene Daten:
    Alarme, abgeschlossene Signale, letzter Scan, letzte Wächter-Prüfung. */
 function aktivitaet(){
@@ -10199,6 +10274,7 @@ function aktivitaetsLeiste(){
 
 function zeichneBilanz(){
   let h = laborKasten();
+  h += sicherText(diagnoseKasten);
   h += bilanzKasten();
   h += sicherText(wasFunktioniertKasten);
   h += dauerKasten();
@@ -10210,6 +10286,57 @@ function zeichneBilanz(){
     abgeschlossen ist, gibt es hier nichts zu zeigen — und dann steht hier nichts,
     statt einer geschoenten Null.</p></div>`;
   $('bilanz').innerHTML = h;
+}
+
+/* Wissensbank: kurze Karten zu den Begriffen, die die App benutzt. Keine Statistik-
+   Versprechen — jede Karte sagt, wie das System den Begriff verwendet und wo er trügt. */
+const WISSEN = [
+  ['Kerzen', 'Verschlingende Kerze', 'Eine Kerze, deren Körper den der Vorgängerin komplett überdeckt. Im System nur wichtig, wenn sie an einer Zone/einem Swing entsteht; mitten in der Range ist sie Rauschen.', 'Zählt im Chart-Score höchstens 12 von 100 Punkten.'],
+  ['Kerzen', 'Pin Bar / Docht-Ablehnung', 'Langer Docht, kleiner Körper: der Kurs wurde abgelehnt. Aussagekräftig am Tief/Hoch einer Zone, besonders mit Volumen.', 'Nur H4 (Gewicht 1,0) und H1 (0,7) fließen ein.'],
+  ['Kerzen', 'Liquiditäts-Sweep', 'Kurz über ein altes Hoch/unter ein altes Tief und zurück. Gezählt wird nur der erste Durchstoß innerhalb von 20 Kerzen, sonst wäre fast jede Kerze ein „Sweep“.', 'Kann in Trends auch der Beginn des Ausbruchs sein.'],
+  ['Kerzen', 'Doji / Inside Bar', 'Unentschlossenheit bzw. Ruhe vor einem Ausbruch. Allein kein Signal.', 'Gibt nur Hinweise, keine Richtung.'],
+  ['Struktur', 'BOS / CHoCH', 'Break of Structure bestätigt den Trend, Change of Character ist der erste Bruch gegen ihn. CHoCH ist früh, aber fehleranfällig.', 'Fließt in den Struktur-Faktor (18 Punkte).'],
+  ['Struktur', 'Fair Value Gap', 'Lücke zwischen drei Kerzen nach einem Impuls. Der Kurs kommt oft zurück, muss aber nicht. Die Auswertung zeigt „Rücksetzer“-Einstiege bisher als Verlustquelle.', 'Als Hypothese behandelt, nicht als Regel.'],
+  ['Struktur', 'Order Block / Zone', 'Letzte Gegenkerze vor einem Impuls. Sinnvoll als Bereich, nie als exakter Kurs.', 'Zonen-Faktor: 14 Punkte.'],
+  ['Risiko', 'R-Multiple & Drittel-Regel', '1 R ist das Risiko bis zum Stop. Je ein Drittel wird bei TP1/TP2/TP3 realisiert, nach TP1 rückt der Stop auf den Einstieg.', 'Nominell 1 / 2 / 3,5 R; echte Fills weichen ab (siehe Diagnose).'],
+  ['Risiko', 'Handelskosten', 'Gebühr + Spread + Slippage fressen bei engen Stops einen großen Teil von 1 R. Je kleiner der Stop in %, desto größer der Kostenanteil.', 'Annahme je Klasse, nicht gemessen.'],
+  ['Validierung', 'Look-ahead & Leakage', 'Eine Regel darf nur Informationen nutzen, die zum Entscheidungszeitpunkt vorlagen. Haltedauer, MFE und Ausgang gehören nicht dazu.', 'Alle Walk-Forward-Tests des Systems entscheiden nur mit bereits beendeten Trades.'],
+  ['Validierung', 'Walk-Forward & Out-of-Sample', 'Regel auf Vergangenheit festlegen, auf der Folgezeit prüfen, dann weiterrollen. Nur wer in den ungesehenen Abschnitten bestehen bleibt, ist ein Kandidat.', 'Bisher hat keine Filterregel bestanden.'],
+  ['Validierung', 'Stichprobengröße', 'Unter 30 Trades ist jede Quote Zufall; auch darüber sind Trades korreliert (gleiche Marktphase).', 'Mindestmarke GENUG = 30.'],
+];
+function wissensKasten(){
+  let fb = {}; try { fb = JSON.parse(localStorage.getItem('wissen_fb') || '{}'); } catch(e){}
+  const gruppen = {};
+  WISSEN.forEach((w, i) => (gruppen[w[0]] = gruppen[w[0]] || []).push([w, i]));
+  return `<h2>Wissensbank <span class="h2-n">${WISSEN.length} Karten</span></h2><div class="karte wissen">
+    ${Object.entries(gruppen).map(([g, l]) => `<div class="kv-t"><span>${esc(g)}</span><span></span></div>
+      ${l.map(([w, i]) => `<details class="wk"><summary>${esc(w[1])}</summary><p>${esc(w[2])}</p>
+        <p class="wk-s"><b>Im System:</b> ${esc(w[3])}</p>
+        <div class="wk-fb"><button data-wfb="${i}:1" class="${fb[i] === 1 ? 'on' : ''}">Klopt</button><button data-wfb="${i}:0" class="${fb[i] === 0 ? 'on' : ''}">Klopt nicht</button></div></details>`).join('')}`).join('')}
+    <p class="kv-hinweis">Dein Feedback bleibt nur in diesem Browser. Die Karten erklären, sie beweisen keinen Vorteil.</p></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-wfb]'); if (!b) return;
+  const [i, v] = b.dataset.wfb.split(':').map(Number);
+  let fb = {}; try { fb = JSON.parse(localStorage.getItem('wissen_fb') || '{}'); } catch(_){}
+  fb[i] = fb[i] === v ? undefined : v;
+  try { localStorage.setItem('wissen_fb', JSON.stringify(fb)); } catch(_){}
+  b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', fb[i] === Number(x.dataset.wfb.split(':')[1])));
+});
+function kostenQuellenKasten(){
+  const al = t => { const m = vorMin(t); return m == null ? '—' : (m < 120 ? m + ' Min.' : Math.round(m / 60) + ' Std.'); };
+  const ak = (S?.universum || {}).aktien || {};
+  const zeilen = [
+    ['Krypto & Gold (Börsen-Schnittstelle)', 'frei, ohne Schlüssel', 'Scan ' + al(S?.erzeugt)],
+    ['Aktien (Yahoo, zu Börsenzeiten, ohne H4)', 'frei, inoffiziell', ak.ausfaelle ? ak.ausfaelle + ' Ausfälle' : 'Scan ' + al(S?.erzeugt)],
+    ['Makro (VIX, Dollar, Renditen)', 'frei', S?.makro ? 'vorhanden' : 'fehlt'],
+    ['Depot-Wächter (Kurse deiner Positionen)', 'frei', WA?.geprueft ? al(WA.geprueft) : 'nicht aktiv'],
+    ['Performance-Auswertung', 'rechnet lokal', PF?.erzeugt ? al(PF.erzeugt) : '—'],
+  ];
+  return `<h2>Kosten & Datenquellen</h2><div class="karte">
+    ${zeilen.map(z => `<div class="rowx"><span class="lab">${esc(z[0])}<br><small>${esc(z[1])}</small></span><span class="val">${esc(z[2])}</span></div>`).join('')}
+    <div class="rowx"><span class="lab">Handelskosten-Annahme</span><span class="val">Krypto 0,35 % · Aktien 0,10 % · Gold 0,05 %</span></div>
+    <p class="kv-hinweis">Alter = Zeit seit dem letzten erfolgreichen Lauf. Nach aktuellem Stand sind keine kostenpflichtigen Datenschnittstellen eingebunden; die Handelskosten sind Annahmen (Roundtrip aus Gebühr, Spread, Slippage) und werden erst mit echten Fills überprüfbar. Hebelprodukte: Der Scheinpreis wird aus dem Basiskurs, K.O.-Schwelle und Bezugsverhältnis abgeleitet — fehlt eines davon, zeigt die App keinen Preis statt eines geschätzten.</p></div>`;
 }
 
 /* ============================================================ SYSTEM */
@@ -10254,6 +10381,7 @@ function zeichneSystem(){
       als Chance auftauchen. Kurse kommen von Yahoo, nur zu Börsenzeiten, ohne H4-Zeitebene. Eine Erweiterung auf eine
       Index-Mitgliederliste braucht eine verlässliche Quelle und einen gestuften Lauf (erst grober Tagesfilter, dann Detailanalyse),
       sonst sprengt sie das Zeitbudget des Laufs.</p></div>`;
+  h += sicherText(kostenQuellenKasten);
   const M = S?.makro;
   if (M){
     h += `<h2>Makro</h2><div class="karte">
@@ -10306,6 +10434,7 @@ function zeichneSystem(){
     <div class="rowx"><span class="lab">Fundamentaldaten bei Aktien</span><span class="val">offen</span></div>
     <div class="rowx"><span class="lab">Dauerlauf-Daemon auf einem Server</span><span class="val">offen</span></div>
   </div>`;
+  h += sicherText(wissensKasten);
   $('system').innerHTML = h;
 }
 

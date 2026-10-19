@@ -108,7 +108,9 @@ def isin_norm(v: Any) -> str:
     return t if summe % 10 == 0 else ""
 
 
-def depot_bereinigen(positionen: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def depot_bereinigen(
+    positionen: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Doppelte Eintraege entfernen: gleiches Kuerzel+Konto oder gleiche (gueltige) ISIN.
     Es gewinnt der SPAETERE Eintrag (die App haengt neue Staende hinten an). Zurueck:
     (Liste, Zaehler) — Zaehler enthalten keine Namen, damit sie oeffentlich stehen duerfen."""
@@ -213,7 +215,13 @@ class ScanIndex:
         s = str(sym or "").upper()
         if s in self.genau:
             return self.genau[s]
-        if self.index_spx and re.sub(r"[\s_-]", "", s) in {"SPX", "SP500", "S&P500", "^GSPC", "GSPC"}:
+        if self.index_spx and re.sub(r"[\s_-]", "", s) in {
+            "SPX",
+            "SP500",
+            "S&P500",
+            "^GSPC",
+            "GSPC",
+        }:
             return self.index_spx
         if nur_genau:
             return None
@@ -348,7 +356,17 @@ def lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
             else (str(pos.get("hebel_richtung")) == "long")
         )
         bk = float(brow["kurs"])
-        lg = Lage(pos, key, name, lang_basis, "basis", bk, zeile_waehrung(brow), brow, eurusd=_zahl(brow.get("eurusd")) or idx.eurusd)
+        lg = Lage(
+            pos,
+            key,
+            name,
+            lang_basis,
+            "basis",
+            bk,
+            zeile_waehrung(brow),
+            brow,
+            eurusd=_zahl(brow.get("eurusd")) or idx.eurusd,
+        )
         lg.zahlen = (brow.get("info") or {}).get("zahlen")
         ko = _zahl(pos.get("ko"))
         if ko is not None and ko > 0:
@@ -505,9 +523,17 @@ def lage_zeile(
     if rsi is not None:
         teile.append(f"RSI (1 Std.) {rsi:.0f}")
     if ziel_next is not None and kurs:
-        teile.append(f"bis zum nächsten Ziel {_fmt(ziel_next)}{z} noch {abs(ziel_next - kurs) / kurs * 100:.1f} %".replace(".", ","))
+        teile.append(
+            f"bis zum nächsten Ziel {_fmt(ziel_next)}{z} noch {abs(ziel_next - kurs) / kurs * 100:.1f} %".replace(
+                ".", ","
+            )
+        )
     if stop is not None and kurs:
-        teile.append(f"Stop {_fmt(stop)}{z} ({abs(kurs - stop) / kurs * 100:.1f} % entfernt)".replace(".", ","))
+        teile.append(
+            f"Stop {_fmt(stop)}{z} ({abs(kurs - stop) / kurs * 100:.1f} % entfernt)".replace(
+                ".", ","
+            )
+        )
     return " Lage: " + "; ".join(teile) + ". Das ist ein Hinweis zum Prüfen, keine Pflicht."
 
 
@@ -519,7 +545,13 @@ def schein_produkt(pos: dict[str, Any], lg: Lage) -> dict[str, Any]:
     nie ein stilles Verhaeltnis 1. Rueckgabe: ``kurs`` (Scheinpreis, Positionswaehrung),
     ``ratio``, ``quelle``, ``basis_einstand`` (Basiskurs, bei dem der Schein auf dem Einstieg
     stuende), ``fehlt`` (Liste)."""
-    aus: dict[str, Any] = {"kurs": None, "ratio": None, "quelle": "", "basis_einstand": None, "fehlt": []}
+    aus: dict[str, Any] = {
+        "kurs": None,
+        "ratio": None,
+        "quelle": "",
+        "basis_einstand": None,
+        "fehlt": [],
+    }
     ko, bk = lg.ko, lg.kurs
     if ko is None or bk is None:
         aus["fehlt"].append("Knock-out-Schwelle" if ko is None else "Kurs des Basiswerts")
@@ -598,7 +630,14 @@ def _gewinnschutz(
         if schein["kurs"] is not None and ein:
             gewinn_extern = (schein["kurs"] / ein - 1.0) * 100.0
         ein = schein["basis_einstand"]
-    ziel_next = next((_zahl(ziele.get(m.lower())) for m in ("TP1", "TP2", "TP3") if m not in erledigt and _zahl(ziele.get(m.lower())) is not None), None)
+    ziel_next = next(
+        (
+            _zahl(ziele.get(m.lower()))
+            for m in ("TP1", "TP2", "TP3")
+            if m not in erledigt and _zahl(ziele.get(m.lower())) is not None
+        ),
+        None,
+    )
     plan_stop = stop if stop is not None else _zahl((pos.get("plan") or {}).get("stop"))
     zt = (lg.zahlen or {}).get("tage")
     bew = gs_mod.bewerte(
@@ -619,10 +658,21 @@ def _gewinnschutz(
     if schein is not None:
         if gewinn_extern is None:
             bew.urteil = gs_mod.UNBEWERTET
-            bew.aktion = "Nicht bewertet: Scheinpreis unbekannt — " + ", ".join(schein["fehlt"] or ["Einstiegspreis des Scheins"]) + " fehlt."
-            bew.fehlt.insert(0, "Hebelschein: " + (", ".join(schein["fehlt"]) or "Einstiegspreis") + " fehlt — ohne das kein Gewinn des Scheins")
+            bew.aktion = (
+                "Nicht bewertet: Scheinpreis unbekannt — "
+                + ", ".join(schein["fehlt"] or ["Einstiegspreis des Scheins"])
+                + " fehlt."
+            )
+            bew.fehlt.insert(
+                0,
+                "Hebelschein: "
+                + (", ".join(schein["fehlt"]) or "Einstiegspreis")
+                + " fehlt — ohne das kein Gewinn des Scheins",
+            )
         elif schein["quelle"]:
-            bew.fehlt.append(f"Hebelschein: {schein['quelle']} (Schätzung ohne Aufgeld, Finanzierung und Spread des Emittenten)")
+            bew.fehlt.append(
+                f"Hebelschein: {schein['quelle']} (Schätzung ohne Aufgeld, Finanzierung und Spread des Emittenten)"
+            )
     gs = dict(st.get("gs") or {})
     bar = ktx.get("h1_ts")
     bar = float(bar) if isinstance(bar, int | float) else None
@@ -635,7 +685,9 @@ def _gewinnschutz(
     if schein is not None:
         e0 = _zahl(pos.get("einstieg"))
         if schein["kurs"] is not None and e0 and menge:
-            gewinn_eur = umrechnen((schein["kurs"] - e0) * menge, pos_waehrung(pos), "EUR", lg.eurusd)
+            gewinn_eur = umrechnen(
+                (schein["kurs"] - e0) * menge, pos_waehrung(pos), "EUR", lg.eurusd
+            )
     elif ein and menge:
         roh = ((kurs - ein) if lang else (ein - kurs)) * menge
         gewinn_eur = umrechnen(roh, lg.waehrung, "EUR", lg.eurusd)
@@ -670,7 +722,9 @@ def _gewinnschutz(
                 teile.append(f"Restpotenzial bis zum nächsten Ziel ca. {_pct(bew.upside_pct)}.")
             if bew.staerken:
                 teile.append("Dagegen spricht: " + "; ".join(bew.staerken) + ".")
-            bias = ", ".join(f"{k.upper()} {_TREND_TXT.get(v, 'fehlt')}" for k, v in bew.bias.items())
+            bias = ", ".join(
+                f"{k.upper()} {_TREND_TXT.get(v, 'fehlt')}" for k, v in bew.bias.items()
+            )
             teile.append(f"Bias: {bias}.")
             teile.append(bew.neubewertung)
             if bew.fehlt:
@@ -678,7 +732,11 @@ def _gewinnschutz(
             teile.append("Ein Hinweis zum Prüfen, kein Auftrag — die Entscheidung bleibt bei dir.")
             ev.append(
                 Ereignis(
-                    {gs_mod.PROFIT_PROTECTION: "gewinnschutz", gs_mod.PARTIAL: "gewinnschutz_teil", gs_mod.EXIT: "gewinnschutz_exit"}[neu],
+                    {
+                        gs_mod.PROFIT_PROTECTION: "gewinnschutz",
+                        gs_mod.PARTIAL: "gewinnschutz_teil",
+                        gs_mod.EXIT: "gewinnschutz_exit",
+                    }[neu],
                     lg.key,
                     wer,
                     " ".join(teile),
@@ -687,8 +745,15 @@ def _gewinnschutz(
                 )
             )
     else:
-        gs["kand"], gs["kand_ts"] = neu, bar  # erster Befund: vorlaeufig, wartet auf den naechsten Schluss
-    gs["anzeige"] = {**bew.als_dict(), "bestaetigt": gs.get("stufe", gs_mod.HOLD), "vorlaeufig": gs.get("kand")}
+        gs["kand"], gs["kand_ts"] = (
+            neu,
+            bar,
+        )  # erster Befund: vorlaeufig, wartet auf den naechsten Schluss
+    gs["anzeige"] = {
+        **bew.als_dict(),
+        "bestaetigt": gs.get("stufe", gs_mod.HOLD),
+        "vorlaeufig": gs.get("kand"),
+    }
     st["gs"] = gs
     return ev
 
@@ -723,7 +788,11 @@ def depot_risiko(
         stp = (
             _zahl(plan.get("stop")) if str(plan.get("ebene") or "position") == "position" else None
         ) or _zahl((alt_pos.get(lg.key) or {}).get("stop"))
-        r = umrechnen(abs(lg.kurs - stp) * m, lg.waehrung, "EUR", lg.eurusd) if stp is not None else None
+        r = (
+            umrechnen(abs(lg.kurs - stp) * m, lg.waehrung, "EUR", lg.eurusd)
+            if stp is not None
+            else None
+        )
         if w is None:
             fehlt += 1
             continue
@@ -736,7 +805,9 @@ def depot_risiko(
     return {"wert": wert, "risiko": risiko, "je": je, "vollstaendig": fehlt == 0}
 
 
-def nachkauf_risiko_grund(depot: dict[str, Any] | None, key: str, menge: float | None) -> str | None:
+def nachkauf_risiko_grund(
+    depot: dict[str, Any] | None, key: str, menge: float | None
+) -> str | None:
     """None = Risiko im Rahmen. Sonst der Grund, warum NICHT bestaetigt wird."""
     if not depot or not depot.get("wert") or not menge or menge <= 0:
         return "Das Depotrisiko ist nicht prüfbar (Depotwert/Menge fehlt) — nicht bestätigt."
@@ -753,9 +824,13 @@ def nachkauf_risiko_grund(depot: dict[str, Any] | None, key: str, menge: float |
     pf_r = (depot["risiko"] + zu_r) / gesamt_w * 100
     gew = (w + zu_w) / gesamt_w * 100
     if pos_r > NACHKAUF_MAX_POS_RISIKO_PCT:
-        return f"Das Risiko der Position wäre nach dem Nachkauf {pos_r:.1f} % des Depots (Grenze {NACHKAUF_MAX_POS_RISIKO_PCT:.0f} %) — nicht bestätigt.".replace(".", ",")
+        return f"Das Risiko der Position wäre nach dem Nachkauf {pos_r:.1f} % des Depots (Grenze {NACHKAUF_MAX_POS_RISIKO_PCT:.0f} %) — nicht bestätigt.".replace(
+            ".", ","
+        )
     if pf_r > NACHKAUF_MAX_PF_RISIKO_PCT:
-        return f"Das gesamte offene Stop-Risiko wäre {pf_r:.1f} % des Depots (Grenze {NACHKAUF_MAX_PF_RISIKO_PCT:.0f} %) — nicht bestätigt.".replace(".", ",")
+        return f"Das gesamte offene Stop-Risiko wäre {pf_r:.1f} % des Depots (Grenze {NACHKAUF_MAX_PF_RISIKO_PCT:.0f} %) — nicht bestätigt.".replace(
+            ".", ","
+        )
     if gew > NACHKAUF_MAX_GEWICHT_PCT:
         return f"Die Position hätte danach {gew:.0f} % Depotgewicht (Grenze {NACHKAUF_MAX_GEWICHT_PCT:.0f} %) — nicht bestätigt."
     return None
@@ -788,7 +863,11 @@ def _nachkauf(
     ein, stp = _zahl(plan.get("einstieg")), _zahl(plan.get("stop"))
     ziel = _zahl(plan.get("tp2")) or _zahl(plan.get("tp1"))
     tor = row.get("alarm") or {}
-    if row.get("richtung") != ("long" if lang else "short") or not row.get("handelbar") or tor.get("ja") is not True:
+    if (
+        row.get("richtung") != ("long" if lang else "short")
+        or not row.get("handelbar")
+        or tor.get("ja") is not True
+    ):
         return []
     if ein is None or stp is None or ziel is None:
         return []
@@ -825,7 +904,9 @@ def _nachkauf(
     crv = upside / risiko
     lage = lage_zeile(lang, kurs, ziel, stp, ktx, z, aktion="nachkauf")
     menge_satz = (
-        f" Obergrenze: ca. {menge / 3:.4g} Stück (ein Drittel der bestehenden Menge)." if menge and menge > 0 else ""
+        f" Obergrenze: ca. {menge / 3:.4g} Stück (ein Drittel der bestehenden Menge)."
+        if menge and menge > 0
+        else ""
     )
     basis = (
         f"Das Setup gilt weiter (Alarm-Tor bestanden), Chance-Risiko vom jetzigen Kurs {crv:.1f} zu 1, "
@@ -1014,7 +1095,11 @@ def pflegen(
             st.pop("hoch_gv_pct", None)
             st["gv_schein_v1"] = True
         sp = schein_produkt(pos, lg)["kurs"]
-        gv_pct = (sp / einstieg_ud - 1) * 100 if sp is not None and einstieg_ud and einstieg_ud > 0 else None
+        gv_pct = (
+            (sp / einstieg_ud - 1) * 100
+            if sp is not None and einstieg_ud and einstieg_ud > 0
+            else None
+        )
     else:
         gv_pct = (
             ((kurs / einstieg_ud - 1) if lang else (einstieg_ud / kurs - 1)) * 100
@@ -1149,7 +1234,13 @@ def pflegen(
     if lg.ebene == "position" and not ziele and plan and str(plan.get("quelle") or "") == "selbst":
         e_r = _zahl(pos.get("einstieg"))
         s_r = _zahl(plan.get("stop"))
-        if e_r and s_r and e_r > 0 and e_r != s_r and ((lang and s_r < e_r) or (not lang and s_r > e_r)):
+        if (
+            e_r
+            and s_r
+            and e_r > 0
+            and e_r != s_r
+            and ((lang and s_r < e_r) or (not lang and s_r > e_r))
+        ):
             risiko_r = abs(e_r - s_r)
             for i, m in enumerate(("tp1", "tp2", "tp3"), start=1):
                 ziele[m] = e_r + i * risiko_r if lang else e_r - i * risiko_r
@@ -1223,7 +1314,9 @@ def pflegen(
             # Was der Verkauf bringt und wohin der Stop wandert — als feste Zahlen, nicht
             # als Hinweis auf eine Rechnung, die man selbst machen muss.
             ein_r = _zahl(pos.get("einstieg"))
-            neu_stop = (ein_r if marke == "TP1" else ziele.get("tp1")) if marke in ("TP1", "TP2") else None
+            neu_stop = (
+                (ein_r if marke == "TP1" else ziele.get("tp1")) if marke in ("TP1", "TP2") else None
+            )
             extra = ""
             if neu_stop is not None and ein_r:
                 extra += f" Neuer Stop: {_fmt(neu_stop)}{z}."
@@ -1253,11 +1346,45 @@ def pflegen(
 
     # 2c — Nachkauf-Hinweis (nur fuer die Position selbst, nicht fuer einen Basiswert).
     if lg.ebene == "position" and lang is not None:
-        ev.extend(_nachkauf(lg.row, bool(lang), kurs, close, (kontext or {}).get(inst), menge, st, z, wer, lg.key, depot))
+        ev.extend(
+            _nachkauf(
+                lg.row,
+                bool(lang),
+                kurs,
+                close,
+                (kontext or {}).get(inst),
+                menge,
+                st,
+                z,
+                wer,
+                lg.key,
+                depot,
+            )
+        )
 
     # 2d — Gewinnschutz (nur Position im Plus, nur Positions-Ebene).
-    if lg.ebene in ("position", "basis") and lang is not None and not st.get("ausgestoppt") and not lg.ausgeknockt:
-        ev.extend(_gewinnschutz(lg, pos, st, kontext and kontext.get(inst), kurs, bool(lang), menge, _zahl(st.get("stop")), ziele, erledigt, z, wer))
+    if (
+        lg.ebene in ("position", "basis")
+        and lang is not None
+        and not st.get("ausgestoppt")
+        and not lg.ausgeknockt
+    ):
+        ev.extend(
+            _gewinnschutz(
+                lg,
+                pos,
+                st,
+                kontext and kontext.get(inst),
+                kurs,
+                bool(lang),
+                menge,
+                _zahl(st.get("stop")),
+                ziele,
+                erledigt,
+                z,
+                wer,
+            )
+        )
 
     # 3 — Stop setzen / nachziehen.
     kand = list(lg.kandidaten)

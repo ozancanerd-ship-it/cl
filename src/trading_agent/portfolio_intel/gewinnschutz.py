@@ -89,7 +89,9 @@ class Bewertung:
         return {
             "urteil": self.urteil,
             "punkte": round(self.punkte, 2),
-            "signale": [{"name": s.name, "gewicht": s.gewicht, "text": s.text} for s in self.signale],
+            "signale": [
+                {"name": s.name, "gewicht": s.gewicht, "text": s.text} for s in self.signale
+            ],
             "staerken": list(self.staerken),
             "fehlt": list(self.fehlt),
             "gewinn_pct": r(self.gewinn_pct, 2),
@@ -158,7 +160,9 @@ def _letzte(sw: Sequence[tuple[int, str, float]], art: str, k: int = 1) -> list[
 # --------------------------------------------------------------------------- Signale
 
 
-def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], list[str], dict[str, float | None]]:
+def signale_fuer(
+    bars: Sequence[Kerze], *, tf: str = ""
+) -> tuple[list[Signal], list[str], dict[str, float | None]]:
     """Schwaechesignale der Long-Sicht (Shorts vorher spiegeln). Rueckgabe:
     ``(signale, staerken, level)``; ``level`` = ``wechsel_unten`` (juengster Swing-Low)
     und ``wechsel_oben`` (juengstes Swing-High)."""
@@ -181,14 +185,33 @@ def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], 
     #    nachdem vorher hoehere Tiefs da waren (= es gab einen Aufwaertstrend).
     if len(tief2) == 2 and tief2[1][1] > tief2[0][1] and kurs < tief2[1][1]:
         sig.append(
-            Signal("choch", 2.0, f"{tf}: Schluss unter dem letzten höheren Tief ({tief2[1][1]:.6g}) — Aufwärtsstruktur gebrochen", True)
+            Signal(
+                "choch",
+                2.0,
+                f"{tf}: Schluss unter dem letzten höheren Tief ({tief2[1][1]:.6g}) — Aufwärtsstruktur gebrochen",
+                True,
+            )
         )
     elif tief2 and kurs < tief2[-1][1]:
-        sig.append(Signal("tief_bruch", 1.5, f"{tf}: Schluss unter dem letzten Swing-Low ({tief2[-1][1]:.6g})", True))
+        sig.append(
+            Signal(
+                "tief_bruch",
+                1.5,
+                f"{tf}: Schluss unter dem letzten Swing-Low ({tief2[-1][1]:.6g})",
+                True,
+            )
+        )
 
     # 2) Tieferes Hoch nach einem Hoch (kein neues Hoch mehr, Struktur flacht ab)
     if len(hoch2) == 2 and hoch2[1][1] < hoch2[0][1] and kurs < hoch2[1][1]:
-        sig.append(Signal("tieferes_hoch", 1.0, f"{tf}: tieferes Hoch ({hoch2[1][1]:.6g} unter {hoch2[0][1]:.6g}) — kein neues Hoch mehr", True))
+        sig.append(
+            Signal(
+                "tieferes_hoch",
+                1.0,
+                f"{tf}: tieferes Hoch ({hoch2[1][1]:.6g} unter {hoch2[0][1]:.6g}) — kein neues Hoch mehr",
+                True,
+            )
+        )
     elif len(hoch2) == 2 and hoch2[1][1] > hoch2[0][1] and (not tief2 or kurs > tief2[-1][1]):
         stark.append(f"{tf}: höhere Hochs und Tiefs — Aufwärtsstruktur intakt")
 
@@ -201,7 +224,14 @@ def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], 
             continue
         obere = h - max(o, c)
         if obere / rng >= 0.55 and (c - lo) / rng <= 0.40 and h >= hh20 - a:
-            sig.append(Signal("wick_rejection", 1.0, f"{tf}: lange obere Lunte nahe dem Hoch ({obere / rng * 100:.0f} % der Kerze) — Ablehnung", True))
+            sig.append(
+                Signal(
+                    "wick_rejection",
+                    1.0,
+                    f"{tf}: lange obere Lunte nahe dem Hoch ({obere / rng * 100:.0f} % der Kerze) — Ablehnung",
+                    True,
+                )
+            )
             break
 
     # 3b) Kerzenlesen (analysis/candles): verschlingende bzw. Impuls-Abwaertskerze in den
@@ -218,8 +248,12 @@ def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], 
                 sig.append(Signal("kerze_gegen", 0.25, f"{tf}: {m.text} — Verkäufer übernehmen"))
                 break
         else:
-            if any(m.richtung == "long" and m.art in ("verschlingen", "impuls", "pin")
-                   and m.staerke >= 0.45 for m in erkenne_kerzen(kb, a, fenster=2)):
+            if any(
+                m.richtung == "long"
+                and m.art in ("verschlingen", "impuls", "pin")
+                and m.staerke >= 0.45
+                for m in erkenne_kerzen(kb, a, fenster=2)
+            ):
                 stark.append(f"{tf}: kräftige Käuferkerze zuletzt — Käufer verteidigen")
 
     # 4) Gescheiterter Ausbruch: neues 20er-Hoch in den letzten 6 Kerzen, Schluss wieder darunter
@@ -228,18 +262,37 @@ def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], 
             i = len(bars) - k
             vorher = max(b[1] for b in bars[max(0, i - 20) : i])
             if bars[i][1] > vorher and kurs < vorher:
-                sig.append(Signal("ausbruch_gescheitert", 1.5, f"{tf}: Ausbruch über {vorher:.6g} ist zurückgefallen — Schluss wieder darunter", True))
+                sig.append(
+                    Signal(
+                        "ausbruch_gescheitert",
+                        1.5,
+                        f"{tf}: Ausbruch über {vorher:.6g} ist zurückgefallen — Schluss wieder darunter",
+                        True,
+                    )
+                )
                 break
 
     # 5) Momentum: baerische RSI-Divergenz oder RSI faellt deutlich vom juengsten Hoch weg
     schluss = [b[3] for b in bars]
     if rsi_divergenz(schluss) == "baerisch":
-        sig.append(Signal("rsi_divergenz", 1.0, f"{tf}: Kurs macht ein neues Hoch, der RSI nicht — Kraft lässt nach"))
+        sig.append(
+            Signal(
+                "rsi_divergenz",
+                1.0,
+                f"{tf}: Kurs macht ein neues Hoch, der RSI nicht — Kraft lässt nach",
+            )
+        )
     else:
         reihe = [rsi(schluss[: i + 1]) for i in range(len(schluss) - 10, len(schluss))]
         rv = [x for x in reihe if x is not None]
         if len(rv) >= 8 and max(rv) - rv[-1] >= 15 and kurs >= 0.97 * hh20:
-            sig.append(Signal("momentum_laesst_nach", 1.0, f"{tf}: RSI {rv[-1]:.0f}, vor kurzem {max(rv):.0f} — Momentum nimmt ab, Kurs noch nahe am Hoch"))
+            sig.append(
+                Signal(
+                    "momentum_laesst_nach",
+                    1.0,
+                    f"{tf}: RSI {rv[-1]:.0f}, vor kurzem {max(rv):.0f} — Momentum nimmt ab, Kurs noch nahe am Hoch",
+                )
+            )
 
     # 6) Volumen: duenn auf Aufwaertskerzen nahe dem Hoch (Distribution) oder Abverkaufskerze mit viel Volumen
     vol = [b[4] for b in bars]
@@ -249,9 +302,24 @@ def signale_fuer(bars: Sequence[Kerze], *, tf: str = "") -> tuple[list[Signal], 
             auf = [b[4] for b in bars[-5:] if b[3] > b[0]]
             nahe = kurs >= hh20 - 1.5 * a
             if auf and nahe and (sum(auf) / len(auf)) < 0.7 * schnitt:
-                sig.append(Signal("volumen_duenn", 1.0, f"{tf}: Aufwärtskerzen nahe dem Hoch mit dünnem Volumen (unter 70 % des Schnitts)"))
-            elif any(b[3] < b[0] and b[4] >= 1.8 * schnitt and (b[0] - b[3]) >= 0.8 * a for b in bars[-3:]):
-                sig.append(Signal("abverkauf_volumen", 1.0, f"{tf}: kräftige Abwärtskerze mit überdurchschnittlichem Volumen"))
+                sig.append(
+                    Signal(
+                        "volumen_duenn",
+                        1.0,
+                        f"{tf}: Aufwärtskerzen nahe dem Hoch mit dünnem Volumen (unter 70 % des Schnitts)",
+                    )
+                )
+            elif any(
+                b[3] < b[0] and b[4] >= 1.8 * schnitt and (b[0] - b[3]) >= 0.8 * a
+                for b in bars[-3:]
+            ):
+                sig.append(
+                    Signal(
+                        "abverkauf_volumen",
+                        1.0,
+                        f"{tf}: kräftige Abwärtskerze mit überdurchschnittlichem Volumen",
+                    )
+                )
     return sig, stark, level
 
 
@@ -302,13 +370,21 @@ def bewerte(
         return b
 
     # Zeitebene fuer die Struktur: H4, sonst H1. Die jeweils andere ergaenzt Momentum/Wicks.
-    prim = "h4" if len(kerzen.get("h4") or []) >= MIN_KERZEN else "h1" if len(kerzen.get("h1") or []) >= MIN_KERZEN else None
+    prim = (
+        "h4"
+        if len(kerzen.get("h4") or []) >= MIN_KERZEN
+        else "h1"
+        if len(kerzen.get("h1") or []) >= MIN_KERZEN
+        else None
+    )
     if prim is None:
         b.fehlt.append("Kerzen (H4/H1) fehlen oder reichen nicht — keine Struktur-Bewertung")
         b.aktion = "Nicht bewertet: zu wenig frische Kerzendaten. Stop und Plan gelten wie bisher."
         return b
     if prim == "h1":
-        b.fehlt.append("H4-Kerzen fehlen — Struktur nur auf H1 geprüft (empfindlicher, weniger belastbar)")
+        b.fehlt.append(
+            "H4-Kerzen fehlen — Struktur nur auf H1 geprüft (empfindlicher, weniger belastbar)"
+        )
     b.zeitebene = prim.upper()
     if not kerzen.get("d1") or len(kerzen["d1"] or []) < MIN_KERZEN:
         b.fehlt.append("D1-Kerzen fehlen")
@@ -326,7 +402,13 @@ def bewerte(
     if prim == "h4" and len(kerzen.get("h1") or []) >= MIN_KERZEN:
         s1, _st1, _lv1 = signale_fuer(spiegel(kerzen["h1"]), tf="H1")
         # H1 liefert nur Ablehnung/Momentum/Volumen als Ergaenzung, keine zweite Struktur-Zaehlung
-        sig += [s for s in s1 if s.name in ("wick_rejection", "momentum_laesst_nach", "volumen_duenn", "abverkauf_volumen") and not any(x.name == s.name for x in sig)]
+        sig += [
+            s
+            for s in s1
+            if s.name
+            in ("wick_rejection", "momentum_laesst_nach", "volumen_duenn", "abverkauf_volumen")
+            and not any(x.name == s.name for x in sig)
+        ]
     if level["unten"] is not None:
         b.wechsel_unten = level["unten"] if lang else -level["unten"]
     if level["oben"] is not None:
@@ -338,7 +420,9 @@ def bewerte(
     b.bias = {"d1": trend.get("d1"), "h4": trend.get("h4")}
     for tf in ("d1", "h4"):
         if trend.get(tf) == dagegen:
-            sig.append(Signal(f"trend_{tf}", 1.0, f"{tf.upper()}-Trend steht gegen die Position", False))
+            sig.append(
+                Signal(f"trend_{tf}", 1.0, f"{tf.upper()}-Trend steht gegen die Position", False)
+            )
     if trend.get("d1") == dafuer and trend.get("h4") in (dafuer, None):
         b.staerken.append("D1" + ("/H4" if trend.get("h4") else "") + "-Trend stützt die Position")
 
@@ -346,13 +430,31 @@ def bewerte(
     if b.hoch_pct and b.hoch_pct >= 3.0 and b.rueckgang_pct is not None:
         anteil = b.rueckgang_pct / b.hoch_pct
         if anteil >= 0.5:
-            sig.append(Signal("gewinn_abgabe", 1.5, f"{anteil * 100:.0f} % des Höchstgewinns ({b.hoch_pct:.1f} %) sind wieder abgegeben"))
+            sig.append(
+                Signal(
+                    "gewinn_abgabe",
+                    1.5,
+                    f"{anteil * 100:.0f} % des Höchstgewinns ({b.hoch_pct:.1f} %) sind wieder abgegeben",
+                )
+            )
         elif anteil >= 0.3:
-            sig.append(Signal("gewinn_abgabe", 1.0, f"{anteil * 100:.0f} % des Höchstgewinns ({b.hoch_pct:.1f} %) sind wieder abgegeben"))
+            sig.append(
+                Signal(
+                    "gewinn_abgabe",
+                    1.0,
+                    f"{anteil * 100:.0f} % des Höchstgewinns ({b.hoch_pct:.1f} %) sind wieder abgegeben",
+                )
+            )
     if ko is not None and ko > 0:
         puffer = ((kurs - ko) if lang else (ko - kurs)) / kurs * 100.0
         if puffer < 15.0:
-            sig.append(Signal("ko_puffer", 1.0, f"Knock-out-Puffer nur {puffer:.1f} % — bei weiterem Rückgang droht der Totalverlust des Scheins"))
+            sig.append(
+                Signal(
+                    "ko_puffer",
+                    1.0,
+                    f"Knock-out-Puffer nur {puffer:.1f} % — bei weiterem Rückgang droht der Totalverlust des Scheins",
+                )
+            )
     if zahlen_tage is not None and 0 <= zahlen_tage <= 3:
         sig.append(Signal("ereignis", 1.0, f"Quartalszahlen in {zahlen_tage} Tag(en) — Gap-Risiko"))
 
@@ -374,7 +476,10 @@ def bewerte(
     schutz_ref = b.wechsel_unten if b.wechsel_unten is not None else stop
     risiko_pct = abs(kurs - schutz_ref) / kurs * 100.0 if schutz_ref else None
     chance_schlecht = (
-        b.upside_pct is not None and risiko_pct is not None and risiko_pct > 0 and b.upside_pct / risiko_pct < 1.0
+        b.upside_pct is not None
+        and risiko_pct is not None
+        and risiko_pct > 0
+        and b.upside_pct / risiko_pct < 1.0
     )
 
     urteil = HOLD
@@ -384,7 +489,13 @@ def bewerte(
         urteil = PARTIAL
     choch = any(s.name in ("choch", "tief_bruch") for s in sig)
     gegen = trend.get("d1") == dagegen or trend.get("h4") == dagegen
-    if choch and gegen and n_sig >= 3 and b.punkte >= SCHWELLE_EXIT and (chance_schlecht or b.upside_pct is None):
+    if (
+        choch
+        and gegen
+        and n_sig >= 3
+        and b.punkte >= SCHWELLE_EXIT
+        and (chance_schlecht or b.upside_pct is None)
+    ):
         urteil = EXIT
     b.urteil = urteil
 
@@ -412,8 +523,16 @@ def bewerte(
     f = lambda x: f"{x:,.4f}".rstrip("0").rstrip(".")  # noqa: E731
     gruende = "; ".join(s.text for s in sig) or "keine Schwächesignale"
     b.begruendung = gruende
-    unten = f" Verliert der Kurs {f(b.wechsel_unten)}{z} per Schluss, wird die Lage schlechter." if b.wechsel_unten else ""
-    oben = f" Ein Schluss über {f(b.wechsel_oben)}{z} stellt die Struktur wieder voll her." if b.wechsel_oben else ""
+    unten = (
+        f" Verliert der Kurs {f(b.wechsel_unten)}{z} per Schluss, wird die Lage schlechter."
+        if b.wechsel_unten
+        else ""
+    )
+    oben = (
+        f" Ein Schluss über {f(b.wechsel_oben)}{z} stellt die Struktur wieder voll her."
+        if b.wechsel_oben
+        else ""
+    )
     b.neubewertung = "Neubewertung bei jedem neuen abgeschlossenen Stundenschluss." + unten + oben
 
     if urteil == HOLD:

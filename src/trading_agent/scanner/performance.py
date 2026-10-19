@@ -100,6 +100,8 @@ class Ergebnis:
     r_drittel_real: float | None = None
     #: Kosten dieses Trades in R (Annahme ``KOSTEN_ANNAHME_PCT``), ``None`` ohne Stop-Abstand.
     kosten_r: float | None = None
+    #: ``long`` / ``short`` (leer, wenn unbekannt) — fuer die Diagnose nach Richtung.
+    richtung: str = ""
 
     @property
     def r_netto(self) -> float | None:
@@ -335,6 +337,7 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
                 ohne_ergebnis=eingestiegen and zustand == "abgelaufen" and raus_e is None,
                 r_drittel_real=r_real,
                 kosten_r=_kosten_r(w, str(w.get("klasse") or "")),
+                richtung=str(w.get("richtung") or "").lower(),
             )
         )
     aus.sort(key=lambda e: e.beendet)
@@ -819,6 +822,7 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
                 "gezaehlt": e.gezaehlt,
                 "r_real": round(e.r_drittel_real, 3) if e.r_drittel_real is not None else None,
                 "kosten_r": round(e.kosten_r, 3) if e.kosten_r is not None else None,
+                "richtung": e.richtung,
             }
             for e in reversed(alle)
         ),

@@ -115,15 +115,9 @@ def derivate_satz(d: dict[str, Any] | None) -> str | None:
     if j is None:
         return None
     if j >= FUNDING_HEISS_JAHR_PCT:
-        return (
-            f"Terminmarkt: Longs zahlen {j:.0f} % aufs Jahr gerechnet — die Long-Seite "
-            "ist voll"
-        )
+        return f"Terminmarkt: Longs zahlen {j:.0f} % aufs Jahr gerechnet — die Long-Seite ist voll"
     if j <= FUNDING_KALT_JAHR_PCT:
-        return (
-            f"Terminmarkt: Leerverkäufer zahlen {abs(j):.0f} % aufs Jahr — viele wetten "
-            "dagegen"
-        )
+        return f"Terminmarkt: Leerverkäufer zahlen {abs(j):.0f} % aufs Jahr — viele wetten dagegen"
     return None
 
 
