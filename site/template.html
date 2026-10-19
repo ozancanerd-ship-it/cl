@@ -7637,7 +7637,19 @@ function zeichnePortfolio(){
     h += `<p class="leer">Noch keine Positionen eingetragen.</p>`;
   }
 
-  h += `<h2>Position eintragen</h2>
+  h += `<h2>Schnell einfügen</h2>
+    <div class="karte">
+      <p style="margin:0 0 9px;font-size:13px;color:var(--ink-2)">Eine Zeile oder mehrere
+      reinkopieren: <span class="mono">Symbol Menge Einstiegskurs Konto</span>, z. B.
+      <span class="mono">SKY 1500 0,07 Kraken</span>. Das Kürzel wird automatisch dem
+      Krypto-Paar zugeordnet (SKY → SKYUSD).</p>
+      <textarea id="pf_schnell" rows="3" spellcheck="false"
+        placeholder="SKY 1500 0,07 Kraken"></textarea>
+      <p style="margin:10px 0 0"><button class="btn" id="pf_schnell_ok">Hinzufügen</button></p>
+      <div id="pf_schnell_meldung"></div>
+    </div>
+
+    <h2>Position eintragen</h2>
     <div class="karte">
       <div class="rowx"><span class="lab">Symbol</span>
         <input id="pf_sym" class="val" placeholder="BTCUSDT oder NVDA" style="width:52%"></div>
@@ -7794,7 +7806,7 @@ function zeichnePortfolio(){
   }));
   const add = $('pf_add');
   if (add) add.addEventListener('click',()=>{
-    const sym = ($('pf_sym').value||'').trim().toUpperCase();
+    const sym = depotSymAufloesen(($('pf_sym').value||'').trim().toUpperCase());
     const menge = parseFloat(($('pf_menge').value||'').replace(',','.'));
     const einstieg = parseFloat(($('pf_einstieg').value||'').replace(',','.'));
     if (!sym || !isFinite(menge) || menge <= 0) return;
@@ -7809,6 +7821,20 @@ function zeichnePortfolio(){
             ...(zahl('pf_ratio') != null ? {ratio: zahl('pf_ratio')} : {}),
             ...(isinNorm(($('pf_isin')||{}).value) ? {isin: isinNorm($('pf_isin').value)} : {})});
     speicherePositionen(a); zeichnePortfolio();
+  });
+  const sn = $('pf_schnell_ok');
+  if (sn) sn.addEventListener('click',()=>{
+    const {neu, fehler} = leseDepot($('pf_schnell').value || '');
+    if (neu.length){
+      const behalten = ladePositionen().filter(p=>!neu.some(n=>n.sym===p.sym && (n.konto||'')===(p.konto||'')));
+      speicherePositionen(behalten.concat(neu.map(n=>({...n, seit: Date.now()}))));
+    }
+    zeichnePortfolio();
+    const m = $('pf_schnell_meldung');
+    if (m) m.innerHTML =
+      `<p style="margin-top:10px;font-size:12.5px;color:${neu.length?'var(--long)':'var(--warn)'}">
+        ${neu.length ? neu.map(n=>esc(n.sym)).join(', ')+' eingetragen. Für den Alarm im Hintergrund: Reiter Sync → Depot kopieren und als Secret DEPOT_CODE hinterlegen.' : ''}
+        ${fehler.length ? `<span style="color:var(--warn)">Nicht gelesen: ${fehler.map(esc).join(' · ')}</span>` : ''}</p>`;
   });
   const clear = $('pf_clear');
   if (clear) clear.addEventListener('click',()=>{ speicherePositionen([]); zeichnePortfolio(); });
