@@ -37,6 +37,7 @@ macht das Ergebnis unübersehbar, statt es dem Gefühl zu überlassen.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -48,6 +49,12 @@ REGELN = ("ganz", "drittel")
 #: eigenständig, damit die Auswertung nicht kippt, wenn am Plan geschraubt wird —
 #: eine Statistik, deren Maßstab sich mitbewegt, misst nichts.
 ZIEL_R = {"TP1": 1.0, "TP2": 2.0, "TP3": 3.5}
+
+#: Roundtrip-Kosten (Gebuehr + Spread + Slippage) in Prozent des Einstiegskurses, je
+#: Klasse. ANNAHME, nicht gemessen — die Bilanz oben rechnet ohne Kosten, ``r_netto``
+#: zeigt, was nach dieser Annahme uebrig bleibt. Krypto-Taker ~0,10 % je Seite plus
+#: Spread/Slippage bei duennen Coins; Aktien (Trade Republic) kleine Fremdkosten + Spread.
+KOSTEN_ANNAHME_PCT = {"krypto": 0.35, "aktien": 0.10, "gold": 0.05}
 
 #: Zustände, ab denen ein Trade zu Ende ist.
 ABGESCHLOSSEN = frozenset({"stop", "ziel_erreicht", "invalidiert", "abgelaufen"})
@@ -87,6 +94,19 @@ class Ergebnis:
     #: weil es keinen Kurs mehr gab (bis 27.09. jedes Wochenende bei Aktien). Das Ergebnis
     #: ist unbekannt; es als 0 R zu buchen, waere eine erfundene Zahl.
     ohne_ergebnis: bool = False
+    #: Dasselbe Ergebnis (Drittel-Regel), aber gemessen am ECHTEN Einstiegskurs und mit den
+    #: tatsaechlichen Zielabstaenden statt der festen 1/2/3,5 R. ``None``, wenn Einstieg,
+    #: Stop oder Fuellkurs fehlen. Verwendet die Alarm-Sperre NICHT — nur die Anzeige.
+    r_drittel_real: float | None = None
+    #: Kosten dieses Trades in R (Annahme ``KOSTEN_ANNAHME_PCT``), ``None`` ohne Stop-Abstand.
+    kosten_r: float | None = None
+
+    @property
+    def r_netto(self) -> float | None:
+        """Fuellkurs-bereinigt UND nach Kosten. ``None``, wenn eines von beiden fehlt."""
+        if self.r_drittel_real is None or self.kosten_r is None:
+            return None
+        return self.r_drittel_real - self.kosten_r
 
     @property
     def gezaehlt(self) -> bool:
@@ -134,7 +154,11 @@ def _r_ganz(zustand: str, erreicht: tuple[str, ...], mfe: float) -> float:
 
 
 def _r_drittel(
-    zustand: str, erreicht: tuple[str, ...], raus_erreicht: tuple[str, ...] | None = None
+    zustand: str,
+    erreicht: tuple[str, ...],
+    raus_erreicht: tuple[str, ...] | None = None,
+    ziel_r: dict[str, float] | None = None,
+    stop_r: float = -1.0,
 ) -> float:
     """Drittel-Regel: je Ziel ein Drittel raus, nach dem ersten Ziel Stop auf Einstand.
 
@@ -143,6 +167,7 @@ def _r_drittel(
     statt eines vollen Verlusts. Genau diese Fälle machen in den echten Daten die
     Trefferquote aus.
     """
+    zr = ZIEL_R if ziel_r is None else ziel_r
     teil = 1.0 / 3.0
     if raus_erreicht is not None:
         # Der Schutz-Stop hat die Position beendet; spaetere Ziele zaehlen nicht mehr.
@@ -150,14 +175,52 @@ def _r_drittel(
         vorher = [t for t in ("TP1", "TP2", "TP3") if t in raus_erreicht]
         if not vorher:
             return 0.0
-        rest_r = ZIEL_R["TP1"] if "TP2" in vorher else 0.0
-        return sum(teil * ZIEL_R[t] for t in vorher) + (3 - len(vorher)) * teil * rest_r
+        rest_r = zr["TP1"] if "TP2" in vorher else 0.0
+        return sum(teil * zr[t] for t in vorher) + (3 - len(vorher)) * teil * rest_r
     getroffen = [t for t in ("TP1", "TP2", "TP3") if t in erreicht]
     if not getroffen:
-        return -1.0 if zustand == "stop" else 0.0
-    gewinn = sum(teil * ZIEL_R[t] for t in getroffen)
+        return stop_r if zustand == "stop" else 0.0
+    gewinn = sum(teil * zr[t] for t in getroffen)
     # Der Rest geht am Einstand raus — nach TP1 steht der Stop dort.
     return gewinn
+
+
+def _real_basis(w: dict[str, Any]) -> tuple[float, float, float, int] | None:
+    """(Fuellkurs, Risiko je Einheit, Plan-Einstieg, Richtungsvorzeichen) oder ``None``."""
+    try:
+        einstieg = float(w["einstieg"])
+        stop = float(w["stop"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    risiko = abs(einstieg - stop)
+    if risiko <= 0 or einstieg <= 0:
+        return None
+    fuell = w.get("einstiegskurs")
+    fuell = float(fuell) if fuell is not None else einstieg
+    return fuell, risiko, einstieg, (1 if str(w.get("richtung") or "long") == "long" else -1)
+
+
+def _ziel_r_real(w: dict[str, Any]) -> tuple[dict[str, float], float] | None:
+    """Tatsaechliches R je Ziel und am Stop, gemessen am Fuellkurs (nicht am Plan-Einstieg)."""
+    b = _real_basis(w)
+    if b is None:
+        return None
+    fuell, risiko, _e, sg = b
+    zr = dict(ZIEL_R)
+    for marke, key in (("TP1", "tp1"), ("TP2", "tp2"), ("TP3", "tp3")):
+        if w.get(key) is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                zr[marke] = sg * (float(w[key]) - fuell) / risiko
+    return zr, sg * (float(w["stop"]) - fuell) / risiko
+
+
+def _kosten_r(w: dict[str, Any], klasse: str) -> float | None:
+    b = _real_basis(w)
+    if b is None:
+        return None
+    _f, risiko, einstieg, _sg = b
+    risiko_pct = risiko / einstieg * 100.0
+    return KOSTEN_ANNAHME_PCT.get(klasse, 0.35) / risiko_pct if risiko_pct > 0 else None
 
 
 def _stunden(von: str, bis: str) -> float | None:
@@ -236,6 +299,22 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
                         + (1.0 - teil * len(getroffen)) * rest_r
                     )
         eingestiegen = _ist_eingestiegen(w, zustand, erreicht)
+        r_real = None
+        zr_stop = _ziel_r_real(w)
+        if zr_stop is not None:
+            zr, stop_r = zr_stop
+            r_real = _r_drittel(zustand, erreicht, raus_e, zr, stop_r)
+            if zustand == "invalidiert" and w.get("ausstiegskurs") is not None and raus_e is None:
+                r_aus = _r_bei(w, float(w["ausstiegskurs"]))
+                if r_aus is not None:
+                    teil = 1.0 / 3.0
+                    getroffen = [t for t in ("TP1", "TP2", "TP3") if t in erreicht]
+                    boden = zr["TP1"] if "TP2" in getroffen else 0.0
+                    rest_r = max(r_aus, boden) if getroffen else r_aus
+                    r_real = (
+                        sum(teil * zr[t] for t in getroffen)
+                        + (1.0 - teil * len(getroffen)) * rest_r
+                    )
         aus.append(
             Ergebnis(
                 instrument=str(w.get("instrument") or "?"),
@@ -254,6 +333,8 @@ def aus_wachliste(daten: dict[str, Any] | None) -> list[Ergebnis]:
                 eingestiegen=eingestiegen,
                 gemeldet=bool(w.get("gemeldet")),
                 ohne_ergebnis=eingestiegen and zustand == "abgelaufen" and raus_e is None,
+                r_drittel_real=r_real,
+                kosten_r=_kosten_r(w, str(w.get("klasse") or "")),
             )
         )
     aus.sort(key=lambda e: e.beendet)
@@ -688,6 +769,13 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
         "ganz": rechne([e.r_ganz for e in ergebnisse]),
         "drittel": rechne([e.r_drittel for e in ergebnisse]),
     }
+    # Zusaetzlich (nur Anzeige): Fuellkurs-bereinigt und nach Kosten, auf denselben Trades.
+    real = [e for e in ergebnisse if e.r_drittel_real is not None]
+    if real:
+        je_regel["drittel_real"] = rechne([e.r_drittel_real for e in real])  # type: ignore[misc]
+    netto = [e for e in ergebnisse if e.r_netto is not None]
+    if netto:
+        je_regel["drittel_netto"] = rechne([e.r_netto for e in netto])  # type: ignore[misc]
     mfe = [e.mfe for e in ergebnisse]
     mae = [e.mae for e in ergebnisse]
     dauer = _dauern(ergebnisse)
@@ -729,6 +817,8 @@ def bericht(wachliste: dict[str, Any] | None, *, jetzt: datetime | None = None) 
                 "eingestiegen": e.eingestiegen,
                 "gemeldet": e.gemeldet,
                 "gezaehlt": e.gezaehlt,
+                "r_real": round(e.r_drittel_real, 3) if e.r_drittel_real is not None else None,
+                "kosten_r": round(e.kosten_r, 3) if e.kosten_r is not None else None,
             }
             for e in reversed(alle)
         ),

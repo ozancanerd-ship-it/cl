@@ -289,3 +289,31 @@ def test_handy_alarme_getrennt_ausgewiesen() -> None:
     assert b.je_meldung["aufs_handy"].anzahl == 1
     assert b.je_meldung["nur_app"].anzahl == 1
     assert b.je_meldung["nur_app"].summe_r == -1.0
+
+
+def test_kosten_und_fuellkurs_felder() -> None:
+    """Füllkurs-R und Kosten-R: additiv, Kosten = Annahme% / Stopabstand%."""
+    w = _wache(
+        klasse="krypto",
+        einstieg=100.0,
+        einstiegskurs=101.0,
+        stop=95.0,
+        tp1=105.0,
+        tp2=110.0,
+        tp3=120.0,
+        richtung="long",
+        zustand="stop",
+    )
+    erg = aus_wachliste(_liste(w))
+    assert len(erg) == 1
+    e = erg[0]
+    assert e.r_drittel_real is not None and e.kosten_r is not None
+    # Stop 6 unter Füllkurs, Risiko aus Plan 5 -> Kosten: 0.35 % / (5/100*100 %) = 0.07 R
+    assert abs(e.kosten_r - 0.07) < 1e-6
+    assert e.r_netto == e.r_drittel_real - e.kosten_r
+
+
+def test_ohne_fuellkurs_keine_real_werte() -> None:
+    erg = aus_wachliste(_liste(_wache()))
+    assert erg[0].r_drittel_real is None
+    assert erg[0].r_netto is None
