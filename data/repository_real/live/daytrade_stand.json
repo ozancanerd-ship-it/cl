@@ -1,5 +1,5 @@
 {
-  "letzte_bar": "2026-10-21T03:00:00+00:00",
+  "letzte_bar": "2026-10-21T04:00:00+00:00",
   "offen": {
     "APT": {
       "sym": "APT",
@@ -14,8 +14,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 0.8305,
-      "r_offen": 0.022,
-      "kurs": 0.8332
+      "r_offen": -0.235,
+      "kurs": 0.8259
     },
     "DOGE": {
       "sym": "DOGE",
@@ -30,8 +30,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 0.0819618,
-      "r_offen": -0.629,
-      "kurs": 0.0813985
+      "r_offen": -0.541,
+      "kurs": 0.0815056
     },
     "BCH": {
       "sym": "BCH",
@@ -46,24 +46,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 286.91,
-      "r_offen": -0.658,
-      "kurs": 284.15
-    },
-    "INJ": {
-      "sym": "INJ",
-      "klasse": "coin",
-      "signal_ts": "2026-10-21T01:00:00+00:00",
-      "signal_kurs": 9.207,
-      "stop": 8.83291667,
-      "ausstieg_marke": 8.425,
-      "breite": 17,
-      "ueberhang_atr": 0.112,
-      "lohnt": false,
-      "alarm": false,
-      "gemeldet": [],
-      "einstieg": 9.207,
-      "r_offen": -0.479,
-      "kurs": 9.051
+      "r_offen": -0.622,
+      "kurs": 284.34
     },
     "XLM": {
       "sym": "XLM",
@@ -78,8 +62,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 0.183317,
-      "r_offen": -0.775,
-      "kurs": 0.181401
+      "r_offen": -0.869,
+      "kurs": 0.181112
     }
   },
   "abgeschlossen": [
@@ -410,6 +394,26 @@
       "grund": "STOP",
       "preis_aus": 0.80085,
       "ts_aus": "2026-10-20T15:00:00+00:00"
+    },
+    {
+      "sym": "INJ",
+      "klasse": "coin",
+      "signal_ts": "2026-10-21T01:00:00+00:00",
+      "signal_kurs": 9.207,
+      "stop": 8.83291667,
+      "ausstieg_marke": 8.425,
+      "breite": 17,
+      "ueberhang_atr": 0.112,
+      "lohnt": false,
+      "alarm": false,
+      "gemeldet": [],
+      "einstieg": 9.207,
+      "r_offen": -0.479,
+      "kurs": 9.051,
+      "r": -1.062,
+      "grund": "STOP",
+      "preis_aus": 8.83291667,
+      "ts_aus": "2026-10-21T04:00:00+00:00"
     }
   ]
 }
