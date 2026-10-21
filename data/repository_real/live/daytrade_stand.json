@@ -1,5 +1,5 @@
 {
-  "letzte_bar": "2026-10-21T06:00:00+00:00",
+  "letzte_bar": "2026-10-21T07:00:00+00:00",
   "offen": {
     "APT": {
       "sym": "APT",
@@ -14,8 +14,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 0.8305,
-      "r_offen": -0.193,
-      "kurs": 0.8271
+      "r_offen": 0.354,
+      "kurs": 0.8426
     },
     "DOGE": {
       "sym": "DOGE",
@@ -30,8 +30,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 0.0819618,
-      "r_offen": -0.622,
-      "kurs": 0.0814071
+      "r_offen": -0.151,
+      "kurs": 0.0819823
     },
     "BCH": {
       "sym": "BCH",
@@ -46,8 +46,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 286.91,
-      "r_offen": -0.433,
-      "kurs": 285.34
+      "r_offen": 0.004,
+      "kurs": 287.65
     },
     "XLM": {
       "sym": "XLM",
@@ -62,8 +62,47 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 0.183317,
-      "r_offen": -0.337,
-      "kurs": 0.182742
+      "r_offen": -0.057,
+      "kurs": 0.183601
+    },
+    "XRP": {
+      "sym": "XRP",
+      "klasse": "coin",
+      "signal_ts": "2026-10-21T07:00:00+00:00",
+      "signal_kurs": 1.34485,
+      "stop": 1.32317167,
+      "ausstieg_marke": 1.28857,
+      "breite": 18,
+      "ueberhang_atr": 0.011,
+      "lohnt": false,
+      "alarm": false,
+      "gemeldet": []
+    },
+    "NEAR": {
+      "sym": "NEAR",
+      "klasse": "coin",
+      "signal_ts": "2026-10-21T07:00:00+00:00",
+      "signal_kurs": 5.1958,
+      "stop": 4.97255833,
+      "ausstieg_marke": 4.6286,
+      "breite": 18,
+      "ueberhang_atr": 0.563,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": []
+    },
+    "ETC": {
+      "sym": "ETC",
+      "klasse": "coin",
+      "signal_ts": "2026-10-21T07:00:00+00:00",
+      "signal_kurs": 8.093,
+      "stop": 7.99783333,
+      "ausstieg_marke": 7.693,
+      "breite": 18,
+      "ueberhang_atr": 1.975,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": []
     }
   },
   "abgeschlossen": [
