@@ -1,5 +1,5 @@
 {
-  "letzte_bar": "2026-10-22T00:00:00+00:00",
+  "letzte_bar": "2026-10-22T01:00:00+00:00",
   "offen": {
     "APT": {
       "sym": "APT",
@@ -7,47 +7,15 @@
       "signal_ts": "2026-10-20T17:00:00+00:00",
       "signal_kurs": 0.8276,
       "stop": 0.80215,
-      "ausstieg_marke": 0.8129,
+      "ausstieg_marke": 0.8132,
       "breite": 16,
       "ueberhang_atr": 0.055,
       "lohnt": false,
       "alarm": false,
       "gemeldet": [],
       "einstieg": 0.8305,
-      "r_offen": -0.172,
-      "kurs": 0.8277
-    },
-    "DOGE": {
-      "sym": "DOGE",
-      "klasse": "coin",
-      "signal_ts": "2026-10-20T22:00:00+00:00",
-      "signal_kurs": 0.0819999,
-      "stop": 0.08074032,
-      "ausstieg_marke": 0.0811913,
-      "breite": 16,
-      "ueberhang_atr": 0.135,
-      "lohnt": false,
-      "alarm": false,
-      "gemeldet": [],
-      "einstieg": 0.0819618,
-      "r_offen": -0.251,
-      "kurs": 0.0818597
-    },
-    "BCH": {
-      "sym": "BCH",
-      "klasse": "coin",
-      "signal_ts": "2026-10-21T01:00:00+00:00",
-      "signal_kurs": 287.14,
-      "stop": 281.62333333,
-      "ausstieg_marke": 283.5,
-      "breite": 17,
-      "ueberhang_atr": 0.392,
-      "lohnt": true,
-      "alarm": true,
-      "gemeldet": [],
-      "einstieg": 286.91,
-      "r_offen": -0.111,
-      "kurs": 287.04
+      "r_offen": -0.334,
+      "kurs": 0.8231
     },
     "XLM": {
       "sym": "XLM",
@@ -62,8 +30,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 0.183317,
-      "r_offen": -0.058,
-      "kurs": 0.183599
+      "r_offen": -0.604,
+      "kurs": 0.181926
     },
     "XRP": {
       "sym": "XRP",
@@ -78,8 +46,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 1.34487,
-      "r_offen": 0.658,
-      "kurs": 1.36252
+      "r_offen": 0.093,
+      "kurs": 1.35025
     },
     "NEAR": {
       "sym": "NEAR",
@@ -87,15 +55,15 @@
       "signal_ts": "2026-10-21T07:00:00+00:00",
       "signal_kurs": 5.1958,
       "stop": 4.97255833,
-      "ausstieg_marke": 4.9551,
+      "ausstieg_marke": 4.9556,
       "breite": 18,
       "ueberhang_atr": 0.563,
       "lohnt": true,
       "alarm": true,
       "gemeldet": [],
       "einstieg": 5.2015,
-      "r_offen": 0.333,
-      "kurs": 5.2908
+      "r_offen": -0.05,
+      "kurs": 5.2031
     },
     "ETC": {
       "sym": "ETC",
@@ -110,8 +78,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 8.074,
-      "r_offen": -0.239,
-      "kurs": 8.076
+      "r_offen": -0.83,
+      "kurs": 8.031
     },
     "BTC": {
       "sym": "BTC",
@@ -126,24 +94,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 83731.3,
-      "r_offen": 0.259,
-      "kurs": 84150.1
-    },
-    "FIL": {
-      "sym": "FIL",
-      "klasse": "coin",
-      "signal_ts": "2026-10-21T17:00:00+00:00",
-      "signal_kurs": 1.072,
-      "stop": 1.04225,
-      "ausstieg_marke": 1.021,
-      "breite": 18,
-      "ueberhang_atr": 0.067,
-      "lohnt": false,
-      "alarm": false,
-      "gemeldet": [],
-      "einstieg": 1.072,
-      "r_offen": -0.628,
-      "kurs": 1.056
+      "r_offen": -0.737,
+      "kurs": 83345.7
     }
   },
   "abgeschlossen": [
@@ -614,6 +566,66 @@
       "grund": "STOP",
       "preis_aus": 1.027925,
       "ts_aus": "2026-10-21T23:00:00+00:00"
+    },
+    {
+      "sym": "DOGE",
+      "klasse": "coin",
+      "signal_ts": "2026-10-20T22:00:00+00:00",
+      "signal_kurs": 0.0819999,
+      "stop": 0.08074032,
+      "ausstieg_marke": 0.0811913,
+      "breite": 16,
+      "ueberhang_atr": 0.135,
+      "lohnt": false,
+      "alarm": false,
+      "gemeldet": [],
+      "einstieg": 0.0819618,
+      "r_offen": -0.251,
+      "kurs": 0.0818597,
+      "r": -0.856,
+      "grund": "AUSSTIEG",
+      "preis_aus": 0.0811212,
+      "ts_aus": "2026-10-22T01:00:00+00:00"
+    },
+    {
+      "sym": "BCH",
+      "klasse": "coin",
+      "signal_ts": "2026-10-21T01:00:00+00:00",
+      "signal_kurs": 287.14,
+      "stop": 281.62333333,
+      "ausstieg_marke": 283.5,
+      "breite": 17,
+      "ueberhang_atr": 0.392,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": [],
+      "einstieg": 286.91,
+      "r_offen": -0.111,
+      "kurs": 287.04,
+      "r": -0.79,
+      "grund": "AUSSTIEG",
+      "preis_aus": 283.45,
+      "ts_aus": "2026-10-22T01:00:00+00:00"
+    },
+    {
+      "sym": "FIL",
+      "klasse": "coin",
+      "signal_ts": "2026-10-21T17:00:00+00:00",
+      "signal_kurs": 1.072,
+      "stop": 1.04225,
+      "ausstieg_marke": 1.021,
+      "breite": 18,
+      "ueberhang_atr": 0.067,
+      "lohnt": false,
+      "alarm": false,
+      "gemeldet": [],
+      "einstieg": 1.072,
+      "r_offen": -0.628,
+      "kurs": 1.056,
+      "r": -1.09,
+      "grund": "STOP",
+      "preis_aus": 1.04225,
+      "ts_aus": "2026-10-22T01:00:00+00:00"
     }
   ]
 }
