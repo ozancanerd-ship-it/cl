@@ -71,7 +71,6 @@
     "setup:AXON:A_MINUS:short": "2026-10-21T14:17:09.628560+00:00",
     "setup:AXP:A_MINUS:short": "2026-10-21T14:43:22.050409+00:00",
     "setup:BCHUSD:A:short": "2026-10-22T08:14:28.860069+00:00",
-    "setup:BCHUSD:B:long": "2026-10-20T23:22:07.804816+00:00",
     "setup:BCHUSD:B:short": "2026-10-22T09:21:58.889102+00:00",
     "setup:BCHUSD:B_PLUS:long": "2026-10-21T17:16:33.539292+00:00",
     "setup:BCHUSD:B_PLUS:short": "2026-10-22T17:40:30.891928+00:00",
@@ -228,6 +227,7 @@
     "weg:DE:B_PLUS": "2026-10-22T13:43:18.031618+00:00",
     "weg:DIS:B": "2026-10-22T20:00:38.882815+00:00",
     "weg:DOGEUSD:B": "2026-10-22T05:25:08.675035+00:00",
+    "weg:DOGUSD:B_PLUS": "2026-10-22T23:28:33.883990+00:00",
     "weg:DOTUSD:B": "2026-10-21T19:16:25.396315+00:00",
     "weg:ETHFIUSD:B": "2026-10-22T08:23:46.469855+00:00",
     "weg:ETHUSD:B_PLUS": "2026-10-22T05:25:08.675035+00:00",
@@ -335,12 +335,12 @@
     },
     "ADIUSD": {
       "richtung": "short",
-      "score": 39.3,
+      "score": 41.5,
       "urteil": "WATCH"
     },
     "AEROUSD": {
       "richtung": "short",
-      "score": 22.2,
+      "score": 23.4,
       "urteil": "NO_TRADE"
     },
     "AIOZUSD": {
@@ -360,7 +360,7 @@
     },
     "ALGOUSD": {
       "richtung": "short",
-      "score": 39.7,
+      "score": 37.8,
       "urteil": "WATCH"
     },
     "ALIGNUSD": {
@@ -425,7 +425,7 @@
     },
     "ASTERUSD": {
       "richtung": "short",
-      "score": 28.8,
+      "score": 30.4,
       "urteil": "NO_TRADE"
     },
     "ATHUSD": {
@@ -445,7 +445,7 @@
     },
     "AUTUSD": {
       "richtung": "short",
-      "score": 57.0,
+      "score": 56.8,
       "urteil": "B_PLUS"
     },
     "AVAUSD": {
@@ -540,7 +540,7 @@
     },
     "BTCUSD": {
       "richtung": "short",
-      "score": 60.1,
+      "score": 59.4,
       "urteil": "WATCH"
     },
     "BTRUSD": {
@@ -661,7 +661,7 @@
     "DOGUSD": {
       "richtung": "short",
       "score": 55.2,
-      "urteil": "B_PLUS"
+      "urteil": "WATCH"
     },
     "DOTUSD": {
       "richtung": null,
@@ -800,7 +800,7 @@
     },
     "INJUSD": {
       "richtung": "short",
-      "score": 48.4,
+      "score": 50.6,
       "urteil": "WATCH"
     },
     "INTC": {
@@ -815,7 +815,7 @@
     },
     "IPUSD": {
       "richtung": "short",
-      "score": 46.7,
+      "score": 46.0,
       "urteil": "WATCH"
     },
     "ISRG": {
@@ -899,9 +899,9 @@
       "urteil": "NO_TRADE"
     },
     "LUNAUSD": {
-      "richtung": "short",
-      "score": 41.8,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 0.0,
+      "urteil": "NO_TRADE"
     },
     "MA": {
       "richtung": "long",
@@ -1030,7 +1030,7 @@
     },
     "NILUSD": {
       "richtung": "short",
-      "score": 37.9,
+      "score": 38.5,
       "urteil": "WATCH"
     },
     "NKE": {
@@ -1110,7 +1110,7 @@
     },
     "PEPEUSD": {
       "richtung": "short",
-      "score": 31.1,
+      "score": 31.4,
       "urteil": "WATCH"
     },
     "PFE": {
@@ -1155,7 +1155,7 @@
     },
     "PYTHUSD": {
       "richtung": "short",
-      "score": 33.6,
+      "score": 33.7,
       "urteil": "WATCH"
     },
     "QCOM": {
@@ -1235,7 +1235,7 @@
     },
     "SKYUSD": {
       "richtung": "long",
-      "score": 46.4,
+      "score": 48.4,
       "urteil": "WATCH"
     },
     "SLB": {
@@ -1265,7 +1265,7 @@
     },
     "SPXUSD": {
       "richtung": "short",
-      "score": 47.5,
+      "score": 48.6,
       "urteil": "WATCH"
     },
     "STBLUSD": {
@@ -1280,7 +1280,7 @@
     },
     "STXUSD": {
       "richtung": "long",
-      "score": 54.7,
+      "score": 56.4,
       "urteil": "WATCH"
     },
     "SUIUSD": {
@@ -1461,11 +1461,6 @@
     "WUSD": {
       "richtung": "short",
       "score": 40.6,
-      "urteil": "WATCH"
-    },
-    "XCNUSD": {
-      "richtung": "short",
-      "score": 31.0,
       "urteil": "WATCH"
     },
     "XDCUSD": {
@@ -2276,6 +2271,6 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "MCD",
-  "stand": "2026-10-22T23:20:06.916528+00:00",
+  "stand": "2026-10-22T23:28:33.883990+00:00",
   "stumme_klassen": []
 }
