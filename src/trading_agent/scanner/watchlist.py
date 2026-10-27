@@ -902,7 +902,14 @@ class Wachliste:
             # Stop zuerst pruefen. Wenn im selben Fenster Ziel UND Stop beruehrt wurden,
             # ist nicht bekannt, was zuerst kam — und dann ist die pessimistische Annahme
             # die einzige, die eine Statistik nicht schoenrechnet.
-            stop_beruehrt = tief <= w.stop if w.long else hoch >= w.stop
+            # Messartefakt-Schutz: das Kursfenster beginnt VOR der Aufnahme. Eine Wache, die in
+            # diesem Lauf erst entstanden ist, darf nicht von Kursen gestoppt werden, die vor
+            # ihrer Existenz lagen (67 Sofort-Stops vom 06.-11.09., Start == Ende, MFE 0).
+            # Sie wird im naechsten Lauf voll geprueft; der Einstiegsalarm bleibt unberuehrt.
+            neu_in_diesem_lauf = w.aufgenommen == jetzt.isoformat()
+            stop_beruehrt = (
+                False if neu_in_diesem_lauf else (tief <= w.stop if w.long else hoch >= w.stop)
+            )
             if stop_beruehrt:
                 w.zustand = Zustand.STOP.value
                 ereignisse.append(

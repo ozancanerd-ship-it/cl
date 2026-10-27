@@ -299,6 +299,12 @@ def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
             continue
         if w.get("einstiegskurs") is None:
             continue
+        # Messartefakt: im selben Lauf aufgenommen und gestoppt (Start == Ende). Kein
+        # Handelsergebnis, sondern ein Kursfenster vor der Aufnahme (siehe watchlist.pruefen).
+        if str(w.get("zustand") or "") == "stop" and w.get("aufgenommen") and (
+            w.get("aufgenommen") == w.get("zuletzt") and float(w.get("bestes_r") or 0.0) <= 0.0
+        ):
+            continue
         erreicht = [str(x) for x in (w.get("erreicht") or [])]
         zustand = str(w.get("zustand"))
         if raus_e is None and zustand not in ("stop", "ziel_erreicht") and "TP1" not in erreicht:
