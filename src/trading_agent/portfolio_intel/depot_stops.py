@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from trading_agent.portfolio_intel import exit_journal
 from trading_agent.portfolio_intel import gewinnschutz as gs_mod
 from trading_agent.refdata import zahlen as zahlen_ref
 
@@ -475,6 +476,11 @@ class Ereignis:
     dringend: bool
     marke: str = ""
     werte: dict[str, Any] = field(default_factory=dict)
+    #: Messpunkt fuer den Rueckblick (``exit_journal``): Instrument, Kurs und Richtung zum
+    #: Zeitpunkt des Hinweises. Von ``pruefe_depot`` gesetzt, nicht von den Bausteinen.
+    instrument: str = ""
+    kurs: float | None = None
+    lang: bool | None = None
 
     @property
     def merker(self) -> str:
@@ -1589,13 +1595,15 @@ def pruefe_depot(
     stand: dict[str, Any],
     schluss: dict[str, float] | None = None,
     kontext: dict[str, dict[str, Any]] | None = None,
+    jetzt: datetime | None = None,
 ) -> tuple[dict[str, Any], list[Ereignis], dict[str, Any]]:
     """Das ganze Depot einmal durch. Gibt (neuer Stand, Ereignisse, Uebersicht) zurueck.
 
     ``stand``: ``{"positionen": {key: {...}}, "gemeldet": {merker: iso}}``.
     Die Uebersicht ist oeffentlich-tauglich (nur Zaehler).
     """
-    idx = ScanIndex(scan)
+    jetzt = jetzt or datetime.now(UTC)
+    idx = ScanIndex(scan, jetzt)
     alt_pos = dict((stand or {}).get("positionen") or {})
     neu_pos: dict[str, Any] = {}
     alle: list[Ereignis] = []
@@ -1621,6 +1629,10 @@ def pruefe_depot(
                 if k not in ("ausgestoppt", "stop", "gemeldet_stop", "quelle")
             }
         st, ev = pflegen(pos, lg, alt, schluss, kontext, depot)
+        for e in ev:  # Messpunkt fuer den Rueckblick auf Verkaufshinweise
+            e.instrument = str((lg.row or {}).get("instrument") or "")
+            e.kurs = lg.kurs
+            e.lang = lg.lang
         st["menge"] = menge
         st["sym"] = str(pos.get("sym") or "")
         neu_pos[key] = st
@@ -1633,7 +1645,11 @@ def pruefe_depot(
             kurse_live += 1
         else:
             kurse_scan += 1
+    journal = exit_journal.fortschreiben(
+        list((stand or {}).get("exit_journal") or []), alle, idx, jetzt
+    )
     uebersicht = {
+        "exit_bilanz": exit_journal.zusammenfassung(journal),
         "positionen": len(neu_pos),
         "mit_stop": mit_stop,
         "ohne_kurs": ohne_kurs,
@@ -1643,7 +1659,11 @@ def pruefe_depot(
         "scan_alter_min": round(idx.alter_min) if idx.alter_min is not None else None,
     }
     return (
-        {"positionen": neu_pos, "gemeldet": dict((stand or {}).get("gemeldet") or {})},
+        {
+            "positionen": neu_pos,
+            "gemeldet": dict((stand or {}).get("gemeldet") or {}),
+            "exit_journal": journal,
+        },
         alle,
         uebersicht,
     )

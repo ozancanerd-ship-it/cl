@@ -5566,7 +5566,24 @@ async function fuelleWaechter(el){
     gebündelt. ${WA.mit_stop} von ${WA.positionen} Positionen haben einen
     Stop${WA.ohne_kurs ? `, ${WA.ohne_kurs} ohne Kurs (nicht im Scan)` : ''}.${esc(kursQuelle)}</p>
     <p style="font-size:12px;color:var(--ink-3)">Zuletzt geprüft ${esc(wann)} · derselbe
-    Stand wie auf diesem Gerät. ${kanSatz}</p></div>`;
+    Stand wie auf diesem Gerät. ${kanSatz}</p>${exitRueckblick(WA.exit_bilanz)}</div>`;
+}
+
+/* Rückblick auf Verkaufshinweise: wohin ging der Kurs NACH dem Hinweis? Nur Zähler aus
+   waechter.json. Unter 30 Fällen je Gruppe steht „zu wenig" statt einer Aussage. */
+function exitRueckblick(eb){
+  if (!eb || !eb.n) return `<p style="font-size:12px;color:var(--ink-3);margin:8px 0 0">Rückblick auf Verkaufshinweise: noch keiner erfasst. Ab jetzt wird jeder bestätigte Hinweis mit dem Kurs festgehalten und nach 1, 3, 7 und 14 Tagen nachgemessen.</p>`;
+  const NAME = {teilverkauf: 'Teilverkauf / Gewinnschutz', ausstieg: 'Ausstieg', stop: 'Stop', knockout: 'Knock-out-Puffer'};
+  const zeilen = Object.entries(eb.gruppen || {}).map(([g, v]) => {
+    const h = (v.h || {})['3'] || (v.h || {})['1'];
+    const tage = (v.h || {})['3'] ? 3 : 1;
+    const t = h ? (h.belastbar
+      ? `nach ${tage} Tg.: ${Math.round(h.weiter_gelaufen * 100)} % liefen weiter für die Position (Median ${h.median_pct > 0 ? '+' : ''}${String(h.median_pct).replace('.', ',')} %)`
+      : `nach ${tage} Tg. erst ${h.n} Messung(en) — zu wenig (${h.n}/${eb.genug})`) : 'noch keine Nachmessung fällig';
+    return `<div class="rowx"><span class="lab">${esc(NAME[g] || g)} · ${v.n} Hinweis(e)</span><span class="val" style="font-size:12px;text-align:right">${t}</span></div>`;
+  }).join('');
+  return `<div style="margin-top:10px"><div class="kv-t"><span>Rückblick auf Verkaufshinweise</span><span>Kurs nach dem Hinweis</span></div>${zeilen}
+    <p class="kv-hinweis">„Weiter gelaufen" heißt: der Kurs ging nach dem Hinweis in Richtung der Position weiter — der Hinweis hätte Gewinn gekostet. Ein Urteil gibt es erst ab ${eb.genug} Messungen je Gruppe.</p></div>`;
 }
 
 /* ======================================================= SYNC-SEITE
