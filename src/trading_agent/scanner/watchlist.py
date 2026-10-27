@@ -133,6 +133,9 @@ class Wache:
     raus: bool = False
     #: Kurs beim vorzeitigen Ausstieg (Analyse gedreht).
     ausstiegskurs: float | None = None
+    #: Was zum Zeitpunkt der Aufnahme bekannt war (Vertrauen, ATR-Bewegung, Momentum,
+    #: Quartalszahlen, Marktlage). NUR Messung fuer spaetere Auswertung, steuert nichts.
+    kontext: dict | None = None
     #: Welche Ziele erreicht waren, als der Schutz-Stop die Position laut Plan beendet
     #: hat, und wo dieser Schutz-Stop lag. Die Wache laeuft danach weiter — ``erreicht``
     #: waechst also womoeglich noch. Bis zum 27.09. zaehlte die Bilanz auch Ziele, die
@@ -194,6 +197,7 @@ class Wache:
             "schutz": self.schutz,
             "raus": self.raus,
             "ausstiegskurs": self.ausstiegskurs,
+            "kontext": self.kontext,
             "raus_erreicht": (list(self.raus_erreicht) if self.raus_erreicht is not None else None),
             "raus_kurs": self.raus_kurs,
             "umsatz_24h": self.umsatz_24h,
@@ -236,6 +240,41 @@ class Ereignis:
             "titel": self.titel,
             "text": self.text,
         }
+
+
+def kontext_aus_zeile(z: dict[str, Any], markt: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Kompakte Momentaufnahme fuer die spaetere Frage: welche Merkmale sagten das Ergebnis voraus?"""
+
+    def _num(v: Any) -> float | None:
+        try:
+            return round(float(v), 4) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    setup = z.get("setup") if isinstance(z.get("setup"), dict) else {}
+    info = z.get("info") if isinstance(z.get("info"), dict) else {}
+    zahlen = info.get("zahlen") if isinstance(info.get("zahlen"), dict) else {}
+    halte = z.get("halte") if isinstance(z.get("halte"), dict) else {}
+    ren = (z.get("zusatz") or {}).get("renditen") if isinstance(z.get("zusatz"), dict) else None
+    ren = ren if isinstance(ren, dict) else {}
+    markt = markt or {}
+    return {
+        "confidence": _num(z.get("confidence")),
+        "bewegung_atr": _num(z.get("bewegung_atr")),
+        "bewegung_pct": _num(z.get("bewegung_pct")),
+        "qualitaet": setup.get("qualitaet"),
+        "atr_pct": _num(halte.get("atr_pct")),
+        "r21": _num(ren.get("r21")),
+        "r63": _num(ren.get("r63")),
+        "sektor_rang": _num(info.get("sektor_rang")),
+        "sektor_von": _num(info.get("sektor_von")),
+        "zahlen_in_tagen": _num(zahlen.get("tage")),
+        "termin_sperre": bool(z.get("termin_sperre")),
+        "n_warnungen": len(z.get("warnungen") or []),
+        "makro_regime": markt.get("makro_regime"),
+        "angst_gier": _num(markt.get("angst_gier")),
+        "btc_funding_jahr_pct": _num(markt.get("btc_funding_jahr_pct")),
+    }
 
 
 def _fmt(v: float | None) -> str:
@@ -564,7 +603,13 @@ class Wachliste:
         return [w for w in self.wachen.values() if w.zustand not in ENDZUSTAENDE]
 
     # ------------------------------------------------------------------ aufnehmen
-    def aufnehmen(self, zeilen: list[dict[str, Any]], *, jetzt: datetime) -> list[Ereignis]:
+    def aufnehmen(
+        self,
+        zeilen: list[dict[str, Any]],
+        *,
+        jetzt: datetime,
+        markt: dict[str, Any] | None = None,
+    ) -> list[Ereignis]:
         """Neue handelbare Setups aus dem Scan uebernehmen. Bestehende nicht ueberschreiben.
 
         Bewusst kein Update laufender Wachen: ein Setup, das schon beobachtet wird, behaelt
@@ -713,6 +758,7 @@ class Wachliste:
                 broker=str(z.get("broker") or ""),
                 eurusd=(float(z["eurusd"]) if z.get("eurusd") else None),
                 umsatz_24h=_umsatz(z),
+                kontext=kontext_aus_zeile(z, markt),
             )
             if w.risiko <= 0 or w.richtung not in ("long", "short"):
                 continue

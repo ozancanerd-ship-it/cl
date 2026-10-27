@@ -322,7 +322,14 @@ async def main() -> int:
     ereignisse = []
     if args.vollstaendig and zeilen:
         ereignisse += liste.gegen_scan(zeilen, jetzt=jetzt)
-        ereignisse += liste.aufnehmen(zeilen, jetzt=jetzt)
+        markt = {
+            "makro_regime": (scan.get("makro") or {}).get("regime"),
+            "angst_gier": ((scan.get("stimmung") or {}).get("angst_gier") or {}).get("wert"),
+            "btc_funding_jahr_pct": ((scan.get("stimmung") or {}).get("derivate") or {}).get(
+                "btc_funding_jahr_pct"
+            ),
+        }
+        ereignisse += liste.aufnehmen(zeilen, jetzt=jetzt, markt=markt)
 
     offen = liste.offen
     print(f"{len(offen)} offene Wache(n) von {len(liste.wachen)} insgesamt")
