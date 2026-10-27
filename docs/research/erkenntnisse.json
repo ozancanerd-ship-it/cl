@@ -1,0 +1,126 @@
+{
+ "schema": 1,
+ "erkenntnisse": [
+  {
+   "id": "E01",
+   "prio": 1,
+   "thema": "Backtest-Overfitting",
+   "quelle": "bailey2014-dsr",
+   "stelle": "Titel/Abstract (Auswahlverzerrung durch Backtest-Overfitting)",
+   "kern": "Wer viele Varianten auf denselben Daten testet, waehlt systematisch Zufallsgewinner aus; die Anzahl der Versuche muss in die Bewertung eingehen.",
+   "codebezug": "scripts/strategie_walkforward.py, scripts/trade_analyse.py: Anzahl getesteter Varianten (N) mitprotokollieren",
+   "status": "hypothese_offen",
+   "test": "N aller bisher geprueften Filter/Regeln zaehlen und Ergebnisse mit erwartetem Zufallsmaximum vergleichen"
+  },
+  {
+   "id": "E02",
+   "prio": 1,
+   "thema": "Mehrfachtest",
+   "quelle": "bailey2014-dsr",
+   "stelle": "Abstract",
+   "kern": "Die Sharpe Ratio muss um Auswahlverzerrung durch viele Versuche und um Nicht-Normalitaet bereinigt werden (Deflated Sharpe Ratio).",
+   "codebezug": "geplant: scripts/validierung_dsr.py (nicht vorhanden)",
+   "status": "nicht_umgesetzt",
+   "test": "Unit-Test gegen handgerechnetes Beispiel, dann Anwendung auf die Filter-Kandidaten"
+  },
+  {
+   "id": "E03",
+   "prio": 1,
+   "thema": "Overfitting-Wahrscheinlichkeit",
+   "quelle": "bailey2017-pbo",
+   "stelle": "Abstract",
+   "kern": "Mit kombinatorischer symmetrischer Kreuzvalidierung laesst sich schaetzen, wie oft die In-Sample-beste Variante Out-of-Sample unter dem Median landet.",
+   "codebezug": "geplant, nur sinnvoll sobald mehrere Varianten je Zeitraum vorliegen (strategie_walkforward.py)",
+   "status": "nicht_umgesetzt",
+   "test": "Synthetische Zufallsstrategien muessen PBO nahe 50 % zeigen"
+  },
+  {
+   "id": "E05",
+   "prio": 1,
+   "thema": "Backtest-Protokoll",
+   "quelle": "arnott2019-protocol",
+   "stelle": "Titel/Abstract (SSRN-Arbeitspapier 2018)",
+   "kern": "Ein Protokoll mit vorab festgelegter Hypothese, Out-of-Sample-Disziplin und dokumentierter Anzahl der Versuche; Ergebnisse nach Optimierung gelten als zweifelhaft.",
+   "codebezug": "docs/AUSSTIEG-STUDIE-2026-10.md (Vorregistrierung 13.10. erfuellt dieses Muster teilweise)",
+   "status": "teilweise_befolgt",
+   "test": "Vorlage fuer Vorregistrierung in docs/research/"
+  },
+  {
+   "id": "E06",
+   "prio": 2,
+   "thema": "Gaps bei Aktien",
+   "quelle": "lou2019-overnight",
+   "stelle": "Abstract",
+   "kern": "Aktienrenditen zerfallen in Nacht- und Taganteil, die oft entgegengesetzte Vorzeichen haben; Strategien verdienen haeufig nur in einem der beiden.",
+   "codebezug": "portfolio_intel/depot_stops.py (LUECKE_PCT), scanner/performance.py (Aktien -47,6 R)",
+   "status": "hypothese_offen",
+   "test": "Aktien-Trades nach Einstieg vor/in Handelszeit und Ausloeser Gap vs intraday aufteilen; nur auswerten wenn n >= 30 je Gruppe"
+  },
+  {
+   "id": "E07",
+   "prio": 2,
+   "thema": "Trend-Persistenz",
+   "quelle": "moskowitz2012-tsmom",
+   "stelle": "Abstract",
+   "kern": "In 58 liquiden Futures halten Preistrends ein bis zwoelf Monate an und kehren sich danach teilweise um.",
+   "codebezug": "Regime/MTF-Trendfilter in scanner/",
+   "status": "kein_transfer_belegt",
+   "test": "Horizont (Monate) passt nicht zu Tages-Trades; nur als Regime-Hypothese pruefen, nicht als Strategie uebernehmen"
+  },
+  {
+   "id": "E09",
+   "prio": 4,
+   "thema": "Portfolio-Konzentration",
+   "quelle": "lopezdeprado2016-hrp",
+   "stelle": "Abstract",
+   "kern": "Klassische Optimierer erzeugen instabile, konzentrierte Gewichte; hierarchische Gruppierung der Kovarianzstruktur stabilisiert Out-of-Sample.",
+   "codebezug": "portfolio_intel/ Gesundheits-/Konzentrationsscore",
+   "status": "hypothese_offen",
+   "test": "nur Diagnose (Korrelationscluster anzeigen), keine automatische Gewichtung"
+  },
+  {
+   "id": "E10",
+   "prio": 6,
+   "thema": "Kalibrierung",
+   "quelle": "niculescu2005-probabilities",
+   "stelle": "Abstract",
+   "kern": "Modelle liefern oft verzerrte Wahrscheinlichkeiten; Platt-Skalierung oder isotonische Regression korrigieren das, aber erst nach Pruefung an Ergebnisdaten.",
+   "codebezug": "Lernen-Tab: Confidence/Score-Anzeige (Berechnungsgrundlage pruefen)",
+   "status": "offen",
+   "test": "Zuverlaessigkeitstabelle: Score-Klasse vs tatsaechliche Trefferquote aus dem Archiv, nur bei n >= 30 je Klasse"
+  },
+  {
+   "id": "E11",
+   "prio": 6,
+   "thema": "Kalibrierung",
+   "quelle": "guo2017-calibration",
+   "stelle": "Abstract",
+   "kern": "Temperatur-Skalierung ist eine einfache Nachkalibrierung mit einem Parameter.",
+   "codebezug": "wie E10",
+   "status": "offen",
+   "test": "wie E10; erst Daten, dann Methode"
+  },
+  {
+   "id": "E12",
+   "prio": 7,
+   "thema": "KI-Schnittstelle",
+   "quelle": "openai-structured-outputs",
+   "stelle": "Abschnitt Responses API / text.format",
+   "kern": "Antworten lassen sich per text.format mit json_schema und strict:true an ein Schema binden (alle Felder required, additionalProperties false); Sicherheitsablehnungen erscheinen als refusal-Teil und muessen abgefangen werden; Function Calling dient dem Zugriff auf eigene Funktionen.",
+   "codebezug": "ops/zweitmeinung.py (derzeit Chat Completions, JSON-Modus, gpt-4o-mini)",
+   "status": "nicht_umgesetzt",
+   "test": "Schema + Validator + refusal-Behandlung per Unit-Test mit Fake-Antworten"
+  },
+  {
+   "id": "E13",
+   "prio": 5,
+   "thema": "Position-Sizing",
+   "quelle": "thorp1997-kelly",
+   "stelle": "Abstract",
+   "kern": "Das Kelly-Kriterium ist ein Wachstumsoptimierungsansatz fuer Einsatzgroessen; die abgerufene Seite behandelt Teil-Kelly und Schaetzfehler nicht.",
+   "codebezug": "Risk Engine (A+ 0,50 %, A 0,35 %, B 0,25 % Risiko je Trade)",
+   "status": "kein_transfer_belegt",
+   "test": "keine Aenderung; Kelly nur bei belegtem Edge relevant (aktuell keiner)"
+  }
+ ]
+}
