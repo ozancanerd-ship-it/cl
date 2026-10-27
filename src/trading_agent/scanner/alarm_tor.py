@@ -213,6 +213,14 @@ class Stand:
     gewinn_r: float = 0.0
     verlust_r: float = 0.0
     ziel1: int = 0
+    kosten_r: float = 0.0
+    #: Summe R nach Kosten in der aelteren / juengeren Haelfte (nach Aufnahmezeit)
+    alt_netto_r: float = 0.0
+    neu_netto_r: float = 0.0
+
+    @property
+    def netto_r(self) -> float:
+        return self.summe_r - self.kosten_r
 
     @property
     def schnitt(self) -> float | None:
@@ -231,6 +239,12 @@ class Stand:
             return "gesperrt"
         pf = self.profitfaktor
         if self.summe_r > 0 and (pf is None or pf >= BEWAEHRT_PF):
+            # "bewaehrt" gilt nur, wenn es NACH KOSTEN positiv bleibt und in beiden
+            # Zeithaelften nicht negativ ist (sonst ist es Zufall oder verblasst).
+            if self.netto_r <= 0:
+                return "offen"
+            if self.anzahl >= 2 * MIN_FAELLE and (self.alt_netto_r < 0 or self.neu_netto_r < 0):
+                return "offen"
             return "bewaehrt"
         return "offen"
 
@@ -255,6 +269,9 @@ class Stand:
                 round(self.profitfaktor, 2) if self.profitfaktor is not None else None
             ),
             "ziel1": self.ziel1,
+            "netto_r": round(self.netto_r, 2),
+            "alt_netto_r": round(self.alt_netto_r, 2),
+            "neu_netto_r": round(self.neu_netto_r, 2),
             "urteil": self.urteil,
         }
 
@@ -272,6 +289,20 @@ def _schluessel(setup: str, klasse: str, richtung: str) -> list[str]:
     return aus
 
 
+#: Roundtrip-Kosten je Klasse in % (Annahme, nicht gemessen; siehe scripts/trade_analyse.py)
+_KOSTEN_PCT = {"krypto": 0.35, "aktien": 0.10, "gold": 0.05}
+
+
+def _kosten_r(w: Mapping[str, Any]) -> float:
+    """Kosten in R: Roundtrip-Prozent / Stop-Abstand in Prozent. 0, wenn nicht berechenbar."""
+    try:
+        e, st = float(w["einstieg"]), float(w["stop"])
+        risiko_pct = abs(e - st) / e * 100
+        return _KOSTEN_PCT.get(str(w.get("klasse") or ""), 0.35) / risiko_pct if risiko_pct else 0.0
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return 0.0
+
+
 def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
     """Die Bilanz je Setup-Art, je Klasse+Setup-Art und je Klasse+Richtung.
 
@@ -285,7 +316,7 @@ def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
     bis zum 26.09. fast alle, weil der Waechter sie jedes Wochenende als „ohne Kurs"
     geschlossen hat. Das hat die Bilanz verduennt, ohne etwas ueber die Setup-Art zu sagen.
     """
-    roh: dict[str, list[tuple[float, bool]]] = {}
+    roh: dict[str, list[tuple[float, bool, float, str]]] = {}
     for w in wachen:
         if not isinstance(w, Mapping):
             continue
@@ -313,16 +344,23 @@ def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
         for k in _schluessel(
             str(w.get("setup") or ""), str(w.get("klasse") or ""), str(w.get("richtung") or "")
         ):
-            roh.setdefault(k, []).append((r, "TP1" in erreicht))
+            roh.setdefault(k, []).append(
+                (r, "TP1" in erreicht, _kosten_r(w), str(w.get("aufgenommen") or ""))
+            )
     aus: dict[str, Stand] = {}
     for k, werte in roh.items():
+        zeitlich = sorted(werte, key=lambda t: t[3])
+        h = len(zeitlich) // 2
         aus[k] = Stand(
             schluessel=k,
             anzahl=len(werte),
-            summe_r=sum(r for r, _ in werte),
-            gewinn_r=sum(r for r, _ in werte if r > 0),
-            verlust_r=sum(r for r, _ in werte if r < 0),
-            ziel1=sum(1 for _, z in werte if z),
+            summe_r=sum(t[0] for t in werte),
+            gewinn_r=sum(t[0] for t in werte if t[0] > 0),
+            verlust_r=sum(t[0] for t in werte if t[0] < 0),
+            ziel1=sum(1 for t in werte if t[1]),
+            kosten_r=sum(t[2] for t in werte),
+            alt_netto_r=sum(t[0] - t[2] for t in zeitlich[:h]),
+            neu_netto_r=sum(t[0] - t[2] for t in zeitlich[h:]),
         )
     return aus
 
