@@ -5552,12 +5552,19 @@ async function fuelleWaechter(el){
       <p style="font-size:12px;color:var(--ink-3)">Zuletzt geprüft ${esc(wann)}. ${kanSatz}</p></div>`;
     return;
   }
-  el.innerHTML = `<div class="note-box gut" style="margin:10px 0 0">
-    <span class="nt">Wächter rund um die Uhr: aktiv</span>
-    <p style="font-size:13px">Der Lauf auf GitHub prüft dein Depot alle zehn Minuten — auch
-    wenn diese App zu ist: Stop gerissen, Ziel erreicht, Knock-out nah sofort; Stop gesetzt
-    oder nachgezogen gebündelt. ${WA.mit_stop} von ${WA.positionen} Positionen haben einen
-    Stop${WA.ohne_kurs ? `, ${WA.ohne_kurs} ohne Kurs (nicht im Scan)` : ''}.</p>
+  // Kein Echtzeit-Versprechen: ein geplanter Lauf alle paar Minuten. Ist die letzte Prüfung
+  // deutlich älter, steht das als Warnung da statt „aktiv".
+  const ueberfaellig = alter != null && alter > 30;
+  const kursQuelle = WA.kurse_live != null
+    ? ` Kurse: ${WA.kurse_live} live nachgeholt, ${WA.kurse_scan || 0} aus dem Scan${WA.scan_alter_min != null ? ` (Scan ${WA.scan_alter_min} Min. alt)` : ''}.`
+    : '';
+  el.innerHTML = `<div class="note-box ${ueberfaellig ? 'warn' : 'gut'}" style="margin:10px 0 0">
+    <span class="nt">Wächter: ${ueberfaellig ? 'überfällig — letzte Prüfung ' + esc(wann) : 'aktiv (periodisch, keine Echtzeit)'}</span>
+    <p style="font-size:13px">Ein geplanter Lauf auf GitHub prüft dein Depot etwa alle zehn
+    Minuten — auch wenn diese App zu ist. Zwischen zwei Läufen sieht er nichts: Stop gerissen, Ziel
+    erreicht, Knock-out nah melden sich beim nächsten Lauf; Stop gesetzt oder nachgezogen
+    gebündelt. ${WA.mit_stop} von ${WA.positionen} Positionen haben einen
+    Stop${WA.ohne_kurs ? `, ${WA.ohne_kurs} ohne Kurs (nicht im Scan)` : ''}.${esc(kursQuelle)}</p>
     <p style="font-size:12px;color:var(--ink-3)">Zuletzt geprüft ${esc(wann)} · derselbe
     Stand wie auf diesem Gerät. ${kanSatz}</p></div>`;
 }

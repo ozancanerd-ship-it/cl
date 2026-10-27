@@ -40,6 +40,7 @@ import hashlib
 import math
 import re
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from trading_agent.portfolio_intel import gewinnschutz as gs_mod
@@ -185,8 +186,17 @@ def umrechnen(wert: float | None, von: str, nach: str, eurusd: float | None) -> 
 class ScanIndex:
     """Scan-Zeilen nach Instrument und nach Muenze."""
 
-    def __init__(self, scan: dict[str, Any]) -> None:
+    def __init__(self, scan: dict[str, Any], jetzt: datetime | None = None) -> None:
         self.eurusd = _zahl(scan.get("eurusd"))
+        #: Wie alt die Scan-Datei ist (Minuten). ``None``, wenn sie keinen Zeitstempel hat.
+        self.alter_min: float | None = None
+        try:
+            erz = datetime.fromisoformat(str(scan.get("erzeugt")).replace("Z", "+00:00"))
+            if erz.tzinfo is None:
+                erz = erz.replace(tzinfo=UTC)
+            self.alter_min = max(0.0, ((jetzt or datetime.now(UTC)) - erz).total_seconds() / 60.0)
+        except (TypeError, ValueError):
+            pass
         self.genau: dict[str, dict[str, Any]] = {}
         # Der S&P 500 steht nicht im Scan, aber in der Makro-Messung (Yahoo ^GSPC, Tagesschluss).
         # Er wird als Zeile mit Hinweis angeboten — KEIN Livekurs.
@@ -288,6 +298,33 @@ class Lage:
     eurusd: float | None = None
     #: Naechster Quartalszahlen-Termin (bei Scheinen: des Basiswerts), aus der Scan-Zeile.
     zahlen: dict[str, Any] | None = None
+    #: Alter der Scan-Datei in Minuten (``None`` = unbekannt). Gilt nur, wenn der Kurs der
+    #: Zeile NICHT live nachgeholt wurde (``row["kurs_live"]``).
+    scan_alter_min: float | None = None
+
+
+#: Ab diesem Scan-Alter (Minuten) steht im Hinweis, dass der Kurs nicht frisch ist. Der volle
+#: Scan laeuft zweimal je Stunde, der Krypto-Scan alle zehn Minuten.
+KURS_ALT_MIN = 25.0
+
+
+def kursnote(lg: Lage) -> str:
+    """Satz fuer Hinweise, wenn der Kurs nicht frisch ist — sonst leer.
+
+    Ein Alarm auf einem Scan-Kurs von vor einer Stunde ist keine Lüge, aber der Leser muss
+    wissen, dass der Kurs alt sein kann (und beim Broker nachsehen)."""
+    row = lg.row or {}
+    if row.get("kurs_live"):
+        return ""
+    if row.get("nur_tagesschluss"):
+        return " Kurs: nur der Tagesschluss, kein Livekurs."
+    a = lg.scan_alter_min
+    if a is not None and a >= KURS_ALT_MIN:
+        return (
+            f" Kurs vom Scan, {a:.0f} Min. alt — vor dem Handeln den aktuellen Kurs beim "
+            "Broker prüfen."
+        )
+    return ""
 
 
 def _kandidaten(
@@ -324,6 +361,12 @@ def _kandidaten(
 
 
 def lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
+    lg = _lage_fuer(pos, idx)
+    lg.scan_alter_min = idx.alter_min
+    return lg
+
+
+def _lage_fuer(pos: dict[str, Any], idx: ScanIndex) -> Lage:
     lang = not (
         (pos.get("plan") or {}).get("richtung") == "short" or pos.get("hebel_richtung") == "short"
     )
@@ -598,6 +641,48 @@ def schein_produkt(pos: dict[str, Any], lg: Lage) -> dict[str, Any]:
     return aus
 
 
+#: Ab dieser Ueberschreitung des Stops (in % des Stops) gilt es als Kurslücke.
+LUECKE_PCT = 1.5
+
+
+def _luecke_satz(kurs: float, stop: float, lang: bool, z: str) -> str:
+    """Hinweis, wenn der Kurs den Stop deutlich ueberrannt hat.
+
+    Ein Stop ist eine Marke, keine Garantie: nach einer Lücke (über Nacht, Zahlen, dünner
+    Markt) liegt der Kurs weit dahinter, und eine Order zum Stop-Preis wird nicht mehr
+    ausgeführt. Der Hinweis nennt den echten Abstand, damit der Verlust nicht kleiner
+    aussieht, als er ist."""
+    if not stop or stop <= 0:
+        return ""
+    ueber = ((stop - kurs) if lang else (kurs - stop)) / stop * 100.0
+    if ueber < LUECKE_PCT:
+        return ""
+    return (
+        f" Der Kurs liegt {ueber:.1f} % jenseits des Stops (Lücke) — eine Order zum Stop-Preis "
+        f"{_fmt(stop)}{z} wird so nicht mehr ausgeführt; der Verlust ist größer als geplant."
+    )
+
+
+#: Trade Republic: 1 EUR je Ausfuehrung (Angabe von Ozan, 2026-09-12; nur Einzelaktien).
+TR_ORDER_EUR = 1.0
+#: Unter diesem Erloes (EUR) macht die Gebuehr mehr als ein Prozent aus und steht im Hinweis.
+GEBUEHR_HINWEIS_BIS_EUR = 100.0
+
+
+def _gebuehr_satz(lg: Lage, konto: str, erloes: float) -> str:
+    """Hinweis, wenn die feste Order-Gebuehr einen Teilverkauf spuerbar verteuert."""
+    if "trade republic" not in konto.lower() or str((lg.row or {}).get("klasse")) != "aktien":
+        return ""
+    eur = umrechnen(erloes, lg.waehrung, "EUR", lg.eurusd)
+    if eur is None or eur <= 0 or eur >= GEBUEHR_HINWEIS_BIS_EUR:
+        return ""
+    return (
+        f" Bei Trade Republic kostet jede Order {TR_ORDER_EUR:.0f} € — bei ca. {eur:.0f} € "
+        f"Erlös sind das {TR_ORDER_EUR / eur * 100:.1f} %; ein kleiner Teilverkauf lohnt "
+        "dann oft nicht."
+    )
+
+
 def _gewinnschutz(
     lg: Lage,
     pos: dict[str, Any],
@@ -726,7 +811,15 @@ def _gewinnschutz(
                 f"{k.upper()} {_TREND_TXT.get(v, 'fehlt')}" for k, v in bew.bias.items()
             )
             teile.append(f"Bias: {bias}.")
+            gesichert = len({"TP1", "TP2", "TP3"} & erledigt)
+            if gesichert:
+                teile.append(
+                    f"Bereits gesichert: {gesichert} von 3 Zielen — die Mengenangabe oben bezieht "
+                    "sich auf den Rest, nicht auf das Ziel-Drittel."
+                )
             teile.append(bew.neubewertung)
+            if kursnote(lg):
+                teile.append(kursnote(lg).strip())
             if bew.fehlt:
                 teile.append("Fehlt: " + "; ".join(bew.fehlt) + ".")
             teile.append("Ein Hinweis zum Prüfen, kein Auftrag — die Entscheidung bleibt bei dir.")
@@ -1212,7 +1305,7 @@ def pflegen(
                 wer,
                 f"{ebene_text}, der Stop lag bei {_fmt(stop)}{z}. Verkaufen{wo_satz} — die Idee "
                 "ist widerlegt, hier wird nicht nachverhandelt. Danach kommt der Wert auf die "
-                "Wiedereinstiegs-Liste.",
+                "Wiedereinstiegs-Liste." + _luecke_satz(kurs, stop, lang, z) + kursnote(lg),
                 True,
                 marke=_fmt(stop),
             )
@@ -1248,6 +1341,23 @@ def pflegen(
     erledigt = set(pos.get("erledigt") or []) | set(st.get("erreicht") or [])
     menge = _zahl(pos.get("menge"))
     offen = 3 - len({"TP1", "TP2", "TP3"} & erledigt)
+    # Ausgangsmenge merken, solange noch KEIN Ziel erreicht ist. Die App weiss nicht, ob die
+    # Stueckzahl nach einem Teilverkauf von Hand verkleinert wurde. Mit „Rest / offene Ziele"
+    # waere das zweite Drittel bei unveraenderter Menge ein HALBES (Menge / 2) — mit der
+    # Ausgangsmenge ist es in beiden Faellen ein Drittel.
+    if not ({"TP1", "TP2", "TP3"} & erledigt):
+        menge0: float | None = menge if menge and menge > 0 else None
+    else:
+        menge0 = _zahl(st.get("menge0"))
+        if menge0 is not None and menge is not None and menge > menge0 * 1.0001:
+            menge0 = None  # nachgekauft: die alte Ausgangsmenge gilt nicht mehr
+    if menge0 is None:
+        st.pop("menge0", None)
+    else:
+        st["menge0"] = menge0
+    stk_ziel: float | None = None
+    if menge and menge > 0 and offen > 0:
+        stk_ziel = min(menge, menge0 / 3.0) if menge0 else menge / offen
     vor = set(st.get("vorlaeufig") or [])
     inst = str((lg.row or {}).get("instrument") or "")
     close = (schluss or {}).get(inst)
@@ -1255,9 +1365,13 @@ def pflegen(
         ziel = _zahl(ziele.get(marke.lower()))
         if ziel is None or marke in erledigt:
             continue
-        if menge and menge > 0 and offen > 0:
-            stk = menge / offen
-            teil += f" (ca. {stk:.4g} Stück von {menge:.6g})"
+        if stk_ziel is not None and menge:
+            teil += f" (ca. {stk_ziel:.4g} Stück von {menge:.6g}"
+            if menge0 and menge0 > menge * 1.001:
+                teil += f", Ausgangsmenge {menge0:.6g}"
+            elif menge0 and erledigt & {"TP1", "TP2", "TP3"}:
+                teil += f", ein Drittel der Ausgangsmenge {menge0:.6g}"
+            teil += ")"
         beruehrt = kurs >= ziel if lang else kurs <= ziel
         # Stundenbestaetigung: nur wenn ein frischer, abgeschlossener Schluss vorliegt.
         # Ohne Daten keine Bestaetigung behaupten — dann gilt das Beruehren wie bisher.
@@ -1276,7 +1390,7 @@ def pflegen(
                     wer,
                     f"VORLÄUFIG: {marke} berührt ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}). "
                     f"{grund} Erst ein bestätigter Stundenschluss macht daraus einen "
-                    "Verkaufshinweis. Bis dahin kein Verkauf.",
+                    "Verkaufshinweis. Bis dahin kein Verkauf." + kursnote(lg),
                     True,
                     marke=f"{marke}-vorlaeufig",
                 )
@@ -1320,8 +1434,9 @@ def pflegen(
             extra = ""
             if neu_stop is not None and ein_r:
                 extra += f" Neuer Stop: {_fmt(neu_stop)}{z}."
-            if menge and menge > 0 and offen > 0:
-                extra += f" Erlös ca. {_fmt((menge / offen) * kurs)}{z} brutto."
+            if stk_ziel is not None:
+                extra += f" Erlös ca. {_fmt(stk_ziel * kurs)}{z} brutto."
+                extra += _gebuehr_satz(lg, wo, stk_ziel * kurs)
             naechstes = {"TP1": "tp2", "TP2": "tp3"}.get(marke)
             extra += lage_zeile(
                 bool(lang),
@@ -1337,7 +1452,7 @@ def pflegen(
                     lg.key,
                     wer,
                     f"{marke} erreicht ({_fmt(kurs)}{z}, Ziel {_fmt(ziel)}{z}){rahmen_satz} — {teil} "
-                    f"verkaufen{wo_satz}.{danach}{extra}",
+                    f"verkaufen{wo_satz}.{danach}{extra}{kursnote(lg)}",
                     True,
                     marke=marke,
                 )
@@ -1484,7 +1599,7 @@ def pruefe_depot(
     alt_pos = dict((stand or {}).get("positionen") or {})
     neu_pos: dict[str, Any] = {}
     alle: list[Ereignis] = []
-    mit_stop = ohne_kurs = 0
+    mit_stop = ohne_kurs = kurse_live = kurse_scan = 0
     depot = depot_risiko(positionen, idx, alt_pos)
     for pos in positionen:
         if not isinstance(pos, dict) or not pos.get("sym") or ist_bar(pos):
@@ -1514,10 +1629,18 @@ def pruefe_depot(
             mit_stop += 1
         if lg.kurs is None:
             ohne_kurs += 1
+        elif (lg.row or {}).get("kurs_live"):
+            kurse_live += 1
+        else:
+            kurse_scan += 1
     uebersicht = {
         "positionen": len(neu_pos),
         "mit_stop": mit_stop,
         "ohne_kurs": ohne_kurs,
+        # Woher die Kurse kommen: live nachgeholt oder aus der Scan-Datei (und wie alt die ist).
+        "kurse_live": kurse_live,
+        "kurse_scan": kurse_scan,
+        "scan_alter_min": round(idx.alter_min) if idx.alter_min is not None else None,
     }
     return (
         {"positionen": neu_pos, "gemeldet": dict((stand or {}).get("gemeldet") or {})},

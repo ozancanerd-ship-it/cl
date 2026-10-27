@@ -688,7 +688,7 @@ def main() -> int:
             scan = {
                 **scan,
                 "gesamt": [
-                    {**r, "kurs": live[str(r.get("instrument"))]}
+                    {**r, "kurs": live[str(r.get("instrument"))], "kurs_live": True}
                     if str(r.get("instrument")) in live
                     else r
                     for r in (scan.get("gesamt") or [])
