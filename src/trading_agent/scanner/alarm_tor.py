@@ -289,8 +289,8 @@ def _schluessel(setup: str, klasse: str, richtung: str) -> list[str]:
     return aus
 
 
-#: Roundtrip-Kosten je Klasse in % (Annahme, nicht gemessen; siehe scripts/trade_analyse.py)
-_KOSTEN_PCT = {"krypto": 0.35, "aktien": 0.10, "gold": 0.05}
+#: Roundtrip-Kosten je Klasse in %. Krypto 0,80 = 2 x Kraken-Pro-Maker 0,40 % (Stufe 1, kraken.com/features/fee-schedule, 27.10.2026 abgerufen; Taker waere 2 x 0,80 = 1,60 %). Aktien/Gold: Annahme.
+_KOSTEN_PCT = {"krypto": 0.80, "aktien": 0.10, "gold": 0.05}
 
 
 def _kosten_r(w: Mapping[str, Any]) -> float:
@@ -301,6 +301,20 @@ def _kosten_r(w: Mapping[str, Any]) -> float:
         return _KOSTEN_PCT.get(str(w.get("klasse") or ""), 0.35) / risiko_pct if risiko_pct else 0.0
     except (KeyError, TypeError, ValueError, ZeroDivisionError):
         return 0.0
+
+
+def _r_bei_ausstieg(w: Mapping[str, Any]) -> float | None:
+    """R beim echten Ausstiegskurs (ab Einstiegskurs, am urspruenglichen Stop gemessen)."""
+    try:
+        e, st, kurs = float(w["einstieg"]), float(w["stop"]), float(w["ausstiegskurs"])
+        basis = float(w.get("einstiegskurs") or e)
+    except (KeyError, TypeError, ValueError):
+        return None
+    risiko = abs(e - st)
+    if risiko <= 0:
+        return None
+    weg = (kurs - basis) if str(w.get("richtung") or "long") == "long" else (basis - kurs)
+    return weg / risiko
 
 
 def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
@@ -338,9 +352,22 @@ def bilanz(wachen: Iterable[Mapping[str, Any]]) -> dict[str, Stand]:
             continue
         erreicht = [str(x) for x in (w.get("erreicht") or [])]
         zustand = str(w.get("zustand"))
-        if raus_e is None and zustand not in ("stop", "ziel_erreicht") and "TP1" not in erreicht:
+        r_aus = _r_bei_ausstieg(w) if zustand == "invalidiert" and raus_e is None else None
+        if (
+            raus_e is None
+            and zustand not in ("stop", "ziel_erreicht")
+            and "TP1" not in erreicht
+            and r_aus is None
+        ):
             continue
         r = _r_drittel(zustand, erreicht, raus_e)
+        if r_aus is not None:
+            # Ausstieg auf gedrehte Analyse: der echte Ausstiegskurs zaehlt (Verluste bei
+            # Ausstieg vor Ziel 1 wurden frueher gar nicht gebucht -> Bilanz zu gut).
+            getroffen = [t for t in ("TP1", "TP2", "TP3") if t in erreicht]
+            boden = _ZIEL_R["TP1"] if "TP2" in getroffen else 0.0
+            rest_r = max(r_aus, boden) if getroffen else r_aus
+            r = sum(_ZIEL_R[t] for t in getroffen) / 3.0 + (1.0 - len(getroffen) / 3.0) * rest_r
         for k in _schluessel(
             str(w.get("setup") or ""), str(w.get("klasse") or ""), str(w.get("richtung") or "")
         ):

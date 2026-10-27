@@ -26,3 +26,10 @@ def test_zweite_haelfte_negativ_verhindert_bewaehrt():
     st = a.bilanz(gut + schlecht)["klasse_setup:krypto|S"]
     assert st.neu_netto_r < 0
     assert st.urteil != "bewaehrt"
+
+
+def test_ausstieg_vor_ziel1_wird_mit_echtem_kurs_gebucht():
+    w = _w(0, True)
+    w.update(zustand="invalidiert", erreicht=[], ausstiegskurs=99.5)  # -0,5 R bei 1 % Stop
+    st = a.bilanz([w])["klasse_setup:krypto|S"]
+    assert st.anzahl == 1 and abs(st.summe_r + 0.5) < 1e-9

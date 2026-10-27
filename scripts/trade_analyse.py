@@ -32,7 +32,7 @@ from trading_agent.scanner.watchlist import archiv_laden, mit_archiv  # noqa: E4
 #: ANNAHME, nicht gemessen: Krypto-Taker ~0,10 % je Seite + Spread/Slippage bei duennen
 #: Coins; Aktien (Trade Republic) ~1 EUR Fremdkosten + Spread. Absichtlich konservativ-
 #: realistisch statt null; die Spalte "netto" zeigt, was uebrig bleibt.
-KOSTEN_PCT = {"krypto": 0.35, "aktien": 0.10, "gold": 0.05}
+KOSTEN_PCT = {"krypto": 0.80, "aktien": 0.10, "gold": 0.05}
 
 
 def laden() -> list[dict]:
