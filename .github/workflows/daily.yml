@@ -249,6 +249,32 @@ jobs:
           python scripts/fetch_aktien_info.py --out web/aktien_info.json \
             --vorlauf-url "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
 
+      # Hintergrunddateien, die nur der VOLLE Lauf holt, ueberleben die Zwischenlaeufe nicht:
+      # jeder 10-Minuten-Lauf baut die Seite aus einem frischen Checkout und liess sie
+      # verschwinden (27.10. gemessen: aktien_info.json und notenbanken.json lieferten auf der
+      # Live-Seite 404 — Quartalszahlen-Termine, Sektor, Kursziele und die Notenbanken-Karte
+      # fehlten, obwohl die App sie zeigt; dasselbe war am 09.10. schon bei ChatGPT passiert).
+      # Hier wird die zuletzt veroeffentlichte Fassung uebernommen, wenn dieser Lauf keine
+      # frische hat — nur wenn sie gueltiges JSON ist, sonst nichts.
+      - name: Hintergrunddateien uebernehmen
+        if: env.LAUF != 'waechter'
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          base="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          mkdir -p web
+          for f in aktien_info.json notenbanken.json; do
+            if [ -s "web/$f" ]; then continue; fi
+            if curl -fsS --max-time 20 "$base/$f" -o "web/$f.tmp" \
+               && python -c "import json,sys; json.load(open(sys.argv[1]))" "web/$f.tmp"; then
+              mv "web/$f.tmp" "web/$f"
+              echo "  uebernommen: $f (letzte veroeffentlichte Fassung)"
+            else
+              rm -f "web/$f.tmp"
+              echo "  nicht vorhanden/ungueltig: $f"
+            fi
+          done
+
       # Der Gesamtmarkt-Scan: dynamisches Krypto-Universum von der Boerse, Aktien,
       # Gold. Schreibt die Rangliste UND je Wert eine Detaildatei mit Zeichnung,
       # MTF-Tabelle, Mustern und Kommentar.
