@@ -83,6 +83,9 @@ ZWECK = "depot-waechter-stand-v1"
 SYNC = "data/repository_real/live/depot_sync.siegel"
 SYNC_ZWECK = "depot-sync-v1"
 
+#: Arten, die aufs Telefon/Mail duerfen. Leer = Verkaufs-/Risiko-Alarme aus (Wunsch 29.10.).
+SENDEN_ARTEN: frozenset[str] = frozenset()
+
 ART_TITEL = {
     "stop": "Stop gerissen — verkaufen",
     "ziel": "Ziel erreicht — Teil verkaufen",
@@ -720,6 +723,13 @@ def main() -> int:
         # Im Protokoll nur die Art — das Protokoll ist oeffentlich einsehbar.
         print(f"  [{'!' if e.art in DRINGEND else '·'}] {ART_TITEL.get(e.art, e.art)}")
 
+    # 29.10.: Verkaufs-/Risiko-Meldungen des Depots gehen auf Wunsch NICHT mehr aufs Telefon oder
+    # per Mail (nur Einstiege kommen vom Scanner). Sie werden weiter berechnet und in der App
+    # gezeigt. SENDEN_ARTEN ausweiten, um einzelne Arten wieder zu verschicken.
+    neu_alle = neu
+    neu = [e for e in neu if e.art in SENDEN_ARTEN]
+    if args.send and neu_alle and not neu:
+        print(f"  ({len(neu_alle)} Meldung(en) nicht verschickt: Verkaufs-Alarme sind aus)")
     if args.send and neu:
         titel, text, klingel = texte(neu)
         dringend = any(e.art in DRINGEND for e in neu)

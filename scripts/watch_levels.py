@@ -295,6 +295,7 @@ async def main() -> int:
     args = ap.parse_args()
 
     from trading_agent.ops.notify import (
+        EmailSink,
         FileSink,
         GitHubIssueSink,
         Notification,
@@ -368,7 +369,9 @@ async def main() -> int:
     #   TP / STOP / SCHUTZ / AUSSTIEG — nur fuer Trades, deren Einstieg gemeldet wurde,
     #              und nur, solange die Position laut Plan noch offen ist.
     # Alles andere steht in der App, wo man es nachliest, wenn man hinsieht.
-    AUFS_TELEFON = {"EINSTIEG", "TP", "STOP", "SCHUTZ", "AUSSTIEG"}
+    # 29.10.: auf ausdruecklichen Wunsch NUR Einstiege aufs Telefon/Mail. TP/STOP/SCHUTZ/AUSSTIEG
+    # stehen weiter in der App und im Protokoll, klingeln aber nicht mehr.
+    AUFS_TELEFON = {"EINSTIEG"}
     from trading_agent.scanner import alarm_tor
 
     zu_senden, notizen = alarm_tor.fuers_telefon(
@@ -413,6 +416,9 @@ async def main() -> int:
             sinks.insert(0, push)
         if gh.available():
             sinks.append(gh)
+        mail = EmailSink(min_severity=Severity.INFO)
+        if mail.available():
+            sinks.insert(0, mail)
         if not tg.available() and not push.available():
             print(
                 "\n::warning::Kein echter Push-Weg konfiguriert. Entweder VAPID_PRIVATE_KEY + "

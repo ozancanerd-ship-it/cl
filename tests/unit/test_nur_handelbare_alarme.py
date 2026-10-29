@@ -28,7 +28,10 @@ SKRIPT = Path(__file__).resolve().parents[2] / "scripts" / "watch_levels.py"
 #: (Analyse hat bei einem LAUFENDEN Trade gedreht). Beides sind Ausstiege aus einer
 #: Position, in der Geld steckt — keine Statusmeldungen. Und beide klingeln nur fuer
 #: Trades, deren Einstieg selbst durch das Alarm-Tor kam (``alarm_tor.fuers_telefon``).
-ERLAUBT = {"EINSTIEG", "TP", "STOP", "SCHUTZ", "AUSSTIEG"}
+#:
+#: 29.10.: auf ausdruecklichen Wunsch (Ozan: "will nur fuer Einstiege Handy-Alarm und Mail")
+#: nur noch EINSTIEG. TP/STOP/SCHUTZ/AUSSTIEG stehen weiter in der App.
+ERLAUBT = {"EINSTIEG"}
 
 
 def _liste() -> set[str]:
@@ -46,3 +49,14 @@ def test_kein_neues_setup_und_kein_plan_update() -> None:
     """Die beiden lautesten Störer namentlich — sie waren die Ursache."""
     laut = _liste() & {"NEUES_SETUP", "PLAN_AKTUALISIERT", "ABGELAUFEN", "INVALIDIERT"}
     assert not laut, f"Diese Ereignisse gehoeren nicht aufs Telefon: {sorted(laut)}"
+
+
+def test_depot_wache_verschickt_keine_verkaufsarten() -> None:
+    txt = (SKRIPT.parent / "depot_wache.py").read_text(encoding="utf-8")
+    assert re.search(r"SENDEN_ARTEN[^=]*=\s*frozenset\(\)", txt)
+    assert "e.art in SENDEN_ARTEN" in txt
+
+
+def test_app_verkaufsalarme_aus() -> None:
+    html = (SKRIPT.parents[1] / "site" / "template.html").read_text(encoding="utf-8")
+    assert "var VERKAUFS_ALARME_AN = false;" in html

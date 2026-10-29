@@ -346,6 +346,10 @@ jobs:
           # Der Auffangkanal. GITHUB_TOKEN wird je Lauf erzeugt und muss nirgends
           # hinterlegt werden — damit kommt auch ohne eingerichtete Secrets etwas an.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Einstiege auch per Mail (nur aktiv, wenn die Geheimnisse gesetzt sind).
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: python scripts/watch_levels.py --send --vollstaendig
 
       # Ozans EIGENE Positionen. Bisher lief diese Pruefung ausschliesslich im Browser —
@@ -469,6 +473,10 @@ jobs:
           # Der Auffangkanal. GITHUB_TOKEN wird je Lauf erzeugt und muss nirgends
           # hinterlegt werden — damit kommt auch ohne eingerichtete Secrets etwas an.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Einstiege auch per Mail (nur aktiv, wenn die Geheimnisse gesetzt sind).
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
         run: python scripts/watch_levels.py --send
 
       # Ozans eigene Positionen auch im leichten Lauf — alle fuenf Minuten mit AKTUELLEN

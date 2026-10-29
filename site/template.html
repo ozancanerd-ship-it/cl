@@ -1467,10 +1467,14 @@ function frischeAuf(){
   }
   // Laeuft IMMER, nicht nur wenn der Depot-Reiter offen ist. Ein Verkaufssignal, das
   // man nur sieht, wenn man ohnehin gerade hinschaut, ist kein Signal.
-  pruefeDepotAlarme();
-  pruefeAktionsAlarme();
-  pruefeUrteilWechsel();
-  pruefeTerminAlarme();
+  // 29.10.: Ozan will aufs Handy NUR Einstiege. Verkaufs-/Depot-Alarme bleiben in der App
+  // sichtbar (Depot-Reiter), melden sich aber nicht mehr von selbst. Schalter auf true setzt sie wieder an.
+  if (VERKAUFS_ALARME_AN){
+    pruefeDepotAlarme();
+    pruefeAktionsAlarme();
+    pruefeUrteilWechsel();
+    pruefeTerminAlarme();
+  }
   pruefeStillstand();
 }
 
@@ -1516,6 +1520,7 @@ function meldung(titel, opts){
        nicht. Die Sperre liegt auf der Platte und ueberlebt jeden Neustart.
      * Aus einem toten Scan kommt gar nichts. Eine Handlungsaufforderung auf Basis von
        Zahlen von gestern Abend ist schlimmer als keine. */
+var VERKAUFS_ALARME_AN = false;
 function pruefeAktionsAlarme(){
   if (!S || scanTot()) return;
   const stand = depotStand();
