@@ -1,5 +1,5 @@
 {
-  "letzte_bar": "2026-11-05T16:00:00+00:00",
+  "letzte_bar": "2026-11-05T17:00:00+00:00",
   "offen": {
     "PAXG": {
       "sym": "PAXG",
@@ -14,24 +14,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 3997.27,
-      "r_offen": 3.586,
-      "kurs": 4112.99
-    },
-    "BCH": {
-      "sym": "BCH",
-      "klasse": "coin",
-      "signal_ts": "2026-11-04T14:00:00+00:00",
-      "signal_kurs": 280.25,
-      "stop": 274.71583333,
-      "ausstieg_marke": 276.62,
-      "breite": 12,
-      "ueberhang_atr": 0.538,
-      "lohnt": true,
-      "alarm": true,
-      "gemeldet": [],
-      "einstieg": 281.08,
-      "r_offen": -0.695,
-      "kurs": 277.36
+      "r_offen": 2.963,
+      "kurs": 4093.92
     },
     "INJ": {
       "sym": "INJ",
@@ -39,15 +23,15 @@
       "signal_ts": "2026-11-04T21:00:00+00:00",
       "signal_kurs": 7.936,
       "stop": 7.695,
-      "ausstieg_marke": 7.711,
+      "ausstieg_marke": 7.772,
       "breite": 17,
       "ueberhang_atr": 0.207,
       "lohnt": false,
       "alarm": false,
       "gemeldet": [],
       "einstieg": 7.934,
-      "r_offen": 0.076,
-      "kurs": 7.972
+      "r_offen": -0.087,
+      "kurs": 7.933
     }
   },
   "abgeschlossen": [
@@ -1078,6 +1062,26 @@
       "grund": "STOP",
       "preis_aus": 7.12925,
       "ts_aus": "2026-11-05T15:00:00+00:00"
+    },
+    {
+      "sym": "BCH",
+      "klasse": "coin",
+      "signal_ts": "2026-11-04T14:00:00+00:00",
+      "signal_kurs": 280.25,
+      "stop": 274.71583333,
+      "ausstieg_marke": 276.62,
+      "breite": 12,
+      "ueberhang_atr": 0.538,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": [],
+      "einstieg": 281.08,
+      "r_offen": -0.695,
+      "kurs": 277.36,
+      "r": -1.11,
+      "grund": "STOP",
+      "preis_aus": 274.71583333,
+      "ts_aus": "2026-11-05T17:00:00+00:00"
     }
   ]
 }
