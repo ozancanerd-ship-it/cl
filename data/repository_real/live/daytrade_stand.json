@@ -1,5 +1,5 @@
 {
-  "letzte_bar": "2026-11-05T14:00:00+00:00",
+  "letzte_bar": "2026-11-05T15:00:00+00:00",
   "offen": {
     "PAXG": {
       "sym": "PAXG",
@@ -7,15 +7,15 @@
       "signal_ts": "2026-11-04T05:00:00+00:00",
       "signal_kurs": 3999.91,
       "stop": 3966.67083333,
-      "ausstieg_marke": 4026.6,
+      "ausstieg_marke": 4035.81,
       "breite": null,
       "ueberhang_atr": 1.781,
       "lohnt": false,
       "alarm": false,
       "gemeldet": [],
       "einstieg": 3997.27,
-      "r_offen": 3.208,
-      "kurs": 4101.42
+      "r_offen": 2.111,
+      "kurs": 4067.87
     },
     "BCH": {
       "sym": "BCH",
@@ -23,31 +23,15 @@
       "signal_ts": "2026-11-04T14:00:00+00:00",
       "signal_kurs": 280.25,
       "stop": 274.71583333,
-      "ausstieg_marke": 278.29,
+      "ausstieg_marke": 277.31,
       "breite": 12,
       "ueberhang_atr": 0.538,
       "lohnt": true,
       "alarm": true,
       "gemeldet": [],
       "einstieg": 281.08,
-      "r_offen": 0.374,
-      "kurs": 284.16
-    },
-    "ETC": {
-      "sym": "ETC",
-      "klasse": "coin",
-      "signal_ts": "2026-11-04T14:00:00+00:00",
-      "signal_kurs": 7.23,
-      "stop": 7.12925,
-      "ausstieg_marke": 7.153,
-      "breite": 12,
-      "ueberhang_atr": 0.814,
-      "lohnt": true,
-      "alarm": true,
-      "gemeldet": [],
-      "einstieg": 7.248,
-      "r_offen": -0.877,
-      "kurs": 7.162
+      "r_offen": -0.373,
+      "kurs": 279.41
     },
     "INJ": {
       "sym": "INJ",
@@ -62,8 +46,8 @@
       "alarm": false,
       "gemeldet": [],
       "einstieg": 7.934,
-      "r_offen": 0.603,
-      "kurs": 8.098
+      "r_offen": -0.146,
+      "kurs": 7.919
     }
   },
   "abgeschlossen": [
@@ -1074,6 +1058,26 @@
       "grund": "STOP",
       "preis_aus": 1.48371667,
       "ts_aus": "2026-11-05T14:00:00+00:00"
+    },
+    {
+      "sym": "ETC",
+      "klasse": "coin",
+      "signal_ts": "2026-11-04T14:00:00+00:00",
+      "signal_kurs": 7.23,
+      "stop": 7.12925,
+      "ausstieg_marke": 7.153,
+      "breite": 12,
+      "ueberhang_atr": 0.814,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": [],
+      "einstieg": 7.248,
+      "r_offen": -0.877,
+      "kurs": 7.162,
+      "r": -1.153,
+      "grund": "STOP",
+      "preis_aus": 7.12925,
+      "ts_aus": "2026-11-05T15:00:00+00:00"
     }
   ]
 }
