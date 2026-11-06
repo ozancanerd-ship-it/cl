@@ -25,6 +25,7 @@
     "schub:CLANKERUSD:6": "2026-11-05T20:15:50.613980+00:00",
     "schub:CPOOLUSD:5": "2026-11-06T03:18:24.293905+00:00",
     "schub:CSCO:5": "2026-11-05T20:35:37.049391+00:00",
+    "schub:DASHUSD:5": "2026-11-06T12:55:33.207017+00:00",
     "schub:ETHFIUSD:5": "2026-11-05T17:12:42.331091+00:00",
     "schub:GOOGL:6": "2026-11-04T16:34:12.290234+00:00",
     "schub:GRTUSD:5": "2026-11-06T00:11:21.712999+00:00",
@@ -276,7 +277,6 @@
     "weg:FETUSD:B": "2026-11-05T12:50:05.720229+00:00",
     "weg:FETUSD:B_PLUS": "2026-11-05T14:53:05.965833+00:00",
     "weg:GE:B": "2026-11-05T20:35:37.049391+00:00",
-    "weg:GRTUSD:B": "2026-11-04T12:51:49.926136+00:00",
     "weg:GS:B": "2026-11-05T15:06:19.408972+00:00",
     "weg:HBARUSD:B_PLUS": "2026-11-05T15:24:17.611294+00:00",
     "weg:HON:B_PLUS": "2026-11-05T16:05:28.421326+00:00",
@@ -470,9 +470,9 @@
       "urteil": "WATCH"
     },
     "APTUSD": {
-      "richtung": "long",
-      "score": 33.3,
-      "urteil": "WATCH"
+      "richtung": null,
+      "score": 3.8,
+      "urteil": "NO_TRADE"
     },
     "ARBUSD": {
       "richtung": "short",
@@ -483,11 +483,6 @@
       "richtung": null,
       "score": 0.0,
       "urteil": "NO_TRADE"
-    },
-    "ARUSD": {
-      "richtung": "short",
-      "score": 44.0,
-      "urteil": "WATCH"
     },
     "ASTERUSD": {
       "richtung": null,
@@ -506,7 +501,7 @@
     },
     "AUTUSD": {
       "richtung": "short",
-      "score": 72.2,
+      "score": 73.1,
       "urteil": "WATCH"
     },
     "AVAXUSD": {
@@ -561,7 +556,7 @@
     },
     "BEAMUSD": {
       "richtung": "short",
-      "score": 23.9,
+      "score": 25.7,
       "urteil": "WATCH"
     },
     "BILLUSD": {
@@ -606,7 +601,7 @@
     },
     "CAPUSD": {
       "richtung": "short",
-      "score": 28.7,
+      "score": 27.2,
       "urteil": "WATCH"
     },
     "CAT": {
@@ -689,10 +684,15 @@
       "score": 36.6,
       "urteil": "WATCH"
     },
-    "DASHUSD": {
+    "CYBERUSD": {
       "richtung": null,
-      "score": 2.5,
+      "score": 4.9,
       "urteil": "NO_TRADE"
+    },
+    "DASHUSD": {
+      "richtung": "long",
+      "score": 52.5,
+      "urteil": "WATCH"
     },
     "DDOG": {
       "richtung": "short",
@@ -796,7 +796,7 @@
     },
     "FETUSD": {
       "richtung": "short",
-      "score": 47.9,
+      "score": 45.7,
       "urteil": "WATCH"
     },
     "FILUSD": {
@@ -1176,7 +1176,7 @@
     },
     "PENGUUSD": {
       "richtung": "long",
-      "score": 40.2,
+      "score": 40.0,
       "urteil": "WATCH"
     },
     "PEP": {
@@ -1230,8 +1230,8 @@
       "urteil": "WATCH"
     },
     "PYTHUSD": {
-      "richtung": null,
-      "score": 5.7,
+      "richtung": "long",
+      "score": 22.8,
       "urteil": "NO_TRADE"
     },
     "QCOM": {
@@ -1271,7 +1271,7 @@
     },
     "RUNEUSD": {
       "richtung": "short",
-      "score": 40.6,
+      "score": 40.5,
       "urteil": "WATCH"
     },
     "SANDUSD": {
@@ -1391,7 +1391,7 @@
     },
     "TAOUSD": {
       "richtung": "short",
-      "score": 67.7,
+      "score": 66.6,
       "urteil": "WATCH"
     },
     "TELUSD": {
@@ -1491,7 +1491,7 @@
     },
     "VELOUSD": {
       "richtung": "short",
-      "score": 45.4,
+      "score": 47.4,
       "urteil": "WATCH"
     },
     "VIRTUALUSD": {
@@ -1521,7 +1521,7 @@
     },
     "WINGSUSD": {
       "richtung": "short",
-      "score": 50.0,
+      "score": 48.1,
       "urteil": "WATCH"
     },
     "WLDUSD": {
@@ -1531,7 +1531,7 @@
     },
     "WLFIUSD": {
       "richtung": "short",
-      "score": 48.1,
+      "score": 47.8,
       "urteil": "WATCH"
     },
     "WMT": {
@@ -1566,7 +1566,7 @@
     },
     "XPLUSD": {
       "richtung": "short",
-      "score": 40.2,
+      "score": 39.3,
       "urteil": "WATCH"
     },
     "XRPUSD": {
@@ -1790,6 +1790,7 @@
     "CVCUSD": "krypto",
     "CVX": "aktien",
     "CVXUSD": "krypto",
+    "CYBERUSD": "krypto",
     "DAGUSD": "krypto",
     "DASHEUR": "krypto",
     "DASHUSD": "krypto",
@@ -2397,6 +2398,6 @@
     "币安人生USDT": "krypto"
   },
   "rang1": "DHR",
-  "stand": "2026-11-06T12:46:47.633479+00:00",
+  "stand": "2026-11-06T12:55:33.207017+00:00",
   "stumme_klassen": []
 }
