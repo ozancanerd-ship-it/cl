@@ -1,5 +1,5 @@
 {
-  "stand": "2026-11-08T23:30:40.715925+00:00",
+  "stand": "2026-11-08T23:39:09.327072+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-11-03T16:41:06.265186+00:00",
@@ -211,7 +211,7 @@
       "tp3": 0.155359,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,17760 — nicht beim Antippen.",
       "umsatz_24h": 2302115.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "AKTUSD": {
@@ -429,7 +429,7 @@
       "tp3": 0.4686500000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,56900 — nicht beim Antippen.",
       "umsatz_24h": 231009.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "APTUSDT": {
@@ -595,7 +595,7 @@
       "tp3": 0.55359,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,67274 — nicht beim Antippen.",
       "umsatz_24h": 308700.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "ATOMUSD": {
@@ -703,7 +703,7 @@
       "tp3": 3929.9000000000005,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 136368.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "AVGO": {
@@ -1152,9 +1152,11 @@
       },
       "name": "Bitcoin",
       "note": "A−",
-      "raus": false,
-      "raus_erreicht": null,
-      "raus_kurs": null,
+      "raus": true,
+      "raus_erreicht": [
+        "TP1"
+      ],
+      "raus_kurs": 75300.1,
       "richtung": "short",
       "rr": 3.21,
       "rs": 63.0,
@@ -1170,7 +1172,7 @@
       "tp3": 73344.95000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 74.790,00 — nicht beim Antippen.",
       "umsatz_24h": 94676631.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "CAT": {
@@ -1332,7 +1334,7 @@
       "tp3": 17.095,
       "trigger": "",
       "umsatz_24h": 142796.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "COP": {
@@ -1500,7 +1502,7 @@
       "tp3": 0.008504999999999995,
       "trigger": "Der Kurs muss unter 0,01073 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 113115.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "CRCLXUSDT": {
@@ -1911,7 +1913,7 @@
       "tp3": 0.8001,
       "trigger": "Der Kurs muss unter 0,98980 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 1235616.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "DYDXUSD": {
@@ -2022,8 +2024,8 @@
       "tp2": 6.023,
       "tp3": 5.831000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 6,8000 — nicht beim Antippen.",
-      "umsatz_24h": 62108.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "umsatz_24h": 62936.0,
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ETHUSD": {
@@ -2197,7 +2199,7 @@
       "tp3": 0.13144999999999993,
       "trigger": "Der Kurs muss unter 0,16490 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 708969.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "FILUSD": {
@@ -2251,7 +2253,7 @@
       "tp3": 0.6269999999999999,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,76100 — nicht beim Antippen.",
       "umsatz_24h": 320288.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "GRTUSD": {
@@ -2577,7 +2579,7 @@
       "tp3": 2.040499999999999,
       "trigger": "Der Kurs muss unter 2,5660 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 861369.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "INJUSD": {
@@ -2789,7 +2791,7 @@
       "tp3": 0.02447,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,02900 — nicht beim Antippen.",
       "umsatz_24h": 570578.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "KO": {
@@ -2995,7 +2997,7 @@
       "tp3": 44.64500000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 51,00 — nicht beim Antippen.",
       "umsatz_24h": 2220151.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "MAR": {
@@ -3273,7 +3275,7 @@
       "tp3": 0.3959000000000002,
       "trigger": "Der Kurs muss unter 0,48170 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 101499.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "MRK": {
@@ -3435,7 +3437,7 @@
       "tp3": 2.8903500000000006,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 3,6195 — nicht beim Antippen.",
       "umsatz_24h": 9763624.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "NEE": {
@@ -3751,7 +3753,7 @@
       "tp3": 0.08070000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,09950 — nicht beim Antippen.",
       "umsatz_24h": 216439.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "PANW": {
@@ -3859,7 +3861,7 @@
       "tp3": 3864.9446282968365,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "PEP": {
@@ -4077,7 +4079,7 @@
       "tp3": 0.07871500000000003,
       "trigger": "Der Kurs muss unter 0,09718 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 505348.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "PYPL": {
@@ -4303,7 +4305,7 @@
       "tp3": 0.0018504999999999995,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0,00157400 — nicht beim Antippen.",
       "umsatz_24h": 110025.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "RTX": {
@@ -4677,7 +4679,7 @@
       "tp3": 4.252999999999998e-06,
       "trigger": "Der Kurs muss unter 0,00000482 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 433382.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "SHOP": {
@@ -4787,7 +4789,7 @@
       "tp3": 0.0104705,
       "trigger": "Der Kurs muss unter 0,01365 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 142063.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "SKYUSD": {
@@ -5168,7 +5170,7 @@
       "tp3": 0.010480000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0,00860000 — nicht beim Antippen.",
       "umsatz_24h": 106768.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "T": {
@@ -5282,7 +5284,7 @@
       "tp3": 208.88405,
       "trigger": "Der Kurs muss unter 238,61 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 4503700.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "TGT": {
@@ -5510,7 +5512,7 @@
       "tp3": 0.33116049999999997,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0,32057 — nicht beim Antippen.",
       "umsatz_24h": 567146.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "TSLA": {
@@ -6005,7 +6007,7 @@
       "tp3": 0.43950000000000017,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,54960 — nicht beim Antippen.",
       "umsatz_24h": 180597.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "VRTX": {
@@ -6161,7 +6163,7 @@
       "tp3": 0.2269,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,32350 — nicht beim Antippen.",
       "umsatz_24h": 1128712.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "WMT": {
@@ -6379,7 +6381,7 @@
       "tp3": 1.0187050000000002,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 1,1980 — nicht beim Antippen.",
       "umsatz_24h": 56872782.0,
-      "zuletzt": "2026-11-08T23:30:07.551767+00:00",
+      "zuletzt": "2026-11-08T23:38:36.169051+00:00",
       "zustand": "aktiv"
     },
     "ZECUSD": {
