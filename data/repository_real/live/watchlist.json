@@ -1,5 +1,5 @@
 {
-  "stand": "2026-11-14T16:15:54.446891+00:00",
+  "stand": "2026-11-14T16:23:35.834554+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-11-03T16:41:06.265186+00:00",
@@ -442,7 +442,7 @@
       "tp3": 0.07615000000000002,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,09330 — nicht beim Antippen.",
       "umsatz_24h": 163040.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "APTUSD": {
@@ -665,7 +665,7 @@
       "tp3": 0.06369999999999995,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,07340 — nicht beim Antippen.",
       "umsatz_24h": 134134.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "AUTUSD": {
@@ -827,7 +827,7 @@
       "tp3": 174.58499999999995,
       "trigger": "",
       "umsatz_24h": 911493.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "BCNUSD": {
@@ -925,64 +925,58 @@
       "zustand": "aktiv"
     },
     "BNBUSD": {
-      "aufgenommen": "2026-11-13T14:18:03.982841+00:00",
+      "aufgenommen": "2026-11-14T16:23:06.417604+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 3.15,
+      "bestes_r": 0.0,
       "broker": "Bybit (USDT) oder Kraken (USD)",
-      "einstieg": 646.22,
-      "einstieg_art": "Ruecklauf in FVG H1",
-      "einstiegskurs": 640.81,
-      "erreicht": [
-        "TP1",
-        "TP2",
-        "TP3"
-      ],
-      "erwartet_pct": 2.92,
-      "eurusd": 1.1095,
+      "einstieg": 601.91,
+      "einstieg_art": "Ruecklauf in FVG M15",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 6.65,
+      "eurusd": 1.105,
       "gemeldet": "",
       "instrument": "BNBUSD",
       "klasse": "krypto",
       "kontext": {
-        "angst_gier": 20.0,
-        "atr_pct": 3.455,
-        "bewegung_atr": 0.71,
-        "bewegung_pct": 1.11,
-        "btc_funding_jahr_pct": 11.52,
-        "confidence": 0.355,
+        "angst_gier": 13.0,
+        "atr_pct": 3.745,
+        "bewegung_atr": 0.88,
+        "bewegung_pct": 1.75,
+        "btc_funding_jahr_pct": -2.77,
+        "confidence": 0.271,
         "makro_regime": "neutral",
-        "n_warnungen": 2,
-        "qualitaet": "brauchbar",
-        "r21": -10.1577,
-        "r63": -7.3701,
+        "n_warnungen": 5,
+        "qualitaet": "unsauber",
+        "r21": -14.734,
+        "r63": -13.3081,
         "sektor_rang": null,
         "sektor_von": null,
         "termin_sperre": false,
         "zahlen_in_tagen": null
       },
       "name": "BNB",
-      "note": "B+",
-      "raus": true,
-      "raus_erreicht": [
-        "TP1"
-      ],
-      "raus_kurs": 640.81,
+      "note": "A−",
+      "raus": false,
+      "raus_erreicht": null,
+      "raus_kurs": null,
       "richtung": "short",
-      "rr": 2.32,
-      "rs": 67.4,
-      "schlechtestes_r": -0.51,
-      "schutz": 633.9,
-      "score": 58.8,
-      "setup": "Ruecksetzer im Trend",
-      "stop": 657.58,
-      "these": "Abwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
-      "tor_grund": "„Ruecksetzer im Trend“ bei Coins: 24 Trades, 10× Ziel 1, zusammen -1,8 R (Ø -0,07 R) — bisher Verlust, klingelt nicht, bis die Bilanz dreht",
-      "tp1": 633.9,
-      "tp2": 619.81,
-      "tp3": 606.46,
-      "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
-      "umsatz_24h": 3045476.0,
-      "zuletzt": "2026-11-14T13:46:53.340393+00:00",
-      "zustand": "ziel_erreicht"
+      "rr": 2.19,
+      "rs": 60.8,
+      "schlechtestes_r": 0.0,
+      "schutz": null,
+      "score": 69.4,
+      "setup": "Ausbruch aus der Basis",
+      "stop": 620.2,
+      "these": "Der Kurs hat sich in einer engen Spanne beruhigt und bricht heraus. Die Idee lebt davon, dass der Bruch haelt — schliesst er zurueck in die Spanne, war es ein Fehlausbruch und der Trade ist erledigt.",
+      "tor_grund": "",
+      "tp1": 579.39,
+      "tp2": 561.87,
+      "tp3": 537.8949999999998,
+      "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 612,23 — nicht beim Antippen.",
+      "umsatz_24h": 2094165.0,
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "BTCUSD": {
       "aufgenommen": "2026-11-08T22:15:01.841744+00:00",
@@ -1206,7 +1200,7 @@
       "tp3": 0.0678,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,08190 — nicht beim Antippen.",
       "umsatz_24h": 141423.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "CMCSA": {
@@ -1779,7 +1773,7 @@
       "tp3": 5.667500000000002,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 6,5000 — nicht beim Antippen.",
       "umsatz_24h": 93126.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "ETHFIUSD": {
@@ -1889,7 +1883,7 @@
       "tp3": 1734.895,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 1.981,12 — nicht beim Antippen.",
       "umsatz_24h": 101899688.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "FCX": {
@@ -2654,7 +2648,7 @@
       "tp3": 0.024205000000000004,
       "trigger": "Der Kurs muss unter 0,03044 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 1386266.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "KO": {
@@ -3738,6 +3732,60 @@
       "zuletzt": "2026-11-09T15:09:22.432208+00:00",
       "zustand": "stop"
     },
+    "ORCAUSD": {
+      "aufgenommen": "2026-11-14T16:23:06.417604+00:00",
+      "ausstiegskurs": null,
+      "bestes_r": 0.0,
+      "broker": "Bybit (USDT) oder Kraken (USD)",
+      "einstieg": 1.168,
+      "einstieg_art": "sofort",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 7.53,
+      "eurusd": 1.105,
+      "gemeldet": "",
+      "instrument": "ORCAUSD",
+      "klasse": "krypto",
+      "kontext": {
+        "angst_gier": 13.0,
+        "atr_pct": 9.81,
+        "bewegung_atr": 1.43,
+        "bewegung_pct": 3.94,
+        "btc_funding_jahr_pct": -2.77,
+        "confidence": 0.347,
+        "makro_regime": "neutral",
+        "n_warnungen": 4,
+        "qualitaet": "unsauber",
+        "r21": -29.7605,
+        "r63": -15.7895,
+        "sektor_rang": null,
+        "sektor_von": null,
+        "termin_sperre": false,
+        "zahlen_in_tagen": null
+      },
+      "name": "ORCA",
+      "note": "A−",
+      "raus": false,
+      "raus_erreicht": null,
+      "raus_kurs": null,
+      "richtung": "short",
+      "rr": 2.3,
+      "rs": 22.4,
+      "schlechtestes_r": 0.0,
+      "schutz": null,
+      "score": 54.6,
+      "setup": "Ausbruch aus der Basis",
+      "stop": 1.217,
+      "these": "Der Kurs hat sich in einer engen Spanne beruhigt und bricht heraus. Die Idee lebt davon, dass der Bruch haelt — schliesst er zurueck in die Spanne, war es ein Fehlausbruch und der Trade ist erledigt.",
+      "tor_grund": "",
+      "tp1": 1.08,
+      "tp2": 1.0554999999999999,
+      "tp3": 0.9964999999999994,
+      "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 1,1810 — nicht beim Antippen.",
+      "umsatz_24h": 114534.0,
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
+      "zustand": "wartet_auf_einstieg"
+    },
     "PAXGUSD": {
       "aufgenommen": "2026-11-13T04:27:34.800130+00:00",
       "ausstiegskurs": 3879.52,
@@ -3843,7 +3891,7 @@
       "tp3": 1.251,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 1,4950 — nicht beim Antippen.",
       "umsatz_24h": 158589.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "PEP": {
@@ -4117,7 +4165,7 @@
       "tp3": 1.259701035625394,
       "trigger": "Der Kurs muss unter 1,6130 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 554631.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "RSRUSD": {
@@ -4732,7 +4780,7 @@
       "tp3": 0.048625000000000015,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,06094 — nicht beim Antippen.",
       "umsatz_24h": 126983.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "SLB": {
@@ -5125,7 +5173,7 @@
       "tp3": 0.010480000000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0,00860000 — nicht beim Antippen.",
       "umsatz_24h": 106768.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "T": {
@@ -5799,7 +5847,7 @@
       "tp3": 0.002636499999999999,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,00307700 — nicht beim Antippen.",
       "umsatz_24h": 104947.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "VETUSD": {
@@ -5853,7 +5901,7 @@
       "tp3": 0.004100500000000001,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,00488800 — nicht beim Antippen.",
       "umsatz_24h": 131706.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "VIRTUALUSD": {
@@ -5910,7 +5958,7 @@
       "tp3": 0.43950000000000017,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,54960 — nicht beim Antippen.",
       "umsatz_24h": 180597.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "VRTX": {
@@ -6008,7 +6056,7 @@
       "tp3": 0.12134999999999993,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,14280 — nicht beim Antippen.",
       "umsatz_24h": 151153.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "aktiv"
     },
     "WLDUSD": {
@@ -6444,7 +6492,7 @@
       "tp3": 758.615,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 38687440.0,
-      "zuletzt": "2026-11-14T16:15:24.989669+00:00",
+      "zuletzt": "2026-11-14T16:23:06.417604+00:00",
       "zustand": "wartet_auf_einstieg"
     }
   }
