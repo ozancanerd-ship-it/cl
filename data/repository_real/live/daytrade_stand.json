@@ -1,53 +1,21 @@
 {
-  "letzte_bar": "2026-11-23T18:00:00+00:00",
+  "letzte_bar": "2026-11-23T19:00:00+00:00",
   "offen": {
-    "ADA": {
-      "sym": "ADA",
-      "klasse": "coin",
-      "signal_ts": "2026-11-23T13:00:00+00:00",
-      "signal_kurs": 0.151652,
-      "stop": 0.14902342,
-      "ausstieg_marke": 0.141706,
-      "breite": 14,
-      "ueberhang_atr": 3.387,
-      "lohnt": true,
-      "alarm": true,
-      "gemeldet": [],
-      "einstieg": 0.151554,
-      "r_offen": -0.866,
-      "kurs": 0.149741
-    },
     "ETC": {
       "sym": "ETC",
       "klasse": "coin",
       "signal_ts": "2026-11-23T13:00:00+00:00",
       "signal_kurs": 5.955,
       "stop": 5.84825,
-      "ausstieg_marke": 5.578,
+      "ausstieg_marke": 5.604,
       "breite": 14,
       "ueberhang_atr": 0.6,
       "lohnt": true,
       "alarm": true,
       "gemeldet": [],
       "einstieg": 5.967,
-      "r_offen": -0.446,
-      "kurs": 5.929
-    },
-    "INJ": {
-      "sym": "INJ",
-      "klasse": "coin",
-      "signal_ts": "2026-11-23T13:00:00+00:00",
-      "signal_kurs": 6.701,
-      "stop": 6.51558333,
-      "ausstieg_marke": 6.074,
-      "breite": 14,
-      "ueberhang_atr": 2.438,
-      "lohnt": true,
-      "alarm": true,
-      "gemeldet": [],
-      "einstieg": 6.701,
-      "r_offen": -0.624,
-      "kurs": 6.602
+      "r_offen": -0.74,
+      "kurs": 5.894
     },
     "TRX": {
       "sym": "TRX",
@@ -62,8 +30,8 @@
       "alarm": true,
       "gemeldet": [],
       "einstieg": 0.309089,
-      "r_offen": 0.607,
-      "kurs": 0.310794
+      "r_offen": -0.208,
+      "kurs": 0.309542
     }
   },
   "abgeschlossen": [
@@ -1390,6 +1358,46 @@
       "grund": "STOP",
       "preis_aus": 0.69374167,
       "ts_aus": "2026-11-23T17:00:00+00:00"
+    },
+    {
+      "sym": "ADA",
+      "klasse": "coin",
+      "signal_ts": "2026-11-23T13:00:00+00:00",
+      "signal_kurs": 0.151652,
+      "stop": 0.14902342,
+      "ausstieg_marke": 0.141706,
+      "breite": 14,
+      "ueberhang_atr": 3.387,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": [],
+      "einstieg": 0.151554,
+      "r_offen": -0.866,
+      "kurs": 0.149741,
+      "r": -1.15,
+      "grund": "STOP",
+      "preis_aus": 0.14902342,
+      "ts_aus": "2026-11-23T19:00:00+00:00"
+    },
+    {
+      "sym": "INJ",
+      "klasse": "coin",
+      "signal_ts": "2026-11-23T13:00:00+00:00",
+      "signal_kurs": 6.701,
+      "stop": 6.51558333,
+      "ausstieg_marke": 6.074,
+      "breite": 14,
+      "ueberhang_atr": 2.438,
+      "lohnt": true,
+      "alarm": true,
+      "gemeldet": [],
+      "einstieg": 6.701,
+      "r_offen": -0.624,
+      "kurs": 6.602,
+      "r": -1.09,
+      "grund": "STOP",
+      "preis_aus": 6.51558333,
+      "ts_aus": "2026-11-23T19:00:00+00:00"
     }
   ]
 }
