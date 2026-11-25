@@ -1,5 +1,5 @@
 {
-  "stand": "2026-11-25T07:44:08.311192+00:00",
+  "stand": "2026-11-25T07:51:49.288808+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-11-03T16:41:06.265186+00:00",
@@ -226,7 +226,7 @@
       "tp3": 0.12327700000000003,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,16170 — nicht beim Antippen.",
       "umsatz_24h": 6264873.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "ALGOUSD": {
@@ -500,7 +500,7 @@
       "tp3": 0.0588,
       "trigger": "Der Kurs muss unter 0,06890 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 145128.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "AUTUSD": {
@@ -781,14 +781,15 @@
     "BATUSD": {
       "aufgenommen": "2026-11-19T12:34:07.371829+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 3.35,
+      "bestes_r": 3.44,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.09056,
       "einstieg_art": "sofort",
       "einstiegskurs": 0.08998,
       "erreicht": [
         "TP1",
-        "TP2"
+        "TP2",
+        "TP3"
       ],
       "erwartet_pct": 8.25,
       "eurusd": 1.0993,
@@ -835,8 +836,8 @@
       "tp3": 0.07442499999999999,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,09079 — nicht beim Antippen.",
       "umsatz_24h": 205814.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
-      "zustand": "aktiv"
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
+      "zustand": "ziel_erreicht"
     },
     "BCHUSD": {
       "aufgenommen": "2026-11-23T16:13:32.244188+00:00",
@@ -889,7 +890,7 @@
       "tp3": 176.87356798775585,
       "trigger": "Der Kurs muss unter 210,35 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 1396302.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "BLK": {
@@ -1111,12 +1112,14 @@
     "BTCUSD": {
       "aufgenommen": "2026-11-23T17:08:22.384341+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.22,
+      "bestes_r": 1.34,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 62193.8,
       "einstieg_art": "Ruecklauf in FVG M15",
       "einstiegskurs": 61690.7,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 5.7,
       "eurusd": 1.097,
       "gemeldet": "",
@@ -1148,7 +1151,7 @@
       "rr": 2.02,
       "rs": 63.4,
       "schlechtestes_r": -0.22,
-      "schutz": null,
+      "schutz": 61690.7,
       "score": 74.5,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 64520.3,
@@ -1159,7 +1162,7 @@
       "tp3": 54051.05,
       "trigger": "Der Kurs muss unter 64.014,30 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 300538682.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "CCUSD": {
@@ -1429,7 +1432,7 @@
       "tp3": 0.0070010772079934355,
       "trigger": "Der Kurs muss unter 0,00864000 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 126132.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "CVX": {
@@ -1641,7 +1644,7 @@
     "DOGEUSD": {
       "aufgenommen": "2026-11-23T16:13:32.244188+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.2,
+      "bestes_r": 1.31,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.0584009,
       "einstieg_art": "sofort",
@@ -1691,7 +1694,7 @@
       "tp3": 0.04798569545991409,
       "trigger": "Der Kurs muss unter 0,05980 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 4275236.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "DOSUSD": {
@@ -1913,7 +1916,7 @@
       "tp3": 5.016454381040455,
       "trigger": "Der Kurs muss unter 5,9740 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 108333.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "ETHFIUSD": {
@@ -2027,7 +2030,7 @@
     "FARTCOINUSD": {
       "aufgenommen": "2026-11-23T17:45:18.642747+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.33,
+      "bestes_r": 1.41,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.0849,
       "einstieg_art": "sofort",
@@ -2077,7 +2080,7 @@
       "tp3": 0.06880000000000003,
       "trigger": "Der Kurs muss unter 0,08850 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 359207.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "FILUSD": {
@@ -3096,12 +3099,14 @@
     "LINKUSD": {
       "aufgenommen": "2026-11-23T16:21:28.705023+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.07,
+      "bestes_r": 1.16,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 9.23375,
       "einstieg_art": "sofort",
       "einstiegskurs": 9.18308,
-      "erreicht": [],
+      "erreicht": [
+        "TP1"
+      ],
       "erwartet_pct": 5.89,
       "eurusd": 1.097,
       "gemeldet": "",
@@ -3133,7 +3138,7 @@
       "rr": 2.0,
       "rs": 56.6,
       "schlechtestes_r": -0.16,
-      "schutz": null,
+      "schutz": 9.18308,
       "score": 69.8,
       "setup": "Rueckeroberung nach Liquiditaetsgriff",
       "stop": 9.689403300746164,
@@ -3144,7 +3149,7 @@
       "tp3": 7.638963447388427,
       "trigger": "Der Kurs muss unter 9,2593 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 3345352.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "LLY": {
@@ -4138,7 +4143,7 @@
       "tp3": 3434.6600000000008,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "PENDLEUSD": {
@@ -4477,7 +4482,7 @@
       "tp3": 0.009509999999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,01155 — nicht beim Antippen.",
       "umsatz_24h": 145729.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "PYPL": {
@@ -4918,7 +4923,7 @@
       "tp3": 0.002857,
       "trigger": "Der Kurs muss unter 0,00383800 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 190400.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "SLB": {
@@ -5092,7 +5097,7 @@
     "SOLUSD": {
       "aufgenommen": "2026-11-23T16:13:32.244188+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.51,
+      "bestes_r": 1.65,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 75.24,
       "einstieg_art": "sofort",
@@ -5142,7 +5147,7 @@
       "tp3": 61.32156374655865,
       "trigger": "Der Kurs muss unter 75,56 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 22472476.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "SPOT": {
@@ -5310,7 +5315,7 @@
     "SUSHIUSD": {
       "aufgenommen": "2026-11-23T17:53:02.867190+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 0.37,
+      "bestes_r": 0.41,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.1552,
       "einstieg_art": "sofort",
@@ -5358,7 +5363,7 @@
       "tp3": 0.12335000000000002,
       "trigger": "Der Kurs muss unter 0,15970 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 184094.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "TAOUSD": {
@@ -5420,7 +5425,7 @@
     "TIAUSD": {
       "aufgenommen": "2026-11-23T17:53:02.867190+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.13,
+      "bestes_r": 1.23,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 0.339,
       "einstieg_art": "sofort",
@@ -5470,7 +5475,7 @@
       "tp3": 0.2749500000000001,
       "trigger": "Der Kurs muss unter 0,35680 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 333158.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "TMO": {
@@ -5904,7 +5909,7 @@
       "tp3": 0.004117999999999999,
       "trigger": "Der Kurs muss unter 0,00494400 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 139747.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "VRTX": {
@@ -6281,7 +6286,7 @@
       "tp3": 0.8040053621993914,
       "trigger": "Der Kurs muss unter 0,99680 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 37384114.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     },
     "XTZUSD": {
@@ -6449,7 +6454,7 @@
       "tp3": 698.5649999999998,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 40758581.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ZEREBROUSD": {
@@ -6506,7 +6511,7 @@
       "tp3": 0.018644999999999995,
       "trigger": "Der Kurs muss unter 0,02241 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 197741.0,
-      "zuletzt": "2026-11-25T07:43:37.279600+00:00",
+      "zuletzt": "2026-11-25T07:51:18.451031+00:00",
       "zustand": "aktiv"
     }
   }
