@@ -1,5 +1,5 @@
 {
-  "stand": "2026-11-27T16:59:56.075403+00:00",
+  "stand": "2026-11-27T17:09:27.744417+00:00",
   "wachen": {
     "AAPL": {
       "aufgenommen": "2026-11-03T16:41:06.265186+00:00",
@@ -58,7 +58,7 @@
       "tp3": 362.33327459398924,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "AAVEUSD": {
@@ -112,7 +112,7 @@
       "tp3": 82.65,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 1247161.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "ABBV": {
@@ -166,13 +166,13 @@
       "tp3": 307.45994567871094,
       "trigger": "Der Kurs muss ueber 282,15 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "ABNB": {
       "aufgenommen": "2026-11-22T14:57:40.799074+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.51,
+      "bestes_r": 1.52,
       "broker": "Trade Republic",
       "einstieg": 167.25,
       "einstieg_art": "Ruecklauf in FVG H4",
@@ -222,7 +222,7 @@
       "tp3": 195.2953420750047,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "ADAUSD": {
@@ -282,7 +282,7 @@
       "tp3": 0.12327700000000003,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,16170 — nicht beim Antippen.",
       "umsatz_24h": 6264873.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "ALGOUSD": {
@@ -394,62 +394,58 @@
       "zustand": "invalidiert"
     },
     "AMZN": {
-      "aufgenommen": "2026-11-03T18:48:47.148782+00:00",
-      "ausstiegskurs": 254.7899932861328,
-      "bestes_r": 2.02,
+      "aufgenommen": "2026-11-27T17:08:59.798207+00:00",
+      "ausstiegskurs": null,
+      "bestes_r": 0.0,
       "broker": "Trade Republic",
-      "einstieg": 250.468505859375,
-      "einstieg_art": "Ruecklauf in FVG M15",
-      "einstiegskurs": 251.02999877929688,
-      "erreicht": [
-        "TP1"
-      ],
-      "erwartet_pct": 8.09,
-      "eurusd": 1.1157,
+      "einstieg": 266.0799865722656,
+      "einstieg_art": "Ruecklauf in FVG H1",
+      "einstiegskurs": null,
+      "erreicht": [],
+      "erwartet_pct": 11.32,
+      "eurusd": 1.097,
       "gemeldet": "",
       "instrument": "AMZN",
       "klasse": "aktien",
       "kontext": {
-        "angst_gier": 26.0,
-        "atr_pct": 3.134,
-        "bewegung_atr": 2.53,
-        "bewegung_pct": 6.22,
-        "btc_funding_jahr_pct": 9.04,
-        "confidence": 0.078,
-        "makro_regime": "neutral",
-        "n_warnungen": 7,
-        "qualitaet": "unsauber",
-        "r21": -2.3418,
-        "r63": -11.4592,
-        "sektor_rang": 4.0,
-        "sektor_von": 9.0,
+        "angst_gier": 12.0,
+        "atr_pct": 4.274,
+        "bewegung_atr": 1.17,
+        "bewegung_pct": 3.86,
+        "btc_funding_jahr_pct": -10.41,
+        "confidence": 0.253,
+        "makro_regime": "risk_off",
+        "n_warnungen": 1,
+        "qualitaet": null,
+        "r21": -3.4255,
+        "r63": -4.6164,
+        "sektor_rang": null,
+        "sektor_von": null,
         "termin_sperre": false,
         "zahlen_in_tagen": null
       },
       "name": "Amazon",
       "note": "B+",
-      "raus": true,
-      "raus_erreicht": [
-        "TP1"
-      ],
-      "raus_kurs": 251.02999877929688,
-      "richtung": "long",
-      "rr": 2.47,
-      "rs": 31.6,
-      "schlechtestes_r": -0.48,
-      "schutz": 251.02999877929688,
-      "score": 60.9,
-      "setup": "Rueckeroberung nach Liquiditaetsgriff",
-      "stop": 238.47268995204243,
-      "these": "Dort lagen die Stops. Sie wurden geholt, und der Kurs kam sofort zurueck — das ist die Stelle, an der eine Bewegung oft beginnt, weil die Gegenseite gerade ausgestoppt wurde.",
-      "tor_grund": "„Rueckeroberung nach Liquiditaetsgriff“ bei Aktien: 28 Trades, 11× Ziel 1, zusammen -0,8 R (Ø -0,03 R) — bisher Verlust, klingelt nicht, bis die Bilanz dreht",
-      "tp1": 266.3999938964844,
-      "tp2": 280.1400146484375,
-      "tp3": 292.453861535039,
-      "trigger": "Der Kurs muss ueber 245,69 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
+      "raus": false,
+      "raus_erreicht": null,
+      "raus_kurs": null,
+      "richtung": "short",
+      "rr": 2.0,
+      "rs": 51.2,
+      "schlechtestes_r": 0.0,
+      "schutz": null,
+      "score": 56.6,
+      "setup": "",
+      "stop": 270.3599853515625,
+      "these": "",
+      "tor_grund": "",
+      "tp1": 261.79998779296875,
+      "tp2": 257.5199890136719,
+      "tp3": 251.09999084472656,
+      "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-23T14:58:48.821042+00:00",
-      "zustand": "invalidiert"
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "ARBUSD": {
       "aufgenommen": "2026-11-20T16:48:53.523493+00:00",
@@ -558,12 +554,12 @@
       "tp3": 0.0588,
       "trigger": "Der Kurs muss unter 0,06890 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 145128.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "AUTUSD": {
       "aufgenommen": "2026-11-25T23:53:13.799669+00:00",
-      "ausstiegskurs": null,
+      "ausstiegskurs": 3622.5,
       "bestes_r": 1.5,
       "broker": "Bybit (USDT) oder Kraken (USD)",
       "einstieg": 3563.1,
@@ -615,7 +611,7 @@
       "trigger": "Der Kurs muss ueber 3.493,00 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": 1350054.0,
       "zuletzt": "2026-11-27T16:59:28.133192+00:00",
-      "zustand": "aktiv"
+      "zustand": "invalidiert"
     },
     "AVGO": {
       "aufgenommen": "2026-11-18T16:10:13.453224+00:00",
@@ -674,7 +670,7 @@
     "AXP": {
       "aufgenommen": "2026-11-23T21:38:45.348203+00:00",
       "ausstiegskurs": null,
-      "bestes_r": 1.58,
+      "bestes_r": 1.6,
       "broker": "Trade Republic",
       "einstieg": 305.0199890136719,
       "einstieg_art": "Ruecklauf in FVG M15",
@@ -724,7 +720,7 @@
       "tp3": 333.11576904935714,
       "trigger": "Der Kurs muss ueber 304,88 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "BA": {
@@ -949,7 +945,7 @@
       "tp3": 191.63,
       "trigger": "Der Kurs muss unter 212,70 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 1258774.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "BCNUSD": {
@@ -1057,7 +1053,7 @@
       "tp3": 0.0026655000000000003,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,00317100 — nicht beim Antippen.",
       "umsatz_24h": 197674.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "BLK": {
@@ -1165,7 +1161,7 @@
       "tp3": 65.25,
       "trigger": "Der Kurs muss ueber 58,24 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "BNBUSD": {
@@ -1330,7 +1326,7 @@
       "tp3": 0.18372500000000003,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 0,17176 — nicht beim Antippen.",
       "umsatz_24h": 165468.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "BTCUSD": {
@@ -1390,7 +1386,7 @@
       "tp3": 54051.05,
       "trigger": "Der Kurs muss unter 64.014,30 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 300538682.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "CCUSD": {
@@ -1444,7 +1440,7 @@
       "tp3": 0.06193999999999999,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,07250 — nicht beim Antippen.",
       "umsatz_24h": 585856.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "CMCSA": {
@@ -1498,7 +1494,7 @@
       "tp3": 28.520998001098633,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "COP": {
@@ -1606,7 +1602,7 @@
       "tp3": 1174.7255557372373,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "COTIUSD": {
@@ -1664,7 +1660,7 @@
       "tp3": 0.0070010772079934355,
       "trigger": "Der Kurs muss unter 0,00864000 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 126132.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "CVX": {
@@ -1718,7 +1714,7 @@
       "tp3": 234.0800018310547,
       "trigger": "Der Kurs muss ueber 208,74 bleiben. Faellt er wieder darunter, ist die Idee erledigt.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "DASHUSD": {
@@ -1772,7 +1768,7 @@
       "tp3": 30.769,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 315377.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "DE": {
@@ -1978,7 +1974,7 @@
       "tp3": 0.048874799999999996,
       "trigger": "Der Kurs muss unter 0,06018 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 6727373.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "DOSUSD": {
@@ -2260,7 +2256,7 @@
       "tp3": 0.06880000000000003,
       "trigger": "Der Kurs muss unter 0,08850 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 359207.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "FILUSD": {
@@ -2435,7 +2431,7 @@
       "tp3": 359.0500183105469,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "GILD": {
@@ -2495,7 +2491,7 @@
       "tp3": 187.13991075121427,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "GOOGL": {
@@ -2551,7 +2547,7 @@
       "tp3": 244.0518456387425,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "GRASSUSD": {
@@ -2717,7 +2713,7 @@
       "tp3": 430.5450744628906,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "HON": {
@@ -2771,7 +2767,7 @@
       "tp3": 251.64132690429688,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "HYPEUSD": {
@@ -2935,7 +2931,7 @@
       "tp3": 462.8892445520645,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "JNJ": {
@@ -2991,7 +2987,7 @@
       "tp3": 301.8948340892439,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "JPM": {
@@ -3224,7 +3220,7 @@
       "tp3": 101.73001098632812,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "LIN": {
@@ -3278,7 +3274,7 @@
       "tp3": 555.817138671875,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "LINKUSD": {
@@ -3396,7 +3392,7 @@
       "tp3": 1527.7548828125,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "LMT": {
@@ -3450,7 +3446,7 @@
       "tp3": 647.22998046875,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "LOW": {
@@ -3558,7 +3554,7 @@
       "tp3": 37.901441838644594,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 5756440.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "MA": {
@@ -3612,7 +3608,7 @@
       "tp3": 704.5273742675781,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "MDLZ": {
@@ -3666,7 +3662,7 @@
       "tp3": 71.38563936641776,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "META": {
@@ -3780,7 +3776,7 @@
       "tp3": 123.3499526977539,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "NEE": {
@@ -3834,7 +3830,7 @@
       "tp3": 93.06499862670898,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "NFLX": {
@@ -3888,7 +3884,7 @@
       "tp3": 48.72500801086426,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "NVDA": {
@@ -3946,31 +3942,31 @@
       "zustand": "stop"
     },
     "NVO": {
-      "aufgenommen": "2026-11-19T19:40:40.464940+00:00",
-      "ausstiegskurs": 40.45500183105469,
-      "bestes_r": 0.65,
+      "aufgenommen": "2026-11-27T17:08:59.798207+00:00",
+      "ausstiegskurs": null,
+      "bestes_r": 0.0,
       "broker": "Trade Republic",
-      "einstieg": 39.959999084472656,
+      "einstieg": 40.1349983215332,
       "einstieg_art": "Ruecklauf in FVG H1",
-      "einstiegskurs": 39.959999084472656,
+      "einstiegskurs": null,
       "erreicht": [],
-      "erwartet_pct": 6.31,
-      "eurusd": 1.0993,
+      "erwartet_pct": 8.83,
+      "eurusd": 1.097,
       "gemeldet": "",
       "instrument": "NVO",
       "klasse": "aktien",
       "kontext": {
-        "angst_gier": 10.0,
-        "atr_pct": 2.797,
-        "bewegung_atr": 0.86,
-        "bewegung_pct": 2.05,
-        "btc_funding_jahr_pct": 9.84,
-        "confidence": 0.228,
+        "angst_gier": 12.0,
+        "atr_pct": 2.891,
+        "bewegung_atr": 0.65,
+        "bewegung_pct": 1.56,
+        "btc_funding_jahr_pct": -10.41,
+        "confidence": 0.179,
         "makro_regime": "risk_off",
-        "n_warnungen": 1,
+        "n_warnungen": 4,
         "qualitaet": null,
-        "r21": 0.2033,
-        "r63": -14.5427,
+        "r21": 5.9478,
+        "r63": -11.4354,
         "sektor_rang": null,
         "sektor_von": null,
         "termin_sperre": false,
@@ -3981,23 +3977,23 @@
       "raus": false,
       "raus_erreicht": null,
       "raus_kurs": null,
-      "richtung": "short",
-      "rr": 2.52,
-      "rs": 43.0,
-      "schlechtestes_r": -0.56,
+      "richtung": "long",
+      "rr": 2.17,
+      "rs": 64.6,
+      "schlechtestes_r": 0.0,
       "schutz": null,
-      "score": 57.2,
+      "score": 65.8,
       "setup": "",
-      "stop": 40.959999084472656,
+      "stop": 38.01499938964844,
       "these": "",
-      "tor_grund": "kein benanntes Setup — ohne Handelsidee kein Alarm",
-      "tp1": 38.02000045776367,
-      "tp2": 37.439998626708984,
-      "tp3": 36.459999084472656,
+      "tor_grund": "",
+      "tp1": 43.68000030517578,
+      "tp2": 44.739999771118164,
+      "tp3": 47.55499458312988,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-24T15:55:08.590619+00:00",
-      "zustand": "invalidiert"
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "ONDOUSD": {
       "aufgenommen": "2026-11-20T17:09:22.152293+00:00",
@@ -4113,7 +4109,7 @@
     },
     "PAXGUSD": {
       "aufgenommen": "2026-11-27T10:52:27.149602+00:00",
-      "ausstiegskurs": null,
+      "ausstiegskurs": 3619.3,
       "bestes_r": 0.04,
       "broker": "Bybit oder Kraken (PAXG)",
       "einstieg": 3656.36,
@@ -4163,7 +4159,7 @@
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss ueber 3.679,00 — nicht beim Antippen.",
       "umsatz_24h": null,
       "zuletzt": "2026-11-27T16:59:28.133192+00:00",
-      "zustand": "aktiv"
+      "zustand": "invalidiert"
     },
     "PENDLEUSD": {
       "aufgenommen": "2026-11-12T10:05:45.130529+00:00",
@@ -4279,7 +4275,7 @@
       "tp3": 153.125,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "PFE": {
@@ -4333,7 +4329,7 @@
       "tp3": 31.385004997253418,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "PG": {
@@ -4387,7 +4383,7 @@
       "tp3": 185.26496124267578,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "PLTR": {
@@ -4504,7 +4500,7 @@
       "tp3": 0.009509999999999998,
       "trigger": "Einstieg erst bei einem 4-Stunden-Schluss unter 0,01155 — nicht beim Antippen.",
       "umsatz_24h": 145729.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "PYPL": {
@@ -4604,7 +4600,7 @@
       "richtung": "short",
       "rr": 2.36,
       "rs": 39.9,
-      "schlechtestes_r": -0.59,
+      "schlechtestes_r": -0.7,
       "schutz": null,
       "score": 53.0,
       "setup": "",
@@ -4616,7 +4612,7 @@
       "tp3": 138.22002410888672,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "RENDERUSD": {
@@ -4733,62 +4729,62 @@
       "tp3": 205.6199951171875,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "SBUX": {
-      "aufgenommen": "2026-11-19T20:08:14.322588+00:00",
+      "aufgenommen": "2026-11-27T17:08:59.798207+00:00",
       "ausstiegskurs": null,
       "bestes_r": 0.0,
       "broker": "Trade Republic",
-      "einstieg": 102.22000122070312,
-      "einstieg_art": "Ruecklauf in FVG H4",
+      "einstieg": 105.06999969482422,
+      "einstieg_art": "Ruecklauf in FVG H1",
       "einstiegskurs": null,
       "erreicht": [],
-      "erwartet_pct": 8.11,
-      "eurusd": 1.0993,
+      "erwartet_pct": 7.99,
+      "eurusd": 1.097,
       "gemeldet": "",
       "instrument": "SBUX",
       "klasse": "aktien",
       "kontext": {
-        "angst_gier": 10.0,
-        "atr_pct": 2.662,
-        "bewegung_atr": 0.67,
-        "bewegung_pct": 1.39,
-        "btc_funding_jahr_pct": 6.35,
-        "confidence": 0.33,
+        "angst_gier": 12.0,
+        "atr_pct": 2.876,
+        "bewegung_atr": 1.15,
+        "bewegung_pct": 2.42,
+        "btc_funding_jahr_pct": -10.41,
+        "confidence": 0.179,
         "makro_regime": "risk_off",
-        "n_warnungen": 2,
-        "qualitaet": "sauber",
-        "r21": 9.8017,
-        "r63": 4.9236,
+        "n_warnungen": 3,
+        "qualitaet": null,
+        "r21": 4.5613,
+        "r63": 0.4475,
         "sektor_rang": null,
         "sektor_von": null,
         "termin_sperre": false,
         "zahlen_in_tagen": null
       },
       "name": "Starbucks",
-      "note": "A",
+      "note": "B+",
       "raus": false,
       "raus_erreicht": null,
       "raus_kurs": null,
       "richtung": "long",
       "rr": 2.0,
-      "rs": 87.0,
+      "rs": 68.8,
       "schlechtestes_r": 0.0,
       "schutz": null,
-      "score": 66.2,
-      "setup": "Ruecksetzer im Trend",
-      "stop": 101.21185552354265,
-      "these": "Aufwaertstrend steht, der Kurs macht Pause. Gehandelt wird die Pause, nicht der Ausbruch — deshalb liegt der Stop hinter dem letzten Strukturpunkt und nicht knapp unter dem Kurs.",
+      "score": 57.4,
+      "setup": "",
+      "stop": 103.3499984741211,
+      "these": "",
       "tor_grund": "",
-      "tp1": 103.2281469178636,
-      "tp2": 104.23629261502407,
-      "tp3": 107.05000305175781,
-      "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
+      "tp1": 106.79000091552734,
+      "tp2": 108.51000213623047,
+      "tp3": 111.62999725341797,
+      "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-20T19:56:36.863049+00:00",
-      "zustand": "invalidiert"
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
+      "zustand": "wartet_auf_einstieg"
     },
     "SHOP": {
       "aufgenommen": "2026-11-20T20:08:54.569998+00:00",
@@ -4895,7 +4891,7 @@
       "tp3": 0.002857,
       "trigger": "Der Kurs muss unter 0,00383800 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 190400.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "SLB": {
@@ -5009,7 +5005,7 @@
       "tp3": 233.06495666503906,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "SOLUSD": {
@@ -5225,7 +5221,7 @@
       "tp3": 0.12335000000000002,
       "trigger": "Der Kurs muss unter 0,15970 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 184094.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "TAOUSD": {
@@ -5279,7 +5275,7 @@
       "tp3": 217.69609999999994,
       "trigger": "",
       "umsatz_24h": 2733960.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "TIAUSD": {
@@ -5333,7 +5329,7 @@
       "tp3": 0.2775,
       "trigger": "Der Kurs muss unter 0,35730 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": 283088.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "TMO": {
@@ -5495,7 +5491,7 @@
       "tp3": 56.09750747680664,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "UNH": {
@@ -5657,7 +5653,7 @@
       "tp3": 123.19749450683594,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "V": {
@@ -5711,7 +5707,7 @@
       "tp3": 459.87046813964844,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "VETUSD": {
@@ -5819,7 +5815,7 @@
       "tp3": 591.5289311466083,
       "trigger": "",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "wartet_auf_einstieg"
     },
     "VZ": {
@@ -5988,7 +5984,7 @@
       "tp3": 141.671306544726,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die ueber ihrer Vorgaengerin schliesst.",
       "umsatz_24h": null,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "XMRUSD": {
@@ -6217,7 +6213,7 @@
     },
     "XYZ": {
       "aufgenommen": "2026-11-19T18:54:35.669348+00:00",
-      "ausstiegskurs": null,
+      "ausstiegskurs": 78.19000244140625,
       "bestes_r": 0.09,
       "broker": "Trade Republic",
       "einstieg": 77.5999984741211,
@@ -6267,7 +6263,7 @@
       "trigger": "Der Kurs muss unter 88,42 bleiben. Steigt er wieder darueber, ist die Idee erledigt.",
       "umsatz_24h": null,
       "zuletzt": "2026-11-27T16:59:28.133192+00:00",
-      "zustand": "aktiv"
+      "zustand": "invalidiert"
     },
     "ZECUSD": {
       "aufgenommen": "2026-11-26T10:49:51.864555+00:00",
@@ -6324,7 +6320,7 @@
       "tp3": 590.63,
       "trigger": "Einstieg erst, wenn der Kurs in der Zone dreht — eine 4-Stunden-Kerze, die unter ihrer Vorgaengerin schliesst.",
       "umsatz_24h": 65234716.0,
-      "zuletzt": "2026-11-27T16:59:28.133192+00:00",
+      "zuletzt": "2026-11-27T17:08:59.798207+00:00",
       "zustand": "aktiv"
     },
     "ZEREBROUSD": {
